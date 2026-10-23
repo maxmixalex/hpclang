@@ -496,6 +496,9 @@ Current delivery checkpoints:
   has its own fresh-boot suite, sharing native installation setup while retaining
   all registration/activation/RAM-loss checks in the registration suite. The
   two-model CI matrix adds retirement with the existing 30-minute job limit.
+  Pre-submit review corrected the new matrix entry indentation (`bf11d170`);
+  YAML parsing verifies all sixteen jobs and the unchanged timeout, and
+  actionlint passes the runtime workflow.
   A separate clean ARM build and both full registration regressions pass
   (HP50g 948.8 seconds; HP49g+ 965.3 seconds), including creation/cancellation,
   activation cuts and complete RAM-loss recovery. Both fresh retirement suites exposed a caller
