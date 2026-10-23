@@ -488,8 +488,18 @@ Current delivery checkpoints:
   and instruction read failures. Sanitized catalog-movement integration verifies
   consumed-root updates, unchanged unconsumed values and separate absolute-call
   operand repair. ARMv4T compilation, ARM static analysis and pinned formatting
-  pass. Calculator-side acceptance and complete execution coverage remain open;
-  this does not authorize general library relocation or reclamation.
+  pass. All six launchers rebuild. HP49g+/HP50g baseline catalog-growth and
+  independent post-call-marker regressions pass with unchanged Flash. Controlled
+  native GOSUB fixtures also pass on both models: a caller-provided rooted string
+  holds the short call/return path, selected by a private test stage, and the
+  original interpreter reaches the post-call marker after catalog growth. The
+  original RTNCC continuation is preserved; the first fixture incorrectly required
+  RTN and failed before the marker. Exact payload and Flash checks pass after that
+  fixture correction. An old-selector control on each model refuses before moving
+  the catalog, returns normally and leaves library 123 unregistered. This isolates
+  the new discovery behavior. GOSUBL/GOSBVL calculator-side acceptance, maintained
+  native coverage and complete execution coverage remain open; this does not
+  authorize general library relocation or reclamation.
 - **Post-recovery resource replacement (locally verified, submitted; CI pending):**
   after actual native recovery, Stock STO creates a new user string under the
   former reservation name. The native closure API rejects it before programming;
