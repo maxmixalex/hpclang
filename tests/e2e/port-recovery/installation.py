@@ -320,7 +320,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     from startup import run_port1_inventory, verify_startup
     from staging import run_staging
     from abort import run_abort
-    from creation import run_creation_publication, run_creation_visibility
+    from creation import run_creation_abort, run_creation_publication, run_creation_visibility
 
     root = args.output / "installation"
     root.mkdir()
@@ -462,6 +462,16 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
 
     run_creation_publication(
         args, before, root, slot, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
+    run_creation_abort(
+        args,
+        before,
+        root,
+        slot,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
     )
     run_publication(
         args,

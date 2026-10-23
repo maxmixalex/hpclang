@@ -508,6 +508,13 @@ phase byte. INTENT, unknown phases and changed records reject without writes;
 an occupied adjacent allocation is preserved. Failed or unconfirmed programming
 retains ownership and permits a same-owned retry. This primitive does not inspect
 RAM, authorize its removal, reconstruct ownership after reset or reclaim Flash.
+The combined native cancellation witness exercises fresh INTENT/CREATED and
+transaction staging before cancellation, releases only its original untouched
+reservation, then closes the claim and repeats that closure without programming.
+Its oracle requires exact Flash contents, a consumed receipt, absence of the
+released variable, preservation of unrelated HOME data and the catalog, normal
+Stock return and unchanged closed records on restart. This tests same-invocation
+cleanup; it does not reconstruct the receipt across a native return or reset.
 The internal packager accepts optional `--creation-claim-slot` for a guarded
 admission ELF with a sealed identity. It patches only the aligned initialized
 `hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and

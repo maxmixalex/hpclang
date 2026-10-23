@@ -146,3 +146,77 @@ def run_creation_visibility(args, before, root, slot, *, emulator, completed, ve
     )
     require(verify_busy_reads(args, phase) == 0, "Creation-claim visibility probe wrote Flash")
     print("Five creation-claim phases remain invisible to Stock after restart", flush=True)
+
+
+def run_creation_abort(
+    args, before, root, slot, *, transfer, emulator, completed, verify_busy_reads
+):
+    from installation import AUTHORITY_SLOT, JOURNAL_SLOT, verify_probe
+    from reservation import require_absent
+    from staging import staged_flash
+
+    expected = bytearray(staged_flash(before))
+    claim = 0x1E0105
+    require(free_tail(expected, 0x1E0000) == claim, "Creation closure tail is occupied")
+    binding = reservation_value((before / "flash").read_bytes(), slot)[:80]
+    expected[claim : claim + 240] = creation_record(binding, b"HPCLEASE", claim, 0)
+    for address, size in ((JOURNAL_SLOT, 4124), (AUTHORITY_SLOT, 32)):
+        expected[address : address + 4] = b"\0" + (2 * size - 2).to_bytes(3, "little")
+    phase = root / "creation-abort"
+    image = "installation-creation-abort"
+    transfer(
+        args,
+        phase,
+        before,
+        args.build,
+        "CLOSECLAIM",
+        package_name=image + ".hp",
+        remote_commands=[
+            "-95 CF HOME CLEAR \"unrelated data\" 'HPCKEEP' STO",
+            "'CLOSECLAIM' RCL 'CLOSECLAIM' PURGE",
+        ],
+    )
+    after = phase / "state"
+    base = verify_probe(
+        before, after, args.build, args.nm, 0, slot, image=image, expected_flash=expected
+    )
+    symbols = symbol_offsets(args.build / (image + ".elf"), args.nm)
+    ram = (after / "sram").read_bytes()
+    creation = struct.unpack_from("<5I", ram, base + symbols["creation_result"])
+    staging = struct.unpack_from("<2I", ram, base + symbols["creation_stage_result"])
+    closed = struct.unpack_from("<3I", ram, base + symbols["creation_close_result"])
+    removed = struct.unpack_from("<12I", ram, base + symbols["publication_result"])
+    require(creation[:4] == (0xFFFFFFFC, 0, 0, 0), "Closure omitted fresh creation receipt")
+    require(staging == (0, 0) and closed == (0, 0, 0), "Creation closure or repeat failed")
+    require(removed[2:4] == (0, 0) and removed[5:7] == (0, 0), "Release did not consume receipt")
+    require(
+        removed[4] > creation[4] and verify_busy_reads(args, phase) == removed[4],
+        "Creation closure Flash operation accounting differs",
+    )
+
+    def verify_closed(state):
+        require_stock_pc(state)
+        require((state / "flash").read_bytes() == expected, "Closed records changed")
+        read, original = reader(state), reader(before)
+        require_absent(read, b"HPCLEASE")
+        require(home_string(read, b"HPCKEEP") == b"unrelated data", "Closure changed user data")
+        count = original(0x8611D, 3)
+        require(
+            read(0x8611D, 3) == count
+            and all(
+                read(0x86120 + 16 * i, 16) == original(0x86120 + 16 * i, 16) for i in range(count)
+            ),
+            "Creation closure changed the native catalog",
+        )
+
+    verify_closed(after)
+    restart = root / "creation-abort-restart"
+    restart.mkdir()
+    shutil.copytree(after, restart / "state")
+    with emulator(
+        args, restart, "10000 capture home\n12000 finish-install\n", ["--reset"], flash_busy=True
+    ) as child:
+        completed(child, 90)
+    verify_closed(restart / "state")
+    require(verify_busy_reads(args, restart) == 0, "Closed claim programmed Flash after restart")
+    print("Fresh creation cancelled, resource released and claim closed across restart", flush=True)

@@ -107,6 +107,9 @@ static unsigned publication_calls, cut_at;
 static uint8_t creation_intent[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES];
 volatile uint32_t creation_result[5];
 volatile uint32_t creation_stage_result[2];
+#ifdef HPCLANG_INSTALLATION_ABORT
+volatile uint32_t creation_close_result[3];
+#endif
 #endif
 unsigned short hpclang_flash_read16(void *, unsigned);
 void hpclang_flash_write16(void *, unsigned, unsigned short);
@@ -370,6 +373,7 @@ static void abort_owned(const uint32_t *map, const struct hpclang_rpl_flash_io *
         reservation_failed();
     struct hpclang_rpl_flash_io io = *reader;
     io.program16 = program_publication;
+#ifndef HPCLANG_INSTALLATION_CREATION
     publication_result[0] = hpclang_rpl_flash_publish_sector(
         &io, EXPECTED_JOURNAL_SLOT, planned_journal, sizeof planned_journal);
     publication_result[1] =
@@ -377,6 +381,7 @@ static void abort_owned(const uint32_t *map, const struct hpclang_rpl_flash_io *
                                           planned_journal, sizeof planned_journal);
     if (publication_result[0] || publication_result[1])
         reservation_failed();
+#endif
     publication_result[2] = hpclang_rpl_flash_cancel_installed(&io, layout, catalog);
     if (publication_result[2])
         reservation_failed();
@@ -386,6 +391,21 @@ static void abort_owned(const uint32_t *map, const struct hpclang_rpl_flash_io *
     publication_result[4] = publication_calls;
     publication_result[5] = created_reservation.object;
     publication_result[6] = created_reservation.capacity;
+#ifdef HPCLANG_INSTALLATION_CREATION
+    /* The original receipt has just been consumed, with no Stock return or
+     * other writer between creation and removal. Only now close the claim. */
+    creation_close_result[0] = hpclang_rpl_flash_close_creation(&io, CREATION_SLOT, creation_intent,
+                                                                sizeof creation_intent);
+    if (creation_close_result[0])
+        reservation_failed();
+    unsigned count = publication_calls;
+    creation_close_result[1] = hpclang_rpl_flash_close_creation(&io, CREATION_SLOT, creation_intent,
+                                                                sizeof creation_intent);
+    creation_close_result[2] = publication_calls - count;
+    if (creation_close_result[1] || creation_close_result[2])
+        reservation_failed();
+    publication_result[4] = publication_calls;
+#endif
 }
 #endif
 
@@ -396,12 +416,14 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
         expected_library, planned_library_bytes, EXPECTED_RECOVERY_BINDING,
         EXPECTED_ADMISSION_BINDING};
     struct hpclang_rpl_flash_installed_recovery planned;
+#if !defined(HPCLANG_INSTALLATION_CREATION) || !defined(HPCLANG_INSTALLATION_ABORT)
     if (hpclang_rpl_flash_preflight_installed(io, &layout, catalog, checked_transaction,
                                               sizeof checked_transaction, &planned) == 0) {
         *slot = planned.library_slot;
         publication_result[10] = 1;
         return 0;
     }
+#endif
     /* The intended target is unchanged. Capture it once before any writes;
      * the host oracle independently compares every resulting Flash byte. */
     for (uint32_t i = 0; i < sizeof planned_image; i += 2) {
@@ -447,6 +469,9 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
 #ifdef HPCLANG_INSTALLATION_CREATION
     complete_creation(map, io);
     stage_created_transaction(io);
+#ifdef HPCLANG_INSTALLATION_ABORT
+    abort_owned(map, io, &layout, catalog);
+#endif
     *slot = planned.library_slot;
     return 0;
 #endif

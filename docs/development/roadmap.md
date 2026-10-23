@@ -427,9 +427,23 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Latest submission: `af3e2a2e` includes the five local implementation commits since
 `50eadbea`, including the missing creation-layout CI artifact fix. Local acceptance
-is recorded below; new CI has not been polled and M8.0 remains open.
+is recorded below. One later check finds Quality 39886905107 and Objects
+39886905191 successful, Core 39886905229 running and Runtime 39886905212 queued.
+No repeated polling; CI acceptance and M8.0 remain open.
 
 Current delivery checkpoints:
+- **Native creation cancellation (locally verified; not yet submitted):** a maintained
+  combined witness publishes INTENT, creates RAM, commits CREATED, stages the
+  transaction, cancels it, discards its original fresh reservation and closes the
+  claim under the same invocation. Repeat closure must not write. Its independent
+  oracle checks full Flash, consumed receipt, resource absence, unrelated HOME,
+  execution guards/Stock return and unchanged closed records after restart.
+  The fresh-cancellation path deliberately omits the unrelated already-armed
+  success shortcut. ARM packaging passes within the unchanged loader limit;
+  87 Python tests, Ruff, pinned formatting and strict docs pass. HP49g+ and HP50g
+  both pass the complete cancellation/release/closure/repeat and restart oracle.
+  This is lifecycle fixture integration, not real-root installation ownership
+  reconstruction.
 - **Creation-claim closure (locally verified; not yet submitted):** the final record primitive
   compares the original INTENT's immutable bytes, accepts only CREATED/partial
   CLOSING/CLOSED, and clears the phase without touching adjacent allocations.
@@ -438,8 +452,9 @@ Current delivery checkpoints:
   and packaging pass. Host tests cover all phases, each immutable-byte corruption,
   every read cut, partial/failed/lost-ack writes and silent programming failure;
   the full installation ASan/UBSan suite passes, followed by focused sanitizer
-  acceptance of the additional silent-write and invalid-original cases. Native
-  lifecycle integration remains pending; this does not grant release permission.
+  acceptance of the additional silent-write and invalid-original cases. The native
+  lifecycle fixture above now passes; real-root cleanup/ownership integration
+  remains open, and this primitive does not grant release permission.
 - **Real-root resource creation (locally verified; submitted in `af3e2a2e`, CI pending):** after the durable
   INTENT, the real installation witness creates the bound 32 KiB HOME string in
   the same exclusive invocation, retaining the original creation receipt and
