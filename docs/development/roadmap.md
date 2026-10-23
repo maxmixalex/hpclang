@@ -419,6 +419,14 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Current UI submission: `64d223d9` is pushed on `m8-flash-write` after local
+acceptance of timing checkpoints, launcher memory reports, minimum-RW admission
+and the installed C example budget. Timing passes all six Direct/Stock models;
+minimum-RW admission passes all six Direct models at the exact required pool
+and focused HP39g+/HP50g Stock. Installed SDK relocation and all three HP39
+Aplet families pass. New CI is submitted and is not polled. Whole-system
+resource accounting and the other M8.2/M8.3 acceptance criteria remain open.
+
 Execution discipline: read this roadmap and remote issue #1 before selecting work;
 reconcile implementation, branch and verification evidence, then update both when
 results or scope facts change. The 2026-10-23 sequencing decision below now governs current work. Port 2 recovery
@@ -491,8 +499,8 @@ The first instrumented UI artifact requires 30 pool pages for its complete
 36 KiB RW ceiling, or 32 on HP39 Stock. Stored objects, transfer staging, native
 allocator policy/overhead and separate LCD DMA allocations remain excluded.
 The report-only change produces byte-identical six-model launchers. Whole-app
-admission and actual Stock reservation reduction remain open. No new CI submission
-or M8.2/M8.3 completion is claimed.
+admission and actual Stock reservation reduction remain open. This is included
+in the current UI submission above; M8.2/M8.3 completion is not claimed.
 Accepted repair (2026-10-23): `5959159a` on `m8-flash-write` includes safe
 admission folding, maintained copy-size preflight and the four preceding
 startup-evidence commits. Local dual-model recovery, the separate size-check
