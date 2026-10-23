@@ -449,13 +449,13 @@ forever for the second post-PASS report: the existing return monitor has already
 taken over after the first report. The captured PC is the report-timeout loop;
 checkpoint ID 2 is absent. The old remaining Stock queue was intentionally
 terminated after this confirmed defect, not restarted because of elapsed time.
-The local fix publishes timing checkpoint ID 2 before PASS and retains the single
+Local fix `3425073b` publishes timing checkpoint ID 2 before PASS and retains the single
 post-cleanup memory checkpoint ID 1. Strict return checks are unchanged. A fresh
 six-model Direct matrix passes in separate v2 output directories, including
 timing, pixels, memory and return; the fresh Stock matrix is still running.
 The changed UI sources pass ARM analysis and pinned formatting; report verifier tests pass.
 
-A separate launcher-memory report now accounts for code, RW minimum/ceiling,
+Local `a1aae4e8` adds a launcher-memory report that accounts for code, RW minimum/ceiling,
 linked stage, stage stack, MMU workspace and HP39 Stock's native workspace.
 CMake regenerates a deleted report. Seven host tests and the relocated installed
 SDK C/C++/font/six-model packaging checks pass, including missing-report rebuild.
