@@ -245,10 +245,13 @@ result, check it, then `swap()` it into the old owner. Calling `reset()` with a
 failed null result would close the old handle. Local scopes clean up on normal
 return; explicitly reset owners before `exit()` or `_Exit()` if they must close
 before termination.
-Release such resources before calling it. Global-object destruction follows
-the runtime's ordinary exit handling.
+Global-object destruction follows the runtime's ordinary exit handling.
 
 ## Migrate HPGCC source
+
+See the [migration guide](migration.md) for per-interface decisions, precision,
+ownership, text encodings and an application acceptance checklist. This guide
+is also installed beside this page in the SDK.
 
 Compatibility is provided by installed headers **and runtime implementations**.
 For supported calls, keep the historical include spelling and function calls;

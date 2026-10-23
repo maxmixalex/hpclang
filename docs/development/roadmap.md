@@ -4288,6 +4288,18 @@ below are retained.
 
 #### M8.5 — Modern C++ and migration
 
+The installed SDK now includes `docs/migration.md`, linked from Getting started
+and the documentation navigation. It maps supported adapter headers and retired
+raw interfaces to concrete services, explains exact versus approximate number
+exchange, byte text versus UTF-8, borrowed buffers and C/C++ ownership, bounded
+line input and model/context checks. It explicitly retains unfinished asynchronous
+sound and Port 2 recovery/reclamation requirements. The migration/tooling and
+public-convention acceptance items below remain open. This documentation slice
+is local; strict documentation, exact installed-file/link checks, and the
+relocated SDK gate pass (C/C++, fonts, HPC1, six-model launchers and all six
+model-specific Notebook builds). HP39 Aplet packaging was not repeated for this
+documentation-only slice; its earlier acceptance remains recorded above.
+
 Local implementation adds allocation-free C++ declaration/scope guards and
 movable ownership for offscreen surfaces. A shipped C++ counter uses the same
 C UI core; its actual view is also exercised by the UI E2E before the complete
