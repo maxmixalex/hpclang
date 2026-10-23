@@ -425,10 +425,14 @@ results or scope facts change. M8.0 remains the primary track. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
-Latest submission is `02e81749` on `m8-flash-write`: the registered native
-installation/activation, interruption and complete RAM-loss batch below passes
-both full local registration suites. New CI is not polled; CI acceptance is
-pending. Earlier checkpoint wording describes its state at that checkpoint.
+Submitted `02e81749` passes Quality (39903692796), Core runtime (39903692792,
+including all fourteen Stock port jobs), Objects (39903692845), Runtime
+(39903692814), Storage (39903692791) and Font Gallery (39903692794).
+PR #6 merges the registered native installation/activation, interruption and
+complete RAM-loss batch into main as `261dba7c`. Both full local registration
+suites also pass. The local retirement/claim-closure follow-up is excluded from
+that merge and its fresh-suite acceptance remains pending. New main CI is not
+polled. Earlier checkpoint wording describes its state at that checkpoint.
 
 Current batch through `92acb946` includes retryable claim closure, native combined
 cancellation, unregistered-root pair cancellation, complete real-root cleanup,
@@ -484,7 +488,8 @@ Current delivery checkpoints:
   all registration/activation/RAM-loss checks in the registration suite. The
   two-model CI matrix adds retirement with the existing 30-minute job limit.
   A separate clean ARM build passes; both full registration regressions are
-  running against that build. Both full fresh retirement suites are now running`n  against the same clean build; combined fresh-suite acceptance remains pending.
+  running against that build. Both full fresh retirement suites are now running
+  against the same clean build; combined fresh-suite acceptance remains pending.
 - **Retired claim closure (locally verified, not submitted):** a new
   internal operation revalidates the trusted installed transaction's retirement
   and requires the resource name to be absent from valid Stock HOME before
