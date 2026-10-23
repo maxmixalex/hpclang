@@ -182,6 +182,19 @@ endforeach()
                 raise AssertionError(f"{name}: expected an ARM ELF executable")
             if hpc[:4] != b"HPC1" or len(hpc) <= 64:
                 raise AssertionError(f"{name}: expected a packaged HPC1 application")
+            memory = json.loads((output / f"{name}-launchers/memory.json").read_text())
+            if (
+                memory["version"] != 1
+                or memory["page_bytes"] != 4096
+                or memory["application"]["image_bytes"] != len(hpc) - 16
+                or memory["application"]["static_bytes"] != int.from_bytes(hpc[12:16], "little")
+            ):
+                raise AssertionError(f"{name}: memory report does not describe the application")
+            ceiling = 36864 if name == "declarative_ui_cpp" else None
+            if memory["application"]["rw_ceiling_bytes"] != ceiling:
+                raise AssertionError(f"{name}: memory report lost its configured RW ceiling")
+            if len(memory["models"]) != 6 or not memory["excludes"]:
+                raise AssertionError(f"{name}: incomplete memory report scope")
             embedded = (output / f"{name}-launchers/objects/application.bin").read_bytes()
             restored = embedded
             if embedded[:4] == b"HPCZ":
@@ -217,7 +230,7 @@ endforeach()
                         if not (bundle / asset).stat().st_size:
                             raise AssertionError(f"missing Aplet companion: {asset}")
         # A missing declared output must be regenerated without touching source.
-        missing = [build / "hello_c-launchers/hp50g.hp"]
+        missing = [build / "hello_c-launchers/hp50g.hp", build / "hello_cpp-launchers/memory.json"]
         if args.aplet_tool:
             missing.append(build / "hello_cpp-aplet/hp39gs/HPCRESET.000")
         for path in missing:

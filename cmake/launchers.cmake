@@ -28,7 +28,7 @@ function(hpclang_target_launchers target)
     set(launcher_args_file "${CMAKE_CURRENT_BINARY_DIR}/${target}-launchers.args")
     file(GENERATE OUTPUT "${launcher_args_file}" CONTENT "${launcher_args_content}\n")
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${target}-launchers")
-    set(outputs)
+    set(outputs "${output}/memory.json")
     foreach(model IN LISTS launcher_MODELS)
         if(NOT HPCLANG_BUILD_MODEL STREQUAL "universal" AND
            NOT model STREQUAL HPCLANG_BUILD_MODEL)

@@ -443,21 +443,35 @@ was approved. Current implementation work resumes M8.2/M8.3 UI resource and
 update-cost acceptance; M8.0 requirements and the submitted recovery repair stay
 open. This explicitly supersedes the earlier restriction that other modules
 advance only during an external wait on the native-port track.
-Current UI follow-up (`bd1b0d56`, local, not pushed, 2026-10-23): checkpoint ID 2 exports observed
-frame/input maxima and sample counts alongside the unchanged memory report.
-The independent verifier requires nine timed updates and 34 key edges and rejects
-missing, malformed or saturated measurements. Direct/Stock launch scripts clear
-old JSON reports before each run. All six Direct models and HP50g Stock pass
-independent pixels, memory, timing observations and normal return; remaining
-Stock models are running. The complete universal ARM application/six launchers,
-report-verifier tests, ARM analysis, formatting and Ruff pass. These are sampled
-emulator costs, not physical deadlines or whole-application admission proof.
-No new M8.2/M8.3 completion or UI CI submission is claimed.
+Current UI follow-up (local, 2026-10-23): `bd1b0d56` is not accepted. Its six
+Direct models and HP50g Stock pass, but HP39g+ Stock reaches PASS and then waits
+forever for the second post-PASS report: the existing return monitor has already
+taken over after the first report. The captured PC is the report-timeout loop;
+checkpoint ID 2 is absent. The old remaining Stock queue was intentionally
+terminated after this confirmed defect, not restarted because of elapsed time.
+The local fix publishes timing checkpoint ID 2 before PASS and retains the single
+post-cleanup memory checkpoint ID 1. Strict return checks are unchanged. A fresh
+six-model Direct matrix passes in separate v2 output directories, including
+timing, pixels, memory and return; the fresh Stock matrix is still running.
+The changed UI sources pass ARM analysis and pinned formatting; report verifier tests pass.
+
+A separate launcher-memory report now accounts for code, RW minimum/ceiling,
+linked stage, stage stack, MMU workspace and HP39 Stock's native workspace.
+CMake regenerates a deleted report. Seven host tests and the relocated installed
+SDK C/C++/font/six-model packaging checks pass, including missing-report rebuild.
+The first instrumented UI artifact requires 30 pool pages for its complete
+36 KiB RW ceiling, or 32 on HP39 Stock. Stored objects, transfer staging, native
+allocator policy/overhead and separate LCD DMA allocations remain excluded.
+The report-only change produces byte-identical six-model launchers. Whole-app
+admission and actual Stock reservation reduction remain open. No new CI submission
+or M8.2/M8.3 completion is claimed.
 Submitted repair (2026-10-23): `5959159a` on `m8-flash-write` includes safe
 admission folding, maintained copy-size preflight and the four preceding
 startup-evidence commits. Local dual-model recovery, the separate size-check
 supplement, 93 Python tests, Ruff/format and strict docs pass. The batch is
-pushed for CI; new runs have not been polled. CI acceptance, merge and M8.0
+pushed for CI. After the independent UI work, a one-time check finds Quality
+39928737438 and Objects 39928737244 successful, Core 39928737294 in progress
+and Runtime 39928737278 queued. No repeated polling. CI acceptance, merge and M8.0
 completion are not claimed. The previous `3d1a665e` failure is historical
 submission evidence, not the result of this repair.
 The direct-call root-discovery follow-up and maintained native code-relocation

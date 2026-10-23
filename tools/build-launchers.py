@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -41,6 +42,67 @@ def run(*args: str | Path) -> str:
     if result.returncode:
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
     return result.stdout
+
+
+def memory_report(
+    payload: bytes, stage_size: int, stage_minimum_pages: int, models: list[str], limit: int | None
+) -> dict:
+    """Account for pool pages without claiming to size the native allocation."""
+    validate_rw_limit(payload, limit)
+    if type(stage_size) is not int or stage_size <= 0:
+        raise ValueError("invalid linked stage extent")
+    if type(stage_minimum_pages) is not int or not 1 < stage_minimum_pages <= MAX_RW_PAGES:
+        raise ValueError("invalid linked stage pool minimum")
+    image = int.from_bytes(payload[4:8], "little")
+    static = int.from_bytes(payload[12:16], "little")
+    if not image or len(payload) != 16 + image:
+        raise ValueError("HPC1 image size does not match its payload")
+    code_pages = (image + PAGE_BYTES - 1) // PAGE_BYTES
+    rw_minimum_pages = 1 + (static + PAGE_BYTES - 1) // PAGE_BYTES + STACK_BYTES // PAGE_BYTES
+    # The linked stage minimum already includes the live stage stack page.
+    # stage1 then adds a distinct L2 workspace, application code and RW pages.
+    fixed_pages = stage_minimum_pages + 1 + code_pages
+    return {
+        "version": 1,
+        "page_bytes": PAGE_BYTES,
+        "pool_capacity_pages": MAX_RW_PAGES,
+        "application": {
+            "image_bytes": image,
+            "code_pages": code_pages,
+            "static_bytes": static,
+            "boot_pages": 1,
+            "stack_bytes": STACK_BYTES,
+            "minimum_rw_pages": rw_minimum_pages,
+            "rw_ceiling_bytes": limit,
+        },
+        "launcher": {
+            "stage_extent_bytes": stage_size,
+            "stage_and_prefix_pages": stage_minimum_pages - 1,
+            "stage_stack_pages": 1,
+            "mmu_workspace_pages": 1,
+        },
+        "models": {
+            model: {
+                "stock_native_workspace_pages": 2 if MODELS[model] <= 3 else 0,
+                "minimum_direct_pool_pages": fixed_pages + rw_minimum_pages,
+                "minimum_stock_pool_pages": fixed_pages
+                + rw_minimum_pages
+                + (2 if MODELS[model] <= 3 else 0),
+                "direct_pool_pages_for_rw_ceiling": None
+                if limit is None
+                else fixed_pages + limit // PAGE_BYTES,
+                "stock_pool_pages_for_rw_ceiling": None
+                if limit is None
+                else fixed_pages + limit // PAGE_BYTES + (2 if MODELS[model] <= 3 else 0),
+            }
+            for model in models
+        },
+        "excludes": [
+            "native launcher allocation policy and allocator overhead",
+            "stored launcher/application objects and transfer staging",
+            "separately owned display DMA pages",
+        ],
+    }
 
 
 def build(
@@ -183,6 +245,8 @@ __hpc1_blob_end:
         if wrap:
             # Use the same native object envelope as repository execution tests.
             run(sys.executable, root / "tools/armtoolbox-wrap.py", binary, output / (model + ".hp"))
+    report = memory_report(original, stage_size, minimum_pool_pages, models, max_rw_bytes)
+    (output / "memory.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> None:

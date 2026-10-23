@@ -129,6 +129,21 @@ the application's mapped read/write arena and moves its stack top accordingly;
 it does not reduce the legacy launcher's Stock reservation or guarantee enough
 heap for a particular application. Omitting the option keeps all available pages.
 
+Each launcher directory also contains `memory.json`, a versioned build report.
+It separates the page-rounded application code, minimum RW layout (boot page,
+static data and reserved stack), linked startup stage, startup stack and MMU
+workspace. Per-model totals distinguish Direct from Stock: HP39 Stock retains
+two additional native workspace pages. With `MAX_RW_BYTES`, the report also
+calculates the pool needed to expose that complete ceiling; without it, those
+fields are null. Deleting the report causes CMake to regenerate it.
+
+These totals describe required pool geometry, not measured free memory or a
+change to Stock's allocation policy. The minimum RW layout does not promise
+application heap capacity. Native allocator overhead, stored launcher/payload
+objects, transfer staging and separately owned LCD DMA pages are excluded and
+listed in the report. A successful build does not prove that a particular
+calculator state has enough memory to launch.
+
 ## Own calculator objects in C++
 
 `<hpclang/object.hpp>` provides the C++17 `hpclang::owned_object` for independent
