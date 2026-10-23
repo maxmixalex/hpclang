@@ -837,6 +837,7 @@ def run_registered_activation(
     if retire_claim:
         from retirement import run_closed_restart, run_closure_cuts, run_retirement
 
+        record = (stored / "state/flash").read_bytes()[slot : slot + layout["record_bytes"]]
         retirement_ready = run_retirement(
             args,
             before,
@@ -845,7 +846,7 @@ def run_registered_activation(
             root,
             library,
             layout,
-            rebound,
+            record,
             slot,
             transfer=transfer,
             verify_busy_reads=verify_busy_reads,
@@ -860,7 +861,7 @@ def run_registered_activation(
             closure,
             library,
             layout,
-            rebound,
+            record,
             slot,
             transfer=transfer,
             verify_busy_reads=verify_busy_reads,

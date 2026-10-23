@@ -488,8 +488,13 @@ Current delivery checkpoints:
   all registration/activation/RAM-loss checks in the registration suite. The
   two-model CI matrix adds retirement with the existing 30-minute job limit.
   A separate clean ARM build passes; both full registration regressions are
-  running against that build. Both full fresh retirement suites are now running
-  against the same clean build; combined fresh-suite acceptance remains pending.
+  running against that build. Both fresh retirement suites exposed a caller
+  format mismatch: the integration passed the packaged library where the
+  retirement oracle requires its Flash allocation record. The caller now passes
+  the actual installed record, which must still match independent reconstruction
+  byte for byte. Five template unit tests and Ruff checks pass. Both failed runs
+  exited; corrected fresh suites are running with the same clean ARM build.
+  Combined fresh-suite acceptance remains pending.
 - **Retired claim closure (locally verified, not submitted):** a new
   internal operation revalidates the trusted installed transaction's retirement
   and requires the resource name to be absent from valid Stock HOME before

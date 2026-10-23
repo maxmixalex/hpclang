@@ -27,7 +27,7 @@ def run_retirement(
 ):
     """Bind the probe from the independently reconstructed installer output.
 
-    Never populate expected ownership from an arbitrary surviving claim. The
+    Never populate expected ownership from an arbitrary surviving claim.
     Neither classification nor claim closure may release RAM or reclaim Flash.
     """
     image = "installation-retirement-close" if close else "installation-retirement"
