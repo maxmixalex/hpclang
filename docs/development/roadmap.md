@@ -487,7 +487,7 @@ Current delivery checkpoints:
   and focused ASan/UBSan pass, including every read cut, all status bytes and
   partial/failed/lost-ack/silent programming. The full installation ASan/UBSan
   regression, pinned formatting and strict docs also pass. Real-root native
-  integration remains pending.
+  integration now passes in the real-root cleanup checkpoint above.
 - **Native creation cancellation (locally verified; CI acceptance pending):** a maintained
   combined witness publishes INTENT, creates RAM, commits CREATED, stages the
   transaction, cancels it, discards its original fresh reservation and closes the
@@ -509,8 +509,8 @@ Current delivery checkpoints:
   every read cut, partial/failed/lost-ack writes and silent programming failure;
   the full installation ASan/UBSan suite passes, followed by focused sanitizer
   acceptance of the additional silent-write and invalid-original cases. The native
-  lifecycle fixture above now passes; real-root cleanup/ownership integration
-  remains open, and this primitive does not grant release permission.
+  lifecycle fixture and real-root cleanup above now pass; post-reset ownership
+  integration remains open, and this primitive does not grant release permission.
 - **Real-root resource creation (locally verified; submitted in `af3e2a2e`, CI pending):** after the durable
   INTENT, the real installation witness creates the bound 32 KiB HOME string in
   the same exclusive invocation, retaining the original creation receipt and
