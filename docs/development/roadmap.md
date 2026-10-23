@@ -433,7 +433,9 @@ complete RAM-loss batch into main as `261dba7c`. Both full local registration
 suites also pass. The local retirement/claim-closure follow-up is excluded from
 that merge. Its fresh retirement suites and same-name replacement supplements
 now pass on both models. This retirement/claim-closure batch is submitted for
-CI; newly triggered runs are not polled and CI acceptance remains pending.
+CI. A later one-time check finds Quality 39911770977 successful; Core
+39911770972, Objects 39911770970 and Runtime 39911770971 are queued.
+CI acceptance remains pending; those queued runs are not repeatedly polled.
 Earlier checkpoint wording describes its state at that checkpoint.
 
 Current batch through `92acb946` includes retryable claim closure, native combined
@@ -497,9 +499,14 @@ Current delivery checkpoints:
   RTN and failed before the marker. Exact payload and Flash checks pass after that
   fixture correction. An old-selector control on each model refuses before moving
   the catalog, returns normally and leaves library 123 unregistered. This isolates
-  the new discovery behavior. GOSUBL/GOSBVL calculator-side acceptance, maintained
-  native coverage and complete execution coverage remain open; this does not
-  authorize general library relocation or reclamation.
+  the new discovery behavior. Additional controlled GOSUBL and GOSBVL fixtures
+  pass on both models with the same native marker, catalog and Flash checks.
+  The absolute-call oracle also checks the encoded target against the actual
+  retained fixture object and preserves the original return opcode. This gives
+  controlled native evidence for all three direct-call forms; it does not prove
+  arbitrary code provenance or hidden-address safety. Maintained native coverage
+  and complete execution coverage remain open; general relocation/reclamation
+  remains gated.
 - **Post-recovery resource replacement (locally verified, submitted; CI pending):**
   after actual native recovery, Stock STO creates a new user string under the
   former reservation name. The native closure API rejects it before programming;
