@@ -419,6 +419,18 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Local serialized-footprint follow-up (2026-10-23): memory.json now records
+actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
+bytes and native object nibbles, validating the native encoded extent. Raw-only
+builds report null wrapper sizes. The UI fixture is 56,296 B as standalone
+HPC1 and 39,478 B embedded; HP50g's transfer is 53,688 B containing a
+107,360-nibble native object. These nested representations must not be summed.
+All six raw and wrapped launchers remain byte-identical; raw-only reporting
+passes. The expanded relocated SDK size-accounting check and all three HP39
+C/C++ Aplet families pass, as do Ruff/format and strict docs.
+This records file/object geometry, not native overhead, HP39 Aplet containers
+or transfer/install peak memory; those resource requirements remain open.
+
 Local host-side pool observer (2026-10-23): optional Stock capture reads the
 existing boot/native state and original coarse table without changing guest
 code or storage. It checks descriptor/table agreement and distinct physical

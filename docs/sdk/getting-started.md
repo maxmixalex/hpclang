@@ -153,6 +153,17 @@ which is included in the per-model minimum pool totals; `minimum_rw_pages`
 still describes the ABI-only layout. Deleting the report causes CMake to
 regenerate it.
 
+The report's `serialized` section records actual output sizes: the standalone
+HPC1 file, the embedded payload (possibly compressed), and each model's raw
+launcher, wrapped transfer file and native object in nibbles. The object extent
+is checked against the wrapper's encoded size field; its eight-byte transfer
+header is excluded. Wrapper-dependent values are null for `--raw-only` builds.
+These are nested representations, not additive allocations: the wrapped file
+already contains the launcher and embedded payload, and launching it does not
+also require storing the standalone HPC1 file. HP39 Aplet envelopes, directory
+metadata, native allocation overhead and transfer/install temporary copies are
+not included in these serialized sizes.
+
 These totals describe required pool geometry, not measured free memory or a
 change to Stock's allocation policy. The minimum RW layout does not promise
 application heap capacity. Native allocator overhead, stored launcher/payload
