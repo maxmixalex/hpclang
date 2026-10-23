@@ -439,8 +439,12 @@ requires both records and stable geometry across cleanup. Host ASan/UBSan
 rejection tests, Python report tests, formatting and Ruff pass. The unmodified
 HP50g launcher passes UI pixels/reports/return and both pool observations:
 94 pages (376 KiB), 9 RW pages, with 64 pages outside stage/code/workspace/stack
-and the capped RW mapping. Other five Stock models run in sequence on exec
-session 49539 (PID 84275). The earlier instrumented HP39g+ experiment exits
+and the capped RW mapping. HP39g+ now also passes: 34 stage-pool pages plus
+two native-workspace pages (144 KiB total), 9 RW pages and 4 supplied pages
+beyond the linked layout. Both reports agree and all 36 physical pages are
+distinct. The design record contains the complete mapped-pool ledger for these
+two observed launches. The remaining four Stock models run in sequence on exec
+session 49539 (PID 84275), currently HP39gs. The earlier instrumented HP39g+ experiment exits
 successfully, but its final snapshot no longer contains the marker, so it
 provides no pool measurement. The new observer captures while the application
 is still mapped and is opt-in;

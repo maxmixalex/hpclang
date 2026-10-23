@@ -1310,7 +1310,26 @@ correct target identity, 36 KiB RW, valid unique physical pages and identical
 pool observations before PASS and after runtime cleanup. The ordinary UI
 pixel/memory/return checks still apply. Initial HP50g execution with the
 unmodified launcher records 94 distinct pages (376 KiB) and a 36 KiB RW arena.
-This measures the supplied mapped pool, not native allocator metadata,
+HP39g+ also passes the complete UI and return flow: 34 stage pages plus two
+native-workspace pages, with identical records before PASS and after cleanup.
+The linked layout and observed distinct pages give this pool ledger for the
+maintained UI acceptance artifact (all values in KiB):
+
+| Pool use | HP39g+ Stock | HP50g Stock |
+| --- | ---: | ---: |
+| Stage extent, alignment and original-table prefix | 20 | 20 |
+| Stage stack | 4 | 4 |
+| Application MMU workspace | 4 | 4 |
+| Application code | 56 | 56 |
+| Application RW, including heap-backed LCD buffers | 36 | 36 |
+| Native-call workspace | 8 | 0 |
+| Supplied pages beyond this layout | 16 | 256 |
+| Total distinct supplied pages | 144 | 376 |
+
+The application RW row includes its boot page, static data, heap and reserved
+8 KiB stack; these must not be added again. This is the acceptance fixture's
+linked image and observed calculator state, not every UI application's budget.
+It measures the supplied mapped pool, not native allocator metadata,
 installation storage or transfer-time peak usage. Other models remain under
 validation; the observer is opt-in rather than a completed six-model gate.
 
