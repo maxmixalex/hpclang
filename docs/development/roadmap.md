@@ -425,6 +425,12 @@ results or scope facts change. M8.0 remains the primary track. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
+The direct-call root-discovery follow-up and maintained native code-relocation
+acceptance are submitted together after local verification. Both models pass
+fresh standard Stock startup, all 88 existing native cases and three new direct
+call cases. Host sanitizers, ARM compilation/analysis, pinned formatting and
+strict docs pass. CI acceptance for this new batch remains pending; newly
+triggered workflows are not polled. This is not M8.0 completion.
 Submitted `02e81749` passes Quality (39903692796), Core runtime (39903692792,
 including all fourteen Stock port jobs), Objects (39903692845), Runtime
 (39903692814), Storage (39903692791) and Font Gallery (39903692794).
@@ -479,7 +485,7 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
-- **Direct-call execution roots (local follow-up, not submitted):** stage root
+- **Direct-call execution roots (locally verified, submitted; CI pending):** stage root
   discovery now follows GOSUB/GOSUBL/GOSBVL as well as the existing direct jumps
   and unconditional returns. A private eight-cell circular stack tracks generated
   return addresses and overwritten original cells; only original values actually
