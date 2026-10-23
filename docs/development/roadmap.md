@@ -498,9 +498,15 @@ Current delivery checkpoints:
   surviving RAM loss, rebuilt catalog and zero writes on the second reset.
   Both output snapshots use valid version-2 fractional phases with obsolete
   absolute anchors removed. Pinned formatting and Ruff pass. Complete fresh
-  registration suites, now including activation cuts and RAM loss, are running
-  on both models with the fixed emulator before submission. General startup
-  ordering and transaction reclamation remain open.
+  registration suites, including activation cuts and RAM loss, now pass on both
+  models with the fixed emulator: HP50g 942.2 seconds, HP49g+ 949.6 seconds.
+  Each records 25,429 root-storage operations, 2,082 creation/cancellation
+  operations, 2,077 activation operations and 1,923 damaged-sector recovery
+  operations. Uncommitted/committed activation cuts require zero/two recovery
+  writes; complete RAM loss requires 1,923, and repeated resets require zero.
+  Both process exits and result files confirm success. This is local acceptance;
+  CI acceptance remains pending. General startup ordering and transaction
+  reclamation remain open.
 - **Complete registered integration (locally verified):** both fresh-boot
   registration suites through `a2a13331` pass, taking 665/673 seconds on
   HP50g/HP49g+ respectively. Activation-cut coverage passes separately as below.
@@ -547,7 +553,7 @@ Current delivery checkpoints:
   A separate registration suite retains these growing integration cases without
   extending the existing creation job. Complete fresh-boot registration and
   creation suites through this checkpoint passed on both models, as recorded
-  above; the expanded registration suite remains in progress. This proves
+  above; the expanded registration suite also passes as recorded above. This proves
   the isolated native-created recovery path, not arbitrary startup ordering,
   claim reclamation or general reconstruction of ownership after interruption.
   Those remaining gates and M8.0 stay open.
