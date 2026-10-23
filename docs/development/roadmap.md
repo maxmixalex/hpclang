@@ -431,6 +431,13 @@ fresh standard Stock startup, all 88 existing native cases and three new direct
 call cases. Host sanitizers, ARM compilation/analysis, pinned formatting and
 strict docs pass. CI acceptance for this new batch remains pending; newly
 triggered workflows are not polled. This is not M8.0 completion.
+
+After the subsequent local startup investigation, a one-time check of `3d1a665e`
+finds Quality 39916501552, Objects 39916501560 and Storage 39916501477 successful;
+Font Gallery 39916501572 is running, Core 39916501547 and Runtime 39916501501
+are queued. No merge or repeated polling. The older `a728192f` Objects run
+39911770970 also succeeded, while its Core/Runtime runs ended cancelled;
+those cancellations are not acceptance evidence.
 Submitted `02e81749` passes Quality (39903692796), Core runtime (39903692792,
 including all fourteen Stock port jobs), Objects (39903692845), Runtime
 (39903692814), Storage (39903692791) and Font Gallery (39903692794).
@@ -1404,6 +1411,20 @@ fix is not submitted yet, so CI acceptance and M8.0 completion remain open.
   24,000 user-array elements and release the matching reservation. These remain
   research-only local fixtures using the experimental recovery installation;
   arbitrary library-header tears and supported early installation remain open.
+
+- **Library checksum rejection observed (local, 2026-10-23):** the scanner calls
+  `0x23a7b` before parsing a library header unless Saturn status bit 10 selects
+  the bypass path. The called routine checks the object prologue/length and
+  uses the Saturn CRC register. Separate clean/torn warm-start observers on both
+  models record the first library at `D0=0x40212` returning to `0x2397c`;
+  only the torn-title fixture proceeds to the rejection path at `0x2397f`.
+  This distinguishes checksum rejection from a merely successful final boot.
+  Both observed damaged runs subsequently restore exact authorized Flash,
+  catalog and empty-stack state, preserve 24,000 user-array elements and release
+  the matching reservation. The observation does not classify all callers of
+  the bypass path, prove that checksum reads stay inside a damaged allocation,
+  or make CRC a sufficient safety proof for arbitrary corruption. These remain
+  startup requirements; experimental ID 4 is not approved for production.
 
 - **Local pre-callback Flash access (historical watchpoint):** native read watchpoints on both models
   observe the original ARM library scanner reading physical `0x140100`, inside
