@@ -91,11 +91,6 @@ static int probe_mapped_read(void *ctx, uint32_t map, uint32_t at, uint8_t *out)
     struct hpclang_rpl_mutation_io *io = ctx;
     return map == 1 && io->read_nibble(io->context, at, out);
 }
-static int probe_mapped_write(void *ctx, uint32_t map, uint32_t at, uint8_t value)
-{
-    struct hpclang_rpl_mutation_io *io = ctx;
-    return map == 1 && io->write_nibble(io->context, at, value);
-}
 static int probe_node(struct live_probe *p, struct hpclang_rpl_reader *reader, uint32_t at,
                       uint32_t span)
 {
@@ -158,9 +153,9 @@ static int probe_register(void)
         }
         at -= size;
     }
-    struct hpclang_rpl_reference_writer writer = {{probe_mapped_read, &io}, probe_mapped_write};
+    const struct hpclang_rpl_reference_reader mapped = {probe_mapped_read, &io};
     result = 8;
-    if (hpclang_rpl_reference_edits_validate(&writer.reader, p->edits, p->builder.count))
+    if (hpclang_rpl_reference_edits_validate(&mapped, p->edits, p->builder.count))
         goto done;
     const struct hpclang_rpl_catalog_repairs repairs = {1, p->edits, p->builder.count, NULL, 0};
     /* After this boundary an error must halt the test, never return Stock. */
