@@ -37,27 +37,35 @@ unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uin
     if (!roots || !io || !io->read || !machine_stack || cursor >= 8u)
         return 0;
     unsigned count = 0;
-    /* Only returns and direct unconditional jumps preserve the known stack
-     * evolution here. Bound cycles without allocating a visited-address table. */
+    uint32_t stack[8];
+    for (unsigned i = 0; i < 8u; ++i)
+        stack[i] = machine_stack[i];
+    unsigned original = 255u;
+    /* Track call-generated continuations separately: a push overwrites that
+     * cell's original value, which must never be reported as a consumed root. */
     for (unsigned steps = 0; count < 8u && steps < 64u; ++steps) {
-        uint32_t *root =
-            hpclang_stage_immediate_return_root(io, continuation, machine_stack, cursor);
+        uint32_t *root = hpclang_stage_immediate_return_root(io, continuation, stack, cursor);
         if (root) {
-            roots[count++] = root;
-            continuation = *root;
             cursor = (cursor + 7u) & 7u;
+            if (original & (1u << cursor)) {
+                roots[count++] = machine_stack + cursor;
+                original &= ~(1u << cursor);
+            }
+            continuation = *root;
             continue;
         }
         uint8_t opcode;
         if (continuation > RPL_MAIN_END - 2u || !read_byte(io, continuation, &opcode))
             break;
-        unsigned prefix, width;
-        if ((opcode & 15u) == 6u) { /* GOTO: signed 12-bit offset from operand. */
+        unsigned prefix, width, call;
+        if ((opcode & 15u) == 6u || (opcode & 15u) == 7u) {
             prefix = 1;
             width = 3;
-        } else if (opcode == 0xc8u || opcode == 0xd8u) {
+            call = (opcode & 15u) == 7u;
+        } else if (opcode == 0xc8u || opcode == 0xd8u || opcode == 0xe8u || opcode == 0xf8u) {
             prefix = 2;
-            width = opcode == 0xc8u ? 4 : 5; /* GOLONG / GOVLNG. */
+            width = opcode == 0xc8u || opcode == 0xe8u ? 4 : 5;
+            call = opcode == 0xe8u || opcode == 0xf8u;
         } else {
             break;
         }
@@ -66,6 +74,12 @@ unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uin
             !io->read(io->context, continuation + prefix, width, &encoded) ||
             encoded >> (4u * width))
             break;
+        uint32_t next = (continuation + prefix + width) & 0xfffffu;
+        if (call) {
+            stack[cursor] = next;
+            original &= ~(1u << cursor);
+            cursor = (cursor + 1u) & 7u;
+        }
         if (width == 5u) {
             continuation = encoded;
         } else {
@@ -73,7 +87,8 @@ unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uin
             int32_t offset = (int32_t)encoded;
             if (encoded >= range / 2u)
                 offset -= (int32_t)range;
-            continuation = (uint32_t)((int32_t)(continuation + prefix) + offset) & 0xfffffu;
+            uint32_t base = call ? next : continuation + prefix;
+            continuation = (uint32_t)((int32_t)base + offset) & 0xfffffu;
         }
     }
     return count;

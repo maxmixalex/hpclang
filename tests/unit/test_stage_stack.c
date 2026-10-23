@@ -228,7 +228,7 @@ static void test_jump_return_chain(void)
         put(0x88000 + 8 * jumps, 0x10, 2);
         assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == (jumps == 63));
     }
-    /* Calls, conditionals and register jumps require separate state analysis. */
+    /* Calls to unclassified code, conditionals and register jumps stop discovery. */
     const uint32_t unsupported[] = {0x107, 0x10e8, 0x10f8, 0x14, 0x15, 0x2b18, 0x3b18};
     for (unsigned i = 0; i < sizeof unsupported / sizeof unsupported[0]; ++i) {
         setup();
@@ -247,8 +247,62 @@ static void test_jump_return_chain(void)
     }
 }
 
+static void test_call_return_chain(void)
+{
+    const struct hpclang_stage_stack_io io = {NULL, read_word, NULL};
+    for (unsigned kind = 0; kind < 2; ++kind) {
+        setup();
+        uint32_t stack[8] = {0}, *roots[8] = {0};
+        unsigned prefix = kind ? 2 : 1, width = kind ? 4 : 3;
+        uint32_t next = 0x90000 + prefix + width;
+        const int32_t offsets[] = {-(1 << (4 * width - 1)), -32, 32, (1 << (4 * width - 1)) - 1};
+        for (unsigned i = 0; i < sizeof offsets / sizeof offsets[0]; ++i) {
+            uint32_t target = next + offsets[i];
+            put(0x90000, kind ? 0xe8 : 7, prefix);
+            put(0x90000 + prefix, (uint32_t)offsets[i], width);
+            put(next, 0x10, 2);
+            put(target, 0x10, 2);
+            assert(hpclang_stage_return_roots(&io, 0x90000, stack, 0, roots) == 1);
+            assert(roots[0] == stack + 7 && !writes);
+            put(target, 0, 2);
+        }
+    }
+    for (unsigned kind = 0; kind < 3; ++kind)
+        for (unsigned cursor = 0; cursor < 8; ++cursor)
+            for (unsigned depth = 1; depth <= 9; ++depth) {
+                setup();
+                uint32_t stack[8], before[8], *roots[8] = {0};
+                unsigned prefix = kind ? 2 : 1;
+                unsigned width = kind == 0 ? 3 : kind == 1 ? 4 : 5;
+                for (unsigned i = 0; i < 8; ++i) {
+                    stack[i] = 0x89000 + 16 * i;
+                    put(stack[i], 0x10, 2);
+                }
+                memcpy(before, stack, sizeof stack);
+                for (unsigned i = 0; i < depth; ++i) {
+                    uint32_t at = 0x88000 + 64 * i;
+                    put(at, kind == 0 ? 7 : kind == 1 ? 0xe8 : 0xf8, prefix);
+                    put(at + prefix, kind == 2 ? at + 64 : 64 - prefix - width, width);
+                    put(at + prefix + width, 0x10, 2);
+                }
+                put(0x88000 + 64 * depth, 0x10, 2);
+                unsigned expected = depth < 8 ? 8 - depth : 0;
+                assert(hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots) == expected);
+                for (unsigned i = 0; i < 8; ++i)
+                    assert(roots[i] == (i < expected ? &stack[(cursor + 7 - i) & 7] : NULL));
+                assert(!memcmp(before, stack, sizeof stack) && !writes);
+                /* A fault in the first call cannot expose even a plausible old root. */
+                for (unsigned i = 0; i < prefix + width; ++i) {
+                    fault = 0x88000 + i;
+                    assert(!hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots));
+                    assert(!memcmp(before, stack, sizeof stack) && !writes);
+                }
+            }
+}
+
 int main(void)
 {
+    test_call_return_chain();
     test_jump_return_chain();
     test_immediate_return_root();
     test_return_chain();

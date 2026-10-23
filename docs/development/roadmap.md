@@ -477,6 +477,19 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
+- **Direct-call execution roots (local follow-up, not submitted):** stage root
+  discovery now follows GOSUB/GOSUBL/GOSBVL as well as the existing direct jumps
+  and unconditional returns. A private eight-cell circular stack tracks generated
+  return addresses and overwritten original cells; only original values actually
+  consumed by a return are reported, once each. The native stack is unchanged.
+  The existing 64-instruction/eight-root bound remains; conditional, computed
+  and unclassified paths still stop discovery. ASan/UBSan tests cover all stack
+  cursors, nested calls through circular overwrite, signed displacement limits
+  and instruction read failures. Sanitized catalog-movement integration verifies
+  consumed-root updates, unchanged unconsumed values and separate absolute-call
+  operand repair. ARMv4T compilation, ARM static analysis and pinned formatting
+  pass. Calculator-side acceptance and complete execution coverage remain open;
+  this does not authorize general library relocation or reclamation.
 - **Post-recovery resource replacement (locally verified, submitted; CI pending):**
   after actual native recovery, Stock STO creates a new user string under the
   former reservation name. The native closure API rejects it before programming;
