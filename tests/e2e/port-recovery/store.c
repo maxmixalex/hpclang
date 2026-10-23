@@ -9,10 +9,71 @@ __thread int errno;
 volatile uint32_t storage_result[2];
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
 #include "rpl-recovery-reservation.h"
+#include "rpl-stock-memory.h"
+#include "template.h"
 static uint8_t staged_image[HPCLANG_RPL_FLASH_SECTOR_BYTES];
 static uint8_t staged_journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
 static uint8_t staged_claim[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES];
-volatile uint32_t storage_stage_result[3];
+volatile uint32_t storage_stage_result[6];
+struct resource_snapshot_layout
+{
+    uint32_t kind, nibble_count, native_prologue;
+    uint8_t data[32768 + 5];
+};
+static struct hpclang_rpl_recovery_reservation resource_receipt;
+static uint32_t execution_first, execution_end;
+
+struct execution_check
+{
+    uint32_t first, end, matches;
+};
+
+static int execution_allocation(void *context, uint32_t first, uint32_t nibbles)
+{
+    struct execution_check *check = context;
+    if (first <= check->first && check->end - first <= nibbles)
+        ++check->matches;
+    return 0;
+}
+
+/* This witness mutates USEROB only. Its entire live image, including stack and
+ * snapshots, must belong to one stable TEMP allocation before Flash is touched.
+ * The native interpreter owns that allocation until this invocation returns. */
+void hpclang_installation_execution_capture(const struct hpclang_rpl_mutation_io *io,
+                                            const struct hpclang_rpl_stock_memory *memory,
+                                            uintptr_t first, uintptr_t end)
+{
+    execution_first = execution_end = 0;
+    if (first >= end || first < 0x08000000u || end > 0x08080000u)
+        return;
+    unsigned matches = 0;
+    struct execution_check check = {0};
+    for (unsigned i = 0; i < HPCLANG_RPL_MAIN_PAGES; ++i) {
+        uintptr_t page = memory->pages[i];
+        if (first < page || first - page >= 2048u)
+            continue;
+        ++matches;
+        check.first = 0x80000u + i * 4096u + 2u * (first - page);
+        check.end = check.first + 2u * (end - first);
+    }
+    if (matches != 1 || check.end > 0x100000u)
+        return;
+    for (uint32_t at = check.first; at < check.end;) {
+        uintptr_t physical = memory->pages[(at - 0x80000u) / 4096u] + (at & 4095u) / 2u;
+        if (physical != first + (at - check.first) / 2u)
+            return;
+        at = (at & ~4095u) + 4096u;
+    }
+    if (hpclang_rpl_mutation_visit_temp(io, execution_allocation, &check) || check.matches != 1)
+        return;
+    execution_first = check.first;
+    execution_end = check.end;
+}
+
+int hpclang_installation_execution_ready(void)
+{
+    return execution_first && execution_end;
+}
 #endif
 static uint32_t owned_first, owned_end;
 unsigned short hpclang_flash_read16(void *, unsigned);
@@ -67,13 +128,69 @@ int hpclang_installation_store(const struct hpclang_rpl_flash_io *source, const 
 }
 
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+static int resource_read(void *context, uint32_t at, uint8_t *value)
+{
+    return hpclang_rpl_stock_memory_read(context, at, value);
+}
+
+static int resource_write(void *context, uint32_t at, uint8_t value)
+{
+    return hpclang_rpl_stock_memory_write(context, at, value);
+}
+
+__attribute__((noinline)) static int
+create_resource(const uint32_t *map, const struct hpclang_rpl_flash_io *flash, uint32_t claim)
+{
+    /* The source copy is dead after sealing/storing prepared_library. Reuse its
+     * owned RAM instead of adding another 32 KiB to the native CODE object. */
+    struct resource_snapshot_layout *snapshot_storage = (void *)expected_library;
+    if (preparation_bytes < sizeof *snapshot_storage)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    struct hpclang_rpl_stock_memory memory;
+    const volatile uint32_t *l1 = (void *)0x07f00000u;
+    if (!hpclang_rpl_stock_memory_capture(&memory, map, l1[0x80]))
+        return HPCLANG_RPL_MUTATION_IO;
+    struct hpclang_rpl_mutation_io io = {.read_nibble = resource_read,
+                                         .write_nibble = resource_write,
+                                         .context = &memory,
+                                         .temp_limit = execution_first,
+                                         .user_limit = execution_end,
+                                         .library_table = 0x8611d};
+    snapshot_storage->kind = HPCLANG_OBJECT_STRING;
+    snapshot_storage->nibble_count = 10 + 2 * 32768;
+    snapshot_storage->native_prologue = 0x2a2c;
+    uint64_t header = 0x2a2cu | (uint64_t)(5 + 2 * 32768) << 20;
+    for (unsigned i = 0; i < 5; ++i)
+        snapshot_storage->data[i] = header >> (8 * i);
+    for (unsigned i = 0; i < 32768; ++i)
+        snapshot_storage->data[5 + i] = i < 80 ? staged_claim[20 + i] : (uint8_t)(i * 37 + 11);
+    const struct hpclang_object *snapshot = (const struct hpclang_object *)snapshot_storage;
+    int result = hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"HPCLEASE", 8,
+                                                         snapshot, &resource_receipt);
+    storage_stage_result[3] = result;
+    if (result)
+        return result;
+    const struct hpclang_rpl_reader reader = {resource_read, &memory};
+    result = hpclang_rpl_recovery_reservation_complete_creation(
+        flash, claim, staged_claim, sizeof staged_claim, &reader, snapshot, &resource_receipt);
+    storage_stage_result[4] = result;
+    if (result)
+        return result;
+    unsigned operations = storage_result[1];
+    result = hpclang_rpl_recovery_reservation_complete_creation(
+        flash, claim, staged_claim, sizeof staged_claim, &reader, snapshot, &resource_receipt);
+    storage_stage_result[5] = result;
+    return result ? result : storage_result[1] == operations ? 0 : HPCLANG_RPL_FLASH_DIRTY;
+}
+
 /* Same invocation and four-extent reservation as the successful root store.
  * Publish in planner order so a later allocation never hides behind an erased
  * marker. Name absence was checked before root storage. The durable intent
- * precedes any RAM creation; no RAM resource or activation is implied here. */
+ * precedes RAM creation and receipt-gated completion; authority stays unarmed. */
 int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
                                const struct hpclang_rpl_flash_recovery_space *space,
-                               uint32_t target, uint32_t claim, const uint8_t identity[48])
+                               uint32_t target, uint32_t claim, const uint8_t identity[48],
+                               const uint32_t *map)
 {
     for (uint32_t i = 0; i < sizeof staged_image; i += 2) {
         uint16_t word;
@@ -119,6 +236,8 @@ int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
                                                            sizeof staged_claim);
         storage_stage_result[2] = result;
     }
+    if (!result)
+        result = create_resource(map, &io, claim);
     if (result)
         for (;;)
             __asm__ volatile("nop"); /* Retain this partially published installation. */

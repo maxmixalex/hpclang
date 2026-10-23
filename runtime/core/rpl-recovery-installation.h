@@ -65,6 +65,20 @@ int hpclang_rpl_recovery_installation_prepare_creation(
     const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *staging,
     uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim_slot);
 
+/* Explicit mutable-buffer preparation with identical placement/sealing checks.
+ * owned must equal layout->record exactly; partial overlap or a separate buffer
+ * is rejected. Caller exclusively owns writable storage of at least capacity
+ * bytes and retains the trusted layout separately. No heap or Flash writes.
+ * On failure the owned template may have been modified and must be discarded;
+ * space/claim_slot change only on success. Existing copying APIs still reject
+ * all aliasing. This neither publishes records nor proves restart ownership. */
+int hpclang_rpl_recovery_installation_prepare_creation_in_place(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    uint32_t identity_nibble, uint32_t claim_nibble,
+    const struct hpclang_rpl_recovery_port_view ports[2],
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *owned,
+    uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim_slot);
+
 /* Resolve a unique live library/catalog binding and compare its complete
  * content with the descriptor in the trusted executing admission image.
  * Read-only; no heap; output changes only on success (0). Other results use

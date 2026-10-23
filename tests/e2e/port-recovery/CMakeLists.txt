@@ -178,7 +178,8 @@ foreach(witness IN LISTS installation_witnesses)
         if(witness MATCHES "^installation-template-creation")
             set(template template-creation)
             target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TEMPLATE_CREATION)
-            target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-reservation.c")
+            target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-reservation.c"
+                "${CORE}/object-snapshot.c")
         endif()
         add_dependencies(${witness} recovery-${template}-data)
         target_sources(${witness} PRIVATE template.c "${CMAKE_CURRENT_BINARY_DIR}/${template}-data.c"
@@ -244,7 +245,13 @@ foreach(witness IN LISTS installation_witnesses)
     endif()
     configure_recovery_image(${witness})
     target_include_directories(${witness} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-    target_compile_definitions(${witness} PRIVATE HPCLANG_PREDICATE_STACK_BYTES=4096)
+    if(witness STREQUAL "installation-template-creation-store")
+        # Integrated preparation and native resource creation have a deeper call
+        # chain than the individual installation predicates. Retain both guards.
+        target_compile_definitions(${witness} PRIVATE HPCLANG_PREDICATE_STACK_BYTES=8192)
+    else()
+        target_compile_definitions(${witness} PRIVATE HPCLANG_PREDICATE_STACK_BYTES=4096)
+    endif()
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${witness}.hp"
             "${CMAKE_CURRENT_BINARY_DIR}/${witness}.bin"
         COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-recovery.py"

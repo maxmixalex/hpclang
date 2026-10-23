@@ -12,6 +12,7 @@ enum
 static uint8_t flash[END - FIRST], before[END - FIRST], catalog_data[160];
 static uint32_t fail_address;
 static const uint8_t *fail_after_staging;
+static uint8_t fail_after_staging_expected = 0xa5;
 static unsigned programs, fail_program;
 static uint16_t partial_program_mask;
 static int program_flash(void *context, uint32_t at, uint16_t value)
@@ -33,7 +34,8 @@ static int program_flash(void *context, uint32_t at, uint16_t value)
 static int read_flash(void *context, uint32_t at, uint16_t *value)
 {
     assert(context == flash && !(at & 1) && at >= FIRST && at + 1 < END);
-    if (at == fail_address || (fail_after_staging && *fail_after_staging != 0xa5))
+    if (at == fail_address ||
+        (fail_after_staging && *fail_after_staging != fail_after_staging_expected))
         return 0;
     *value = flash[at - FIRST] | (uint16_t)flash[at - FIRST + 1] << 8;
     return 1;
@@ -548,6 +550,72 @@ static void creation_preparation_tests(const struct hpclang_rpl_flash_io *io,
     }
 }
 
+static void in_place_creation_tests(const struct hpclang_rpl_flash_io *io,
+                                    const struct hpclang_rpl_flash_catalog *catalog)
+{
+    uint8_t storage[sizeof creation_original + 16], original[sizeof creation_original];
+    uint8_t separate[sizeof creation_original];
+    uint8_t *owned = storage + 8;
+    struct ram_port ram = {.fail = UINT32_MAX};
+    const struct hpclang_rpl_reader empty = {read_port, &ram};
+    const struct hpclang_rpl_recovery_port_view ports[2] = {{&empty, 0, sizeof ram.data},
+                                                            {&empty, 0, sizeof ram.data}};
+    const struct hpclang_rpl_flash_recovery_space sentinel = {1, 2, 3};
+    for (unsigned scenario = 0; scenario < 10; ++scenario) {
+        install(0, 0);
+        memset(flash + 0x105, 255, ((vectors[0].span + 15) & ~7u) / 2);
+        word(120, 0, 3);
+        memset(storage, 0xa5, sizeof storage);
+        memcpy(owned, creation_original, sizeof creation_original);
+        if (scenario == 9)
+            owned[30] ^= 1;
+        memcpy(original, owned, sizeof original);
+        struct hpclang_rpl_flash_recovery_layout layout = {owned, sizeof creation_original,
+                                                           creation_recovery_binding_nibble,
+                                                           creation_admission_binding_nibble};
+        if (scenario == 6)
+            fail_address = END - 2;
+        if (scenario == 8) {
+            unsigned changed = 0;
+            while (changed < sizeof original && original[changed] == creation_expected[changed])
+                ++changed;
+            assert(changed < sizeof original);
+            fail_after_staging = owned + changed;
+            fail_after_staging_expected = original[changed];
+        }
+        memcpy(before, flash, sizeof flash);
+        struct hpclang_rpl_flash_recovery_space space = sentinel;
+        uint32_t claim = UINT32_MAX;
+        int result =
+            scenario == 1
+                ? hpclang_rpl_recovery_installation_prepare_creation(
+                      io, &layout, creation_identity_object_nibble,
+                      creation_admission_creation_nibble, ports, catalog, FIRST, owned,
+                      sizeof original, &space, &claim)
+                : hpclang_rpl_recovery_installation_prepare_creation_in_place(
+                      io, &layout, creation_identity_object_nibble,
+                      scenario == 5 ? 8 : creation_admission_creation_nibble, ports, catalog, FIRST,
+                      scenario == 2   ? owned + 1
+                      : scenario == 3 ? separate
+                                      : owned,
+                      sizeof original - (scenario == 4), &space, scenario == 7 ? NULL : &claim);
+        fail_after_staging = NULL;
+        fail_after_staging_expected = 0xa5;
+        if (!scenario) {
+            assert(!result && !memcmp(owned, creation_expected, sizeof original));
+            assert(space.library_slot == FIRST + 0x20105 &&
+                   claim == space.authority_slot + HPCLANG_RPL_FLASH_AUTHORITY_BYTES);
+        } else {
+            assert(result < 0 && claim == UINT32_MAX && !memcmp(&space, &sentinel, sizeof space));
+            assert(!memcmp(owned, scenario == 8 ? creation_expected : original, sizeof original));
+        }
+        for (unsigned i = 0; i < 8; ++i)
+            assert(storage[i] == 0xa5 && storage[sizeof storage - 1 - i] == 0xa5);
+        assert(!memcmp(before, flash, sizeof flash));
+    }
+    fail_address = UINT32_MAX;
+}
+
 static void selected_creation_tests(const struct hpclang_rpl_flash_io *source)
 {
     struct hpclang_rpl_flash_io io = *source;
@@ -900,6 +968,7 @@ int main(void)
     creation_claim_tests(&io, &catalog);
     creation_publication_tests(&io);
     creation_preparation_tests(&io, &catalog);
+    in_place_creation_tests(&io, &catalog);
     placement_tests(&io, &catalog);
     space_tests(&io);
     creation_space_tests(&io);

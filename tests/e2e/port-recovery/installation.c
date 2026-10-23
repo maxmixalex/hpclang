@@ -39,9 +39,11 @@ int hpclang_installation_store(const struct hpclang_rpl_flash_io *io, const uint
                                uint32_t bytes, uint32_t slot);
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
 #include "rpl-object-store.h"
+int hpclang_installation_execution_ready(void);
 int hpclang_installation_stage(const struct hpclang_rpl_flash_io *io,
                                const struct hpclang_rpl_flash_recovery_space *space,
-                               uint32_t target, uint32_t claim, const uint8_t identity[48]);
+                               uint32_t target, uint32_t claim, const uint8_t identity[48],
+                               const uint32_t *map);
 #endif
 #endif
 
@@ -68,16 +70,23 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
     placement_result[0] = (uint32_t)hpclang_rpl_recovery_installation_plan(
         io, expected_library, EXPECTED_LIBRARY_BYTES, ports, catalog, &slot);
     placement_result[1] = slot;
+#if !defined(HPCLANG_INSTALLATION_TEMPLATE_CREATION) || !defined(HPCLANG_INSTALLATION_STORE)
     for (unsigned i = 0; i < EXPECTED_LIBRARY_BYTES; ++i)
         prepared_library[i] = 0xa5;
+#endif
     struct hpclang_rpl_flash_recovery_space space = {UINT32_MAX, UINT32_MAX, UINT32_MAX};
     const struct hpclang_rpl_flash_recovery_layout layout = {
         expected_library, preparation_bytes, EXPECTED_RECOVERY_BINDING, EXPECTED_ADMISSION_BINDING};
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
     uint32_t claim = UINT32_MAX;
-    preparation_result[0] = (uint32_t)hpclang_rpl_recovery_installation_prepare_creation(
-        io, &layout, EXPECTED_IDENTITY_NIBBLE, template_creation, ports, catalog, EXPECTED_TARGET,
-        prepared_library, EXPECTED_LIBRARY_BYTES, &space, &claim);
+    preparation_result[0] = (uint32_t)
+#ifdef HPCLANG_INSTALLATION_STORE
+        hpclang_rpl_recovery_installation_prepare_creation_in_place(
+#else
+        hpclang_rpl_recovery_installation_prepare_creation(
+#endif
+            io, &layout, EXPECTED_IDENTITY_NIBBLE, template_creation, ports, catalog,
+            EXPECTED_TARGET, prepared_library, EXPECTED_LIBRARY_BYTES, &space, &claim);
     preparation_creation_slot = claim;
 #else
     preparation_result[0] = (uint32_t)hpclang_rpl_recovery_installation_prepare(
@@ -102,6 +111,10 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
         }
         if (stored_result)
             return;
+        if (!hpclang_installation_execution_ready()) {
+            stored_result = HPCLANG_RPL_FLASH_UNSUPPORTED;
+            return;
+        }
     }
 #endif
     if (!preparation_result[0])
@@ -116,7 +129,8 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
             ++at;
             identity[i] |= ((prepared_library[at / 2] >> (4 * (at & 1))) & 15) << 4;
         }
-        stored_result = hpclang_installation_stage(io, &space, EXPECTED_TARGET, claim, identity);
+        stored_result = hpclang_installation_stage(io, &space, EXPECTED_TARGET, claim, identity,
+                                                   catalog->reader->context);
     }
 #endif
 #endif
@@ -193,7 +207,9 @@ int hpclang_recovery_predicate(const uint32_t *map)
     }
 #endif
 #ifdef HPCLANG_INSTALLATION_STARTUP
+#if !defined(HPCLANG_INSTALLATION_TEMPLATE_CREATION) || !defined(HPCLANG_INSTALLATION_STORE)
     hpclang_startup_inventory(map, &reader);
+#endif
 #endif
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 0x8611d, 3 + 128 * 16, 0x26bbb};
 #endif

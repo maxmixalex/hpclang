@@ -32,6 +32,9 @@ entry:
  str r3,[r2,#4]
  mov sp,r2
  mov r0,r6
+ mov r1,r7
+ ldr r2,end_offset
+ add r2,r7,r2
  bl admission
  cmp r0,#0
  beq .Lfailed

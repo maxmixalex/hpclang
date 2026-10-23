@@ -426,6 +426,58 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Real-root resource creation (locally verified; not yet submitted):** after the durable
+  INTENT, the real installation witness creates the bound 32 KiB HOME string in
+  the same exclusive invocation, retaining the original creation receipt and
+  immutable snapshot. It commits CREATED through receipt/content validation,
+  then repeats completion without additional Flash writes. Authority stays 7F;
+  registration/activation and restart ownership are not granted by this result.
+  Independent verification compares the complete resource, claim and Flash, and
+  requires resource persistence after restart. Local callback wrappers avoid
+  unsupported ARM GOT relocations without relaxing packaging. ARM build/package,
+  static analysis (excluding the native fixed-address diagnostic) and 66 Python
+  tests pass. Initial uploads exceeded Stock memory before execution. The snapshot
+  now reuses the no-longer-needed source-template copy after sealing/storing the
+  prepared root, reducing the package from 214,210 to 181,450 bytes. Template
+  buffers now explicitly require word alignment. Both reduced-footprint native
+  name-rejection cases pass. Normal runs write root/pair/INTENT, then resource
+  creation returns NOSPACE (-3), retaining execution with no CREATED claim.
+  Captured diagnostics show 27,500 Flash operations and an empty receipt.
+  An explicit owned in-place preparation API now retains all placement/sealing
+  checks, accepts only exact source/destination identity and leaves outputs
+  untouched on failure (the owned draft is disposable). Copying APIs still reject
+  overlap. The store witness aliases its two template symbols, then reuses that
+  buffer for the resource snapshot after Flash storage. Package size is 130,602
+  bytes; the original HOME template and full 32 KiB resource remain required.
+  ARM build/package, static analysis, 66 Python tests and the full host sanitizer
+  suite pass, including ten new in-place cases. Both native name-rejection cases
+  pass. Normal creation now returns INCOMPLETE (-14) after native writes, with
+  no receipt/CREATED transition; captured initialized execution bytes have changed.
+  This is not a passing resource install. Nibble-level comparison of both saved
+  captures finds the execution copy relocated from physical SRAM nibble offset
+  0xd0150 to 0xc012d: exactly 0x10023 nibbles, the resource plus its directory
+  entry. The CPU remains at the old copy. The witness ran from movable USEROB
+  without execution protection. Next validate Stock-owned TEMP execution before
+  resource creation and reject unsafe placement before any Flash publication;
+  retain ownership and staged state meanwhile.
+  A subsequent HP50g one-shot RCL/PURGE execution creates the exact 32 KiB
+  resource: all six stage results are zero, the original receipt is populated,
+  and Flash operation count is 27,501. Full verification still fails Stock return:
+  the 4 KiB stack low guard is overwritten and entry deliberately retains control.
+  TEMP execution and sufficient measured stack space both need maintained
+  acceptance; neither successful stage diagnostics nor process exit proves return.
+  The witness now validates the complete live image against one TEMP allocation
+  before publication and uses its bounds as mutation fences. Maintained E2E adds
+  USEROB rejection and consumes only the one-shot installer binding for the valid
+  path. Its guarded stack is 8 KiB; duplicate inventory diagnostics stay in the
+  dedicated witnesses. ARM packaging passes at 131,002 bytes (31,560 initialized),
+  with unchanged loader/relocation checks. Compiler stack reports, 87 Python tests,
+  strict docs and pinned formatting pass. HP49g+ and HP50g now pass the complete
+  maintained sequence: existing-name rejection, unsafe USEROB execution rejection,
+  exact resource/CREATED publication, repeat without additional writes, intact
+  code/stack guards, Stock return and unchanged root/resource after restart.
+  Each performs 27,505 Flash operations. Authority remains unarmed; this does not
+  close ownership reconstruction, startup ordering, activation or reclamation.
 - **Real-root creation intent (locally verified; not yet submitted):** before any root write,
   the native witness resolves HOME and rejects an existing HPCLEASE name. After
   staging the real root's pair, it publishes INTENT at the fourth planned extent,
@@ -484,7 +536,10 @@ Current delivery checkpoints:
 Batch `50eadbea` is submitted for CI: admission, four-extent
 planning/drafts, intent publication, receipt-gated completion and native real-root
 storage/restart. All 452 native and 84 Python files pass the pinned CI formatters.
-CI acceptance remains pending; M8.0 is not closed.
+One later CI check finds Quality 39839641114, Objects 39839637487 and Runtime
+39839637491 successful. Core 39839637484 failed in both installation jobs because
+the artifact omitted template-creation-layout.json; local f43009f0 adds it. That
+fix is not submitted yet, so CI acceptance and M8.0 completion remain open.
 - **Claim-bound real library storage (locally verified; CI pending):** the existing
   selected-slot writer now has a maintained claim-bound template variant using
   the same preparation and storage code. Independent verification reconstructs

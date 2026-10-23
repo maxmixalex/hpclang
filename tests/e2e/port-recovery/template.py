@@ -55,7 +55,11 @@ def generate(library_path, layout_path, output):
     identity = bytes(int(data[i : i + 2][::-1], 16) for i in range(at, at + 96, 2))
     output.write_text(
         "/* Generated from the actual recovery/admission build. */\n#include <stdint.h>\n"
-        + f"uint8_t expected_library[{len(record)}], prepared_library[{len(record)}];\n"
+        + f"_Alignas(4) uint8_t expected_library[{len(record)}];\n"
+        + "#if defined(HPCLANG_INSTALLATION_TEMPLATE_CREATION) && defined(HPCLANG_INSTALLATION_STORE)\n"
+        + f'extern uint8_t prepared_library[{len(record)}] __attribute__((alias("expected_library")));\n'
+        + "#else\n"
+        + f"_Alignas(4) uint8_t prepared_library[{len(record)}];\n#endif\n"
         + "const uint8_t expected_identity[48] = {"
         + ",".join(map(str, identity))
         + "};\n"
@@ -222,6 +226,15 @@ def run_creation_name_collision(args, before, root, library, *, transfer, verify
 
 
 def verify_creation_name_collision(args, before, phase, library, *, verify_busy_reads):
+    verify_creation_rejection(args, before, phase, library, -6, verify_busy_reads=verify_busy_reads)
+    require(
+        home_string(reader(phase / "state"), b"HPCLEASE") == b"existing user data",
+        "Name collision changed the user's variable",
+    )
+    print("Real installation rejects a pre-existing resource name before Flash writes", flush=True)
+
+
+def verify_creation_rejection(args, before, phase, library, result, *, verify_busy_reads):
     from installation import verify_probe
     from prepare import free_tail
 
@@ -236,21 +249,16 @@ def verify_creation_name_collision(args, before, phase, library, *, verify_busy_
     candidates = [
         at for at in candidates if at >= 0x141000 and at + size < (at & ~0x1FFFF) + 0x20000
     ]
-    require(candidates, "Collision fixture has no root capacity")
-    base = verify_probe(before, state, args.build, args.nm, -6, candidates[0], image=image)
+    require(candidates, "Rejection fixture has no root capacity")
+    base = verify_probe(before, state, args.build, args.nm, result, candidates[0], image=image)
     symbols = symbol_offsets(args.build / (image + ".elf"), args.nm)
     require(
         struct.unpack_from("<2I", (state / "sram").read_bytes(), base + symbols["storage_result"])
         == (0, 0),
-        "Name collision attempted root storage",
+        "Rejected installation attempted root storage",
     )
-    require(verify_busy_reads(args, phase) == 0, "Name collision wrote Flash")
-    require(
-        home_string(reader(state), b"HPCLEASE") == b"existing user data",
-        "Name collision changed the user's variable",
-    )
+    require(verify_busy_reads(args, phase) == 0, "Rejected installation wrote Flash")
     verify_source(state, library)
-    print("Real installation rejects a pre-existing resource name before Flash writes", flush=True)
 
 
 def run_creation_storage(
@@ -264,8 +272,17 @@ def run_creation_storage(
     )
     root = root / "creation-storage"
     root.mkdir()
-    stored = root / "stored"
     image = "installation-template-creation-store"
+    unsafe = root / "unsafe-execution"
+    transfer(args, unsafe, before, args.build, "CLAIMSTORE", package_name=image + ".hp")
+    verify_creation_rejection(
+        args, before, unsafe, library, -5, verify_busy_reads=verify_busy_reads
+    )
+    from reservation import require_absent
+
+    require_absent(reader(unsafe / "state"), b"HPCLEASE")
+    print("Movable USEROB execution rejected before Flash publication", flush=True)
+    stored = root / "stored"
     transfer(
         args,
         stored,
@@ -273,6 +290,7 @@ def run_creation_storage(
         args.build,
         "CLAIMSTORE",
         package_name=image + ".hp",
+        consume=True,
         execution_ms=60000,
     )
     slot, rebound, operations = verify_storage(
@@ -305,6 +323,11 @@ def run_creation_storage(
         staged_pair=pair,
     )
     verify_source(restart / "state", library)
+    require(
+        home_string(reader(restart / "state"), b"HPCLEASE")
+        == home_string(reader(stored / "state"), b"HPCLEASE"),
+        "Restart changed the created recovery resource",
+    )
     print("Claim-bound root and staged transaction survive Stock restart unchanged", flush=True)
     return {"slot": slot, "operations": operations}
 

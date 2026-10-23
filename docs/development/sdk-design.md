@@ -461,6 +461,38 @@ check and Flash publication share one exclusive invocation; returning or resetti
 does not turn the claim into permission to adopt a later same-name object. The
 maintained negative case supplies an existing string and requires rejection before
 Flash programming, preserving that string and the input template.
+The real-root resource extension continues within that same exclusive invocation:
+it creates the 32 KiB string from an immutable bound snapshot, retains the fresh
+receipt, and calls receipt-gated creation completion before returning. A repeated
+completion must make no extra Flash writes. The authority remains staged (7F).
+Native verification compares all resource bytes and the CREATED claim, and checks
+that root, Flash and resource survive Stock restart. Persistence does not by itself
+approve adopting a recreated resource or satisfy safe early startup/activation.
+The witness reuses its owned, word-aligned preparation buffer for the immutable
+resource snapshot after the root has been stored. The Flash library and original
+HOME template remain separate and verified; no extra 32 KiB CODE
+allocation is needed.
+The installer must not execute inside movable USEROB while creating that HOME
+resource. Its entry supplies the complete live image bounds, including stack and
+buffers; before Flash publication the witness validates their physical mapping
+and containment in one TEMP allocation, then uses those bounds as mutation
+fences. The one-shot test retains the executable on the RPL stack while purging
+only its HOME binding before evaluation. Original input templates are preserved.
+This contract permits the tested USEROB creation without TEMP allocation or GC;
+it is not permission to relocate the running image. Negative coverage executes
+directly from USEROB and requires rejection with unchanged Flash. Stack guards
+and the subsequent Stock-return check remain mandatory after successful creation.
+`hpclang_rpl_recovery_installation_prepare_creation_in_place` explicitly accepts
+an exclusively owned mutable template as both source and destination. It performs
+the same namespace, four-extent, layout, identity, resealing and repeated placement
+checks as copying preparation. Partial overlap and separate destinations are
+rejected; the copying APIs continue to reject all aliases. A failed operation may
+have changed the owned draft, which must then be discarded, while output geometry
+and Flash remain unchanged. The real store witness aliases its source/prepared
+buffers for this API, preserving the original HOME template separately. After the
+root is stored, the same buffer becomes the immutable resource snapshot; validation
+checks complete stored library bytes and snapshot contents at their respective
+lifetimes rather than requiring both copies to remain resident simultaneously.
 `hpclang_rpl_flash_activate_staged_authority` handles the later phase transition
 without treating the record as an unfinished tail. It requires the exact READY
 journal, complete authority body and phase 7F (or 7E for a lost acknowledgement),

@@ -6,7 +6,7 @@ import zlib
 
 from installation import LIBRARY_ID, TARGET, fixture, verify_probe
 from reservation import reader
-from verify import installed_recovery, require, require_stock_pc, symbol_offsets
+from verify import home_string, installed_recovery, require, require_stock_pc, symbol_offsets
 
 
 def staged_records(flash, journal, authority):
@@ -76,7 +76,12 @@ def verify_storage(
         binding = b"HPCMEM2\0" + identity
         binding += struct.pack("<6I", slot, journal, authority, TARGET, crc, 32768)
         claim = extra["claim_slot"]
-        expected_flash[claim : claim + 240] = creation_record(binding, b"HPCLEASE", claim, 0x7F)
+        expected_flash[claim : claim + 240] = creation_record(binding, b"HPCLEASE", claim, 0x7E)
+        resource = binding + bytes((i * 37 + 11) & 255 for i in range(80, 32768))
+        require(
+            home_string(reader(after), b"HPCLEASE") == resource,
+            "Created resource differs from the exact bound snapshot",
+        )
     base = verify_probe(
         before, after, build, nm, 0, slot, image=image, expected_flash=expected_flash
     )
@@ -84,8 +89,8 @@ def verify_storage(
     ram = (after / "sram").read_bytes()
     if staged:
         require(
-            struct.unpack_from("<3I", ram, base + symbols["storage_stage_result"]) == (0, 0, 0),
-            "Real root storage did not stage its transaction and creation intent",
+            struct.unpack_from("<6I", ram, base + symbols["storage_stage_result"]) == (0,) * 6,
+            "Real root installation did not complete receipt-gated resource creation",
         )
     require(
         struct.unpack_from("<4I", ram, base + symbols["preparation_result"])
@@ -121,7 +126,17 @@ def verify_storage(
                     "Stored binding extents overlap",
                 )
     at = base + symbols["prepared_library"]
-    require(ram[at : at + len(record)] == record, "Stored and prepared records differ")
+    if staged:
+        require(
+            symbols["prepared_library"] == symbols["expected_library"],
+            "Template copy was not reused",
+        )
+        require(
+            ram[at + 17 : at + 17 + len(resource)] == resource,
+            "Reused template buffer does not retain the immutable resource snapshot",
+        )
+    else:
+        require(ram[at : at + len(record)] == record, "Stored and prepared records differ")
     result, operations = struct.unpack_from("<2I", ram, base + symbols["storage_result"])
     require(result == 0 and operations > 0, "Native storage did not report successful programming")
     return slot, library, operations
