@@ -836,6 +836,7 @@ def run_registered_activation(
     print("Native-created registered transaction recovered through its installed guard", flush=True)
     if retire_claim:
         from retirement import run_closed_restart, run_closure_cuts, run_retirement
+        from retirement_conflict import run_conflict
 
         record = (stored / "state/flash").read_bytes()[slot : slot + layout["record_bytes"]]
         retirement_ready = run_retirement(
@@ -888,10 +889,20 @@ def run_registered_activation(
             completed=completed,
             verify_busy_reads=verify_busy_reads,
         )
+        run_conflict(
+            args,
+            retirement_ready["recovered"],
+            closure / "retirement-package",
+            root / "retirement-conflict",
+            layout["reservation"]["name"].encode("ascii"),
+            transfer=transfer,
+            verify_busy_reads=verify_busy_reads,
+        )
         return {
             "operations": operations,
             "recovery_operations": recovery_operations,
             "closure_cuts": closure_cuts,
+            "replacement_preserved": True,
         }
     cuts = run_activation_cuts(
         args,

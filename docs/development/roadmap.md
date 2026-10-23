@@ -475,6 +475,15 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
+- **Post-recovery resource replacement (locally verified, not submitted):**
+  after actual native recovery, Stock STO creates a new user string under the
+  former reservation name. The native closure API rejects it before programming;
+  both HP49g+ and HP50g preserve the exact user payload and complete Flash/catalog,
+  with zero SST operations and normal guarded return. The maintained retirement
+  suite now includes this case. Its isolated two-model acceptance passes; the
+  already-running fresh retirement suites predate this additional case, so they
+  do not establish combined-suite acceptance for the new check. This verifies
+  replacement rejection, not ownership reconstruction or orphan release.
 - **Claim closure interruption (locally verified, not submitted):**
   the maintained test cuts the actual phase-word program before any bit lands,
   after a partial clear and after complete closure. Exact emulator event fields
