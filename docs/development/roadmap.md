@@ -1439,6 +1439,21 @@ fix is not submitted yet, so CI acceptance and M8.0 completion remain open.
   preparation writes under torn metadata; this pass is not library configuration
   execution. General startup safety and the production entry remain open.
 
+- **Allocation traversal leaves Flash (local counterexample, 2026-10-23):**
+  ORing the first record length with `0x40000` changes one erased bit from zero
+  to one while leaving bank identity intact. Both models then execute the
+  scanner status read at `D0=0x9c34a`, continuation `0x23956`, outside the Flash
+  window. The captured read map resolves it to SRAM `0x0804e1a5`; the observed
+  A-register byte agrees with the captured RAM byte `0x78`. This disproves
+  confinement of the native pre-recovery traversal to its Flash bank. It does
+  not demonstrate a RAM write, user-data corruption or failed recovery: these
+  two observed runs still pass exact final Flash/catalog/stack, user-array and
+  reservation checks. All six ordinary cases with length OR masks `0x20000`,
+  `0x40000` and `0x80000` also recover. Their success cannot prove safety for
+  other RAM contents. Startup design must account for this data-dependent
+  out-of-bank traversal before relying on an early library callback; merely
+  adding more successful corruption samples does not close that requirement.
+
 - **Local pre-callback Flash access (historical watchpoint):** native read watchpoints on both models
   observe the original ARM library scanner reading physical `0x140100`, inside
   the installation fixture's `0x140000` target sector, during warm startup.
