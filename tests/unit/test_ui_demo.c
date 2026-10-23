@@ -44,6 +44,16 @@ static void settle(struct demo_app *app)
         assert(demo_poll(app) == 0);
     assert(demo_poll(app) == 1);
 }
+static int declare(struct demo_app *app, struct hpclang_ui_surface *renderer)
+{
+    unsigned char before[sizeof(*app)];
+    memcpy(before, app, sizeof(before));
+    int result = demo_view(app, renderer, 131, 64);
+    /* Declaration may reconcile UI storage, but cannot mutate the model,
+     * advance a provider or change its request/cleanup bookkeeping. */
+    assert(memcmp(before, app, sizeof(before)) == 0);
+    return result;
+}
 static void run(unsigned levels, int inverted)
 {
     struct hpclang_ui_config config = {DEMO_UI_NODES, DEMO_UI_TEXT_BYTES, DEMO_UI_EFFECTS};
@@ -54,38 +64,38 @@ static void run(unsigned levels, int inverted)
     assert(ui && r);
     struct demo_app app;
     demo_init(&app, ui);
-    assert(demo_view(&app, r, 131, 64) == 0);
+    assert(declare(&app, r) == 0);
     assert(hpclang_ui_surface_render(r, ui) == 1);
     activate(&app, DEMO_CONNECT, 0);
-    assert(demo_view(&app, r, 131, 64) == 0);
+    assert(declare(&app, r) == 0);
     activate(&app, DEMO_SCAN, 0);
-    assert(demo_view(&app, r, 131, 64) == 0 && app.model.scan == DEMO_LOADING);
+    assert(declare(&app, r) == 0 && app.model.scan == DEMO_LOADING);
     settle(&app);
     assert(app.model.scan == DEMO_ERROR && app.cleanups == 1);
-    assert(demo_view(&app, r, 131, 64) == 0);
+    assert(declare(&app, r) == 0);
     activate(&app, DEMO_SCAN, 0);
-    assert(demo_view(&app, r, 131, 64) == 0);
+    assert(declare(&app, r) == 0);
     settle(&app);
     assert(app.model.scan == DEMO_READY && app.model.count == 3 && app.cleanups == 2);
-    assert(demo_view(&app, r, 131, 64) == 0);
+    assert(declare(&app, r) == 0);
     uint32_t id = app.model.devices[1].id;
     uint32_t lifetime = control(&app, DEMO_TOGGLE, id);
     assert(hpclang_ui_focus(ui, lifetime) == 0);
     /* Appearance can be replaced while the application and focused lifetime survive. */
     hpclang_ui_surface_destroy(r);
     r = demo_renderer(131, 64, levels, &font, !inverted);
-    assert(r && demo_view(&app, r, 131, 64) == 0);
+    assert(r && declare(&app, r) == 0);
     assert(control(&app, DEMO_TOGGLE, id) == lifetime);
     assert(hpclang_ui_focused(ui) == lifetime);
     assert(hpclang_ui_surface_render(r, ui) == 1);
     activate(&app, DEMO_TOGGLE, id);
     assert(app.model.devices[1].enabled == 0);
-    assert(demo_view(&app, r, 131, 64) == 0);
+    assert(declare(&app, r) == 0);
     activate(&app, DEMO_REVERSE, 0);
-    assert(demo_view(&app, r, 131, 64) == 0 && control(&app, DEMO_TOGGLE, id) == lifetime);
+    assert(declare(&app, r) == 0 && control(&app, DEMO_TOGGLE, id) == lifetime);
     for (unsigned i = 3; i < 8; ++i) {
         activate(&app, DEMO_ADD, 0);
-        assert(demo_view(&app, r, 131, 64) == 0 && control(&app, DEMO_TOGGLE, id) == lifetime);
+        assert(declare(&app, r) == 0 && control(&app, DEMO_TOGGLE, id) == lifetime);
     }
     assert(app.model.count == 8);
     assert(hpclang_ui_surface_render(r, ui) == 1);
@@ -94,21 +104,41 @@ static void run(unsigned levels, int inverted)
     struct hpclang_ui_event event;
     assert(hpclang_ui_edit(ui, HPCLANG_INPUT_INSERT, '8', &event) == 1);
     assert(demo_update(&app, &event) == 1);
-    assert(demo_view(&app, r, 131, 64) == 0 && !strcmp(app.model.filter, "8"));
+    assert(declare(&app, r) == 0 && !strcmp(app.model.filter, "8"));
     assert(!control(&app, DEMO_TOGGLE, id));
     uint32_t revision = app.model.revision;
     activate(&app, DEMO_WAVE, 0);
-    assert(demo_view(&app, r, 131, 64) == 0 && app.model.revision == revision + 1);
+    assert(declare(&app, r) == 0 && app.model.revision == revision + 1);
     assert(hpclang_ui_surface_render(r, ui) == 1);
     activate(&app, DEMO_SCAN, 0);
-    assert(demo_view(&app, r, 131, 64) == 0);
+    assert(declare(&app, r) == 0);
     assert(demo_poll(&app) == 0);
+    uint32_t cancelled = app.request;
     activate(&app, DEMO_CANCEL, 0);
     assert(app.model.scan == DEMO_IDLE && app.cleanups == 3 && demo_poll(&app) == 0);
-    assert(demo_view(&app, r, 131, 64) == 0);
+    assert(declare(&app, r) == 0);
+    activate(&app, DEMO_SCAN, 0);
+    uint32_t replacement = app.request;
+    assert(replacement && replacement != cancelled);
+    assert(declare(&app, r) == 0);
+    struct hpclang_ui_event stale = {
+        .kind = HPCLANG_UI_EFFECT_READY, .effect = cancelled, .value = 8};
+    assert(demo_update(&app, &stale) == 0);
+    stale.kind = HPCLANG_UI_EFFECT_ERROR;
+    assert(demo_update(&app, &stale) == 0);
+    assert(app.request == replacement && app.model.scan == DEMO_LOADING);
+    assert(app.model.count == 8 && app.cleanups == 3 && app.polls == 1);
+    /* The new request still starts and completes normally after stale delivery. */
+    settle(&app);
+    assert(app.model.scan == DEMO_READY && app.cleanups == 4);
+    assert(declare(&app, r) == 0);
+    activate(&app, DEMO_SCAN, 0);
+    assert(declare(&app, r) == 0);
     activate(&app, DEMO_EXIT, 0);
     assert(app.model.quit);
     assert(hpclang_ui_shutdown(ui) == 0);
+    assert(app.cleanups == 5);
+    assert(hpclang_ui_shutdown(ui) == 0 && app.cleanups == 5);
     hpclang_ui_surface_destroy(r);
     free(storage);
 }

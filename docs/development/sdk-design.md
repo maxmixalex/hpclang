@@ -1218,6 +1218,48 @@ provider can exercise effect transitions, alongside real calculator input and
 display verification. This fixture preserves the original application model
 while fitting each target's screen and input capabilities.
 
+### C application sketch review
+
+The 2026-10-23 technical review uses the installed
+`examples/declarative-ui/app.c` as the public sketch, together with its
+`app.h` model and `main.c` event loop. This is executable ordinary C, built
+from a relocated SDK, rather than a second illustrative API that could drift
+from the implementation. The review preserves the application contract above.
+Public names remain provisional until UI milestone acceptance.
+
+| Original requirement | Public sketch | Independent evidence |
+| --- | --- | --- |
+| Nested composition and conditional children | `status_card` scopes two component instances; `demo_view` composes rows, columns and a scrolling root, selecting controls with ordinary `if` statements. | `test_ui_demo.c` executes the actual view at each state; `test_ui.c` exercises scope interruption, duplicate keys and rejected frames. |
+| Keyed changing list | `device_row` uses persistent device IDs; insertion and reversal change model order without manually creating widgets. | The application test checks surviving control lifetimes after insertion/reversal and renderer replacement. |
+| Controlled text and values | `demo_view` reads the filter and enabled state; `demo_update` accepts edit proposals and toggle values. | The application test edits the filter through `hpclang_ui_edit`; core input tests cover UTF-8, selection, capacity and accepted/rejected proposals. |
+| Explicit asynchronous states | `demo_update` queues scan work; `demo_poll` drives its provider; loading/error/retry/cancel are model states. | The application test covers failure, retry, cancellation, stale success/error delivery during a replacement request, and exit with queued work. |
+| Revision-driven custom canvas | `wave` paints the model samples inside the renderer's drawing lease; `DEMO_WAVE` updates samples and revision. | Host renderer tests exercise clipping/damage; six-model LCD verification checks model-derived waveform coordinates independently. |
+| Bounded declarations and separate rendering | `demo_view` begins, lays out and commits a candidate; `main.c` renders and publishes afterward. Storage is configured before the loop. | Every application-test declaration checks that the entire application model and provider bookkeeping remain unchanged; allocation-fault and failed-frame tests cover the core/renderer boundaries. |
+
+The view borrows the model for canvas state. Keep the model alive through paint;
+change its revision whenever the canvas-visible samples change. The accepted
+tree owns copied text, but does not copy arbitrary canvas state. Model updates
+and accepted declarations therefore precede rendering in the example loop.
+
+The scan deliberately uses application ownership (`owner=0`). The Scan button
+disappears when Loading replaces it, so tying the operation to that button's
+node lifetime would cancel valid work. Cancel/disconnect explicitly cancels and
+drains the task before reusing its provider context. Completion tokens must
+match the active request; shutdown cleans up outstanding work exactly once.
+Node-owned effects remain available when removal really should cancel work.
+
+`HPCLANG_UI_WITH` uses the supported compiler's cleanup attribute to balance
+scopes across normal completion, `break`, `continue`, `return` and outward
+`goto`. It is not an ISO-C-only macro. Explicit begin/close functions are the
+alternative; jumping into a scope or using `longjmp` across it is unsupported.
+The caller retains responsibility for commit/abort and error propagation.
+
+This review finds the six application patterns represented in the public C
+surface. It does not freeze names, claim pointer hardware or faithful HP39
+native styling, or close physical-memory/performance acceptance. The simulated
+provider, renderer palette/font choices and keyboard-only interaction are the
+documented target adaptations, not removed application requirements.
+
 ### Startup resource admission
 
 Stock startup has an earlier admission boundary than the application's RW

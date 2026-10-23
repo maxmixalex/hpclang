@@ -419,6 +419,16 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Local C sketch review (2026-10-23): the installed device-manager represents all
+six retained declaration/application patterns. The design record maps each to
+public example code and independent tests, explains application-owned scan
+lifetime and borrowed canvas state, and retains provisional API names. The
+application fixture now verifies declaration purity, stale success/error events
+during a replacement scan, and exactly-once queued-task cleanup on exit across
+two palettes and 2/4/16 levels. ASan/UBSan, pinned formatting and strict docs
+pass. The public-sketch technical review is complete; resource acceptance and
+M8.2/M8.3 completion remain open. This follow-up is local, not yet submitted.
+
 Current UI submission: `64d223d9` is pushed on `m8-flash-write` after local
 acceptance of timing checkpoints, launcher memory reports, minimum-RW admission
 and the installed C example budget. Timing passes all six Direct/Stock models;
@@ -2176,7 +2186,7 @@ triggered CI workflows pass at `d94580b4`, without closing an entire M8 stage.
 | --- | --- | --- |
 | M8.0 | Native port reads and substantial mutation support exist. Port 2 backup create/replace/remove and library creation have native evidence. | Complete library registration/attachment and execution-reference safety; Port 1 replacement/removal; trusted Port 2 recovery installation and authority lifecycle, safe startup ordering, reclamation and retained per-port gates. |
 | M8.1 | Installed source SDK and six-model packaging accepted. | Preserve relocation/build/package regressions as later features are integrated. |
-| M8.2 | Declaration, layout, input, effects and canvas implemented; integrated UI CI accepted. | Public application/API review and remaining smallest-target resource/update-cost criteria. |
+| M8.2 | Declaration, layout, input, effects and canvas implemented; integrated UI CI accepted; public C sketch technically reviewed. | Remaining smallest-target resource/update-cost criteria and submitted follow-up CI; names remain provisional until acceptance. |
 | M8.3 | Components, themes and renderer implemented; all-six Direct/Stock local memory-report and low-memory checks pass. | Whole-application physical-memory admission and remaining resource/CI acceptance; touched-stack watermarks alone are insufficient. |
 | M8.4 | Multiple graphics, keyboard, console and system adapter groups exist. Fixed-array line-input aliases pass all-six Direct/Stock locally. | Complete the retained historical API/application ledger, asynchronous KOS sound and decimal-format policy, plus remaining adapter groups and CI acceptance. |
 | M8.5 | Initial C++ UI/object wrappers accepted; additional owners verified locally. | Broader ownership/migration guidance, examples and pending integration acceptance. |
@@ -3922,9 +3932,12 @@ Deliver and review this core in the following slices, using the retained
   patterns as one stateful example, with a deterministic asynchronous provider
   and real calculator keyboard/display evidence.
 
-- [ ] Review a small public application sketch before freezing API names:
+- [x] Review a small public application sketch before freezing API names:
   nested rows/columns, conditional children, a keyed changing list, controlled
   text input, a custom canvas and an asynchronous operation with cancellation.
+  The [C application sketch review](sdk-design.md#c-application-sketch-review)
+  maps these requirements to the installed example and independent fixtures.
+  This technical review does not freeze names before UI milestone acceptance.
 - [ ] Define bounded node storage, deterministic sizing/measurement/overflow,
   stable-key reconciliation and predictable allocation-failure behavior.
   Measure actual memory and update cost on the smallest supported target.
