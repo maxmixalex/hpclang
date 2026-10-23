@@ -487,8 +487,9 @@ Current delivery checkpoints:
   has its own fresh-boot suite, sharing native installation setup while retaining
   all registration/activation/RAM-loss checks in the registration suite. The
   two-model CI matrix adds retirement with the existing 30-minute job limit.
-  A separate clean ARM build passes; both full registration regressions are
-  running against that build. Both fresh retirement suites exposed a caller
+  A separate clean ARM build and both full registration regressions pass
+  (HP50g 948.8 seconds; HP49g+ 965.3 seconds), including creation/cancellation,
+  activation cuts and complete RAM-loss recovery. Both fresh retirement suites exposed a caller
   format mismatch: the integration passed the packaged library where the
   retirement oracle requires its Flash allocation record. The caller now passes
   the actual installed record, which must still match independent reconstruction
