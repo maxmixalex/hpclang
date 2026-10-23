@@ -571,7 +571,8 @@ static int installation_creation(const struct hpclang_rpl_flash_io *io, uint32_t
                                  const struct hpclang_rpl_flash_catalog *catalog,
                                  const uint8_t expected_binding[80], uint32_t claim_slot,
                                  const uint8_t *name, uint32_t name_length,
-                                 enum hpclang_rpl_flash_creation_phase *phase, int staged)
+                                 enum hpclang_rpl_flash_creation_phase *phase, int staged,
+                                 int retired)
 {
     if (!io || !io->read16 || !expected_binding || !name || !phase ||
         memcmp(expected_binding, "HPCMEM2", 8) || claim_slot < io->first || claim_slot >= io->end ||
@@ -584,6 +585,8 @@ static int installation_creation(const struct hpclang_rpl_flash_io *io, uint32_t
                                           authority, journal, &installed, staged);
     if (transaction < 0)
         return transaction;
+    if (retired && transaction != 0)
+        return HPCLANG_RPL_FLASH_DIRTY;
     if (installed.library_slot != binding_word(expected_binding + 56) ||
         installed.target != binding_word(expected_binding + 68))
         return HPCLANG_RPL_FLASH_DIRTY;
@@ -606,6 +609,10 @@ static int installation_creation(const struct hpclang_rpl_flash_io *io, uint32_t
     enum hpclang_rpl_flash_creation_phase candidate;
     if (hpclang_rpl_flash_creation_inspect(io->first, io->end, claim_slot, record, sizeof record,
                                            expected_binding, name, name_length, &candidate))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    if (retired && candidate != HPCLANG_RPL_FLASH_CREATION_CREATED &&
+        candidate != HPCLANG_RPL_FLASH_CREATION_CLOSING &&
+        candidate != HPCLANG_RPL_FLASH_CREATION_CLOSED)
         return HPCLANG_RPL_FLASH_DIRTY;
     struct streamed_view view = {io, installed.target, journal, authority, transaction != 0};
     const struct hpclang_rpl_flash_io restored = {&view, streamed_read, NULL, io->first, io->end};
@@ -636,7 +643,17 @@ int hpclang_rpl_recovery_installation_creation(const struct hpclang_rpl_flash_io
                                                enum hpclang_rpl_flash_creation_phase *phase)
 {
     return installation_creation(io, library_number, catalog, expected_binding, claim_slot, name,
-                                 name_length, phase, 0);
+                                 name_length, phase, 0, 0);
+}
+
+int hpclang_rpl_recovery_installation_creation_retired(
+    const struct hpclang_rpl_flash_io *io, uint32_t library_number,
+    const struct hpclang_rpl_flash_catalog *catalog, const uint8_t expected_binding[80],
+    uint32_t claim_slot, const uint8_t *name, uint32_t name_length,
+    enum hpclang_rpl_flash_creation_phase *phase)
+{
+    return installation_creation(io, library_number, catalog, expected_binding, claim_slot, name,
+                                 name_length, phase, 0, 1);
 }
 
 int hpclang_rpl_recovery_installation_creation_staged(
@@ -646,7 +663,7 @@ int hpclang_rpl_recovery_installation_creation_staged(
 {
     enum hpclang_rpl_flash_creation_phase phase;
     int result = installation_creation(io, library_number, catalog, expected_binding, claim_slot,
-                                       name, name_length, &phase, 1);
+                                       name, name_length, &phase, 1, 0);
     return result                                        ? result
            : phase == HPCLANG_RPL_FLASH_CREATION_CREATED ? 0
                                                          : HPCLANG_RPL_FLASH_DIRTY;

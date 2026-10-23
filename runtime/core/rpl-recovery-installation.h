@@ -157,6 +157,20 @@ int hpclang_rpl_recovery_installation_creation(const struct hpclang_rpl_flash_io
                                                uint32_t name_length,
                                                enum hpclang_rpl_flash_creation_phase *phase);
 
+/* Read-only retirement prerequisite for the SAME trusted executing root/binding.
+ * Require a fully closed authority and retired journal, then validate identity,
+ * catalog and exact claim allocation against actual Flash (never replayed data).
+ * Accept CREATED/CLOSING/CLOSED claims; output changes only on success (0).
+ * No RAM inspection, writes, release, ownership reconstruction or reclamation
+ * permission. Callers must separately prove resource absence or safe release,
+ * durable provenance and execution safety before cleanup. Retain the exclusive
+ * stable-view and trusted-input contract of creation() above. */
+int hpclang_rpl_recovery_installation_creation_retired(
+    const struct hpclang_rpl_flash_io *io, uint32_t library_number,
+    const struct hpclang_rpl_flash_catalog *catalog, const uint8_t expected_binding[80],
+    uint32_t claim_slot, const uint8_t *name, uint32_t name_length,
+    enum hpclang_rpl_flash_creation_phase *phase);
+
 /* Streaming staged-transaction validation. Require exact authority 7F and READY
  * journal, then validate both intact current and proposed views, including root
  * identity/catalog and native pair boundaries. No heap or writes. Return 0 and

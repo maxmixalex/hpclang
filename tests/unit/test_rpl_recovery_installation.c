@@ -1237,6 +1237,49 @@ static void creation_claim_tests(const struct hpclang_rpl_flash_io *io,
             assert(result < 0 && phase == 99);
         }
         assert(!memcmp(before, flash, sizeof flash));
+        phase = 99;
+        result = hpclang_rpl_recovery_installation_creation_retired(io, 1701, catalog, binding,
+                                                                    claim_slot, name, 8, &phase);
+        if (scenario == 4)
+            assert(!result && phase == HPCLANG_RPL_FLASH_CREATION_CLOSED);
+        else
+            assert(result < 0 && phase == 99);
+        assert(!memcmp(before, flash, sizeof flash));
+        if (scenario == 4) {
+            /* A closed pair alone must not authorize an unpublished claim;
+             * nor may a retired claim hide an active/partly retired pair. */
+            const uint8_t states[] = {0xff, 0x7f, 0x7e, 0x7c, 0x40, 0x02, 0, 0x80};
+            for (unsigned field = 0; field < 3; ++field)
+                for (unsigned i = 0; i < sizeof states; ++i) {
+                    uint32_t at = field == 0 ? CLAIM + 16 : field == 1 ? JOURNAL : AUTHORITY;
+                    uint8_t saved = flash[at - FIRST];
+                    flash[at - FIRST] = states[i];
+                    phase = 99;
+                    result = hpclang_rpl_recovery_installation_creation_retired(
+                        io, 1701, catalog, binding, CLAIM, name, 8, &phase);
+                    int accepted = field ? states[i] == 0 : (states[i] & ~0x7e) == 0;
+                    assert(accepted ? result == 0 && phase != 99 : result < 0 && phase == 99);
+                    assert(flash[at - FIRST] == states[i]);
+                    flash[at - FIRST] = saved;
+                    assert(!memcmp(before, flash, sizeof flash));
+                }
+            /* Closed transactions inspect actual media, not the old capsule's
+             * intact bank header. Read failures must also preserve output. */
+            flash[0x100] ^= 1;
+            phase = 99;
+            assert(hpclang_rpl_recovery_installation_creation_retired(io, 1701, catalog, binding,
+                                                                      CLAIM, name, 8, &phase) < 0 &&
+                   phase == 99);
+            flash[0x100] ^= 1;
+            fail_address = CLAIM & ~1u;
+            assert(hpclang_rpl_recovery_installation_creation_retired(io, 1701, catalog, binding,
+                                                                      CLAIM, name, 8, &phase) < 0 &&
+                   phase == 99);
+            fail_address = UINT32_MAX;
+            assert(hpclang_rpl_recovery_installation_creation_retired(io, 1701, catalog, binding,
+                                                                      CLAIM, name, 8, NULL) < 0);
+            assert(!memcmp(before, flash, sizeof flash));
+        }
         if (!scenario) {
             /* Activation must validate intact actual Flash as well as its
              * proposed image; a recovery-only restored view is insufficient. */

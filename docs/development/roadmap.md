@@ -425,6 +425,11 @@ results or scope facts change. M8.0 remains the primary track. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
+Latest submission is `02e81749` on `m8-flash-write`: the registered native
+installation/activation, interruption and complete RAM-loss batch below passes
+both full local registration suites. New CI is not polled; CI acceptance is
+pending. Earlier checkpoint wording describes its state at that checkpoint.
+
 Current batch through `92acb946` includes retryable claim closure, native combined
 cancellation, unregistered-root pair cancellation, complete real-root cleanup,
 RAM-bounded CODE packaging, independent acceptance suites and one-shot installer
@@ -466,6 +471,16 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
+- **Post-recovery retirement prerequisite (host verified, native acceptance pending):**
+  a read-only installation gate requires both the authority and journal to be
+  fully retired before accepting a CREATED/CLOSING/CLOSED claim. It validates
+  the trusted binding, installed root/catalog and exact claim allocation against
+  actual Flash; the historical capsule cannot hide current damage. ARM static
+  analysis and pinned formatting pass. After correcting the bank-damage fixture
+  to target the actual native header, the complete installation ASan/UBSan suite
+  passes, including partial phases, uncommitted claims, bank damage, read failure
+  and unchanged outputs/storage. Native post-recovery acceptance is pending. This gate does not prove RAM
+  ownership or permit release, claim mutation or Flash reclamation.
 - **Native-created transaction with complete RAM loss (locally verified):**
   added a registration-path check that clears SRAM before resetting the actual
   installed/armed transaction, then declines Stock memory recovery. Initially both
