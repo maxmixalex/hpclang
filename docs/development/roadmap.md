@@ -431,8 +431,10 @@ including all fourteen Stock port jobs), Objects (39903692845), Runtime
 PR #6 merges the registered native installation/activation, interruption and
 complete RAM-loss batch into main as `261dba7c`. Both full local registration
 suites also pass. The local retirement/claim-closure follow-up is excluded from
-that merge and its fresh-suite acceptance remains pending. New main CI is not
-polled. Earlier checkpoint wording describes its state at that checkpoint.
+that merge. Its fresh retirement suites and same-name replacement supplements
+now pass on both models. This retirement/claim-closure batch is submitted for
+CI; newly triggered runs are not polled and CI acceptance remains pending.
+Earlier checkpoint wording describes its state at that checkpoint.
 
 Current batch through `92acb946` includes retryable claim closure, native combined
 cancellation, unregistered-root pair cancellation, complete real-root cleanup,
@@ -475,16 +477,17 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
-- **Post-recovery resource replacement (locally verified, not submitted):**
+- **Post-recovery resource replacement (locally verified, submitted; CI pending):**
   after actual native recovery, Stock STO creates a new user string under the
   former reservation name. The native closure API rejects it before programming;
   both HP49g+ and HP50g preserve the exact user payload and complete Flash/catalog,
   with zero SST operations and normal guarded return. The maintained retirement
-  suite now includes this case. Its isolated two-model acceptance passes; the
-  already-running fresh retirement suites predate this additional case, so they
-  do not establish combined-suite acceptance for the new check. This verifies
-  replacement rejection, not ownership reconstruction or orphan release.
-- **Claim closure interruption (locally verified, not submitted):**
+  suite now includes this case. Isolated acceptance and supplements using both
+  successful fresh retirement runs pass. Each supplement executes the maintained
+  final case against that run's actual recovered state and bound native package;
+  original suite results are preserved separately from supplement results.
+  This verifies replacement rejection, not ownership reconstruction or orphan release.
+- **Claim closure interruption (locally verified, submitted; CI pending):**
   the maintained test cuts the actual phase-word program before any bit lands,
   after a partial clear and after complete closure. Exact emulator event fields
   and full Flash comparisons must match; reset must preserve the interrupted
@@ -506,9 +509,13 @@ Current delivery checkpoints:
   retirement oracle requires its Flash allocation record. The caller now passes
   the actual installed record, which must still match independent reconstruction
   byte for byte. Five template unit tests and Ruff checks pass. Both failed runs
-  exited; corrected fresh suites are running with the same clean ARM build.
-  Combined fresh-suite acceptance remains pending.
-- **Retired claim closure (locally verified, not submitted):** a new
+  exited; corrected fresh suites pass with the same clean ARM build
+  (HP50g 1299.9 seconds; HP49g+ 1308.2 seconds). Both successful result files
+  record closure-cut retry writes of one/one/zero for unwritten/partial/complete
+  cases. Supplemental replacement checks against those fresh states also pass.
+  All workflow actionlint checks, recovery-directory Ruff checks and 71 related
+  Python tests pass. CI acceptance for this follow-up remains pending.
+- **Retired claim closure (locally verified, submitted; CI pending):** a new
   internal operation revalidates the trusted installed transaction's retirement
   and requires the resource name to be absent from valid Stock HOME before
   clearing only its claim phase. Existing same-name objects, active transactions
