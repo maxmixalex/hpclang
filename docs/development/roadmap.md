@@ -443,7 +443,7 @@ was approved. Current implementation work resumes M8.2/M8.3 UI resource and
 update-cost acceptance; M8.0 requirements and the submitted recovery repair stay
 open. This explicitly supersedes the earlier restriction that other modules
 advance only during an external wait on the native-port track.
-Current UI follow-up (local, 2026-10-23): checkpoint ID 2 now exports observed
+Current UI follow-up (`bd1b0d56`, local, not pushed, 2026-10-23): checkpoint ID 2 exports observed
 frame/input maxima and sample counts alongside the unchanged memory report.
 The independent verifier requires nine timed updates and 34 key edges and rejects
 missing, malformed or saturated measurements. Direct/Stock launch scripts clear
