@@ -10,6 +10,23 @@
 #include <stddef.h>
 
 volatile unsigned installation_result[8];
+#ifdef HPCLANG_INSTALLATION_RETIREMENT
+#include "rpl-recovery-installation.h"
+/* The host binds these owned ELF fields from the independently reconstructed
+ * native installation, not from whichever claim the witness happens to find. */
+const volatile uint8_t retirement_binding[80] = "HPCMEM2";
+const volatile uint8_t retirement_name[128] = "HPCRES";
+const volatile uint32_t retirement_name_length = 6;
+const volatile uint32_t retirement_library_id = UINT32_MAX;
+const volatile uint32_t retirement_claim_slot = UINT32_MAX;
+volatile uint32_t retirement_claim_phase;
+#ifdef HPCLANG_INSTALLATION_RETIREMENT_CLOSE
+int hpclang_installation_retire_close(const struct hpclang_rpl_flash_io *io, uint32_t library_id,
+                                      const struct hpclang_rpl_flash_catalog *catalog,
+                                      const uint8_t binding[80], uint32_t claim,
+                                      const uint8_t *name, uint32_t length);
+#endif
+#endif
 #ifdef HPCLANG_INSTALLATION_CREATION_ADMISSION
 #include "rpl-recovery-installation.h"
 #include "rpl-recovery-reservation.h"
@@ -232,7 +249,31 @@ int hpclang_recovery_predicate(const uint32_t *map)
     plan_placement(&io, &catalog);
 #endif
     uint32_t slot = UINT32_MAX;
-#if defined(HPCLANG_INSTALLATION_IDENTITY)
+#if defined(HPCLANG_INSTALLATION_RETIREMENT)
+    uint8_t binding[80], name[128];
+    for (unsigned i = 0; i < sizeof binding; ++i)
+        binding[i] = retirement_binding[i];
+    for (unsigned i = 0; i < sizeof name; ++i)
+        name[i] = retirement_name[i];
+    enum hpclang_rpl_flash_creation_phase phase = 99;
+#ifdef HPCLANG_INSTALLATION_RETIREMENT_CLOSE
+    int result =
+        hpclang_installation_retire_close(&io, retirement_library_id, &catalog, binding,
+                                          retirement_claim_slot, name, retirement_name_length);
+    if (!result)
+        result = hpclang_rpl_recovery_installation_creation_retired(
+            &io, retirement_library_id, &catalog, binding, retirement_claim_slot, name,
+            retirement_name_length, &phase);
+#else
+    int result = hpclang_rpl_recovery_installation_creation_retired(
+        &io, retirement_library_id, &catalog, binding, retirement_claim_slot, name,
+        retirement_name_length, &phase);
+#endif
+    retirement_claim_phase = phase;
+    if (!result)
+        slot = binding[56] | (uint32_t)binding[57] << 8 | (uint32_t)binding[58] << 16 |
+               (uint32_t)binding[59] << 24;
+#elif defined(HPCLANG_INSTALLATION_IDENTITY)
     uint8_t identity[48];
     for (unsigned i = 0; i < sizeof identity; ++i)
         identity[i] = hpclang_recovery_identity[i];

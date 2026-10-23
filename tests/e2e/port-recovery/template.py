@@ -823,6 +823,48 @@ def run_registered_activation(
         verify_source(state, library)
         require_absent(reader(state), layout["reservation"]["name"].encode("ascii"))
     print("Native-created registered transaction recovered through its installed guard", flush=True)
+    from retirement import run_closed_restart, run_retirement
+
+    retirement_ready = run_retirement(
+        args,
+        before,
+        stored / "state",
+        repaired,
+        root,
+        library,
+        layout,
+        rebound,
+        slot,
+        transfer=transfer,
+        verify_busy_reads=verify_busy_reads,
+    )
+    closure = root / "claim-closure"
+    closure.mkdir()
+    run_retirement(
+        args,
+        before,
+        stored / "state",
+        repaired,
+        closure,
+        library,
+        layout,
+        rebound,
+        slot,
+        transfer=transfer,
+        verify_busy_reads=verify_busy_reads,
+        close=True,
+        prepared_states=retirement_ready,
+    )
+    run_closed_restart(
+        args,
+        retirement_ready["recovered"],
+        closure / "retirement-recovered/state",
+        closure,
+        layout["reservation"]["name"].encode("ascii"),
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
     cuts = run_activation_cuts(
         args,
         before,

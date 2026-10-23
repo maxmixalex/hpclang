@@ -1,5 +1,6 @@
 #include "rpl-recovery-installation.h"
 #include "rpl-port.h"
+#include "rpl-object-store.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -667,4 +668,42 @@ int hpclang_rpl_recovery_installation_creation_staged(
     return result                                        ? result
            : phase == HPCLANG_RPL_FLASH_CREATION_CREATED ? 0
                                                          : HPCLANG_RPL_FLASH_DIRTY;
+}
+
+/* Keep directory/encoding buffers out of the deep installed-root validation
+ * chain. These phases execute sequentially under the caller's exclusive view. */
+__attribute__((noinline)) static int close_absent_creation(const struct hpclang_rpl_flash_io *io,
+                                                           const uint8_t expected_binding[80],
+                                                           uint32_t claim_slot, const uint8_t *name,
+                                                           uint32_t name_length,
+                                                           const struct hpclang_rpl_reader *ram)
+{
+    uint32_t home;
+    struct hpclang_rpl_directory_entry_view entry;
+    if (hpclang_rpl_store_home_object(ram, &home) || home < 0x80000u ||
+        hpclang_rpl_directory_find(ram, home, name, name_length, &entry) !=
+            HPCLANG_RPL_STORE_NOT_FOUND)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint8_t intent[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES];
+    int result = hpclang_rpl_flash_creation_encode(io->first, io->end, claim_slot, expected_binding,
+                                                   name, name_length, intent, sizeof intent);
+    if (result)
+        return result;
+    return hpclang_rpl_flash_close_creation(io, claim_slot, intent, sizeof intent);
+}
+
+int hpclang_rpl_recovery_installation_close_retired_creation(
+    const struct hpclang_rpl_flash_io *io, uint32_t library_number,
+    const struct hpclang_rpl_flash_catalog *catalog, const uint8_t expected_binding[80],
+    uint32_t claim_slot, const uint8_t *name, uint32_t name_length,
+    const struct hpclang_rpl_reader *ram)
+{
+    if (!io || !io->program16 || !ram || !ram->read_nibble)
+        return HPCLANG_RPL_FLASH_INVALID;
+    enum hpclang_rpl_flash_creation_phase phase;
+    int result = hpclang_rpl_recovery_installation_creation_retired(
+        io, library_number, catalog, expected_binding, claim_slot, name, name_length, &phase);
+    if (result)
+        return result;
+    return close_absent_creation(io, expected_binding, claim_slot, name, name_length, ram);
 }

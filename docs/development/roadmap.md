@@ -471,7 +471,33 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
-- **Post-recovery retirement prerequisite (host verified, native acceptance pending):**
+- **Retired claim closure (locally verified, not submitted):** a new
+  internal operation revalidates the trusted installed transaction's retirement
+  and requires the resource name to be absent from valid Stock HOME before
+  clearing only its claim phase. Existing same-name objects, active transactions
+  and invalid/unreadable RAM reject without writes. Trusted durable producer
+  provenance, exclusive views and no allocation reuse remain caller obligations;
+  the operation does not discover authority from a surviving claim. ARM analysis
+  and the complete installation ASan/UBSan suite pass, including absence/presence,
+  malformed RAM, active/intent rejection, partial-write retry and idempotent
+  closure cases. A native SST witness restricts programming to the bound claim
+  phase word and repeats closure to verify zero additional writes. Its maintained
+  registration checks compare all Flash bytes and preserve RAM resources; both
+  model runs initially reject the active transaction with zero Flash changes,
+  but fail the low stack guard before Stock return. The closure frame reserves
+  568 bytes across deep validation. Moving directory/encoding buffers into a
+  separate non-inlined phase reduces that frame to 56 bytes without increasing
+  the 4 KiB witness stack. ARM packaging/analysis and the complete installation
+  sanitizer rerun pass. Both native models now reject active transactions without
+  writes, close the actually recovered claim with exactly one SST operation, and
+  repeat closure with zero further writes. Full Flash comparison changes only
+  the claim phase byte; resources, catalog, mappings and stack guards remain
+  intact. Two subsequent resets per model preserve the complete Flash image and
+  catalog with zero writes and no resource revival. These targeted native runs
+  reuse the accepted installation snapshots; the expanded fresh registration
+  suite has not yet been rerun. Native closure-interruption coverage and Flash
+  reclamation remain open.
+- **Post-recovery retirement prerequisite (locally verified, not submitted):**
   a read-only installation gate requires both the authority and journal to be
   fully retired before accepting a CREATED/CLOSING/CLOSED claim. It validates
   the trusted binding, installed root/catalog and exact claim allocation against
@@ -479,8 +505,21 @@ Current delivery checkpoints:
   analysis and pinned formatting pass. After correcting the bank-damage fixture
   to target the actual native header, the complete installation ASan/UBSan suite
   passes, including partial phases, uncommitted claims, bank damage, read failure
-  and unchanged outputs/storage. Native post-recovery acceptance is pending. This gate does not prove RAM
-  ownership or permit release, claim mutation or Flash reclamation.
+  and unchanged outputs/storage. A native retirement witness now binds its
+  expected fields from the independently reconstructed installation. The
+  registration suite checks rejection of the real active transaction and
+  acceptance after actual recovery, preserving Flash, catalog, mappings and
+  owning CODE/stack guards. ARM packaging, formatting and Ruff pass. Initial
+  native probes stop during USB reception: Stock reports insufficient memory
+  before the probe executes. The fixture now consumes its completed original
+  HPCTEMPLATE copy through Stock commands in a separate snapshot before upload,
+  checks unchanged Flash and active reservation bytes (or continued absence after
+  recovery), then runs the read-only probe. Both HP49g+ and HP50g retests pass:
+  active transactions reject with unchanged output, and recovered transactions
+  accept the still-CREATED claim; complete Flash, catalog, mappings and execution
+  guards remain unchanged. Both process exits are zero. This fixture preparation
+  does not establish low-memory admission. The gate does not prove RAM ownership
+  or permit release, claim mutation or Flash reclamation.
 - **Native-created transaction with complete RAM loss (locally verified):**
   added a registration-path check that clears SRAM before resetting the actual
   installed/armed transaction, then declines Stock memory recovery. Initially both

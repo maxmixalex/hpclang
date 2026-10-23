@@ -132,7 +132,7 @@ set(installation_witnesses installation installation-transaction installation-pu
         installation-cancellation installation-identity installation-reservation-failure
         installation-store installation-cleanup installation-staging installation-abort
         installation-activation-reject installation-creation installation-creation-admission
-        installation-creation-abort)
+        installation-creation-abort installation-retirement installation-retirement-close)
 if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
     math(EXPR TEMPLATE_AUTHORITY "${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT} + 4124")
     foreach(template IN ITEMS template template-creation)
@@ -173,7 +173,7 @@ foreach(witness IN LISTS installation_witnesses)
     add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c memory.c
         "${CORE}/flash-mapping.S" "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
-            rpl-flash-write rpl-port rpl-backup rpl-object-span)
+            rpl-flash-write rpl-port rpl-backup rpl-object-span rpl-object-store)
         target_sources(${witness} PRIVATE "${CORE}/${module}.c")
     endforeach()
     if(witness MATCHES "^installation-template")
@@ -185,8 +185,7 @@ foreach(witness IN LISTS installation_witnesses)
                 "${CORE}/object-snapshot.c")
         endif()
         add_dependencies(${witness} recovery-${template}-data)
-        target_sources(${witness} PRIVATE template.c "${CMAKE_CURRENT_BINARY_DIR}/${template}-data.c"
-            "${CORE}/rpl-object-store.c")
+        target_sources(${witness} PRIVATE template.c "${CMAKE_CURRENT_BINARY_DIR}/${template}-data.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TEMPLATE)
     endif()
     if(witness STREQUAL "installation-store" OR witness STREQUAL "installation-cleanup" OR
@@ -210,6 +209,17 @@ foreach(witness IN LISTS installation_witnesses)
         target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-installation.c"
             "${CORE}/rpl-recovery-identity.c" "${CORE}/rpl-recovery-reservation.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_CREATION_ADMISSION)
+    elseif(witness MATCHES "^installation-retirement")
+        target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-identity.c"
+            "${CORE}/rpl-recovery-installation.c")
+        target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_RETIREMENT)
+        if(witness STREQUAL "installation-retirement-close")
+            target_sources(${witness} PRIVATE retirement.c predicate-tls.S)
+            foreach(module IN ITEMS time time-math rtc rtc-decode datetime sst-flash)
+                target_sources(${witness} PRIVATE "${CORE}/${module}.c")
+            endforeach()
+            target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_RETIREMENT_CLOSE)
+        endif()
     elseif(witness STREQUAL "installation-identity")
         target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-identity.c"
             "${CORE}/rpl-recovery-installation.c")
