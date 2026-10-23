@@ -316,24 +316,9 @@ def verify_probe(
     return base
 
 
-def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
-    from startup import run_port1_inventory, verify_startup
-    from staging import run_staging
-    from abort import run_abort
-    from creation import run_creation_abort, run_creation_publication, run_creation_visibility
-
-    root = args.output / "installation"
-    root.mkdir()
+def installed_baseline(args, clean, root, *, transfer, emulator, completed):
     build = args.build
     setup = SimpleNamespace(**(vars(args) | {"flash_busy_reads": 0}))
-    missing = root / "missing"
-    transfer(args, missing, clean, build, "INSTEST", package_name="installation.hp")
-    base = verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
-    startup_missing = verify_startup(clean, missing / "state", build, args.nm, base)
-    verify_placement(clean, missing / "state", build, args.nm, base, existing=False)
-    verify_preparation(clean, missing / "state", build, args.nm, base, existing=False)
-    require(verify_busy_reads(args, missing) == 0, "Missing-library lookup wrote Flash")
-    print("Native installation lookup rejected the absent library", flush=True)
     installed = root / "installed"
     transfer(
         setup,
@@ -360,6 +345,30 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         LIBRARY_ID,
         TARGET,
         read=reader(before),
+    )
+    return before, slot, size
+
+
+def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
+    from startup import run_port1_inventory, verify_startup
+    from staging import run_staging
+    from abort import run_abort
+    from creation import run_creation_abort, run_creation_publication, run_creation_visibility
+
+    root = args.output / "installation"
+    root.mkdir()
+    build = args.build
+
+    missing = root / "missing"
+    transfer(args, missing, clean, build, "INSTEST", package_name="installation.hp")
+    base = verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
+    startup_missing = verify_startup(clean, missing / "state", build, args.nm, base)
+    verify_placement(clean, missing / "state", build, args.nm, base, existing=False)
+    verify_preparation(clean, missing / "state", build, args.nm, base, existing=False)
+    require(verify_busy_reads(args, missing) == 0, "Missing-library lookup wrote Flash")
+    print("Native installation lookup rejected the absent library", flush=True)
+    before, slot, size = installed_baseline(
+        args, clean, root, transfer=transfer, emulator=emulator, completed=completed
     )
     matched = root / "matched"
     transfer(args, matched, before, build, "INSTEST", package_name="installation.hp")
@@ -447,19 +456,6 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         completed=completed,
         verify_busy_reads=verify_busy_reads,
     )
-    from publication import run_publication
-    from template import run_template
-
-    real_template = run_template(
-        args,
-        clean,
-        root,
-        transfer=transfer,
-        emulator=emulator,
-        completed=completed,
-        verify_busy_reads=verify_busy_reads,
-    )
-
     run_creation_publication(
         args, before, root, slot, transfer=transfer, verify_busy_reads=verify_busy_reads
     )
@@ -467,15 +463,6 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         args,
         before,
         root,
-        slot,
-        transfer=transfer,
-        emulator=emulator,
-        completed=completed,
-        verify_busy_reads=verify_busy_reads,
-    )
-    run_publication(
-        args,
-        before,
         slot,
         transfer=transfer,
         emulator=emulator,
@@ -496,24 +483,56 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                     "matched": startup_matched,
                     "port1": startup_port1,
                 },
-                reservation_creation=["existing-different", "existing-identical", "lost-write-ack"],
-                publication=True,
                 creation_publication=True,
-                cancellation=True,
                 selected_storage=True,
                 unarmed_staging=True,
                 reservation_abort=True,
                 creation_claim_visibility=True,
-                real_template=real_template,
             ),
             indent=2,
         )
         + "\n"
     )
     print(
-        "PASS: native installation, transaction preflight, publication and cancellation",
+        "PASS: native installation, transaction preflight and creation lifecycle",
         flush=True,
     )
+
+
+def run_publication_suite(args, clean, *, transfer, emulator, completed, verify_busy_reads):
+    from publication import run_publication
+
+    root = args.output / "installation"
+    root.mkdir()
+    before, slot, size = installed_baseline(
+        args, clean, root, transfer=transfer, emulator=emulator, completed=completed
+    )
+    run_publication(
+        args,
+        before,
+        slot,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    (args.output / "result.json").write_text(
+        json.dumps(
+            dict(
+                status="pass",
+                model=args.model,
+                suite="publication",
+                slot=slot,
+                bytes=size,
+                reservation_creation=["existing-different", "existing-identical", "lost-write-ack"],
+                publication=True,
+                cancellation=True,
+            ),
+            indent=2,
+        )
+        + "\n"
+    )
+    print("PASS: native transaction publication, rejection and cancellation", flush=True)
 
 
 if __name__ == "__main__":

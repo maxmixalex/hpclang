@@ -427,9 +427,28 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Latest submission: `af3e2a2e` includes the five local implementation commits since
 `50eadbea`, including the missing creation-layout CI artifact fix. Local acceptance
-is recorded below. One later check finds Quality 39886905107 and Objects
-39886905191 successful, Core 39886905229 running and Runtime 39886905212 queued.
-No repeated polling; CI acceptance and M8.0 remain open.
+is recorded below. A later check finds Quality 39886905107, Objects 39886905191
+and Runtime 39886905212 successful. Core 39886905229 completes its unit/package,
+identity and recovery jobs, but both installation jobs are cancelled at the
+30-minute job limit while progressing through the combined suite. CI acceptance
+and M8.0 remain open. The local runner now separates installation, publication,
+real-template and resource-creation suites into independent clean-boot jobs with all existing
+checks retained. The complete HP50g creation suite passes from a fresh boot;
+the installation suite is still running. The isolated template suite reaches
+its previously uncompleted recovery step but performs no Flash writes. A
+55-second restart control also performs none. The retained 150,186-byte
+one-shot installer leaves only 22,776 bytes between the native stacks before
+fault injection. Removing only that completed installer raises the gap to
+194,409 bytes; the same injected fault then repairs in 1,923 operations and
+passes the unchanged second-restart oracle. The real-store test now consumes
+its one-shot HOME binding while preserving HPCTEMPLATE, and checks absence
+explicitly. Fresh complete template-suite runs pass on HP49g+ and HP50g:
+25,428 storage operations, 1,923 recovery operations, exact full Flash/catalog,
+source preservation and unchanged second restart. This does not relax the
+separate low-memory/resource-ownership requirements. Publication reuses the same
+native installed-baseline helper, with its own fresh boot and evidence; its
+standalone entry is under local validation while the original combined run
+continues to verify the remaining lifecycle checks.
 
 Current delivery checkpoints:
 - **Real-root cleanup integration (locally verified; not submitted):**
@@ -587,7 +606,8 @@ Current delivery checkpoints:
   and read-only admission sequences, rejecting a wrong binding while preserving
   Flash, catalog, reservation and unrelated HOME data. Publication leaves one
   checked stack result; the next command clears it, and exact input/output depths
-  are verified. Separate native programs stay within the loader's 32 KiB limit.
+  are verified. At that checkpoint, separate programs stayed within the then
+  conservative 32 KiB packaging limit (superseded by the RAM-bound check above).
   Ownership, safe startup, activation and cancellation remain separate requirements.
 
 Batch `50eadbea` is submitted for CI: admission, four-extent
@@ -795,7 +815,8 @@ fix is not submitted yet, so CI acceptance and M8.0 completion remain open.
 - **Real recovery template integration (local, open):** packaging the actual
   guarded recovery/admission ELF images produces a 49,588-byte native record.
   Embedding that record in the installation witness exceeds the recovery CODE
-  loader's 32 KiB initialized-image limit; its native packaging rejects it.
+  then-conservative 32 KiB initialized-image packaging limit; native packaging
+  rejected it at that checkpoint. The RAM-bound check above supersedes that cap.
   The small empty-configuration installation fixture therefore does not prove
   real-template installation. A separate-input prototype now passes native
   preparation on HP49g+/HP50g: the installer verifies the full template against

@@ -697,7 +697,16 @@ does not by itself prove which earlier factory callbacks executed or were skippe
 
 `tests/e2e/port-recovery/run.py` orchestrates the fresh firmware boot, offline
 fault preparation, hardware reset, USB transfer and independent verification.
-It then performs another hardware reset and compares the complete native library
+The `--suite` option separates independent acceptance flows: `recovery` (the
+default) tests replay and interruption; `identity` checks sealed admission;
+`installation` covers lookup, staging and creation/cancellation fixtures;
+`publication` covers resource conflicts, publication, repeat and cancellation;
+`template` tests the real recovery library's preparation, storage and recovery;
+`creation` tests its bound RAM creation, rejection and complete cancellation
+lifecycle. Each suite starts with a fresh firmware boot and writes its own
+evidence directory. CI runs all six on both models; splitting the flows does
+not remove checks or require a saved state from another job.
+The recovery suite then performs another hardware reset and compares the complete native library
 catalog against the clean boot (IDs, bindings, bank switches and flags, independent
 of ordering). The repaired Flash and retained journal must remain unchanged, the
 stack empty and execution back in Stock ROM. This catches recovery that returns

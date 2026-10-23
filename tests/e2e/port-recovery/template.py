@@ -398,11 +398,7 @@ def run_creation_cleanup(
     return {"slot": slot, "operations": operations}
 
 
-def run_template(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
-    from installation import verify_placement, verify_preparation, verify_probe
-    from startup import verify_startup
-    from store import restart_storage, verify_storage
-
+def run_creation(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
     claim_before, claim_library, claim_layout = run_creation_template(
         args, clean, root, transfer=transfer, verify_busy_reads=verify_busy_reads
     )
@@ -429,6 +425,14 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
         completed=completed,
         verify_busy_reads=verify_busy_reads,
     )
+    return {"creation_storage": claim_storage, "creation_cleanup": claim_cleanup}
+
+
+def run_template(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
+    from installation import verify_placement, verify_preparation, verify_probe
+    from startup import verify_startup
+    from store import restart_storage, verify_storage
+
     root = root / "real-template"
     root.mkdir()
     build = args.build
@@ -490,6 +494,10 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
         build,
         "REALSTORE",
         package_name="installation-template-store.hp",
+        # This one-shot installer owns a large template/runtime copy. Release
+        # its HOME binding on entry so it cannot consume recovery-time memory
+        # after returning. The independent HPCTEMPLATE source remains intact.
+        consume=True,
         # A real library programs tens of thousands of words with simulated
         # busy polling; the small-witness budget can terminate it mid-write.
         execution_ms=60000,
@@ -507,6 +515,9 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
         verify_busy_reads(args, stored) == operations,
         "Real storage bypassed Flash polling",
     )
+    from reservation import require_absent
+
+    require_absent(reader(stored / "state"), b"REALSTORE")
     restart_storage(
         args,
         stored,
@@ -565,8 +576,6 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
     )
     return {
         "bytes": layout["record_bytes"],
-        "creation_storage": claim_storage,
-        "creation_cleanup": claim_cleanup,
         "slot": slot,
         "operations": operations,
         "recovery": recovery,

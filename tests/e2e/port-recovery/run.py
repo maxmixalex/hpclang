@@ -515,10 +515,28 @@ def run(args):
         )
         return
 
-    if args.suite == "installation":
-        from installation import run_installation
+    if args.suite in ("template", "creation"):
+        from template import run_creation, run_template
 
-        run_installation(
+        result = (run_creation if args.suite == "creation" else run_template)(
+            args,
+            clean / "state",
+            args.output,
+            transfer=transfer,
+            emulator=emulator,
+            completed=completed,
+            verify_busy_reads=verify_busy_reads,
+        )
+        (args.output / "result.json").write_text(
+            json.dumps(dict(status="pass", model=args.model, suite=args.suite, **result), indent=2)
+            + "\n"
+        )
+        return
+
+    if args.suite in ("installation", "publication"):
+        from installation import run_installation, run_publication_suite
+
+        (run_installation if args.suite == "installation" else run_publication_suite)(
             args,
             clean / "state",
             transfer=transfer,
@@ -753,7 +771,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument(
-        "--suite", choices=("recovery", "installation", "identity"), default="recovery"
+        "--suite",
+        choices=("recovery", "installation", "identity", "template", "creation", "publication"),
+        default="recovery",
     )
     parser.add_argument("--dist", type=Path, required=True, help="portable x50ng distribution")
     parser.add_argument(
