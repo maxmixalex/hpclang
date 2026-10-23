@@ -419,6 +419,27 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Local native-pool observation (2026-10-23): an isolated test-only stage records
+its incoming geometry before the UI runs. HP50g Stock passes the complete UI
+and normal return; its retained witness reports 94 stage-pool pages (376 KiB),
+6 stage pages, 14 code pages and 9 RW pages. One MMU workspace and one stage
+stack page leave 63 supplied pages outside the capped application RW mapping.
+The saved coarse table independently contains 94 valid, distinct physical
+pages. The witness adds 64 B of stage storage and crosses a page boundary:
+this instrumented stage needs one more page than production. This observation
+does not measure native allocator block size/overhead or installation/transfer
+peaks, and is not a production minimum claim. The separate HP39g+ experiment
+is running on exec session 78905. Evidence lives under
+`/work/oct23-native-pool-src/build`, with build/read scripts retained in
+`research/oct23-native-pool-witness.py` and `research/oct23-native-pool-read.py`.
+The first two setup attempts failed before application execution (missing PTY
+directory, then CRLF sequence input); the corrected HP50g v3 log passes.
+
+One-time submitted-UI CI check after independent review/accounting work:
+`64d223d9` Quality 39935566666 passes; Core 39935566642, Runtime 39935566879,
+Objects 39935566875, Storage 39935566853 and Gallery 39935566811 are queued.
+No repeated queue polling or merge; these results do not cover local follow-ups.
+
 Local native-allocation policy audit (2026-10-23): release-source inspection
 decodes the wrapper's `0x01c00000` as MMU packing, optional ARM OS RAM and one
 16-byte native stack-growth block. The low 20 bits in this mode reserve free
@@ -458,7 +479,7 @@ acceptance of timing checkpoints, launcher memory reports, minimum-RW admission
 and the installed C example budget. Timing passes all six Direct/Stock models;
 minimum-RW admission passes all six Direct models at the exact required pool
 and focused HP39g+/HP50g Stock. Installed SDK relocation and all three HP39
-Aplet families pass. New CI is submitted and is not polled. Whole-system
+Aplet families pass. CI is submitted; the one-time result above is current. Whole-system
 resource accounting and the other M8.2/M8.3 acceptance criteria remain open.
 
 Execution discipline: read this roadmap and remote issue #1 before selecting work;
