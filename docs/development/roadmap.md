@@ -421,7 +421,7 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Execution discipline: read this roadmap and remote issue #1 before selecting work;
 reconcile implementation, branch and verification evidence, then update both when
-results or scope facts change. M8.0 remains the primary track. Port 2 recovery
+results or scope facts change. The 2026-10-23 sequencing decision below now governs current work. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
@@ -437,6 +437,22 @@ The observed pre-recovery traversal into SRAM remains a known limitation to
 resolve or exclude from that envelope, not a reason to collect unlimited
 additional successful corruption samples.
 
+Maintainer sequencing decision (2026-10-23): keep Port 2 reclamation and automatic
+startup recovery within M8, but advance other modules first. No scope reduction
+was approved. Current implementation work resumes M8.2/M8.3 UI resource and
+update-cost acceptance; M8.0 requirements and the submitted recovery repair stay
+open. This explicitly supersedes the earlier restriction that other modules
+advance only during an external wait on the native-port track.
+Current UI follow-up (local, 2026-10-23): checkpoint ID 2 now exports observed
+frame/input maxima and sample counts alongside the unchanged memory report.
+The independent verifier requires nine timed updates and 34 key edges and rejects
+missing, malformed or saturated measurements. Direct/Stock launch scripts clear
+old JSON reports before each run. All six Direct models and HP50g Stock pass
+independent pixels, memory, timing observations and normal return; remaining
+Stock models are running. The complete universal ARM application/six launchers,
+report-verifier tests, ARM analysis, formatting and Ruff pass. These are sampled
+emulator costs, not physical deadlines or whole-application admission proof.
+No new M8.2/M8.3 completion or UI CI submission is claimed.
 Submitted repair (2026-10-23): `5959159a` on `m8-flash-write` includes safe
 admission folding, maintained copy-size preflight and the four preceding
 startup-evidence commits. Local dual-model recovery, the separate size-check
@@ -2113,13 +2129,14 @@ triggered CI workflows pass at `d94580b4`, without closing an entire M8 stage.
 | M8.5 | Initial C++ UI/object wrappers accepted; additional owners verified locally. | Broader ownership/migration guidance, examples and pending integration acceptance. |
 | M8.6 | Integrated examples and relocated packaging have substantial local evidence. | Complete downstream scenarios, resource/error/return and release acceptance; retain the independent-launcher evaluation without presuming retirement. |
 
-The next implementation track is M8.0's existing native-port work: establish
+The retained M8.0 implementation track is native-port work: establish
 complete execution-reference coverage for safe movement/registration, then
 finish the trusted recovery installation/authority and startup requirements
 needed for reclamation. Those requirements must be satisfied together before
 public reclamation is enabled. Asynchronous sound is an M8.4 obligation, not a
 dependency of Port 2. Its verified timer/IRQ foundations remain available for
-later continuation. UI/resource and other adapter work may proceed independently
+later continuation. The following earlier scheduling rule is superseded by the
+2026-10-23 sequencing decision above: UI/resource and other adapter work could proceed independently
 when the native-port track has a concrete external wait; this does not silently
 replace that track or close its remaining requirements.
 

@@ -409,6 +409,18 @@ Host checkpoint waits and keyboard injection waits are excluded. These are
 separate sampled paths: adding their maxima would not establish an end-to-end
 latency bound. Renderer construction, asynchronous provider work and initial
 display acquisition are outside these measurements.
+
+The maintained UI test also exports these observations as checkpoint ID 2
+(`*-frame-memory-2.json`). The checkpoint envelope has version 1; its five
+payload words are payload version 1, maximum frame microseconds, maximum input
+microseconds, frame sample count and input sample count. The independent verifier
+requires all nine timed updates and 34 key edges, rejects missing or saturated
+timings, and prints both maxima. Initial painting is measured separately and is
+not one of those nine updates. The original memory report remains checkpoint
+ID 1. Each launch removes old checkpoint files so a previous run cannot supply
+the required observations. These sampled emulator values are evidence for
+comparison, not a physical-device deadline or worst-case execution bound.
+
 The standalone C and C++ examples also deliberately sleep for 20 milliseconds
 per event-loop iteration. They process one keyboard event per iteration and
 draw an accepted model change on the following iteration. That scheduling and
