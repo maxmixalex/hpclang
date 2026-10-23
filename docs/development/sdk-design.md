@@ -500,6 +500,14 @@ and changes only the authority phase byte. An occupied successor is preserved.
 The existing publication-retry interfaces still require an erased end marker.
 This primitive does not replace installation admission, fresh receipt validation,
 original ownership or safe startup checks; callers must establish those first.
+`hpclang_rpl_flash_close_creation` is the final claim-record transition after
+the caller has closed the transaction and safely released its resource under
+uninterrupted ownership. It compares every immutable byte against the original
+INTENT, accepts CREATED, partial CLOSING or already CLOSED, and clears only the
+phase byte. INTENT, unknown phases and changed records reject without writes;
+an occupied adjacent allocation is preserved. Failed or unconfirmed programming
+retains ownership and permits a same-owned retry. This primitive does not inspect
+RAM, authorize its removal, reconstruct ownership after reset or reclaim Flash.
 The internal packager accepts optional `--creation-claim-slot` for a guarded
 admission ELF with a sealed identity. It patches only the aligned initialized
 `hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and

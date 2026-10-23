@@ -735,6 +735,133 @@ static void claim_binding_word(uint8_t *binding, unsigned at, uint32_t value)
         binding[at + i] = (uint8_t)(value >> (8 * i));
 }
 
+static unsigned close_reads, close_read_failure;
+static int close_read(void *context, uint32_t at, uint16_t *value)
+{
+    if (++close_reads == close_read_failure)
+        return 0;
+    return read_flash(context, at, value);
+}
+
+static int close_silent_program(void *context, uint32_t at, uint16_t value)
+{
+    (void)context;
+    (void)at;
+    (void)value;
+    ++programs;
+    return 1;
+}
+
+static void creation_close_tests(const struct hpclang_rpl_flash_io *source, uint32_t slot,
+                                 const uint8_t *record)
+{
+    const unsigned bytes = HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES;
+    struct hpclang_rpl_flash_io io = *source;
+    io.read16 = close_read;
+    io.program16 = program_flash;
+    for (unsigned phase = 0; phase < 256; ++phase) {
+        install(0, 3);
+        memcpy(flash + slot - FIRST, record, bytes);
+        flash[slot - FIRST + 16] = phase;
+        flash[slot - FIRST - 1] = 0x23;
+        flash[slot - FIRST + bytes] = 0x53; /* Occupied successor, not an erased tail. */
+        memcpy(before, flash, sizeof flash);
+        close_reads = close_read_failure = programs = fail_program = 0;
+        int result = hpclang_rpl_flash_close_creation(&io, slot, record, bytes);
+        if (!(phase & ~0x7eu)) {
+            assert(!result && programs == (phase != 0));
+            before[slot - FIRST + 16] = 0;
+            programs = 0;
+            assert(!hpclang_rpl_flash_close_creation(&io, slot, record, bytes));
+            assert(!programs);
+        } else {
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && !programs);
+        }
+        assert(!memcmp(before, flash, sizeof flash));
+    }
+    for (unsigned at = 0; at < bytes; ++at) {
+        if (at == 16)
+            continue;
+        install(0, 3);
+        memcpy(flash + slot - FIRST, record, bytes);
+        flash[slot - FIRST + 16] = 0x7e;
+        flash[slot - FIRST + at] ^= 1;
+        memcpy(before, flash, sizeof flash);
+        close_reads = close_read_failure = programs = fail_program = 0;
+        assert(hpclang_rpl_flash_close_creation(&io, slot, record, bytes) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(!programs && !memcmp(before, flash, sizeof flash));
+    }
+    /* Every preflight read and both read/verify accesses around the phase write. */
+    for (unsigned cut = 1; cut <= bytes + 2; ++cut) {
+        install(0, 3);
+        memcpy(flash + slot - FIRST, record, bytes);
+        flash[slot - FIRST + 16] = 0x7e;
+        memcpy(before, flash, sizeof flash);
+        close_reads = programs = fail_program = 0;
+        close_read_failure = cut;
+        assert(hpclang_rpl_flash_close_creation(&io, slot, record, bytes) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(programs == (cut == bytes + 2));
+        if (programs)
+            before[slot - FIRST + 16] = 0;
+        assert(!memcmp(before, flash, sizeof flash));
+        close_read_failure = programs = 0;
+        assert(!hpclang_rpl_flash_close_creation(&io, slot, record, bytes));
+        assert(programs == (cut != bytes + 2));
+        before[slot - FIRST + 16] = 0;
+        assert(!memcmp(before, flash, sizeof flash));
+    }
+    const uint16_t masks[] = {0, 0x5555, 0xaaaa, 0xffff};
+    for (unsigned i = 0; i < sizeof masks / sizeof masks[0]; ++i) {
+        install(0, 3);
+        memcpy(flash + slot - FIRST, record, bytes);
+        flash[slot - FIRST + 16] = 0x7e;
+        memcpy(before, flash, sizeof flash);
+        close_reads = close_read_failure = programs = 0;
+        fail_program = 1;
+        partial_program_mask = masks[i];
+        assert(hpclang_rpl_flash_close_creation(&io, slot, record, bytes) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(programs == 1);
+        before[slot - FIRST + 16] &= (uint8_t)~(masks[i] >> 8);
+        assert(!memcmp(before, flash, sizeof flash));
+        fail_program = programs = 0;
+        assert(!hpclang_rpl_flash_close_creation(&io, slot, record, bytes));
+        assert(programs == (masks[i] != 0xffff));
+        before[slot - FIRST + 16] = 0;
+        assert(!memcmp(before, flash, sizeof flash));
+    }
+    install(0, 3);
+    memcpy(flash + slot - FIRST, record, bytes);
+    flash[slot - FIRST + 16] = 0x7e;
+    memcpy(before, flash, sizeof flash);
+    close_reads = close_read_failure = programs = fail_program = 0;
+    io.program16 = close_silent_program;
+    assert(hpclang_rpl_flash_close_creation(&io, slot, record, bytes) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(programs == 1 && !memcmp(before, flash, sizeof flash));
+    io.program16 = program_flash;
+    programs = 0;
+    assert(!hpclang_rpl_flash_close_creation(&io, slot, record, bytes));
+    assert(programs == 1);
+    before[slot - FIRST + 16] = 0;
+    assert(!memcmp(before, flash, sizeof flash));
+    /* A later-phase or damaged expected record is not the original intent. */
+    for (unsigned fault = 0; fault < 4; ++fault) {
+        uint8_t invalid[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES];
+        memcpy(invalid, record, sizeof invalid);
+        if (fault == 0)
+            invalid[16] = 0;
+        if (fault == 1)
+            invalid[bytes - 1] ^= 1;
+        programs = 0;
+        assert(hpclang_rpl_flash_close_creation(&io, slot, fault == 2 ? NULL : invalid,
+                                                bytes - (fault == 3)) == HPCLANG_RPL_FLASH_INVALID);
+        assert(!programs && !memcmp(before, flash, sizeof flash));
+    }
+    partial_program_mask = close_reads = close_read_failure = programs = fail_program = 0;
+}
+
 static void creation_publication_tests(const struct hpclang_rpl_flash_io *source)
 {
     const uint32_t slot = FIRST + 0xa0105;
@@ -748,6 +875,7 @@ static void creation_publication_tests(const struct hpclang_rpl_flash_io *source
     claim_binding_word(binding, 76, 32768);
     assert(!hpclang_rpl_flash_creation_encode(
         FIRST, END, slot, binding, (const uint8_t *)"HPCLEASE", 8, record, sizeof record));
+    creation_close_tests(source, slot, record);
     struct hpclang_rpl_flash_io io = *source;
     io.program16 = program_flash;
     install(0, 3);

@@ -425,8 +425,22 @@ results or scope facts change. M8.0 remains the primary track. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
+Latest submission: `af3e2a2e` includes the five local implementation commits since
+`50eadbea`, including the missing creation-layout CI artifact fix. Local acceptance
+is recorded below; new CI has not been polled and M8.0 remains open.
+
 Current delivery checkpoints:
-- **Real-root resource creation (locally verified; not yet submitted):** after the durable
+- **Creation-claim closure (locally verified; not yet submitted):** the final record primitive
+  compares the original INTENT's immutable bytes, accepts only CREATED/partial
+  CLOSING/CLOSED, and clears the phase without touching adjacent allocations.
+  Transaction closure, safe RAM release and uninterrupted ownership remain caller
+  prerequisites; matching bytes cannot authorize post-restart adoption. ARM build
+  and packaging pass. Host tests cover all phases, each immutable-byte corruption,
+  every read cut, partial/failed/lost-ack writes and silent programming failure;
+  the full installation ASan/UBSan suite passes, followed by focused sanitizer
+  acceptance of the additional silent-write and invalid-original cases. Native
+  lifecycle integration remains pending; this does not grant release permission.
+- **Real-root resource creation (locally verified; submitted in `af3e2a2e`, CI pending):** after the durable
   INTENT, the real installation witness creates the bound 32 KiB HOME string in
   the same exclusive invocation, retaining the original creation receipt and
   immutable snapshot. It commits CREATED through receipt/content validation,
@@ -478,7 +492,7 @@ Current delivery checkpoints:
   code/stack guards, Stock return and unchanged root/resource after restart.
   Each performs 27,505 Flash operations. Authority remains unarmed; this does not
   close ownership reconstruction, startup ordering, activation or reclamation.
-- **Real-root creation intent (locally verified; not yet submitted):** before any root write,
+- **Real-root creation intent (locally verified; submitted in `af3e2a2e`, CI pending):** before any root write,
   the native witness resolves HOME and rejects an existing HPCLEASE name. After
   staging the real root's pair, it publishes INTENT at the fourth planned extent,
   binding the resealed root identity, all coordinates, journal CRC, name and RAM
@@ -490,7 +504,7 @@ Current delivery checkpoints:
   saved rejection captures pass after correcting the verifier to expect the
   prepared (unwritten) slot in diagnostics: zero Flash operations, original string
   and template preserved. Strict docs and pinned formatting pass.
-- **Real-root transaction staging (locally verified; not yet submitted):** the maintained
+- **Real-root transaction staging (locally verified; submitted in `af3e2a2e`, CI pending):** the maintained
   claim-bound storage witness now writes its real recovery library, READY journal
   and unarmed authority in the same exclusive invocation, using the four-extent
   plan rather than fixture addresses. Each write callback is confined to its owned
@@ -508,7 +522,7 @@ Current delivery checkpoints:
   Physical Flash, source template and native root registration survive restart.
   CI artifact review also found the creation-template layout JSON missing from
   the upload list; it is now included and the workflow parses successfully.
-- **Adjacent-allocation activation (locally verified; not yet submitted):** integration
+- **Adjacent-allocation activation (locally verified; submitted in `af3e2a2e`, CI pending):** integration
   review found that publication retry requires an erased successor, whereas a
   completed staged authority may precede an already-published creation claim.
   A separate activation primitive accepts only exact 7F/7E and complete READY
@@ -520,7 +534,7 @@ Current delivery checkpoints:
   receipt validation; HP49g+/HP50g both pass activation and transaction closure
   with 1,958 Flash operations each. Strict docs and pinned formatting pass. Complete
   installer integration, fresh receipt checks and safe startup remain required.
-- **Staged creation admission (locally verified; not yet submitted):** the
+- **Staged creation admission (locally verified; submitted in `af3e2a2e`, CI pending):** the
   streaming gate requires exact unarmed authority 7F, READY journal and CREATED
   claim, checking root/catalog and native boundaries in both current and proposed
   Flash views. Current damage cannot be excused by the recovery image. Host

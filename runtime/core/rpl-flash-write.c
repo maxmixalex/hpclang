@@ -135,8 +135,8 @@ int hpclang_rpl_flash_finish_creation_intent(const struct hpclang_rpl_flash_io *
     return creation_intent(io, slot, record, bytes, 1);
 }
 
-int hpclang_rpl_flash_complete_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
-                                        const uint8_t *intent, uint32_t bytes)
+static int transition_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                               const uint8_t *intent, uint32_t bytes, int closing)
 {
     enum hpclang_rpl_flash_creation_phase expected_phase;
     if (!io || !io->read16 || !io->program16 || !intent ||
@@ -153,16 +153,28 @@ int hpclang_rpl_flash_complete_creation(const struct hpclang_rpl_flash_io *io, u
             return HPCLANG_RPL_FLASH_DIRTY;
         uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
         if (i == 16) {
-            if (value != 0x7fu && value != 0x7eu)
+            if (closing ? (value & ~0x7eu) != 0 : value != 0x7fu && value != 0x7eu)
                 return HPCLANG_RPL_FLASH_DIRTY;
             phase = value;
         } else if (value != intent[i]) {
             return HPCLANG_RPL_FLASH_DIRTY;
         }
     }
-    const uint8_t created = 0x7e;
-    return phase == created || write_bytes(io, slot + 16u, &created, 1u) ? HPCLANG_RPL_FLASH_WRITTEN
-                                                                         : HPCLANG_RPL_FLASH_DIRTY;
+    const uint8_t target = closing ? 0 : 0x7e;
+    return phase == target || write_bytes(io, slot + 16u, &target, 1u) ? HPCLANG_RPL_FLASH_WRITTEN
+                                                                       : HPCLANG_RPL_FLASH_DIRTY;
+}
+
+int hpclang_rpl_flash_complete_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                        const uint8_t *intent, uint32_t bytes)
+{
+    return transition_creation(io, slot, intent, bytes, 0);
+}
+
+int hpclang_rpl_flash_close_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                     const uint8_t *intent, uint32_t bytes)
+{
+    return transition_creation(io, slot, intent, bytes, 1);
 }
 
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,

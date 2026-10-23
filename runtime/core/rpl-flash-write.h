@@ -319,6 +319,18 @@ int hpclang_rpl_flash_finish_creation_intent(const struct hpclang_rpl_flash_io *
 int hpclang_rpl_flash_complete_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                         const uint8_t *intent, uint32_t bytes);
 
+/* Close an owned CREATED claim only AFTER its transaction has been closed and
+ * its resource safely released. The caller must establish those prerequisites
+ * under uninterrupted ownership; this primitive never discovers/adopts RAM or
+ * authorizes release. Compare the original INTENT's entire immutable record,
+ * then clear only the phase byte. Accept CREATED, NOR-compatible partial CLOSING
+ * and CLOSED (lost acknowledgement); reject INTENT and every other phase.
+ * An occupied following allocation is allowed and preserved. No erase or RAM
+ * writes. DIRTY retains ownership; same-owned retries remain possible with the
+ * original bytes. Matching contents do not reconstruct ownership after reset. */
+int hpclang_rpl_flash_close_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                     const uint8_t *intent, uint32_t bytes);
+
 /* Bind one caller-reserved erased authority allocation to an already durable
  * ready journal. Verify the complete journal, then publish/verify the binding
  * body before its ARMED status. Neither journal nor target is modified.
