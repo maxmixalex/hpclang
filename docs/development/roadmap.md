@@ -440,8 +440,8 @@ additional successful corruption samples.
 Maintainer sequencing decision (2026-10-23): keep Port 2 reclamation and automatic
 startup recovery within M8, but advance other modules first. No scope reduction
 was approved. Current implementation work resumes M8.2/M8.3 UI resource and
-update-cost acceptance; M8.0 requirements and the submitted recovery repair stay
-open. This explicitly supersedes the earlier restriction that other modules
+update-cost acceptance; M8.0 requirements stay open, while the recovery repair
+is accepted below. This explicitly supersedes the earlier restriction that other modules
 advance only during an external wait on the native-port track.
 Current UI follow-up (local, 2026-10-23): `bd1b0d56` is not accepted. Its six
 Direct models and HP50g Stock pass, but HP39g+ Stock reaches PASS and then waits
@@ -452,10 +452,10 @@ terminated after this confirmed defect, not restarted because of elapsed time.
 Local fix `3425073b` publishes timing checkpoint ID 2 before PASS and retains the single
 post-cleanup memory checkpoint ID 1. Strict return checks are unchanged. A fresh
 six-model Direct matrix passes in separate v2 output directories, including
-timing, pixels, memory and return; HP39g+ and HP39gs Stock now also pass both
+timing, pixels, memory and return; all three HP39 models and HP48gII Stock pass both
 reports, independent pixels and normal return. HP39gs reports 2,424/8,192
 touched stack bytes, 18,892/22,888 heap bytes and observed frame/input maxima
-18,913/610 us over 9/34 samples. The remaining Stock matrix is still running.
+18,913/610 us over 9/34 samples. The remaining HP49g+/HP50g Stock matrix is running.
 The changed UI sources pass ARM analysis and pinned formatting; report verifier tests pass.
 
 Current minimum-RW admission follow-up (local, 2026-10-23): optional
@@ -469,10 +469,19 @@ pool, independent pixels, memory/timing reports and normal return. Eight host
 tests, relocated installed-SDK C/C++/six-model packaging, Ruff/format and ARM
 analysis (using the repository's fixed-address MMIO exclusion) pass. Default
 launchers without a minimum remain byte-identical on all six models. Focused
-HP39g+ Stock passes pixels, both reports and normal return; HP50g is running
-on the same focused queue. The existing timing-only Stock matrix remains live.
+HP39g+ and HP50g Stock pass pixels, both reports and normal return; the focused
+queue exits successfully. HP50g reports 2,432/8,192 touched stack bytes,
+20,076/22,888 heap bytes and frame/input maxima 28,188/610 us over 9/34 samples.
+The existing timing-only Stock matrix remains live.
 This adds an admission condition, not a reduced Stock
 allocation policy or whole-system resource proof. No milestone is closed.
+The installed C device-manager example now declares the same 36 KiB minimum
+and ceiling instead of relying on the launcher's remaining pages. The relocated
+SDK check now builds this unmodified C example alongside the existing clients,
+validates its memory report and all six launchers, and optionally includes it in
+Aplet packaging. The expanded non-Aplet SDK suite, Ruff/format and strict docs
+pass locally. The example README's obsolete 16,764-byte pool is corrected to
+13,692 bytes. This does not assert a whole-system 36 KiB footprint.
 Local `a1aae4e8` adds a launcher-memory report that accounts for code, RW minimum/ceiling,
 linked stage, stage stack, MMU workspace and HP39 Stock's native workspace.
 CMake regenerates a deleted report. Seven host tests and the relocated installed

@@ -38,6 +38,14 @@ The build produces the HPC1 image and six-model launchers. HP39 Aplet packaging
 uses the SDK's separate `hpclang_target_aplet` helper and its declared historical
 tool/assets dependencies.
 
+The example requires and caps its application read/write arena at 36 KiB through
+`MIN_RW_BYTES` and `MAX_RW_BYTES`. This includes static data, heap and the reserved
+8 KiB application stack. Launcher admission also accounts for application code
+and startup workspace before entering the application. Inspect the generated
+`declarative_ui-launchers/memory.json` for the linked image's pool requirements.
+Stored objects, native allocator overhead and separate LCD DMA pages are
+additional; these settings do not reduce the Stock launcher's reservation.
+
 ## Operate
 
 Up/down moves focus and scrolls it into view. Enter activates a button. In the
@@ -52,5 +60,6 @@ released. It retries display timeouts from the accepted image, reborrowing the
 LCD back page each time. Startup/allocation failures return an error to the
 launcher. The full example flow passes local Direct and Stock tests on all six
 models, with normal return, alternate-theme and native/fallback-font checkpoints.
-The ARM declaration pool uses 16,764 bytes; renderer and LCD pages are additional.
-Remote CI acceptance remains pending.
+The ARM declaration pool uses 13,692 bytes; renderer and LCD pages are additional.
+The shared application flow has passed Runtime CI. The new explicit launcher
+memory requirement is a separate follow-up pending CI acceptance.

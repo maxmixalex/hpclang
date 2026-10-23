@@ -7,7 +7,7 @@ option(HPCLANG_DEMO_NATIVE_FONT "Prefer the calculator's native default font" OF
 target_compile_definitions(declarative_ui PRIVATE
     HPCLANG_DEMO_INVERTED=$<BOOL:${HPCLANG_DEMO_INVERTED}>
     HPCLANG_DEMO_NATIVE_FONT=$<BOOL:${HPCLANG_DEMO_NATIVE_FONT}>)
-hpclang_target_launchers(declarative_ui)
+hpclang_target_launchers(declarative_ui MIN_RW_BYTES 36864 MAX_RW_BYTES 36864)
 set(ui_ascii)
 foreach(codepoint RANGE 32 126)
     list(APPEND ui_ascii ${codepoint})

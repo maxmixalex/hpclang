@@ -83,6 +83,7 @@ def main():
         check_interworking(package, work, env)
         application = work / "external application"
         shutil.copytree(package / "examples/hello", application)
+        shutil.copytree(package / "examples/declarative-ui", application / "devices")
         shutil.copytree(package / "examples/declarative-ui-cpp", application / "counter")
         counter_cmake = application / "counter/CMakeLists.txt"
         counter_source = counter_cmake.read_text()
@@ -103,7 +104,7 @@ def main():
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
-                "add_subdirectory(notebook)\nadd_subdirectory(console)\n"
+                "add_subdirectory(notebook)\nadd_subdirectory(console)\nadd_subdirectory(devices)\n"
                 "hpclang_add_application(numeric_input numeric-input.cpp)\n"
                 "target_compile_features(numeric_input PRIVATE cxx_std_17)\n"
                 "hpclang_target_launchers(numeric_input)\n"
@@ -119,6 +120,7 @@ foreach(application IN ITEMS hello_c hello_cpp numeric_input)
 endforeach()
 """)
             for directory, target in (
+                ("devices", "declarative_ui"),
                 ("counter", "declarative_ui_cpp"),
                 ("objects", "object_cpp"),
                 ("timer", "hpgcc_timer"),
@@ -171,6 +173,7 @@ endforeach()
             ("hello_c", build),
             ("hello_cpp", build),
             ("numeric_input", build),
+            ("declarative_ui", build / "devices"),
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
@@ -191,7 +194,7 @@ endforeach()
                 or memory["application"]["static_bytes"] != int.from_bytes(hpc[12:16], "little")
             ):
                 raise AssertionError(f"{name}: memory report does not describe the application")
-            ceiling = 36864 if name == "declarative_ui_cpp" else None
+            ceiling = 36864 if name in ("declarative_ui", "declarative_ui_cpp") else None
             if memory["application"]["rw_ceiling_bytes"] != ceiling:
                 raise AssertionError(f"{name}: memory report lost its configured RW ceiling")
             if memory["application"]["required_rw_bytes"] != ceiling:

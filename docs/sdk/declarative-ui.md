@@ -430,6 +430,14 @@ registers or mappings, then runs the UI with exactly the required pool count.
 This verifies bounded admission for the tested UI allocation policy; the
 legacy Stock allocation policy and other system-memory costs remain separate.
 
+The installed C device-manager example now declares the same 36 KiB minimum
+and ceiling. The relocated SDK check builds this example without rewriting its
+launcher settings and verifies its memory report and all six packaged launchers.
+The pool requirement in its own `memory.json` is authoritative for that linked
+image; the larger instrumented C/C++ acceptance fixture has different code and
+static-data sizes. Both settings govern application RW admission, not the total
+system allocation or installation footprint.
+
 The standalone C and C++ examples also deliberately sleep for 20 milliseconds
 per event-loop iteration. They process one keyboard event per iteration and
 draw an accepted model change on the following iteration. That scheduling and
