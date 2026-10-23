@@ -425,7 +425,12 @@ results or scope facts change. M8.0 remains the primary track. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
-Latest submission: `af3e2a2e` includes the five local implementation commits since
+Current batch through `92acb946` includes retryable claim closure, native combined
+cancellation, unregistered-root pair cancellation, complete real-root cleanup,
+RAM-bounded CODE packaging, independent acceptance suites and one-shot installer
+release. Local acceptance is complete below; CI acceptance remains pending.
+
+Previous CI submission: `af3e2a2e` includes the five implementation commits since
 `50eadbea`, including the missing creation-layout CI artifact fix. Local acceptance
 is recorded below. A later check finds Quality 39886905107, Objects 39886905191
 and Runtime 39886905212 successful. Core 39886905229 completes its unit/package,
@@ -433,10 +438,12 @@ identity and recovery jobs, but both installation jobs are cancelled at the
 30-minute job limit while progressing through the combined suite. CI acceptance
 and M8.0 remain open. The local runner now separates installation, publication,
 real-template and resource-creation suites into independent clean-boot jobs with all existing
-checks retained. The complete HP50g creation suite passes from a fresh boot;
-the installation suite is still running. The isolated template suite reaches
-its previously uncompleted recovery step but performs no Flash writes. A
-55-second restart control also performs none. The retained 150,186-byte
+checks retained. The complete HP50g creation suite passes from a fresh boot
+(about 11 minutes). The original combined installation/publication run also
+passes, taking about 35 minutes locally, beyond the unchanged CI job limit.
+The isolated template suite initially reached its previously uncompleted
+recovery step without Flash writes; a 55-second restart control did not help.
+The retained 150,186-byte
 one-shot installer leaves only 22,776 bytes between the native stacks before
 fault injection. Removing only that completed installer raises the gap to
 194,409 bytes; the same injected fault then repairs in 1,923 operations and
@@ -446,12 +453,14 @@ explicitly. Fresh complete template-suite runs pass on HP49g+ and HP50g:
 25,428 storage operations, 1,923 recovery operations, exact full Flash/catalog,
 source preservation and unchanged second restart. This does not relax the
 separate low-memory/resource-ownership requirements. Publication reuses the same
-native installed-baseline helper, with its own fresh boot and evidence; its
-standalone entry is under local validation while the original combined run
-continues to verify the remaining lifecycle checks.
+native installed-baseline helper, with its own fresh boot and evidence. Its
+standalone entry passes conflicts, write failure, activation rejection,
+publication, closed-repeat and both cancellation paths in about 14 minutes.
+Both template suites take about 8 minutes. All 88 recovery Python tests,
+pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
-- **Real-root cleanup integration (locally verified; not submitted):**
+- **Real-root cleanup integration (locally verified; CI acceptance pending):**
   the maintained installer now cancels its same-owned staged pair, discards the
   original fresh RAM reservation and closes/repeats its creation claim. The new
   oracle compares complete Flash, closed envelopes and claim, consumed receipt,
@@ -467,7 +476,7 @@ Current delivery checkpoints:
   runtime envelope bounds remain enforced; count/extent tests cover the former
   boundary and 64 KiB; native execution above 32 KiB passes on both models.
   Root retirement, post-reset ownership, early startup and reclamation remain open.
-- **Unregistered-root cancellation (locally verified; not yet submitted):** real installation
+- **Unregistered-root cancellation (locally verified; CI acceptance pending):** real installation
   has not registered its new root when resource creation finishes, so the
   registered-library cancellation gate cannot be reused unchanged. Added a
   separate same-owned complete-pair primitive: compare the retained READY journal,
@@ -479,7 +488,7 @@ Current delivery checkpoints:
   partial/failed/lost-ack/silent programming. The full installation ASan/UBSan
   regression, pinned formatting and strict docs also pass. Real-root native
   integration remains pending.
-- **Native creation cancellation (locally verified; not yet submitted):** a maintained
+- **Native creation cancellation (locally verified; CI acceptance pending):** a maintained
   combined witness publishes INTENT, creates RAM, commits CREATED, stages the
   transaction, cancels it, discards its original fresh reservation and closes the
   claim under the same invocation. Repeat closure must not write. Its independent
@@ -491,7 +500,7 @@ Current delivery checkpoints:
   both pass the complete cancellation/release/closure/repeat and restart oracle.
   This is lifecycle fixture integration, not real-root installation ownership
   reconstruction.
-- **Creation-claim closure (locally verified; not yet submitted):** the final record primitive
+- **Creation-claim closure (locally verified; CI acceptance pending):** the final record primitive
   compares the original INTENT's immutable bytes, accepts only CREATED/partial
   CLOSING/CLOSED, and clears the phase without touching adjacent allocations.
   Transaction closure, safe RAM release and uninterrupted ownership remain caller
