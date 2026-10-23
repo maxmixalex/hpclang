@@ -428,15 +428,21 @@ post-M8 deferral. Only M8.1 is accepted complete.
 Current batch through `92acb946` includes retryable claim closure, native combined
 cancellation, unregistered-root pair cancellation, complete real-root cleanup,
 RAM-bounded CODE packaging, independent acceptance suites and one-shot installer
-release. Local acceptance is complete below; CI acceptance remains pending.
+release. Submitted head `59e3b88b` passes Quality 39894707699, Core runtime
+39894707696 (including all twelve Stock suite jobs), Objects 39894707697 and
+Runtime 39894707705. PR #5 merges that batch into main as `9b33e772`.
+Local registered-lifecycle follow-up `a2a13331` and activation-cut work are not
+included in that merge; their acceptance remains separate below. New main CI
+is not polled. M8.0 remains open.
 
 Previous CI submission: `af3e2a2e` includes the five implementation commits since
 `50eadbea`, including the missing creation-layout CI artifact fix. Local acceptance
 is recorded below. A later check finds Quality 39886905107, Objects 39886905191
 and Runtime 39886905212 successful. Core 39886905229 completes its unit/package,
 identity and recovery jobs, but both installation jobs are cancelled at the
-30-minute job limit while progressing through the combined suite. CI acceptance
-and M8.0 remain open. The local runner now separates installation, publication,
+30-minute job limit while progressing through the combined suite. That earlier
+submission was not accepted; its split-suite successor is accepted above.
+The runner now separates installation, publication,
 real-template and resource-creation suites into independent clean-boot jobs with all existing
 checks retained. The complete HP50g creation suite passes from a fresh boot
 (about 11 minutes). The original combined installation/publication run also
@@ -460,6 +466,19 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
+- **Activation interruption boundary (locally verified, not submitted):** the
+  registration suite now cuts the actual final authority write before or after
+  its single changing phase bit reaches Flash. The oracle checks the exact
+  operation/address/value/mask/read event and the complete Flash image against
+  native-created records. Both reset paths retain the original template/catalog;
+  an uncommitted authority must preserve its resource without writes, while a
+  committed authority must recover/retire and release it. Both paths repeat reset
+  to check stability. HP49g+ and HP50g both pass: the uncommitted case makes zero
+  writes and retains the resource; the committed case retires the already intact
+  target transaction with two writes and releases the resource. Both second
+  resets make zero writes. These runs are separate from the still-running
+  complete pre-cut registration/creation suites. This does not
+  reconstruct ownership of an interrupted unarmed resource or reclaim its claim.
 - **Registered creation/configuration integration (local, not submitted):** the
   new preparation APIs require the exact registered root and reconstruct its
   fresh four-extent plan before permitting a transaction. Focused and full host

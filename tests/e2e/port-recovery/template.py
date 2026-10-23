@@ -566,6 +566,123 @@ def run_registered_creation(
     return {"slot": slot, "operations": operations}
 
 
+def run_activation_cuts(
+    args,
+    before,
+    reference,
+    root,
+    library,
+    layout,
+    journal,
+    authority,
+    operations,
+    *,
+    transfer,
+    emulator,
+    completed,
+    verify_busy_reads,
+):
+    """Cut the actual activation write before/after its sole changing bit lands."""
+    import re
+    import shutil
+    from reservation import require_absent
+    from verify import verify_flash, verify_restart
+
+    expected = (reference / "flash").read_bytes()
+    name = layout["reservation"]["name"].encode("ascii")
+    resource = home_string(reader(reference), name)
+    address = authority & ~1
+    value = int.from_bytes(expected[address : address + 2], "little")
+    bit = 1 << (8 * (authority & 1))
+    require(expected[authority] == 0x7E, "Reference transaction is not armed")
+    results = {}
+    for committed in (False, True):
+        label = "activation-cut-" + ("committed" if committed else "uncommitted")
+        cut = root / label
+        mask = bit if committed else 0
+        transfer(
+            args,
+            cut,
+            before,
+            args.build,
+            "REGCUT",
+            consume=True,
+            package_name="installation-template-creation-active-store.hp",
+            power_cut=(operations, 1, mask),
+        )
+        events = re.findall(
+            r"^hpclang-flash-cut operation=(\d+) address=(\d+) bytes=(\d+) "
+            r"value=(\d+) mask=(\d+) reads=(\d+)$",
+            (cut / "emulator.log").read_text(),
+            re.M,
+        )
+        require(
+            len(events) == 1
+            and tuple(map(int, events[0])) == (operations, address, 2, value, mask, 1),
+            "Power cut missed the native activation write",
+        )
+        torn = bytearray(expected)
+        if not committed:
+            torn[authority] = 0x7F
+        require(
+            (cut / "state/flash").read_bytes() == torn,
+            "Activation cut changed unrelated Flash or native-created records",
+        )
+        require(
+            home_string(reader(cut / "state"), name) == resource,
+            "Activation cut lost its native-created resource",
+        )
+        previous = cut / "state"
+        count = 0
+        for repeat in range(2):
+            phase = root / f"{label}-restart-{repeat}"
+            shutil.copytree(previous, phase / "state")
+            with emulator(
+                args,
+                phase,
+                "10000 capture home\n12000 finish-install\n",
+                ["--reset"],
+                flash_busy=True,
+                reset_checkpoint=True,
+            ) as child:
+                completed(child, 90)
+            state = phase / "state"
+            observed = verify_busy_reads(args, phase)
+            if committed and not repeat:
+                verify_flash(
+                    bytes(torn),
+                    (state / "flash").read_bytes(),
+                    journal,
+                    0x140000,
+                    retire=True,
+                    authority_slot=authority,
+                )
+                require(observed > 0, "Committed activation did not retire its transaction")
+                count = observed
+            else:
+                require(
+                    (state / "flash").read_bytes() == (previous / "flash").read_bytes(),
+                    "Unarmed or already recovered activation changed Flash",
+                )
+                require(observed == 0, "Unarmed or recovered transaction wrote on reset")
+            verify_restart(before, state, state)
+            verify_source(state, library)
+            if committed:
+                require_absent(reader(state), name)
+            else:
+                require(
+                    home_string(reader(state), name) == resource,
+                    "Uncommitted activation released its resource",
+                )
+            previous = state
+        results[label] = count
+    print(
+        "Activation power cuts distinguish committed authority without adopting unarmed resources",
+        flush=True,
+    )
+    return results
+
+
 def run_registered_activation(
     args, before, root, library, layout, slot, *, transfer, emulator, completed, verify_busy_reads
 ):
@@ -654,7 +771,22 @@ def run_registered_activation(
         verify_source(state, library)
         require_absent(reader(state), layout["reservation"]["name"].encode("ascii"))
     print("Native-created registered transaction recovered through its installed guard", flush=True)
-    return {"operations": operations, "recovery_operations": recovery_operations}
+    cuts = run_activation_cuts(
+        args,
+        before,
+        stored / "state",
+        root,
+        library,
+        layout,
+        journal,
+        authority,
+        operations,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    return {"operations": operations, "recovery_operations": recovery_operations, "cuts": cuts}
 
 
 def run_registration(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
