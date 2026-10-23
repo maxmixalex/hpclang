@@ -418,7 +418,9 @@ requires all nine timed updates and 34 key edges, rejects missing or saturated
 timings, and prints both maxima. Initial painting is measured separately and is
 not one of those nine updates. The original memory report remains checkpoint
 ID 1. Each launch removes old checkpoint files so a previous run cannot supply
-the required observations. These sampled emulator values are evidence for
+the required observations. Timing is published before application PASS; memory
+is published once after runtime cleanup, preserving Stock's return-monitoring
+boundary. These sampled emulator values are evidence for
 comparison, not a physical-device deadline or worst-case execution bound.
 
 The standalone C and C++ examples also deliberately sleep for 20 milliseconds

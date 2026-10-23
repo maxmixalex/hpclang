@@ -58,22 +58,24 @@ int __wrap_hpclang_start(const struct hpclang_boot_info *boot)
                 __asm__ volatile("nop");
         }
     }
-    /* Keep performance observations separate from the stable memory schema.
-     * Frame/input timers exclude host handshakes; reporting is not timed. */
+    return status;
+}
+
+int hpclang_ui_report_updates(void)
+{
+    /* Publish before PASS: Stock return monitoring may take over after the
+     * single post-cleanup memory checkpoint. Neither handshake is timed. */
     updates[0] = 2;
     updates[1] = 5;
     updates[2] = 1;
     for (unsigned i = 0; i < 4; ++i)
         updates[3 + i] = hpclang_ui_update_witness[i];
-    offset = (uint32_t)((uintptr_t)updates - HPCLANG_BOOT_BASE);
+    uint32_t offset = (uint32_t)((uintptr_t)updates - HPCLANG_BOOT_BASE);
     hpclang_e2e_result = 0x4d100000u | offset;
-    start = hpclang_time_monotonic_us();
+    uint64_t start = hpclang_time_monotonic_us();
     while (hpclang_e2e_result != (0x4d200000u | offset)) {
-        if (hpclang_time_monotonic_us() - start > 2000000u) {
-            hpclang_e2e_result = 0x4641190eu;
-            for (;;)
-                __asm__ volatile("nop");
-        }
+        if (hpclang_time_monotonic_us() - start > 2000000u)
+            return -1;
     }
-    return status;
+    return 0;
 }
