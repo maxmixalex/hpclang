@@ -218,6 +218,8 @@ jobs:
             build: configuration
           - name: registration
             build: configuration
+            - name: retirement
+              build: configuration
           - name: publication
             build: configuration
           - name: identity

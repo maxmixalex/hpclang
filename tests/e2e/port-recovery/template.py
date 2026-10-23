@@ -736,7 +736,18 @@ def run_activation_ram_loss(
 
 
 def run_registered_activation(
-    args, before, root, library, layout, slot, *, transfer, emulator, completed, verify_busy_reads
+    args,
+    before,
+    root,
+    library,
+    layout,
+    slot,
+    *,
+    transfer,
+    emulator,
+    completed,
+    verify_busy_reads,
+    retire_claim=False,
 ):
     """Arm a freshly created real transaction, then interrupt its target sector.
 
@@ -823,48 +834,64 @@ def run_registered_activation(
         verify_source(state, library)
         require_absent(reader(state), layout["reservation"]["name"].encode("ascii"))
     print("Native-created registered transaction recovered through its installed guard", flush=True)
-    from retirement import run_closed_restart, run_retirement
+    if retire_claim:
+        from retirement import run_closed_restart, run_closure_cuts, run_retirement
 
-    retirement_ready = run_retirement(
-        args,
-        before,
-        stored / "state",
-        repaired,
-        root,
-        library,
-        layout,
-        rebound,
-        slot,
-        transfer=transfer,
-        verify_busy_reads=verify_busy_reads,
-    )
-    closure = root / "claim-closure"
-    closure.mkdir()
-    run_retirement(
-        args,
-        before,
-        stored / "state",
-        repaired,
-        closure,
-        library,
-        layout,
-        rebound,
-        slot,
-        transfer=transfer,
-        verify_busy_reads=verify_busy_reads,
-        close=True,
-        prepared_states=retirement_ready,
-    )
-    run_closed_restart(
-        args,
-        retirement_ready["recovered"],
-        closure / "retirement-recovered/state",
-        closure,
-        layout["reservation"]["name"].encode("ascii"),
-        emulator=emulator,
-        completed=completed,
-        verify_busy_reads=verify_busy_reads,
-    )
+        retirement_ready = run_retirement(
+            args,
+            before,
+            stored / "state",
+            repaired,
+            root,
+            library,
+            layout,
+            rebound,
+            slot,
+            transfer=transfer,
+            verify_busy_reads=verify_busy_reads,
+        )
+        closure = root / "claim-closure"
+        closure.mkdir()
+        run_retirement(
+            args,
+            before,
+            stored / "state",
+            repaired,
+            closure,
+            library,
+            layout,
+            rebound,
+            slot,
+            transfer=transfer,
+            verify_busy_reads=verify_busy_reads,
+            close=True,
+            prepared_states=retirement_ready,
+        )
+        run_closed_restart(
+            args,
+            retirement_ready["recovered"],
+            closure / "retirement-recovered/state",
+            closure,
+            layout["reservation"]["name"].encode("ascii"),
+            emulator=emulator,
+            completed=completed,
+            verify_busy_reads=verify_busy_reads,
+        )
+        closure_cuts = run_closure_cuts(
+            args,
+            retirement_ready["recovered"],
+            closure,
+            layout["reservation"]["name"].encode("ascii"),
+            transfer=transfer,
+            emulator=emulator,
+            completed=completed,
+            verify_busy_reads=verify_busy_reads,
+        )
+        return {
+            "operations": operations,
+            "recovery_operations": recovery_operations,
+            "closure_cuts": closure_cuts,
+        }
     cuts = run_activation_cuts(
         args,
         before,
@@ -900,7 +927,9 @@ def run_registered_activation(
     }
 
 
-def run_registration(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
+def run_registration(
+    args, clean, root, *, transfer, emulator, completed, verify_busy_reads, retire_claim=False
+):
     claim_before, claim_library, claim_layout = run_creation_template(
         args, clean, root, transfer=transfer, verify_busy_reads=verify_busy_reads
     )
@@ -915,18 +944,20 @@ def run_registration(args, clean, root, *, transfer, emulator, completed, verify
         completed=completed,
         verify_busy_reads=verify_busy_reads,
     )
-    registered_creation = run_registered_creation(
-        args,
-        root / "creation-registration/restart/state",
-        root,
-        claim_library,
-        claim_layout,
-        registration["slot"],
-        transfer=transfer,
-        emulator=emulator,
-        completed=completed,
-        verify_busy_reads=verify_busy_reads,
-    )
+    registered_creation = None
+    if not retire_claim:
+        registered_creation = run_registered_creation(
+            args,
+            root / "creation-registration/restart/state",
+            root,
+            claim_library,
+            claim_layout,
+            registration["slot"],
+            transfer=transfer,
+            emulator=emulator,
+            completed=completed,
+            verify_busy_reads=verify_busy_reads,
+        )
     activation = run_registered_activation(
         args,
         root / "creation-registration/restart/state",
@@ -938,12 +969,12 @@ def run_registration(args, clean, root, *, transfer, emulator, completed, verify
         emulator=emulator,
         completed=completed,
         verify_busy_reads=verify_busy_reads,
+        retire_claim=retire_claim,
     )
-    return {
-        "registration": registration,
-        "registered_creation": registered_creation,
-        "activation": activation,
-    }
+    result = {"registration": registration, "activation": activation}
+    if registered_creation is not None:
+        result["registered_creation"] = registered_creation
+    return result
 
 
 def run_creation(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):

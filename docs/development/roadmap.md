@@ -471,6 +471,20 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
+- **Claim closure interruption (locally verified, not submitted):**
+  the maintained test cuts the actual phase-word program before any bit lands,
+  after a partial clear and after complete closure. Exact emulator event fields
+  and full Flash comparisons must match; reset must preserve the interrupted
+  claim without writes, retry must close it, and two further resets must remain
+  unchanged. HP49g+ and HP50g both pass: unwritten/partial/complete cases retry
+  with one/one/zero SST operations respectively. Each first reset and both
+  post-retry resets perform zero writes; exact cut events and complete Flash
+  images match. Retirement/closure acceptance now
+  has its own fresh-boot suite, sharing native installation setup while retaining
+  all registration/activation/RAM-loss checks in the registration suite. The
+  two-model CI matrix adds retirement with the existing 30-minute job limit.
+  A separate clean ARM build passes; both full registration regressions are
+  running against that build. Both full fresh retirement suites are now running`n  against the same clean build; combined fresh-suite acceptance remains pending.
 - **Retired claim closure (locally verified, not submitted):** a new
   internal operation revalidates the trusted installed transaction's retirement
   and requires the resource name to be absent from valid Stock HOME before
@@ -482,7 +496,7 @@ Current delivery checkpoints:
   malformed RAM, active/intent rejection, partial-write retry and idempotent
   closure cases. A native SST witness restricts programming to the bound claim
   phase word and repeats closure to verify zero additional writes. Its maintained
-  registration checks compare all Flash bytes and preserve RAM resources; both
+  retirement checks compare all Flash bytes and preserve RAM resources; both
   model runs initially reject the active transaction with zero Flash changes,
   but fail the low stack guard before Stock return. The closure frame reserves
   568 bytes across deep validation. Moving directory/encoding buffers into a
@@ -495,8 +509,7 @@ Current delivery checkpoints:
   intact. Two subsequent resets per model preserve the complete Flash image and
   catalog with zero writes and no resource revival. These targeted native runs
   reuse the accepted installation snapshots; the expanded fresh registration
-  suite has not yet been rerun. Native closure-interruption coverage and Flash
-  reclamation remain open.
+  suites are running. Native closure-interruption coverage passes as recorded`n  above; Flash reclamation remains open.
 - **Post-recovery retirement prerequisite (locally verified, not submitted):**
   a read-only installation gate requires both the authority and journal to be
   fully retired before accepting a CREATED/CLOSING/CLOSED claim. It validates
@@ -507,7 +520,7 @@ Current delivery checkpoints:
   passes, including partial phases, uncommitted claims, bank damage, read failure
   and unchanged outputs/storage. A native retirement witness now binds its
   expected fields from the independently reconstructed installation. The
-  registration suite checks rejection of the real active transaction and
+  retirement suite checks rejection of the real active transaction and
   acceptance after actual recovery, preserving Flash, catalog, mappings and
   owning CODE/stack guards. ARM packaging, formatting and Ruff pass. Initial
   native probes stop during USB reception: Stock reports insufficient memory

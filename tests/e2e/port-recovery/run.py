@@ -516,13 +516,15 @@ def run(args):
         )
         return
 
-    if args.suite in ("template", "creation", "registration"):
+    if args.suite in ("template", "creation", "registration", "retirement"):
+        from functools import partial
         from template import run_creation, run_registration, run_template
 
         suites = {
             "creation": run_creation,
             "template": run_template,
             "registration": run_registration,
+            "retirement": partial(run_registration, retire_claim=True),
         }
         result = suites[args.suite](
             args,
@@ -786,6 +788,7 @@ def main():
             "creation",
             "publication",
             "registration",
+            "retirement",
         ),
         default="recovery",
     )
