@@ -114,7 +114,6 @@ def memory_report(
         "excludes": [
             "native launcher allocation policy and allocator overhead",
             "stored launcher/application objects and transfer staging",
-            "separately owned display DMA pages",
         ],
     }
 

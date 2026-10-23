@@ -419,6 +419,18 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Local resource-accounting correction (2026-10-23): LCD DMA backing is not an
+extra native allocation in the current backend. `display-hardware.c` allocates
+and releases it through application malloc/free, and translates the same RW
+pages. ARM object relocations independently confirm those calls. Therefore the
+36 KiB RW budget and normal E2E heap extent already include DMA buffers and
+their allocation slack; adding them again would double-count. Remove the wrong
+DMA exclusion from memory.json and SDK/example guidance. Document scan-geometry
+size, bounded retry slack and old/new-buffer overlap during replacement.
+Eight memory-report tests, DMA/display-session ASan/UBSan, Ruff/format and strict
+docs pass. Native launcher reservation/overhead, stored objects and transfer
+staging remain outside the report; whole-system admission remains open.
+
 Local C sketch review (2026-10-23): the installed device-manager represents all
 six retained declaration/application patterns. The design record maps each to
 public example code and independent tests, explains application-owned scan
@@ -507,7 +519,9 @@ CMake regenerates a deleted report. Seven host tests and the relocated installed
 SDK C/C++/font/six-model packaging checks pass, including missing-report rebuild.
 The first instrumented UI artifact requires 30 pool pages for its complete
 36 KiB RW ceiling, or 32 on HP39 Stock. Stored objects, transfer staging, native
-allocator policy/overhead and separate LCD DMA allocations remain excluded.
+allocator policy/overhead remain excluded. The earlier exclusion of LCD DMA
+backing was incorrect: the current display backend uses application malloc,
+so those buffers are already included in the RW arena and measured heap extent.
 The report-only change produces byte-identical six-model launchers. Whole-app
 admission and actual Stock reservation reduction remain open. This is included
 in the current UI submission above; M8.2/M8.3 completion is not claimed.

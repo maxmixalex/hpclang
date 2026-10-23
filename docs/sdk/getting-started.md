@@ -156,8 +156,11 @@ regenerate it.
 These totals describe required pool geometry, not measured free memory or a
 change to Stock's allocation policy. The minimum RW layout does not promise
 application heap capacity. Native allocator overhead, stored launcher/payload
-objects, transfer staging and separately owned LCD DMA pages are excluded and
-listed in the report. A successful build does not prove that a particular
+objects and transfer staging are excluded and listed in the report. The current
+display backend allocates LCD DMA buffers from the application heap: their
+backing storage and alignment slack consume the same RW arena, not an additional
+native allocation. An ABI-only RW minimum does not budget those heap requests;
+choose an application minimum that includes them. A successful build does not prove that a particular
 calculator state has enough memory to launch.
 
 ## Own calculator objects in C++
