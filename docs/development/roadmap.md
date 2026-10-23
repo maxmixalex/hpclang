@@ -432,6 +432,22 @@ is recorded below. One later check finds Quality 39886905107 and Objects
 No repeated polling; CI acceptance and M8.0 remain open.
 
 Current delivery checkpoints:
+- **Real-root cleanup integration (locally verified; not submitted):**
+  the maintained installer now cancels its same-owned staged pair, discards the
+  original fresh RAM reservation and closes/repeats its creation claim. The new
+  oracle compares complete Flash, closed envelopes and claim, consumed receipt,
+  resource absence, retained template, execution guards and restart behavior.
+  ARM build/package and 88 recovery Python tests pass. HP49g+ and HP50g both
+  pass the complete cleanup oracle (27,511 Flash operations each) and monitored
+  restart with zero additional writes. Restart monitoring is now explicitly
+  enabled; the initial check otherwise read the prior saved operation counter.
+  Pinned formatting and strict docs pass. The combined image has 35,076
+  initialized bytes, verified intact on both models. Packaging now
+  derives its copy limit from the main-RAM window instead of the conservative
+  32 KiB cap: Saturn CE decrements the five-nibble A field. Complete source plus
+  runtime envelope bounds remain enforced; count/extent tests cover the former
+  boundary and 64 KiB; native execution above 32 KiB passes on both models.
+  Root retirement, post-reset ownership, early startup and reclamation remain open.
 - **Unregistered-root cancellation (locally verified; not yet submitted):** real installation
   has not registered its new root when resource creation finishes, so the
   registered-library cancellation gate cannot be reused unchanged. Added a

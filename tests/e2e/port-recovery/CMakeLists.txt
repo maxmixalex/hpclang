@@ -165,7 +165,8 @@ if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
             DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${template}-data.c")
     endforeach()
     list(APPEND installation_witnesses installation-template installation-template-store
-        installation-template-creation installation-template-creation-store)
+        installation-template-creation installation-template-creation-store
+        installation-template-creation-cancel-store)
 endif()
 foreach(witness IN LISTS installation_witnesses)
     add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c memory.c
@@ -249,7 +250,11 @@ foreach(witness IN LISTS installation_witnesses)
     endif()
     configure_recovery_image(${witness})
     target_include_directories(${witness} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-    if(witness STREQUAL "installation-template-creation-store")
+    if(witness STREQUAL "installation-template-creation-cancel-store")
+        target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_RESOURCE_CANCEL)
+        target_sources(${witness} PRIVATE "${CORE}/rpl-flash-replay.c")
+    endif()
+    if(witness MATCHES "^installation-template-creation.*-store$")
         # Integrated preparation and native resource creation have a deeper call
         # chain than the individual installation predicates. Retain both guards.
         target_compile_definitions(${witness} PRIVATE HPCLANG_PREDICATE_STACK_BYTES=8192)

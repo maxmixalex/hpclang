@@ -332,6 +332,72 @@ def run_creation_storage(
     return {"slot": slot, "operations": operations}
 
 
+def run_creation_cleanup(
+    args,
+    before,
+    root,
+    library,
+    layout,
+    *,
+    transfer,
+    emulator,
+    completed,
+    verify_busy_reads,
+):
+    from reservation import require_absent
+    from store import restart_storage, verify_storage
+
+    verify_source(before, library)
+    root = root / "creation-cleanup"
+    root.mkdir()
+    image = "installation-template-creation-cancel-store"
+    stored = root / "stored"
+    transfer(
+        args,
+        stored,
+        before,
+        args.build,
+        "CLAIMCLOSE",
+        package_name=image + ".hp",
+        consume=True,
+        execution_ms=60000,
+    )
+    slot, rebound, operations = verify_storage(
+        before,
+        stored / "state",
+        args.build,
+        args.nm,
+        make_fixture=partial(fixture, library, layout),
+        image=image,
+        staged=True,
+        closed=True,
+    )
+    verify_source(stored / "state", library)
+    require(verify_busy_reads(args, stored) == operations, "Cleanup bypassed Flash polling")
+    restart = root / "restart"
+    restart_storage(
+        args,
+        stored,
+        restart,
+        rebound,
+        slot,
+        emulator=emulator,
+        completed=completed,
+        library_id=layout["library_id"],
+    )
+    verify_source(restart / "state", library)
+    require_absent(reader(restart / "state"), b"HPCLEASE")
+    require(
+        verify_busy_reads(args, restart) == 0,
+        "Closed installation wrote Flash after reset",
+    )
+    print(
+        "Real installation cancellation, resource release and claim closure survive restart",
+        flush=True,
+    )
+    return {"slot": slot, "operations": operations}
+
+
 def run_template(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
     from installation import verify_placement, verify_preparation, verify_probe
     from startup import verify_startup
@@ -352,6 +418,17 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
         verify_busy_reads=verify_busy_reads,
     )
 
+    claim_cleanup = run_creation_cleanup(
+        args,
+        claim_before,
+        root,
+        claim_library,
+        claim_layout,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
     root = root / "real-template"
     root.mkdir()
     build = args.build
@@ -378,10 +455,24 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
     base = verify_probe(before, after, build, args.nm, -8, 0xFFFFFFFF, image=image)
     verify_startup(before, after, build, args.nm, base, image=image)
     verify_placement(
-        before, after, build, args.nm, base, existing=False, make_fixture=make_fixture, image=image
+        before,
+        after,
+        build,
+        args.nm,
+        base,
+        existing=False,
+        make_fixture=make_fixture,
+        image=image,
     )
     verify_preparation(
-        before, after, build, args.nm, base, existing=False, make_fixture=make_fixture, image=image
+        before,
+        after,
+        build,
+        args.nm,
+        base,
+        existing=False,
+        make_fixture=make_fixture,
+        image=image,
     )
     symbols = symbol_offsets(build / (image + ".elf"), args.nm)
     values = struct.unpack_from(
@@ -412,7 +503,10 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
         image="installation-template-store",
     )
     verify_source(stored / "state", library)
-    require(verify_busy_reads(args, stored) == operations, "Real storage bypassed Flash polling")
+    require(
+        verify_busy_reads(args, stored) == operations,
+        "Real storage bypassed Flash polling",
+    )
     restart_storage(
         args,
         stored,
@@ -438,7 +532,13 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
     rejected = root / "rejected"
     transfer(args, rejected, wrong / "state", build, "REALPREP", package_name=image + ".hp")
     base = verify_probe(
-        wrong / "state", rejected / "state", build, args.nm, -100, 0xFFFFFFFF, image=image
+        wrong / "state",
+        rejected / "state",
+        build,
+        args.nm,
+        -100,
+        0xFFFFFFFF,
+        image=image,
     )
     values = struct.unpack_from(
         "<3I", (rejected / "state/sram").read_bytes(), base + symbols["template_result"]
@@ -466,6 +566,7 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
     return {
         "bytes": layout["record_bytes"],
         "creation_storage": claim_storage,
+        "creation_cleanup": claim_cleanup,
         "slot": slot,
         "operations": operations,
         "recovery": recovery,

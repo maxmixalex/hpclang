@@ -654,7 +654,7 @@ class RecoveryPackageTests(unittest.TestCase):
 
     def test_fresh_flash_copy_alignment_and_lifetime(self):
         for model in ("hp49gplus", "hp50g"):
-            for size in (1, 8, 9, 24, 4096, 32768):
+            for size in (1, 8, 9, 24, 4096, 32768, 32769, 65536):
                 payload = bytes(i % 251 for i in range(size))
                 initialized = (size + 7) & ~7
                 runtime = initialized + 8192
@@ -784,7 +784,7 @@ class RecoveryPackageTests(unittest.TestCase):
             self.assertTrue(PACK.configuration_library(program, library_id))
 
     def test_object_extent_payload_and_owned_storage(self):
-        for size in (1, 8, 9, 24, 4096, 32768):
+        for size in (1, 8, 9, 24, 4096, 32768, 32769, 65536):
             with self.subTest(size=size):
                 payload = bytes(i % 251 for i in range(size))
                 initialized = (size + 7) & ~7
@@ -832,7 +832,8 @@ class RecoveryPackageTests(unittest.TestCase):
     def test_invalid_inputs(self):
         for payload, runtime, model in (
             (b"", 8, "hp50g"),
-            (bytes(32769), 32776, "hp50g"),
+            (bytes(256 * 1024 + 1), 256 * 1024 + 8, "hp50g"),
+            (bytes(128 * 1024), 128 * 1024, "hp50g"),
             (bytes(9), 8, "hp50g"),
             (bytes(8), 9, "hp50g"),
             (bytes(8), -8, "hp50g"),
@@ -852,6 +853,17 @@ class RecoveryPackageTests(unittest.TestCase):
             PACK.package(payload, 4096, model="hp50g"),
         )
 
+    def test_copy_count_uses_the_complete_address_field(self):
+        # LC(5), A=DAT0 W, DAT1=A W, D0/D1 += 16, C=C-1 A, GONC.
+        loop = "1527151716f17fce5fe"
+        for size in (8, 32768, 32776, 65536, 256 * 1024):
+            code = PACK.entry(size, 0)
+            start = code.index(loop)
+            self.assertEqual(code[start - 7 : start - 5], "34")
+            self.assertEqual(int(code[start - 5 : start][::-1], 16), size // 8 - 1)
+        with self.assertRaises(ValueError):
+            PACK.entry(256 * 1024 + 8, 0)
+
     def test_complete_program_must_fit_main_ram_window(self):
         # Measure the serialized overhead independently, including both copies
         # of initialized data and the surrounding RPL objects. The HP transfer
@@ -859,7 +871,7 @@ class RecoveryPackageTests(unittest.TestCase):
         # enough free RAM: the OS and other objects also occupy this window.
         window_bytes = 256 * 1024
         for model in ("hp49gplus", "hp50g"):
-            for size in (1, 8, 32768):
+            for size in (1, 8, 32768, 32776, 65536):
                 with self.subTest(model=model, initialized=size):
                     payload = bytes(size)
                     runtime = (size + 7) & ~7

@@ -6,7 +6,13 @@ import zlib
 
 from installation import LIBRARY_ID, TARGET, fixture, verify_probe
 from reservation import reader
-from verify import home_string, installed_recovery, require, require_stock_pc, symbol_offsets
+from verify import (
+    home_string,
+    installed_recovery,
+    require,
+    require_stock_pc,
+    symbol_offsets,
+)
 
 
 def staged_records(flash, journal, authority):
@@ -22,8 +28,17 @@ def staged_records(flash, journal, authority):
 
 
 def verify_storage(
-    before, after, build, nm, *, make_fixture=fixture, image="installation-store", staged=False
+    before,
+    after,
+    build,
+    nm,
+    *,
+    make_fixture=fixture,
+    image="installation-store",
+    staged=False,
+    closed=False,
 ):
+    require(not closed or staged, "Closed installation requires staged records")
     prior = (before / "flash").read_bytes()
     actual = (after / "flash").read_bytes()
     changed = [i for i, (a, b) in enumerate(zip(prior, actual, strict=True)) if a != b]
@@ -35,7 +50,10 @@ def verify_storage(
 
         candidates = [free_tail(prior, bank) for bank in range(0x140000, 0x200000, 0x20000)]
         candidates = [at for at in candidates if actual[at : at + 32] == original[:32]]
-        require(len(candidates) == 1, "Expected exactly one new recovery root at a native tail")
+        require(
+            len(candidates) == 1,
+            "Expected exactly one new recovery root at a native tail",
+        )
         slot = candidates[0]
     require(
         0x140105 <= slot < 0x200000
@@ -61,7 +79,10 @@ def verify_storage(
         extra["claim_slot"] = word(layout["admission_creation_nibble"])
     library, expected, _ = make_fixture(journal_slot=journal, authority_slot=authority, **extra)
     require(record == expected, "Stored record differs from independently rebound library")
-    require(prior[slot : slot + len(record)] == b"\xff" * len(record), "Storage overwrote data")
+    require(
+        prior[slot : slot + len(record)] == b"\xff" * len(record),
+        "Storage overwrote data",
+    )
     expected_flash = bytearray(prior)
     expected_flash[slot : slot + len(record)] = record
     if staged:
@@ -69,6 +90,8 @@ def verify_storage(
 
         records = staged_records(prior, journal, authority)
         for address, data in records.items():
+            if closed:
+                data[:4] = b"\0" + (2 * len(data) - 2).to_bytes(3, "little")
             expected_flash[address : address + len(data)] = data
         identity_at = 8 + layout["identity_object_nibble"]
         identity = b"".join(word(identity_at + 8 * i).to_bytes(4, "little") for i in range(12))
@@ -76,17 +99,33 @@ def verify_storage(
         binding = b"HPCMEM2\0" + identity
         binding += struct.pack("<6I", slot, journal, authority, TARGET, crc, 32768)
         claim = extra["claim_slot"]
-        expected_flash[claim : claim + 240] = creation_record(binding, b"HPCLEASE", claim, 0x7E)
-        resource = binding + bytes((i * 37 + 11) & 255 for i in range(80, 32768))
-        require(
-            home_string(reader(after), b"HPCLEASE") == resource,
-            "Created resource differs from the exact bound snapshot",
+        expected_flash[claim : claim + 240] = creation_record(
+            binding, b"HPCLEASE", claim, 0 if closed else 0x7E
         )
+        resource = binding + bytes((i * 37 + 11) & 255 for i in range(80, 32768))
+        if closed:
+            from reservation import require_absent
+
+            require_absent(reader(after), b"HPCLEASE")
+        else:
+            require(
+                home_string(reader(after), b"HPCLEASE") == resource,
+                "Created resource differs from the exact bound snapshot",
+            )
     base = verify_probe(
         before, after, build, nm, 0, slot, image=image, expected_flash=expected_flash
     )
     symbols = symbol_offsets(build / (image + ".elf"), nm)
     ram = (after / "sram").read_bytes()
+    if closed:
+        require(
+            struct.unpack_from("<6I", ram, base + symbols["storage_cleanup_result"]) == (0,) * 6,
+            "Real installation cleanup or its idempotent repeat failed",
+        )
+        require(
+            struct.unpack_from("<2I", ram, base + symbols["resource_receipt"]) == (0, 0),
+            "Cleanup did not consume its original creation receipt",
+        )
     if staged:
         require(
             struct.unpack_from("<6I", ram, base + symbols["storage_stage_result"]) == (0,) * 6,
@@ -138,21 +177,33 @@ def verify_storage(
     else:
         require(ram[at : at + len(record)] == record, "Stored and prepared records differ")
     result, operations = struct.unpack_from("<2I", ram, base + symbols["storage_result"])
-    require(result == 0 and operations > 0, "Native storage did not report successful programming")
+    require(
+        result == 0 and operations > 0,
+        "Native storage did not report successful programming",
+    )
     return slot, library, operations
 
 
 def run_storage(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
     stored = root / "selected-storage"
-    transfer(args, stored, clean, args.build, "STORELIB", package_name="installation-store.hp")
+    transfer(
+        args,
+        stored,
+        clean,
+        args.build,
+        "STORELIB",
+        package_name="installation-store.hp",
+    )
     slot, library, operations = verify_storage(clean, stored / "state", args.build, args.nm)
     require(
-        verify_busy_reads(args, stored) == operations, "Storage bypassed expected Flash polling"
+        verify_busy_reads(args, stored) == operations,
+        "Storage bypassed expected Flash polling",
     )
     restart = root / "selected-storage-restart"
     restart_storage(args, stored, restart, library, slot, emulator=emulator, completed=completed)
     print(
-        "Native prepared library stored at selected slot and discovered after restart", flush=True
+        "Native prepared library stored at selected slot and discovered after restart",
+        flush=True,
     )
     cut = root / "interrupted-storage"
     transfer(
@@ -204,7 +255,8 @@ def run_storage(args, clean, root, *, transfer, emulator, completed, verify_busy
         "Interrupted library cleanup bypassed expected Flash polling",
     )
     print(
-        "Interrupted library commit abandoned without changing other Flash or catalog", flush=True
+        "Interrupted library commit abandoned without changing other Flash or catalog",
+        flush=True,
     )
 
 
@@ -223,7 +275,7 @@ def restart_storage(
     restart.mkdir()
     shutil.copytree(stored / "state", restart / "state")
     with emulator(
-        args, restart, "10000 capture home\n12000 finish-install\n", ["--reset"]
+        args, restart, "10000 capture home\n12000 finish-install\n", ["--reset"], flash_busy=True
     ) as child:
         completed(child, 90)
     state = restart / "state"
@@ -283,6 +335,7 @@ def verify_cleanup(before, after, build, nm, slot):
         int(bool(metadata & 0xF0)) + int(status != 0 and status & 0x53 == 0x53) + int(status != 0)
     )
     require(
-        result == 0 and operations == needed, "Cleanup did not follow bounded header transition"
+        result == 0 and operations == needed,
+        "Cleanup did not follow bounded header transition",
     )
     return operations

@@ -128,6 +128,27 @@ int hpclang_installation_store(const struct hpclang_rpl_flash_io *source, const 
 }
 
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+#ifdef HPCLANG_INSTALLATION_RESOURCE_CANCEL
+#include "rpl-flash-replay.h"
+volatile uint32_t storage_cleanup_result[6];
+static uint32_t cleanup_journal, cleanup_authority;
+
+static int program_cleanup(void *context, uint32_t address, uint16_t value)
+{
+    if (address >= (cleanup_journal & ~1u) &&
+        address < cleanup_journal + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) {
+        owned_first = cleanup_journal;
+        owned_end = owned_first + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES;
+    } else if (address >= (cleanup_authority & ~1u) &&
+               address < cleanup_authority + HPCLANG_RPL_FLASH_AUTHORITY_BYTES) {
+        owned_first = cleanup_authority;
+        owned_end = owned_first + HPCLANG_RPL_FLASH_AUTHORITY_BYTES;
+    } else {
+        return 0;
+    }
+    return program_owned(context, address, value);
+}
+#endif
 static int resource_read(void *context, uint32_t at, uint8_t *value)
 {
     return hpclang_rpl_stock_memory_read(context, at, value);
@@ -139,7 +160,8 @@ static int resource_write(void *context, uint32_t at, uint8_t value)
 }
 
 __attribute__((noinline)) static int
-create_resource(const uint32_t *map, const struct hpclang_rpl_flash_io *flash, uint32_t claim)
+create_resource(const uint32_t *map, const struct hpclang_rpl_flash_io *flash, uint32_t claim,
+                const struct hpclang_rpl_flash_recovery_space *space)
 {
     /* The source copy is dead after sealing/storing prepared_library. Reuse its
      * owned RAM instead of adding another 32 KiB to the native CODE object. */
@@ -180,7 +202,44 @@ create_resource(const uint32_t *map, const struct hpclang_rpl_flash_io *flash, u
     result = hpclang_rpl_recovery_reservation_complete_creation(
         flash, claim, staged_claim, sizeof staged_claim, &reader, snapshot, &resource_receipt);
     storage_stage_result[5] = result;
-    return result ? result : storage_result[1] == operations ? 0 : HPCLANG_RPL_FLASH_DIRTY;
+    if (result || storage_result[1] != operations)
+        return result ? result : HPCLANG_RPL_FLASH_DIRTY;
+#ifdef HPCLANG_INSTALLATION_RESOURCE_CANCEL
+    cleanup_journal = space->journal_slot;
+    cleanup_authority = space->authority_slot;
+    struct hpclang_rpl_flash_io cancellation = *flash;
+    cancellation.program16 = program_cleanup;
+    result = hpclang_rpl_flash_cancel_staged_pair(&cancellation, cleanup_journal, cleanup_authority,
+                                                  staged_journal, sizeof staged_journal);
+    storage_cleanup_result[0] = result;
+    if (result)
+        return result;
+    operations = storage_result[1];
+    result = hpclang_rpl_flash_cancel_staged_pair(&cancellation, cleanup_journal, cleanup_authority,
+                                                  staged_journal, sizeof staged_journal);
+    storage_cleanup_result[1] = storage_result[1] - operations;
+    if (result || storage_cleanup_result[1])
+        return result ? result : HPCLANG_RPL_FLASH_DIRTY;
+    result = hpclang_rpl_recovery_reservation_discard_created(&io, (const uint8_t *)"HPCLEASE", 8,
+                                                              snapshot, &resource_receipt);
+    storage_cleanup_result[2] = result;
+    if (result)
+        return result;
+    owned_first = claim;
+    owned_end = claim + sizeof staged_claim;
+    result = hpclang_rpl_flash_close_creation(flash, claim, staged_claim, sizeof staged_claim);
+    storage_cleanup_result[3] = result;
+    if (result)
+        return result;
+    operations = storage_result[1];
+    result = hpclang_rpl_flash_close_creation(flash, claim, staged_claim, sizeof staged_claim);
+    storage_cleanup_result[4] = result;
+    storage_cleanup_result[5] = storage_result[1] - operations;
+    return result ? result : storage_cleanup_result[5] ? HPCLANG_RPL_FLASH_DIRTY : 0;
+#else
+    (void)space;
+    return 0;
+#endif
 }
 
 /* Same invocation and four-extent reservation as the successful root store.
@@ -237,7 +296,7 @@ int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
         storage_stage_result[2] = result;
     }
     if (!result)
-        result = create_resource(map, &io, claim);
+        result = create_resource(map, &io, claim, space);
     if (result)
         for (;;)
             __asm__ volatile("nop"); /* Retain this partially published installation. */

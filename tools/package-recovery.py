@@ -17,12 +17,15 @@ import subprocess
 import tempfile
 
 
-MAX_INITIALIZED = 32768
 MAX_NIBBLES = 0xFFFFF
 # This entry converts Saturn addresses through the Stock main-RAM window
 # [0x80000, 0x100000). Count the entire enclosing program, not just its ARM copy.
 # This is a physical ceiling, not the amount of free RAM at installation time.
 MAIN_RAM_NIBBLES = 0x100000 - 0x80000
+# CE decrements C's five-nibble A field, not a 12-bit counter. The copied
+# payload must fit physical main RAM; package() also bounds its source, runtime
+# reservation and envelope together. This is not a free-memory guarantee.
+MAX_INITIALIZED = MAIN_RAM_NIBBLES // 2
 MODELS = ("hp49gplus", "hp50g")
 
 # The owned recovery image uses PC-relative calls/data and local-exec TLS.
@@ -55,7 +58,7 @@ def entry(initialized_size: int, source_offset: int, *, fresh_copy: bool = False
     caller supplies fifteen nibbles between instructions and initialized bytes.
     """
     if not 8 <= initialized_size <= MAX_INITIALIZED or initialized_size % 8:
-        raise ValueError("initialized image must contain 1..4096 eight-byte blocks")
+        raise ValueError("initialized image must fit main RAM in complete eight-byte blocks")
     code = "8f" + immediate(0x679B) + "20" + "81b5"  # SAVE, P=0, C=PC
     code += "da" + "34" + immediate(source_offset) + "c2" + "134"
     code += "da" + "34" + immediate(0 if fresh_copy else initialized_size * 2 + 15) + "c2"
@@ -87,7 +90,7 @@ def package(
     if model not in MODELS:
         raise ValueError("independent recovery entry is validated only for hp49gplus/hp50g")
     if not initialized or len(initialized) > MAX_INITIALIZED:
-        raise ValueError("initialized image size must be 1..32768 bytes")
+        raise ValueError("initialized image must be nonempty and fit main RAM")
     initialized += bytes((-len(initialized)) % 8)
     if runtime_size < len(initialized) or runtime_size % 8:
         raise ValueError("runtime size must be eight-byte aligned and contain initialized image")
