@@ -515,6 +515,17 @@ Its oracle requires exact Flash contents, a consumed receipt, absence of the
 released variable, preservation of unrelated HOME data and the catalog, normal
 Stock return and unchanged closed records on restart. This tests same-invocation
 cleanup; it does not reconstruct the receipt across a native return or reset.
+Real-root installation has a separate pre-registration boundary:
+`hpclang_rpl_flash_cancel_staged_pair` accepts the original READY journal and the
+coordinates of a complete pair published by the same exclusive invocation. It
+checks both immutable bodies and the unchanged target, then finishes the journal
+tombstone before clearing authority metadata and status. A partially cancelled
+pair can be retried under that same ownership; armed or partially published
+records, body mismatches and reversed cancellation order reject. This primitive
+does not discover allocation ownership, inspect the root/catalog, release RAM or
+authorize a restart adoption. The existing registered-library cancellation API
+retains its native membership and exact root/catalog checks; both share the
+ordered envelope commit implementation.
 The internal packager accepts optional `--creation-claim-slot` for a guarded
 admission ELF with a sealed identity. It patches only the aligned initialized
 `hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and

@@ -549,6 +549,82 @@ static int cancellation_status(const uint8_t old[4], const uint8_t desired[4], u
     return !stored_metadata && !(old[0] & 1u);
 }
 
+static int commit_cancellation(const struct cancellation_view *view, const uint8_t original[2][4])
+{
+    const struct hpclang_rpl_flash_io *io = view->io;
+    for (unsigned index = 0; index < 2; ++index) {
+        uint8_t current[4];
+        if (!load_bytes(io, view->slots[index], current, 4) || memcmp(current, original[index], 4))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    for (unsigned index = 0; index < 2; ++index) {
+        uint32_t slot = view->slots[index];
+        for (unsigned byte = 1; byte < 4; ++byte)
+            if (!cancellation_byte(io, slot + byte, view->headers[index][byte]))
+                return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t status = original[index][0];
+        if ((status & 0x53u) == 0x53u && !cancellation_byte(io, slot, (uint8_t)(status & ~1u)))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        if (!cancellation_byte(io, slot, 0))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t current[4];
+        if (!load_bytes(io, slot, current, 4) || memcmp(current, view->headers[index], 4))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    return 0;
+}
+
+int hpclang_rpl_flash_cancel_staged_pair(const struct hpclang_rpl_flash_io *io,
+                                         uint32_t journal_slot, uint32_t authority_slot,
+                                         const uint8_t *journal, uint32_t bytes)
+{
+    uint32_t target;
+    const uint8_t *image;
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    if (!io || !io->read16 || !io->program16 ||
+        !cancellation_slot(io, journal_slot, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ||
+        !cancellation_slot(io, authority_slot, sizeof authority) ||
+        hpclang_rpl_flash_sector_decode(io->first, io->end, journal_slot, journal, bytes, &target,
+                                        &image) ||
+        hpclang_rpl_flash_authority_encode(io->first, io->end, authority_slot, journal_slot,
+                                           journal, bytes, authority, sizeof authority))
+        return HPCLANG_RPL_FLASH_INVALID;
+    authority[0] = 0x7f;
+    const uint8_t *records[2] = {journal, authority};
+    const uint32_t sizes[2] = {bytes, sizeof authority};
+    struct cancellation_view view = {.io = io, .slots = {journal_slot, authority_slot}};
+    uint8_t original[2][4];
+    for (unsigned index = 0; index < 2; ++index) {
+        uint32_t extent = 2u * sizes[index] - 2u;
+        view.headers[index][0] = 0;
+        for (unsigned byte = 1; byte < 4; ++byte)
+            view.headers[index][byte] = (uint8_t)(extent >> (8u * (byte - 1u)));
+        if (!load_bytes(io, view.slots[index], original[index], 4))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t status = original[index][0], metadata = original[index][3] >> 4;
+        if (original[index][1] != view.headers[index][1] ||
+            original[index][2] != view.headers[index][2] ||
+            (original[index][3] & 15u) != view.headers[index][3] ||
+            (metadata & ~(index ? 4u : 3u)) ||
+            (status != records[index][0] && (metadata || (status & ~0x7eu))))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        if (index && (status != 0x7fu || metadata != 4u) && memcmp(original[0], view.headers[0], 4))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        for (uint32_t at = 4; at < sizes[index]; ++at) {
+            uint8_t actual;
+            if (!load_bytes(io, view.slots[index] + at, &actual, 1) || actual != records[index][at])
+                return HPCLANG_RPL_FLASH_DIRTY;
+        }
+    }
+    /* An unarmed, same-owned cancellation must never conceal a changed target. */
+    for (uint32_t at = 0; at < HPCLANG_RPL_FLASH_SECTOR_BYTES; at += 2) {
+        uint16_t actual;
+        if (!io->read16(io->context, target + at, &actual) || actual != image_word(image, at))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    return commit_cancellation(&view, original);
+}
+
 int hpclang_rpl_flash_cancel_installed(const struct hpclang_rpl_flash_io *io,
                                        const struct hpclang_rpl_flash_recovery_layout *layout,
                                        const struct hpclang_rpl_flash_catalog *catalog)
@@ -603,25 +679,9 @@ int hpclang_rpl_flash_cancel_installed(const struct hpclang_rpl_flash_io *io,
         return result;
     /* Recheck both envelopes before the first write. The caller's exclusive
      * ownership keeps payloads, mappings and the installed identity stable. */
-    for (unsigned index = 0; index < 2; ++index) {
-        uint8_t current[4];
-        if (!load_bytes(io, view.slots[index], current, 4) || memcmp(current, original[index], 4))
-            return HPCLANG_RPL_FLASH_DIRTY;
-    }
-    for (unsigned index = 0; index < 2; ++index) {
-        uint32_t slot = view.slots[index];
-        for (unsigned byte = 1; byte < 4; ++byte)
-            if (!cancellation_byte(io, slot + byte, view.headers[index][byte]))
-                return HPCLANG_RPL_FLASH_DIRTY;
-        uint8_t status = original[index][0];
-        if ((status & 0x53u) == 0x53u && !cancellation_byte(io, slot, (uint8_t)(status & ~1u)))
-            return HPCLANG_RPL_FLASH_DIRTY;
-        if (!cancellation_byte(io, slot, 0))
-            return HPCLANG_RPL_FLASH_DIRTY;
-        uint8_t current[4];
-        if (!load_bytes(io, slot, current, 4) || memcmp(current, view.headers[index], 4))
-            return HPCLANG_RPL_FLASH_DIRTY;
-    }
+    result = commit_cancellation(&view, original);
+    if (result)
+        return result;
     uint32_t matched;
     result =
         hpclang_rpl_flash_match_installation(io, layout->record, layout->bytes, catalog, &matched);

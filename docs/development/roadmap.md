@@ -432,6 +432,18 @@ is recorded below. One later check finds Quality 39886905107 and Objects
 No repeated polling; CI acceptance and M8.0 remain open.
 
 Current delivery checkpoints:
+- **Unregistered-root cancellation (locally verified; not yet submitted):** real installation
+  has not registered its new root when resource creation finishes, so the
+  registered-library cancellation gate cannot be reused unchanged. Added a
+  separate same-owned complete-pair primitive: compare the retained READY journal,
+  full unarmed authority and unchanged target; finish the journal tombstone before
+  clearing authority metadata/status. It supports interrupted cancellation but
+  rejects armed/publication states, damaged bodies and out-of-order closure.
+  No RAM release, root retirement or post-reset adoption is implied. ARM build
+  and focused ASan/UBSan pass, including every read cut, all status bytes and
+  partial/failed/lost-ack/silent programming. The full installation ASan/UBSan
+  regression, pinned formatting and strict docs also pass. Real-root native
+  integration remains pending.
 - **Native creation cancellation (locally verified; not yet submitted):** a maintained
   combined witness publishes INTENT, creates RAM, commits CREATED, stages the
   transaction, cancels it, discards its original fresh reservation and closes the
