@@ -516,8 +516,8 @@ Current delivery checkpoints:
   to check stability. HP49g+ and HP50g both pass: the uncommitted case makes zero
   writes and retains the resource; the committed case retires the already intact
   target transaction with two writes and releases the resource. Both second
-  resets make zero writes. These runs are separate from the still-running
-  complete pre-cut registration/creation suites. This does not
+  resets make zero writes. These runs are separate from the completed
+  pre-cut registration/creation suites recorded above. This does not
   reconstruct ownership of an interrupted unarmed resource or reclaim its claim.
 - **Registered creation/configuration integration (local, not submitted):** the
   new preparation APIs require the exact registered root and reconstruct its
@@ -546,7 +546,8 @@ Current delivery checkpoints:
   released and the original source template/catalog survive both resets.
   A separate registration suite retains these growing integration cases without
   extending the existing creation job. Complete fresh-boot registration and
-  creation suites are running on both models before submission. This proves
+  creation suites through this checkpoint passed on both models, as recorded
+  above; the expanded registration suite remains in progress. This proves
   the isolated native-created recovery path, not arbitrary startup ordering,
   claim reclamation or general reconstruction of ownership after interruption.
   Those remaining gates and M8.0 stay open.
