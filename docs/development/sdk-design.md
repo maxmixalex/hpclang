@@ -1262,6 +1262,33 @@ documented target adaptations, not removed application requirements.
 
 ### Startup resource admission
 
+The wrapper's native request word is `0x01c00000`, not a byte count. The
+Launcher V3 format in HPGCC 1.1's `ARMToolbox/LibFmt.txt` and HPGCC 2.0 SP2's
+`sources/ARMToolbox/masd_source/ARMTBX_3_SOURCES.DIR` assigns bit 22 to the MMU
+packer, bit 23 to optional ARM OS RAM, and bits 24–27 to native stack-growth
+reservation in 16-byte blocks. Our word sets both flags and one stack block.
+With the packer enabled, the low 20 bits describe space to leave for TEMPOB
+growth, not the application's pool size; this word leaves that field zero.
+Writing a 36 KiB application limit there would change native free-space policy,
+not enforce a 36 KiB allocation.
+
+The historical implementations assemble a pool from available native memory
+and optionally append an OS allocation. Their OS probing policy varies: the
+1.1 HP48 source leaves 4 KiB after its probe, while the other 1.1 source leaves
+16 KiB; the 2.0 final-launch path also probes before reserving its block.
+Those source facts explain why a single static native-reservation number would
+be misleading. They do not prove a specific six-model firmware allocation or
+allocator overhead. Runtime admission validates the supplied pool; whole-system
+acceptance still needs model-specific observation of the native allocation,
+stored objects and transfer staging. The linked minimum in `memory.json` is a
+requirement on that pool, not an observation of its actual size.
+
+Source audit provenance: the inspected `hpgcc-2.0-SP2-Linux.tar.bz2` has SHA-256
+`e4f9d632e65316101717f39c00523c2f43608a11156d4a4d4e8fae3195771029`;
+the member is `hpgcc_20/sources/ARMToolbox/masd_source/ARMTBX_3_SOURCES.DIR`.
+The 1.1 comparison uses `ARMToolbox/masd_source48/SYSMEM.ARM` and
+`ARMToolbox/masd_source/SYSMEM.ARM` in the retained 39G-support release archive.
+
 Stock startup has an earlier admission boundary than the application's RW
 budget. Stage0 must fit the linked stage1 memory extent (including its prefix,
 alignment gaps and BSS) plus a complete stage stack page in the supplied pool.

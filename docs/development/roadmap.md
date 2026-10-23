@@ -419,6 +419,18 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Local native-allocation policy audit (2026-10-23): release-source inspection
+decodes the wrapper's `0x01c00000` as MMU packing, optional ARM OS RAM and one
+16-byte native stack-growth block. The low 20 bits in this mode reserve free
+TEMPOB growth; they do not request a fixed pool size. Native source versions
+probe available OS allocations with different margins, so copying the UI RW
+budget into this word would not bound the native reservation. The design
+record retains source member names and archive provenance and distinguishes
+this static policy evidence from required model-specific runtime accounting.
+The wrapper now spells out the same bit combination; all six existing launcher
+envelopes remain byte-identical. Native allocation/overhead and installation/
+transfer footprints remain open; no resource or milestone closure is claimed.
+
 Local resource-accounting correction (2026-10-23): LCD DMA backing is not an
 extra native allocation in the current backend. `display-hardware.c` allocates
 and releases it through application malloc/free, and translates the same RW
