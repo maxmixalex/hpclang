@@ -90,6 +90,21 @@ int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
                                      const uint8_t *journal, uint32_t journal_bytes,
                                      struct hpclang_rpl_flash_installed_recovery *installed);
 
+/* Read-only validation of a complete staged (7F) authority and READY journal
+ * addressed by the trusted executing layout. Validate both actual allocation
+ * boundaries, the intact current port and the proposed target image, with the
+ * same exact installed library/catalog binding outside target in both views.
+ * Reject FF/FE/ARMED/CLOSING/CLOSED rather than treating them as staged.
+ * scratch holds one sector record and is disposable on failure; it must be
+ * disjoint from all other inputs/output. installed changes only on success (0).
+ * Stable exclusive views and a separately established original one-use claim
+ * remain required. This proves content/placement, not provenance, RAM ownership,
+ * safe startup, authority to activate, or permission to adopt matching records. */
+int hpclang_rpl_flash_preflight_staged_installed(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    const struct hpclang_rpl_flash_catalog *catalog, uint8_t *scratch, uint32_t capacity,
+    struct hpclang_rpl_flash_installed_recovery *installed);
+
 /* Cancel an unpublished transaction under the SAME trusted one-use installation
  * claim, without needing the lost desired image. Caller must have established
  * initial empty-slot ownership and prevented reuse/other writers since then.
@@ -112,6 +127,21 @@ int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
 int hpclang_rpl_flash_cancel_installed(const struct hpclang_rpl_flash_io *io,
                                        const struct hpclang_rpl_flash_recovery_layout *layout,
                                        const struct hpclang_rpl_flash_catalog *catalog);
+
+/* Cancel a complete READY journal / unarmed authority published by this same
+ * exclusive invocation, before the new root has been registered. Caller proves
+ * exact allocation ownership and retains the original READY journal; never use
+ * this to adopt records discovered after returning to Stock or resetting.
+ * Verify both full immutable records and the unchanged target before writing.
+ * Finish the journal tombstone before touching authority; metadata is cleared
+ * before status so interrupted cancellation cannot publish a native live object.
+ * Same-owned partial-cancellation retries are accepted; armed, partial-publication
+ * and mismatched records reject. Only the two four-byte envelopes change.
+ * DIRTY retains ownership. This neither releases RAM nor closes the creation
+ * claim, retires the root, reclaims storage or proves safe startup ordering. */
+int hpclang_rpl_flash_cancel_staged_pair(const struct hpclang_rpl_flash_io *io,
+                                         uint32_t journal_slot, uint32_t authority_slot,
+                                         const uint8_t *journal, uint32_t bytes);
 
 /* Connect exact installed library content/catalog identity to its two HPCBIND1
  * descriptors and the bound transaction preflight. Both descriptors must agree.

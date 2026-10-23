@@ -25,7 +25,7 @@ AUTHORITY_SLOT = JOURNAL_SLOT + 4124
 TARGET = 0x140000
 
 
-def fixture():
+def fixture(*, journal_slot=JOURNAL_SLOT, authority_slot=AUTHORITY_SLOT):
     pack = packager()
     # Empty configuration: installable through Stock without an application callback.
     # Two owned PIC stubs (BX LR), never invoked by the empty configuration.
@@ -33,8 +33,8 @@ def fixture():
     image = pack.bind_image(
         bytes.fromhex("1eff2fe1") + bytes(12) + b"HPCBIND1" + bytes(8) + b"HPCROOT1" + bytes(40),
         16,
-        JOURNAL_SLOT,
-        AUTHORITY_SLOT,
+        journal_slot,
+        authority_slot,
     )
     program = pack._recovery_program(pack.package(image, len(image), model="hp50g"))
     empty = pack.immediate(0x2D9D) + pack.immediate(0x312B)
@@ -78,11 +78,119 @@ def generate_fixture(output):
         + "};\n"
         + f"#define EXPECTED_RECOVERY_BINDING {layout['recovery_binding_nibble']}u\n"
         + f"#define EXPECTED_ADMISSION_BINDING {layout['admission_binding_nibble']}u\n"
+        + f"#define EXPECTED_IDENTITY_NIBBLE {layout['identity_object_nibble']}u\n"
         + f"#define EXPECTED_JOURNAL_SLOT {JOURNAL_SLOT}u\n"
         + f"#define EXPECTED_AUTHORITY_SLOT {AUTHORITY_SLOT}u\n"
         + f"#define EXPECTED_TARGET {TARGET}u\n"
+        + f"#define EXPECTED_LIBRARY_ID {LIBRARY_ID}u\n"
         + f"#define EXPECTED_IDENTITY_LIBRARY {IDENTITY_LIBRARY_ID}u\n"
     )
+
+
+def verify_placement(
+    before,
+    after,
+    build,
+    nm,
+    base,
+    *,
+    existing,
+    make_fixture=fixture,
+    image="installation",
+):
+    """Check selection independently from native allocation headers."""
+    _, record, _ = make_fixture()
+    flash = (before / "flash").read_bytes()
+    if existing:
+        expected = (0xFFFFFFFA, 0xFFFFFFFF)  # EXISTS, unchanged output
+    else:
+        candidates = []
+        for bank in range(0x140000, 0x200000, 0x20000):
+            at, end = bank + 0x105, bank + 0x20000
+            while at < end and flash[at] != 255:
+                require(flash[at] in (0, 0x53), "Unexpected native allocation")
+                extent = (int.from_bytes(flash[at + 1 : at + 4], "little") & 0xFFFFF) + 2
+                require(
+                    extent >= 8 and extent % 4 == 0 and at + extent // 2 < end,
+                    "Invalid native allocation extent",
+                )
+                at += extent // 2
+            require(flash[at:end] == b"\xff" * (end - at), "Non-erased native free tail")
+            if end - at > len(record):
+                candidates.append(at)
+        require(candidates, "Fixture has no room for planned library")
+        expected = (0, candidates[0])
+    symbols = symbol_offsets(build / (image + ".elf"), nm)
+    ram = (after / "sram").read_bytes()
+    require(
+        struct.unpack_from("<2I", ram, base + symbols["placement_result"]) == expected,
+        "Native cross-port installation plan differs",
+    )
+    require((after / "flash").read_bytes() == flash, "Placement planning changed Flash")
+
+
+def verify_preparation(
+    before,
+    after,
+    build,
+    nm,
+    base,
+    *,
+    existing,
+    make_fixture=fixture,
+    image="installation",
+    creation=False,
+):
+    symbols = symbol_offsets(build / (image + ".elf"), nm)
+    ram = (after / "sram").read_bytes()
+    result, library, journal, authority = struct.unpack_from(
+        "<4I", ram, base + symbols["preparation_result"]
+    )
+    _, original, _ = make_fixture()
+    at = base + symbols["prepared_library"]
+    actual = ram[at : at + len(original)]
+    flash = (before / "flash").read_bytes()
+    require((after / "flash").read_bytes() == flash, "Draft preparation changed Flash")
+    if existing:
+        require(
+            (result, library, journal, authority) == (0xFFFFFFFA,) + (0xFFFFFFFF,) * 3,
+            "Conflicting draft published installation coordinates",
+        )
+        require(actual == b"\xa5" * len(original), "Conflicting draft changed staging")
+        if creation:
+            require(
+                struct.unpack_from("<I", ram, base + symbols["preparation_creation_slot"])[0]
+                == 0xFFFFFFFF,
+                "Conflicting draft published a claim coordinate",
+            )
+        return
+    require(result == 0, "Native draft preparation failed")
+    extra = {}
+    if creation:
+        extra["claim_slot"] = struct.unpack_from(
+            "<I", ram, base + symbols["preparation_creation_slot"]
+        )[0]
+    _, expected, _ = make_fixture(journal_slot=journal, authority_slot=authority, **extra)
+    require(actual == expected, "Native draft differs from independently rebound package")
+    tails = {}
+    for bank in range(0x140000, 0x200000, 0x20000):
+        pos, end = bank + 0x105, bank + 0x20000
+        while pos < end and flash[pos] != 255:
+            require(flash[pos] in (0, 0x53), "Unexpected allocation before draft space")
+            extent = (int.from_bytes(flash[pos + 1 : pos + 4], "little") & 0xFFFFF) + 2
+            require(extent >= 8 and extent % 4 == 0 and pos + extent // 2 < end, "Invalid extent")
+            pos += extent // 2
+        require(flash[pos:end] == b"\xff" * (end - pos), "Draft tail is not erased")
+        tails[bank] = pos
+    extents = [(library, len(expected)), (journal, 4124), (authority, 32)]
+    if creation:
+        extents.append((extra["claim_slot"], 240))
+    for pos, size in extents:
+        bank = pos & ~0x1FFFF
+        require(bank in tails and pos == tails[bank], "Draft allocation leaves a hole or overlaps")
+        require(pos % 4 == 1 and pos + size < bank + 0x20000, "Draft allocation leaves bank")
+        require(pos + size <= TARGET or pos >= TARGET + 4096, "Draft overlaps target sector")
+        tails[bank] += size
 
 
 def verify_execution(ram, initialized, symbols, package, result, slot, *, fresh_copy=False):
@@ -160,6 +268,7 @@ def verify_probe(
     image="installation",
     expected_flash=None,
     fresh_copy=False,
+    baseline_results=0,
 ):
     require_stock_pc(after)
     require(
@@ -168,7 +277,10 @@ def verify_probe(
         "Installation witness changed unexpected Flash bytes",
     )
     read, original = reader(after), reader(before)
-    require(original(0x806FD) - original(0x806F8) == 5, "Expected an empty baseline stack")
+    require(
+        original(0x806FD) - original(0x806F8) == 5 * (baseline_results + 1),
+        "Unexpected baseline stack depth",
+    )
     require(read(0x806FD) - read(0x806F8) == 10, "Expected exactly one predicate result")
     pointer = read(read(0x806F8))
     require(
@@ -204,19 +316,9 @@ def verify_probe(
     return base
 
 
-def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
-    from startup import verify_startup
-
-    root = args.output / "installation"
-    root.mkdir()
+def installed_baseline(args, clean, root, *, transfer, emulator, completed):
     build = args.build
     setup = SimpleNamespace(**(vars(args) | {"flash_busy_reads": 0}))
-    missing = root / "missing"
-    transfer(args, missing, clean, build, "INSTEST", package_name="installation.hp")
-    base = verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
-    startup_missing = verify_startup(clean, missing / "state", build, args.nm, base)
-    require(verify_busy_reads(args, missing) == 0, "Missing-library lookup wrote Flash")
-    print("Native installation lookup rejected the absent library", flush=True)
     installed = root / "installed"
     transfer(
         setup,
@@ -244,12 +346,61 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         TARGET,
         read=reader(before),
     )
+    return before, slot, size
+
+
+def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
+    from startup import run_port1_inventory, verify_startup
+    from staging import run_staging
+    from abort import run_abort
+    from creation import run_creation_abort, run_creation_publication, run_creation_visibility
+
+    root = args.output / "installation"
+    root.mkdir()
+    build = args.build
+
+    missing = root / "missing"
+    transfer(args, missing, clean, build, "INSTEST", package_name="installation.hp")
+    base = verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
+    startup_missing = verify_startup(clean, missing / "state", build, args.nm, base)
+    verify_placement(clean, missing / "state", build, args.nm, base, existing=False)
+    verify_preparation(clean, missing / "state", build, args.nm, base, existing=False)
+    require(verify_busy_reads(args, missing) == 0, "Missing-library lookup wrote Flash")
+    print("Native installation lookup rejected the absent library", flush=True)
+    before, slot, size = installed_baseline(
+        args, clean, root, transfer=transfer, emulator=emulator, completed=completed
+    )
     matched = root / "matched"
     transfer(args, matched, before, build, "INSTEST", package_name="installation.hp")
     base = verify_probe(before, matched / "state", build, args.nm, 0, slot)
     startup_matched = verify_startup(before, matched / "state", build, args.nm, base)
+    verify_placement(before, matched / "state", build, args.nm, base, existing=True)
+    verify_preparation(before, matched / "state", build, args.nm, base, existing=True)
     require(verify_busy_reads(args, matched) == 0, "Installed-library lookup wrote Flash")
+    startup_port1 = run_port1_inventory(
+        args, clean, root, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
+    run_staging(
+        args,
+        before,
+        root,
+        slot,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
     transactions = []
+    run_abort(args, before, root, slot, transfer=transfer, verify_busy_reads=verify_busy_reads)
+    run_creation_visibility(
+        args,
+        before,
+        root,
+        slot,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
     for label, status in (
         ("armed", 1),
         ("damaged", 1),
@@ -294,11 +445,24 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         )
         transactions.append(label)
         print(f"Installed transaction preflight verified: {label}", flush=True)
-    from publication import run_publication
+    from store import run_storage
 
-    run_publication(
+    run_storage(
+        args,
+        clean,
+        root,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    run_creation_publication(
+        args, before, root, slot, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
+    run_creation_abort(
         args,
         before,
+        root,
         slot,
         transfer=transfer,
         emulator=emulator,
@@ -314,7 +478,52 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 slot=slot,
                 bytes=size,
                 transactions=transactions,
-                startup_inventory={"missing": startup_missing, "matched": startup_matched},
+                startup_inventory={
+                    "missing": startup_missing,
+                    "matched": startup_matched,
+                    "port1": startup_port1,
+                },
+                creation_publication=True,
+                selected_storage=True,
+                unarmed_staging=True,
+                reservation_abort=True,
+                creation_claim_visibility=True,
+            ),
+            indent=2,
+        )
+        + "\n"
+    )
+    print(
+        "PASS: native installation, transaction preflight and creation lifecycle",
+        flush=True,
+    )
+
+
+def run_publication_suite(args, clean, *, transfer, emulator, completed, verify_busy_reads):
+    from publication import run_publication
+
+    root = args.output / "installation"
+    root.mkdir()
+    before, slot, size = installed_baseline(
+        args, clean, root, transfer=transfer, emulator=emulator, completed=completed
+    )
+    run_publication(
+        args,
+        before,
+        slot,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    (args.output / "result.json").write_text(
+        json.dumps(
+            dict(
+                status="pass",
+                model=args.model,
+                suite="publication",
+                slot=slot,
+                bytes=size,
                 reservation_creation=["existing-different", "existing-identical", "lost-write-ack"],
                 publication=True,
                 cancellation=True,
@@ -323,10 +532,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         )
         + "\n"
     )
-    print(
-        "PASS: native installation, transaction preflight, publication and cancellation",
-        flush=True,
-    )
+    print("PASS: native transaction publication, rejection and cancellation", flush=True)
 
 
 if __name__ == "__main__":

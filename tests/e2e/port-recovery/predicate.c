@@ -66,7 +66,12 @@ static int real_constant(const uint32_t *map, uint32_t address, int value)
     }
     return 1;
 }
-int admission(const uint32_t *map)
+#if defined(HPCLANG_INSTALLATION_TEMPLATE_CREATION) && defined(HPCLANG_INSTALLATION_STORE)
+void hpclang_installation_execution_capture(const struct hpclang_rpl_mutation_io *io,
+                                            const struct hpclang_rpl_stock_memory *memory,
+                                            uintptr_t first, uintptr_t end);
+#endif
+int admission(const uint32_t *map, uintptr_t first, uintptr_t end)
 {
     uintptr_t pointer = (uintptr_t)map;
     if (pointer < 0x08000000u || pointer > 0x08080000u - 257u * 4u || pointer % 4u ||
@@ -83,6 +88,12 @@ int admission(const uint32_t *map)
                                          .context = &memory,
                                          .temp_limit = 0x100000,
                                          .user_limit = 0x80000};
+#if defined(HPCLANG_INSTALLATION_TEMPLATE_CREATION) && defined(HPCLANG_INSTALLATION_STORE)
+    hpclang_installation_execution_capture(&io, &memory, first, end);
+#else
+    (void)first;
+    (void)end;
+#endif
     return hpclang_rpl_mutation_push_real_boolean(&io, hpclang_recovery_predicate(map)) ==
            HPCLANG_RPL_MUTATION_OK;
 }

@@ -38,6 +38,10 @@ def verify_publication(before, after, build, nm, expected, slot, repeated):
     results = struct.unpack_from(
         "<12I", (after / "sram").read_bytes(), base + symbols["publication_result"]
     )
+    activation = struct.unpack_from(
+        "<3I", (after / "sram").read_bytes(), base + symbols["activation_result"]
+    )
+    require(activation == (0, 0, 0), "Staged transaction or fresh receipt failed before activation")
     require(
         results[:9] == ((0,) * 9 if repeated else (0xFFFFFFFC, 0, 0, 0xFFFFFFFC, 0, 1, 0, 0, 0)),
         "Unexpected publication/retry/closure results",
@@ -118,6 +122,7 @@ def run_reservation_collisions(args, baseline, root, slot, *, transfer, verify_b
 
 
 def run_publication(args, baseline, slot, *, transfer, emulator, completed, verify_busy_reads):
+    from activation import run_activation_rejection
     from cancellation import run_cancellation
     from reservation_failure import run_failure
 
@@ -127,6 +132,9 @@ def run_publication(args, baseline, slot, *, transfer, emulator, completed, veri
         args, baseline, root, slot, transfer=transfer, verify_busy_reads=verify_busy_reads
     )
     run_failure(args, baseline, root, transfer=transfer, verify_busy_reads=verify_busy_reads)
+    run_activation_rejection(
+        args, baseline, root, slot, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
     prepared = root / "expected"
     prepare(baseline, prepared, JOURNAL_SLOT, TARGET, bound=True)
     records = (prepared / "flash").read_bytes()

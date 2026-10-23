@@ -55,4 +55,46 @@ int hpclang_rpl_recovery_reservation_create(const struct hpclang_rpl_mutation_io
                                             const struct hpclang_object *snapshot,
                                             struct hpclang_rpl_recovery_reservation *created);
 
+/* Recheck the original creation receipt and complete untouched snapshot before
+ * advancing transaction publication. Same exclusive invocation as create: no
+ * native return, intervening RAM relocation, writer or address reuse. Resolves
+ * HOME again and validates the hidden directory, exact address/capacity and all
+ * snapshot nibbles. No writes; neither snapshot nor receipt is modified.
+ * Returns mutation results. A match does not reconstruct ownership after reset
+ * or authorize activation without the installed Flash transaction checks.
+ */
+int hpclang_rpl_recovery_reservation_check_created(
+    const struct hpclang_rpl_reader *reader, const uint8_t *name, uint32_t name_length,
+    const struct hpclang_object *snapshot, const struct hpclang_rpl_recovery_reservation *created);
+
+/* Commit a durable claim's CREATED phase after checking this invocation's
+ * original receipt and entire untouched snapshot, then its exact binding header.
+ * The name comes from the trusted original INTENT record. Keep RAM/Flash views,
+ * snapshot and receipt stable and exclusively owned; no native return or reuse
+ * since create. Returns Flash results; DIRTY retains ownership and prohibits
+ * activation/native return. No RAM writes or receipt changes. Does not prove
+ * the initial name absence/intent ordering or reconstruct provenance after reset. */
+int hpclang_rpl_recovery_reservation_complete_creation(
+    const struct hpclang_rpl_flash_io *flash, uint32_t slot, const uint8_t *intent, uint32_t bytes,
+    const struct hpclang_rpl_reader *reader, const struct hpclang_object *snapshot,
+    const struct hpclang_rpl_recovery_reservation *created);
+
+/* Discard an untouched reservation created by this same exclusive invocation,
+ * after cancelling any associated unpublished Flash transaction. The original
+ * snapshot, name and creation receipt must remain stable; no native return,
+ * other writer, relocation or reuse may intervene. Resolve HOME again and
+ * require the exact receipt address, capacity and full original string before
+ * removal. Matching bytes alone are not a receipt and never authorize adoption.
+ * This is cancellation cleanup, not active-recovery workspace release or
+ * reconstruction of ownership after reset. It does not inspect Flash phases.
+ *
+ * Success consumes the receipt (both fields zero). Pre-write errors leave it
+ * and native memory unchanged. Any error after a write attempt is INCOMPLETE:
+ * retain the invocation, never resume Stock or retry with the stale receipt.
+ * Existing native references are preserved by normal directory removal.
+ */
+int hpclang_rpl_recovery_reservation_discard_created(
+    const struct hpclang_rpl_mutation_io *io, const uint8_t *name, uint32_t name_length,
+    const struct hpclang_object *snapshot, struct hpclang_rpl_recovery_reservation *created);
+
 #endif

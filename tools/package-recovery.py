@@ -17,12 +17,15 @@ import subprocess
 import tempfile
 
 
-MAX_INITIALIZED = 32768
 MAX_NIBBLES = 0xFFFFF
 # This entry converts Saturn addresses through the Stock main-RAM window
 # [0x80000, 0x100000). Count the entire enclosing program, not just its ARM copy.
 # This is a physical ceiling, not the amount of free RAM at installation time.
 MAIN_RAM_NIBBLES = 0x100000 - 0x80000
+# CE decrements C's five-nibble A field, not a 12-bit counter. The copied
+# payload must fit physical main RAM; package() also bounds its source, runtime
+# reservation and envelope together. This is not a free-memory guarantee.
+MAX_INITIALIZED = MAIN_RAM_NIBBLES // 2
 MODELS = ("hp49gplus", "hp50g")
 
 # The owned recovery image uses PC-relative calls/data and local-exec TLS.
@@ -55,7 +58,7 @@ def entry(initialized_size: int, source_offset: int, *, fresh_copy: bool = False
     caller supplies fifteen nibbles between instructions and initialized bytes.
     """
     if not 8 <= initialized_size <= MAX_INITIALIZED or initialized_size % 8:
-        raise ValueError("initialized image must contain 1..4096 eight-byte blocks")
+        raise ValueError("initialized image must fit main RAM in complete eight-byte blocks")
     code = "8f" + immediate(0x679B) + "20" + "81b5"  # SAVE, P=0, C=PC
     code += "da" + "34" + immediate(source_offset) + "c2" + "134"
     code += "da" + "34" + immediate(0 if fresh_copy else initialized_size * 2 + 15) + "c2"
@@ -87,7 +90,7 @@ def package(
     if model not in MODELS:
         raise ValueError("independent recovery entry is validated only for hp49gplus/hp50g")
     if not initialized or len(initialized) > MAX_INITIALIZED:
-        raise ValueError("initialized image size must be 1..32768 bytes")
+        raise ValueError("initialized image must be nonempty and fit main RAM")
     initialized += bytes((-len(initialized)) % 8)
     if runtime_size < len(initialized) or runtime_size % 8:
         raise ValueError("runtime size must be eight-byte aligned and contain initialized image")
@@ -387,6 +390,29 @@ def bind_reservation(initialized: bytes, offset: int, reservation: tuple[str, in
     return initialized[:offset] + descriptor + initialized[offset + size :]
 
 
+def bind_creation_slot(initialized, offset, slot, binding):
+    """Bind only an owned placeholder; geometry does not prove allocation ownership."""
+    if type(offset) is not int or offset < 0 or offset % 4 or offset + 4 > len(initialized):
+        raise ValueError("Creation claim slot is outside initialized aligned storage")
+    if initialized[offset : offset + 4] != b"\xff" * 4:
+        raise ValueError("Creation claim slot is not an unbound placeholder")
+    if slot is None:
+        return initialized
+    if binding is None:
+        raise ValueError("Creation claim requires the bound journal and authority")
+    # Reuse the same geometry checks as both execution descriptors.
+    bind_image(b"HPCBIND1" + bytes(8), 0, *binding)
+    if type(slot) is not int or not 0x140000 <= slot < 0x200000:
+        raise ValueError("Creation claim leaves user Flash")
+    within = slot & 0x1FFFF
+    if within < 0x105 or within % 4 != 1 or within + 240 >= 0x20000:
+        raise ValueError("Creation claim overlaps a bank header or end marker")
+    for address, size in zip(binding, (4124, 32), strict=True):
+        if slot < address + size and address < slot + 240:
+            raise ValueError("Creation claim overlaps transaction storage")
+    return initialized[:offset] + slot.to_bytes(4, "little") + initialized[offset + 4 :]
+
+
 def elf_symbols(elf: Path, nm: str) -> dict[str, int]:
     symbols = {}
     for line in subprocess.check_output([nm, elf], text=True).splitlines():
@@ -396,7 +422,7 @@ def elf_symbols(elf: Path, nm: str) -> dict[str, int]:
     return symbols
 
 
-def recovery_layout(library, images, *, identity_offset=None):
+def recovery_layout(library, images, *, identity_offset=None, creation_offset=None):
     """Locate owned ELF descriptors through generated command links, never signatures.
 
     Nibble offsets include the native allocation's four-byte envelope. Consumers
@@ -404,6 +430,8 @@ def recovery_layout(library, images, *, identity_offset=None):
     Optional identity_object_nibble instead excludes the allocation envelope,
     matching the coordinate carried inside the HPCROOT1 descriptor.
     """
+    if creation_offset is not None and identity_offset is None:
+        raise ValueError("Creation claim requires a sealed admission identity")
     data = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in library[8:])
 
     def word(at, width=5):
@@ -428,6 +456,22 @@ def recovery_layout(library, images, *, identity_offset=None):
         if len(expected) != 32 or data[descriptor : descriptor + 32] != expected:
             raise ValueError("Recovery descriptor does not match its generated command")
         layout[name + "_binding_nibble"] = 8 + descriptor
+        if name == "admission" and creation_offset is not None:
+            if (
+                type(creation_offset) is not int
+                or creation_offset < 0
+                or creation_offset % 4
+                or creation_offset + 4 > len(initialized)
+            ):
+                raise ValueError("Creation claim symbol is outside owned initialized storage")
+            claim = start + source + 2 * creation_offset
+            expected_claim = "".join(
+                f"{byte & 15:x}{byte >> 4:x}"
+                for byte in initialized[creation_offset : creation_offset + 4]
+            )
+            if data[claim : claim + 8] != expected_claim:
+                raise ValueError("Creation claim does not match its generated admission command")
+            layout["admission_creation_nibble"] = 8 + claim
         if name == "admission" and identity_offset is not None:
             if (
                 type(identity_offset) is not int
@@ -520,6 +564,7 @@ def package_elf(
     binding: tuple[int, int] | None = None,
     library_id: int | None = None,
     reservation: tuple[str, int] | None = None,
+    creation_slot: int | None = None,
 ) -> tuple[bytes, bytes]:
     """Check the owned recovery ELF contract and return envelope and raw image.
 
@@ -566,6 +611,11 @@ def package_elf(
     reservation_offset = symbols.get("hpclang_recovery_reservation")
     if reservation_offset is not None:
         initialized = bind_reservation(initialized, reservation_offset, reservation)
+    creation_offset = symbols.get("hpclang_recovery_creation_slot")
+    if creation_slot is not None and creation_offset is None:
+        raise ValueError("Recovery ELF has no creation claim slot symbol")
+    if creation_offset is not None:
+        initialized = bind_creation_slot(initialized, creation_offset, creation_slot, binding)
     return package(initialized, end, model=model, fresh_copy=fresh_copy), initialized
 
 
@@ -591,6 +641,11 @@ def main() -> None:
         "--authority-slot",
         type=lambda value: int(value, 0),
         help="caller-reserved physical authority address (ELF library only)",
+    )
+    parser.add_argument(
+        "--creation-claim-slot",
+        type=lambda value: int(value, 0),
+        help="caller-reserved creation claim address (sealed admission ELF only)",
     )
     parser.add_argument(
         "--flash-copy",
@@ -663,6 +718,8 @@ def main() -> None:
         )
     if args.layout_output is not None and args.admission_elf is None:
         parser.error("--layout-output requires --admission-elf")
+    if args.creation_claim_slot is not None and args.admission_elf is None:
+        parser.error("--creation-claim-slot requires --admission-elf")
     paths = [
         args.input,
         args.output,
@@ -699,6 +756,7 @@ def main() -> None:
     program = result
     admission = args.admission_program.read_bytes() if args.admission_program else None
     identity_offset = None
+    creation_offset = None
     if args.admission_elf is not None:
         # A hidden command always starts with a fresh immutable Flash copy.
         # Validate both ELFs and bind both before writing any output file.
@@ -712,9 +770,14 @@ def main() -> None:
             binding=binding,
             library_id=args.library_id,
             reservation=(args.reservation_name, args.reservation_bytes),
+            creation_slot=args.creation_claim_slot,
         )
         admission_symbols = elf_symbols(args.admission_elf, args.nm)
         identity_offset = admission_symbols.get("hpclang_recovery_identity")
+        if args.creation_claim_slot is not None:
+            creation_offset = admission_symbols.get("hpclang_recovery_creation_slot")
+            if identity_offset is None:
+                raise ValueError("Creation claim requires a sealed admission identity")
         if (
             "hpclang_recovery_reservation" in admission_symbols
             and args.reservation_prefix != "HPCMEM2"
@@ -751,6 +814,7 @@ def main() -> None:
                 ),
             ),
             identity_offset=identity_offset,
+            creation_offset=creation_offset,
         )
         if identity_offset is not None:
             result = seal_recovery_identity(result, layout["identity_object_nibble"])

@@ -84,6 +84,99 @@ static int publish_erased(const struct hpclang_rpl_flash_io *io, uint32_t slot,
     return HPCLANG_RPL_FLASH_WRITTEN;
 }
 
+static int creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                           const uint8_t *record, uint32_t bytes, int retry)
+{
+    enum hpclang_rpl_flash_creation_phase phase;
+    if (!io || !io->read16 || !io->program16 || !record ||
+        bytes != HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES ||
+        hpclang_rpl_flash_creation_inspect(io->first, io->end, slot, record, bytes, record + 20,
+                                           record + 100, record[17], &phase) ||
+        phase != HPCLANG_RPL_FLASH_CREATION_INTENT)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint16_t word;
+    if (!io->read16(io->context, (slot + 16u) & ~1u, &word))
+        return retry ? HPCLANG_RPL_FLASH_DIRTY : HPCLANG_RPL_FLASH_FAILED;
+    uint8_t current = (uint8_t)(word >> (8u * ((slot + 16u) & 1u)));
+    if (retry && current != 0xffu && current != 0x7fu)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    for (uint32_t i = 0; i <= bytes; ++i) {
+        uint32_t at = slot + i;
+        if (!io->read16(io->context, at & ~1u, &word))
+            return retry ? HPCLANG_RPL_FLASH_DIRTY : HPCLANG_RPL_FLASH_FAILED;
+        uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
+        int matches = !retry || i == bytes ? value == 0xffu
+                      : i == 16            ? value == current
+                      : current == 0xffu   ? (value & record[i]) == record[i]
+                                           : value == record[i];
+        if (!matches)
+            return retry ? HPCLANG_RPL_FLASH_DIRTY : HPCLANG_RPL_FLASH_OCCUPIED;
+    }
+    if (current == 0x7fu)
+        return 0;
+    /* Publish the native deleted envelope only after its immutable body, then
+     * publish intent last. No partial result may return to Stock or create RAM. */
+    if (!write_bytes(io, slot + 1u, record + 1u, 15u) ||
+        !write_bytes(io, slot + 17u, record + 17u, bytes - 17u) ||
+        !write_bytes(io, slot, record, 1u) || !write_bytes(io, slot + 16u, record + 16u, 1u))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    return 0;
+}
+
+int hpclang_rpl_flash_publish_creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                              const uint8_t *record, uint32_t bytes)
+{
+    return creation_intent(io, slot, record, bytes, 0);
+}
+
+int hpclang_rpl_flash_finish_creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                             const uint8_t *record, uint32_t bytes)
+{
+    return creation_intent(io, slot, record, bytes, 1);
+}
+
+static int transition_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                               const uint8_t *intent, uint32_t bytes, int closing)
+{
+    enum hpclang_rpl_flash_creation_phase expected_phase;
+    if (!io || !io->read16 || !io->program16 || !intent ||
+        bytes != HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES ||
+        hpclang_rpl_flash_creation_inspect(io->first, io->end, slot, intent, bytes, intent + 20,
+                                           intent + 100, intent[17], &expected_phase) ||
+        expected_phase != HPCLANG_RPL_FLASH_CREATION_INTENT)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint8_t phase = 0xff;
+    for (uint32_t i = 0; i < bytes; ++i) {
+        uint32_t at = slot + i;
+        uint16_t word;
+        if (!io->read16(io->context, at & ~1u, &word))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
+        if (i == 16) {
+            if (closing ? (value & ~0x7eu) != 0 : value != 0x7fu && value != 0x7eu)
+                return HPCLANG_RPL_FLASH_DIRTY;
+            phase = value;
+        } else if (value != intent[i]) {
+            return HPCLANG_RPL_FLASH_DIRTY;
+        }
+    }
+    const uint8_t target = closing ? 0 : 0x7e;
+    return phase == target || write_bytes(io, slot + 16u, &target, 1u) ? HPCLANG_RPL_FLASH_WRITTEN
+                                                                       : HPCLANG_RPL_FLASH_DIRTY;
+}
+
+int hpclang_rpl_flash_complete_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                        const uint8_t *intent, uint32_t bytes)
+{
+    return transition_creation(io, slot, intent, bytes, 0);
+}
+
+int hpclang_rpl_flash_close_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                     const uint8_t *intent, uint32_t bytes)
+{
+    return transition_creation(io, slot, intent, bytes, 1);
+}
+
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                      const uint8_t *record, uint32_t bytes)
 {
@@ -114,9 +207,9 @@ static int matching_record(const struct hpclang_rpl_flash_io *io, uint32_t slot,
     return HPCLANG_RPL_FLASH_WRITTEN;
 }
 
-int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
-                                        uint32_t journal_slot, const uint8_t *journal,
-                                        uint32_t journal_bytes)
+static int publish_authority_status(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                    uint32_t journal_slot, const uint8_t *journal,
+                                    uint32_t journal_bytes, uint8_t status)
 {
     uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
     if (!io || !io->read16 || !io->program16 ||
@@ -126,7 +219,22 @@ int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, u
     int result = matching_record(io, journal_slot, journal, journal_bytes, 0, 0x7e);
     if (result != HPCLANG_RPL_FLASH_WRITTEN)
         return result;
+    authority[0] = status;
     return publish_erased(io, slot, authority, sizeof authority);
+}
+
+int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                        uint32_t journal_slot, const uint8_t *journal,
+                                        uint32_t journal_bytes)
+{
+    return publish_authority_status(io, slot, journal_slot, journal, journal_bytes, 0x7eu);
+}
+
+int hpclang_rpl_flash_stage_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                      uint32_t journal_slot, const uint8_t *journal,
+                                      uint32_t journal_bytes)
+{
+    return publish_authority_status(io, slot, journal_slot, journal, journal_bytes, 0x7fu);
 }
 
 static int finish_hidden_record(const struct hpclang_rpl_flash_io *io, uint32_t slot,
@@ -141,7 +249,8 @@ static int finish_hidden_record(const struct hpclang_rpl_flash_io *io, uint32_t 
         uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
         if (!i) {
             status = value;
-            if (status != 0xffu && status != 0x7fu && status != 0xfeu && status != 0x7eu)
+            if (status != 0xffu && status != 0x7fu &&
+                (record[0] != 0x7eu || (status != 0xfeu && status != 0x7eu)))
                 return HPCLANG_RPL_FLASH_DIRTY;
         } else if (i == bytes) {
             if (value != 0xffu)
@@ -150,7 +259,7 @@ static int finish_hidden_record(const struct hpclang_rpl_flash_io *io, uint32_t 
             return HPCLANG_RPL_FLASH_DIRTY;
         }
     }
-    if (status == 0x7eu)
+    if (status == record[0])
         return HPCLANG_RPL_FLASH_WRITTEN;
     return write_bytes(io, slot + 1u, record + 1u, bytes - 1u) && write_bytes(io, slot, record, 1u)
                ? HPCLANG_RPL_FLASH_WRITTEN
@@ -168,9 +277,9 @@ int hpclang_rpl_flash_finish_sector(const struct hpclang_rpl_flash_io *io, uint3
     return finish_hidden_record(io, slot, record, bytes);
 }
 
-int hpclang_rpl_flash_finish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
-                                       uint32_t journal_slot, const uint8_t *journal,
-                                       uint32_t journal_bytes)
+static int finish_authority_status(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                   uint32_t journal_slot, const uint8_t *journal,
+                                   uint32_t journal_bytes, uint8_t status)
 {
     uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
     if (!io || !io->read16 || !io->program16 ||
@@ -180,7 +289,47 @@ int hpclang_rpl_flash_finish_authority(const struct hpclang_rpl_flash_io *io, ui
     if (matching_record(io, journal_slot, journal, journal_bytes, 0, 0x7e) !=
         HPCLANG_RPL_FLASH_WRITTEN)
         return HPCLANG_RPL_FLASH_DIRTY;
+    authority[0] = status;
     return finish_hidden_record(io, slot, authority, sizeof authority);
+}
+
+int hpclang_rpl_flash_finish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                       uint32_t journal_slot, const uint8_t *journal,
+                                       uint32_t journal_bytes)
+{
+    return finish_authority_status(io, slot, journal_slot, journal, journal_bytes, 0x7eu);
+}
+
+int hpclang_rpl_flash_finish_staged_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                              uint32_t journal_slot, const uint8_t *journal,
+                                              uint32_t journal_bytes)
+{
+    return finish_authority_status(io, slot, journal_slot, journal, journal_bytes, 0x7fu);
+}
+
+int hpclang_rpl_flash_activate_staged_authority(const struct hpclang_rpl_flash_io *io,
+                                                uint32_t slot, uint32_t journal_slot,
+                                                const uint8_t *journal, uint32_t journal_bytes)
+{
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_authority_encode(io->first, io->end, slot, journal_slot, journal,
+                                           journal_bytes, authority, sizeof authority))
+        return HPCLANG_RPL_FLASH_INVALID;
+    if (matching_record(io, journal_slot, journal, journal_bytes, 0, 0x7e) !=
+        HPCLANG_RPL_FLASH_WRITTEN)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint16_t word;
+    if (!io->read16(io->context, slot & ~1u, &word))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint8_t phase = (uint8_t)(word >> (8u * (slot & 1u)));
+    if ((phase != 0x7f && phase != 0x7e) || matching_record(io, slot, authority, sizeof authority,
+                                                            0, phase) != HPCLANG_RPL_FLASH_WRITTEN)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    /* The allocation was already published. Its successor may now be occupied;
+     * activate only its phase byte, never resume body or tail publication. */
+    return write_bytes(io, slot, authority, 1) ? HPCLANG_RPL_FLASH_WRITTEN
+                                               : HPCLANG_RPL_FLASH_DIRTY;
 }
 
 int hpclang_rpl_flash_close_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
@@ -629,9 +778,24 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
             at += extent + 2u;
             continue;
         }
-        if (status && !(status & 1u) && !(header >> 20u)) {
+        int unpublished = status != 0x53u && (status & 0x53u) == 0x53u;
+        if (status && (!(status & 1u) || unpublished) && !(header >> 20u)) {
+            if (unpublished) {
+                /* Only library cancellation creates an odd zero-metadata
+                 * marker. Do not broaden backup corruption recovery. */
+                struct recovery_status view = {&reader, at, 0x53u};
+                const struct hpclang_rpl_reader committed = {committed_status_nibble, &view};
+                struct hpclang_rpl_port_cursor cursor = {at, 0x40000u, 0};
+                struct hpclang_rpl_port_entry entry;
+                result = hpclang_rpl_flash_next(&committed, &cursor, &entry);
+                if (result != 1 || entry.prologue != 0x02b40u)
+                    return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                                  : HPCLANG_RPL_FLASH_DIRTY;
+            }
             /* Tail cleanup verifies zero metadata and the extent before
-             * clearing bit zero. Every subsequent status remains even.
+             * clearing bit zero. A cancelled library first clears metadata
+             * while its status is still an unpublished superset of 53.
+             * Every subsequent status remains even.
              * Require a bounded allocation covering the discard plan and an
              * erased remainder; a failed append may have reserved more space
              * than its partial body needs. Do not
@@ -663,7 +827,9 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
                 return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
                                                               : HPCLANG_RPL_FLASH_DIRTY;
             if (partial) {
-                if (entry.prologue != 0x02b62u || (header >> 20u) != 1u ||
+                int library = entry.prologue == 0x02b40u;
+                if ((entry.prologue != 0x02b62u && !(library && unpublished)) ||
+                    (header >> 20u) != 1u ||
                     (((entry.span + 15u) & ~7u) != extent + 2u &&
                      ((entry.span + 11u) & ~3u) != extent + 2u))
                     return HPCLANG_RPL_FLASH_DIRTY;
@@ -673,6 +839,22 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
                     if (result)
                         return result;
                     if (value != 15u)
+                        return HPCLANG_RPL_FLASH_DIRTY;
+                }
+                if (library) {
+                    /* Only abandon an unpublished final allocation. Never
+                     * complete it or treat a partially removed live library
+                     * as fresh installation. Zero metadata before changing
+                     * status so every interrupted cleanup is recognizable by
+                     * the bounded discard path above. Preserve the payload. */
+                    struct hpclang_rpl_flash_space tail;
+                    uint32_t next = at + extent + 2u;
+                    result = hpclang_rpl_flash_tail(&reader, next, 0x40000u, &tail);
+                    if (result || tail.address != next)
+                        return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                                      : HPCLANG_RPL_FLASH_DIRTY;
+                    const uint8_t metadata = (uint8_t)((header >> 16u) & 15u);
+                    if (apply && !write_bytes(io, bank + at / 2u + 3u, &metadata, 1u))
                         return HPCLANG_RPL_FLASH_DIRTY;
                 }
                 if (apply && !discard_status(io, bank + at / 2u))
@@ -965,10 +1147,10 @@ static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *n
     return select_record(io, name, name_length, 0x02b62u, 0, bytes, selection, NULL);
 }
 
-static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
-                         uint32_t bytes, uint32_t prologue, uint32_t *attempted_slot)
+static int plan_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record, uint32_t bytes,
+                       uint32_t prologue, uint32_t *slot, struct erased_tail *tails)
 {
-    if (!valid_record(record, bytes))
+    if (!slot || !valid_record(record, bytes))
         return HPCLANG_RPL_FLASH_INVALID;
     struct packed_record packed = {record, bytes};
     const struct hpclang_rpl_reader source = {packed_read, &packed};
@@ -977,8 +1159,8 @@ static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *r
     if (hpclang_rpl_port_next(&source, &source_cursor, &wanted) != 1 || wanted.prologue != prologue)
         return HPCLANG_RPL_FLASH_INVALID;
     struct record_selection selection;
-    int result = select_record(io, wanted.name, wanted.name_length, wanted.prologue,
-                               wanted.library_number, bytes, &selection, NULL);
+    int result = scan_records(io, wanted.name, wanted.name_length, wanted.prologue,
+                              wanted.library_number, bytes, &selection, tails);
     if (result)
         return result;
     if (selection.matches)
@@ -986,6 +1168,99 @@ static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *r
     uint32_t selected = selection.free_slot;
     if (selected == io->end)
         return HPCLANG_RPL_FLASH_NOSPACE;
+    *slot = selected;
+    return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
+int hpclang_rpl_flash_plan_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                   uint32_t bytes, uint32_t *slot)
+{
+    return plan_record(io, record, bytes, 0x02b40u, slot, NULL);
+}
+
+static int take_recovery_tail(struct erased_tail *tail, uint32_t bytes, uint32_t target,
+                              uint32_t *slot)
+{
+    if ((tail->slot & 3u) != 1u || tail->bytes < bytes ||
+        (tail->slot < target + HPCLANG_RPL_FLASH_SECTOR_BYTES && target < tail->slot + bytes))
+        return 0;
+    *slot = tail->slot;
+    tail->slot += bytes;
+    tail->bytes -= bytes;
+    return 1;
+}
+
+static int plan_recovery_space(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                               uint32_t bytes, uint32_t target,
+                               struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim_slot)
+{
+    if (!space || !io || (io->first & 0x1ffffu) || io->first > io->end ||
+        io->end - io->first != 6u * 0x20000u || target < io->first ||
+        target > io->end - HPCLANG_RPL_FLASH_SECTOR_BYTES ||
+        (target & (HPCLANG_RPL_FLASH_SECTOR_BYTES - 1u)) || (bytes & 3u))
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct erased_tail tails[6];
+    uint32_t unused;
+    int result = plan_record(io, record, bytes, 0x02b40u, &unused, tails);
+    if (result)
+        return result;
+    for (unsigned library = 0; library < 6; ++library)
+        for (unsigned journal = 0; journal < 6; ++journal)
+            for (unsigned authority = 0; authority < 6; ++authority) {
+                struct erased_tail available[6];
+                memcpy(available, tails, sizeof available);
+                struct hpclang_rpl_flash_recovery_space selected;
+                if (take_recovery_tail(&available[library], bytes, target,
+                                       &selected.library_slot) &&
+                    take_recovery_tail(&available[journal], HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES,
+                                       target, &selected.journal_slot) &&
+                    take_recovery_tail(&available[authority], HPCLANG_RPL_FLASH_AUTHORITY_BYTES,
+                                       target, &selected.authority_slot)) {
+                    if (!claim_slot) {
+                        *space = selected;
+                        return 0;
+                    }
+                    for (unsigned claim = 0; claim < 6; ++claim) {
+                        uint32_t slot;
+                        if (take_recovery_tail(&available[claim],
+                                               HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES, target,
+                                               &slot)) {
+                            *space = selected;
+                            *claim_slot = slot;
+                            return 0;
+                        }
+                    }
+                }
+            }
+    return HPCLANG_RPL_FLASH_NOSPACE;
+}
+
+int hpclang_rpl_flash_plan_recovery_space(const struct hpclang_rpl_flash_io *io,
+                                          const uint8_t *record, uint32_t bytes, uint32_t target,
+                                          struct hpclang_rpl_flash_recovery_space *space)
+{
+    return plan_recovery_space(io, record, bytes, target, space, NULL);
+}
+
+int hpclang_rpl_flash_plan_creation_space(const struct hpclang_rpl_flash_io *io,
+                                          const uint8_t *record, uint32_t bytes, uint32_t target,
+                                          struct hpclang_rpl_flash_recovery_space *space,
+                                          uint32_t *claim_slot)
+{
+    if (!claim_slot)
+        return HPCLANG_RPL_FLASH_INVALID;
+    return plan_recovery_space(io, record, bytes, target, space, claim_slot);
+}
+
+static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                         uint32_t bytes, uint32_t prologue, uint32_t *attempted_slot)
+{
+    if (!io || !io->program16)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t selected;
+    int result = plan_record(io, record, bytes, prologue, &selected, NULL);
+    if (result)
+        return result;
     struct hpclang_rpl_flash_io reserved = *io;
     uint32_t bank = io->first + ((selected - io->first) / 0x20000u) * 0x20000u;
     reserved.first = bank + 0x104u;
@@ -1005,6 +1280,28 @@ int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, cons
                                      uint32_t bytes, uint32_t *attempted_slot)
 {
     return create_record(io, record, bytes, 0x02b40u, attempted_slot);
+}
+
+int hpclang_rpl_flash_create_library_at(const struct hpclang_rpl_flash_io *io,
+                                        const uint8_t *record, uint32_t bytes, uint32_t slot)
+{
+    if (!io || !io->program16 || slot < io->first || slot >= io->end)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct erased_tail tails[6];
+    uint32_t unused;
+    int result = plan_record(io, record, bytes, 0x02b40u, &unused, tails);
+    if (result)
+        return result;
+    uint32_t index = (slot - io->first) / 0x20000u;
+    if (slot != tails[index].slot)
+        return HPCLANG_RPL_FLASH_OCCUPIED;
+    if (bytes > tails[index].bytes)
+        return HPCLANG_RPL_FLASH_NOSPACE;
+    struct hpclang_rpl_flash_io reserved = *io;
+    uint32_t bank = io->first + index * 0x20000u;
+    reserved.first = bank + 0x104u;
+    reserved.end = bank + 0x20000u;
+    return hpclang_rpl_flash_append(&reserved, slot, record, bytes);
 }
 
 int hpclang_rpl_flash_finish_remove(const struct hpclang_rpl_flash_io *io, uint32_t address)

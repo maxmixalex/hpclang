@@ -881,17 +881,83 @@ static void match_libraries(const struct hpclang_rpl_flash_io *source, const uin
     assert(slot == UINT32_MAX && !writes);
 }
 
+static void plan_libraries(const struct hpclang_rpl_flash_io *io, const uint8_t *library,
+                           uint32_t bytes)
+{
+    struct hpclang_rpl_flash_io readonly = *io;
+    readonly.program16 = NULL;
+    static uint8_t original[sizeof flash];
+    for (unsigned bank = 0; bank < 6; ++bank) {
+        init();
+        for (unsigned preceding = 0; preceding < bank; ++preceding)
+            fill_bank(preceding);
+        memcpy(flash + bank * 0x20000u + 0x105u, record, sizeof record);
+        memcpy(original, flash, sizeof flash);
+        uint32_t slot = UINT32_MAX;
+        assert(!hpclang_rpl_flash_plan_library(&readonly, library, bytes, &slot));
+        assert(slot == base + bank * 0x20000u + 0x105u + sizeof record);
+        assert(!writes && !memcmp(original, flash, sizeof flash));
+        uint32_t attempted = UINT32_MAX;
+        assert(hpclang_rpl_flash_create_library(&readonly, library, bytes, &attempted) ==
+               HPCLANG_RPL_FLASH_INVALID);
+        assert(attempted == UINT32_MAX && !writes);
+        assert(!hpclang_rpl_flash_create_library(io, library, bytes, &attempted));
+        assert(attempted == slot);
+
+        init();
+        memcpy(flash + bank * 0x20000u + 0x105u, library, bytes);
+        slot = UINT32_MAX;
+        assert(hpclang_rpl_flash_plan_library(&readonly, library, bytes, &slot) ==
+               HPCLANG_RPL_FLASH_EXISTS);
+        assert(slot == UINT32_MAX && !writes);
+        flash[sizeof flash - 1u] = 0;
+        assert(hpclang_rpl_flash_plan_library(&readonly, library, bytes, &slot) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(slot == UINT32_MAX && !writes);
+
+        init();
+        fail_address = base + bank * 0x20000u + 0x1fffeu;
+        assert(hpclang_rpl_flash_plan_library(&readonly, library, bytes, &slot) ==
+               HPCLANG_RPL_FLASH_FAILED);
+        assert(slot == UINT32_MAX && !writes);
+    }
+    init();
+    memcpy(flash + 0x105u, library, bytes);
+    flash[0x105u] = 0; /* Deleted content is not an owned installation to adopt. */
+    uint32_t slot = UINT32_MAX;
+    assert(!hpclang_rpl_flash_plan_library(&readonly, library, bytes, &slot));
+    assert(slot == base + 0x105u + bytes && !writes);
+    init();
+    for (unsigned bank = 0; bank < 6; ++bank)
+        fill_bank(bank);
+    slot = UINT32_MAX;
+    assert(hpclang_rpl_flash_plan_library(&readonly, library, bytes, &slot) ==
+           HPCLANG_RPL_FLASH_NOSPACE);
+    assert(slot == UINT32_MAX && !writes);
+    assert(hpclang_rpl_flash_plan_library(&readonly, record, sizeof record, &slot) ==
+           HPCLANG_RPL_FLASH_INVALID);
+    assert(hpclang_rpl_flash_plan_library(&readonly, library, bytes, NULL) ==
+           HPCLANG_RPL_FLASH_INVALID);
+    assert(hpclang_rpl_flash_plan_library(NULL, library, bytes, &slot) ==
+           HPCLANG_RPL_FLASH_INVALID);
+    assert(slot == UINT32_MAX && !writes);
+}
+
 static void create_libraries(const struct hpclang_rpl_flash_io *io)
 {
     /* Native library 123, with the unused high nibble left erased by SDK. */
     const uint8_t library[] = {0x53, 0x36, 0x00, 0x10, 0x40, 0x2b, 0x60, 0x02, 0x00, 0x01,
                                0x58, 0x01, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                0x00, 0x00, 0x00, 0xd0, 0xc5, 0xf2, 0xff, 0xff};
+    plan_libraries(io, library, sizeof library);
     init();
     memcpy(flash + 0x105u, library, sizeof library);
     flash[0x105u] = 0x73;
-    assert(hpclang_rpl_flash_recover_tails(io) == HPCLANG_RPL_FLASH_DIRTY && !writes);
-    assert(flash[0x105u] == 0x73 && !memcmp(flash + 0x106u, library + 1u, sizeof library - 1u));
+    assert(!hpclang_rpl_flash_recover_tails(io) && writes == 3);
+    assert(flash[0x105u] == 0 && flash[0x108u] == 0);
+    assert(!memcmp(flash + 0x106u, library + 1u, 2u));
+    assert(!memcmp(flash + 0x109u, library + 4u, sizeof library - 4u));
+    assert(!hpclang_rpl_flash_recover_tails(io) && writes == 3);
     init();
     uint32_t attempted = UINT32_MAX;
     struct hpclang_rpl_flash_replacement transaction = {0};

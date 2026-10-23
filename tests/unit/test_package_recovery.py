@@ -89,6 +89,7 @@ class RecoveryPackageTests(unittest.TestCase):
             predicate_image = PACK.bind_image(b"HPCBIND1" + bytes(56), 0, 0x1A0105, 0x1A1121)
             valid_predicate = True
             identity_offset = None
+            creation_offset = None
 
             def listing(command, **kwargs):
                 if command[0] == "readelf":
@@ -99,9 +100,15 @@ class RecoveryPackageTests(unittest.TestCase):
                     if command[-1] == predicate and identity_offset is not None
                     else ""
                 )
+                creation_symbol = (
+                    f"{creation_offset:08x} D hpclang_recovery_creation_slot\n"
+                    if command[-1] == predicate and creation_offset is not None
+                    else ""
+                )
+                zero = max(64, (len(predicate_image) + 3) & ~3) if command[-1] == predicate else 64
                 return (
-                    "00000000 T entry\n00000040 B __zero_start\n00000080 B __image_end\n"
-                    f"{offset:08x} D hpclang_recovery_binding\n" + identity_symbol
+                    f"00000000 T entry\n{zero:08x} B __zero_start\n00000080 B __image_end\n"
+                    f"{offset:08x} D hpclang_recovery_binding\n" + identity_symbol + creation_symbol
                 )
 
             def extract(command, **kwargs):
@@ -213,6 +220,69 @@ class RecoveryPackageTests(unittest.TestCase):
                 PACK.main()
                 self.assertEqual(output.read_bytes(), sealed)
                 argv[layout_option:layout_option] = ["--layout-output", str(layout_path)]
+                creation_offset = 64
+                # The second identical word has no symbol and must not be patched.
+                predicate_image += b"\xff" * 8
+                argv[-2:-2] = ["--creation-claim-slot", "0x1c0105"]
+                claim_option = argv.index("--creation-claim-slot") + 1
+                digests = []
+                for claim_slot in (0x1C0105, 0x1E0105):
+                    argv[claim_option] = hex(claim_slot)
+                    PACK.main()
+                    owned_layout = json.loads(layout_path.read_text())
+                    values = [n for byte in output.read_bytes()[8:] for n in (byte & 15, byte >> 4)]
+                    at = owned_layout["admission_creation_nibble"] - 8
+                    self.assertEqual(sum(values[at + i] << (4 * i) for i in range(8)), claim_slot)
+                    self.assertEqual(values[at + 8 : at + 16], [15] * 8)
+                    identity_at = owned_layout["identity_object_nibble"]
+                    digest = bytes(
+                        values[identity_at + i] | values[identity_at + i + 1] << 4
+                        for i in range(32, 96, 2)
+                    )
+                    span = 5 + sum(values[5 + i] << (4 * i) for i in range(5))
+                    canonical = bytearray((span + 1) // 2)
+                    for index in range(span):
+                        nibble = (
+                            0
+                            if identity_at + 32 <= index < identity_at + 96 or index >= span - 4
+                            else values[index]
+                        )
+                        canonical[index // 2] |= nibble << (4 * (index % 2))
+                    self.assertEqual(digest, hashlib.sha256(canonical).digest())
+                    canonical[at // 2] ^= 1 << (4 * (at % 2))
+                    self.assertNotEqual(digest, hashlib.sha256(canonical).digest())
+                    digests.append(digest)
+                self.assertNotEqual(*digests)
+                for missing in ("creation", "identity"):
+                    saved_creation, saved_identity = creation_offset, identity_offset
+                    if missing == "creation":
+                        creation_offset = None
+                    else:
+                        identity_offset = None
+                    for path in (output, binary, program, layout_path):
+                        path.write_bytes(b"retained")
+                    with self.assertRaises(ValueError):
+                        PACK.main()
+                    self.assertTrue(
+                        all(
+                            path.read_bytes() == b"retained"
+                            for path in (output, binary, program, layout_path)
+                        )
+                    )
+                    creation_offset, identity_offset = saved_creation, saved_identity
+                for bad_slot in ("0x180105", "0x181121", "0x1c0000", "0x200000"):
+                    argv[claim_option] = bad_slot
+                    for path in (output, binary, program, layout_path):
+                        path.write_bytes(b"retained")
+                    with self.assertRaises(ValueError):
+                        PACK.main()
+                    self.assertTrue(
+                        all(
+                            path.read_bytes() == b"retained"
+                            for path in (output, binary, program, layout_path)
+                        )
+                    )
+                argv[claim_option] = "0x1c0105"
                 for bad_identity_offset in (8, 18, 64):
                     identity_offset = bad_identity_offset
                     for path in (output, binary, program, layout_path):
@@ -326,6 +396,48 @@ class RecoveryPackageTests(unittest.TestCase):
             self.assertEqual(envelope, PACK.package(expected, 256, model="hp50g"))
             with self.assertRaisesRegex(ValueError, "outside initialized"):
                 package("000000b0 D hpclang_recovery_reservation\n")
+
+            image = bytes(16) + b"\xff" * 4 + bytes(12)
+            symbols = "00000000 T entry\n00000020 B __zero_start\n00000080 B __image_end\n"
+            claim_symbol = "00000010 D hpclang_recovery_creation_slot\n"
+            self.assertEqual(package(claim_symbol)[1], image)
+            with self.assertRaisesRegex(ValueError, "no creation claim"):
+                package("", creation_slot=0x1C0105)
+            with self.assertRaisesRegex(ValueError, "bound journal"):
+                package(claim_symbol, creation_slot=0x1C0105)
+            with self.assertRaisesRegex(ValueError, "outside initialized"):
+                package("00000020 D hpclang_recovery_creation_slot\n")
+
+    def test_creation_slot_uses_only_owned_disjoint_placeholder(self):
+        image = bytes(range(16)) + b"\xff" * 8
+        binding = (0x180105, 0x181121)
+        self.assertEqual(PACK.bind_creation_slot(image, 16, None, None), image)
+        patched = PACK.bind_creation_slot(image, 16, 0x1C0105, binding)
+        self.assertEqual(patched[:16], image[:16])
+        self.assertEqual(patched[16:20], bytes.fromhex("05011c00"))
+        self.assertEqual(patched[20:], image[20:])
+        for offset in (-4, 1, True, 24):
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                PACK.bind_creation_slot(image, offset, 0x1C0105, binding)
+        for slot in (
+            True,
+            0x1C0105 + 0.0,
+            0x140000,
+            0x1C0106,
+            0x1DFF11,
+            0x200000,
+            0x180105,
+            0x181121,
+            0x1810FD,
+        ):
+            with self.subTest(slot=slot), self.assertRaises(ValueError):
+                PACK.bind_creation_slot(image, 16, slot, binding)
+        with self.assertRaisesRegex(ValueError, "placeholder"):
+            PACK.bind_creation_slot(patched, 16, 0x1C0105, binding)
+        with self.assertRaisesRegex(ValueError, "bound journal"):
+            PACK.bind_creation_slot(image, 16, 0x1C0105, None)
+        with self.assertRaisesRegex(ValueError, "sealed admission"):
+            PACK.recovery_layout(b"", (), creation_offset=0)
 
     def test_library_number_uses_only_owned_placeholder(self):
         image = bytes(range(16)) + b"\xff" * 4 + bytes(range(16))
@@ -542,7 +654,7 @@ class RecoveryPackageTests(unittest.TestCase):
 
     def test_fresh_flash_copy_alignment_and_lifetime(self):
         for model in ("hp49gplus", "hp50g"):
-            for size in (1, 8, 9, 24, 4096, 32768):
+            for size in (1, 8, 9, 24, 4096, 32768, 32769, 65536):
                 payload = bytes(i % 251 for i in range(size))
                 initialized = (size + 7) & ~7
                 runtime = initialized + 8192
@@ -672,7 +784,7 @@ class RecoveryPackageTests(unittest.TestCase):
             self.assertTrue(PACK.configuration_library(program, library_id))
 
     def test_object_extent_payload_and_owned_storage(self):
-        for size in (1, 8, 9, 24, 4096, 32768):
+        for size in (1, 8, 9, 24, 4096, 32768, 32769, 65536):
             with self.subTest(size=size):
                 payload = bytes(i % 251 for i in range(size))
                 initialized = (size + 7) & ~7
@@ -720,7 +832,8 @@ class RecoveryPackageTests(unittest.TestCase):
     def test_invalid_inputs(self):
         for payload, runtime, model in (
             (b"", 8, "hp50g"),
-            (bytes(32769), 32776, "hp50g"),
+            (bytes(256 * 1024 + 1), 256 * 1024 + 8, "hp50g"),
+            (bytes(128 * 1024), 128 * 1024, "hp50g"),
             (bytes(9), 8, "hp50g"),
             (bytes(8), 9, "hp50g"),
             (bytes(8), -8, "hp50g"),
@@ -740,6 +853,17 @@ class RecoveryPackageTests(unittest.TestCase):
             PACK.package(payload, 4096, model="hp50g"),
         )
 
+    def test_copy_count_uses_the_complete_address_field(self):
+        # LC(5), A=DAT0 W, DAT1=A W, D0/D1 += 16, C=C-1 A, GONC.
+        loop = "1527151716f17fce5fe"
+        for size in (8, 32768, 32776, 65536, 256 * 1024):
+            code = PACK.entry(size, 0)
+            start = code.index(loop)
+            self.assertEqual(code[start - 7 : start - 5], "34")
+            self.assertEqual(int(code[start - 5 : start][::-1], 16), size // 8 - 1)
+        with self.assertRaises(ValueError):
+            PACK.entry(256 * 1024 + 8, 0)
+
     def test_complete_program_must_fit_main_ram_window(self):
         # Measure the serialized overhead independently, including both copies
         # of initialized data and the surrounding RPL objects. The HP transfer
@@ -747,7 +871,7 @@ class RecoveryPackageTests(unittest.TestCase):
         # enough free RAM: the OS and other objects also occupy this window.
         window_bytes = 256 * 1024
         for model in ("hp49gplus", "hp50g"):
-            for size in (1, 8, 32768):
+            for size in (1, 8, 32768, 32776, 65536):
                 with self.subTest(model=model, initialized=size):
                     payload = bytes(size)
                     runtime = (size + 7) & ~7

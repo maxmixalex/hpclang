@@ -399,8 +399,119 @@ static void test_authority(void)
     assert(!memcmp(authority, saved, sizeof saved));
 }
 
+static void claim_word(uint8_t *data, unsigned at, uint32_t value)
+{
+    for (unsigned i = 0; i < 4; ++i)
+        data[at + i] = (uint8_t)(value >> (8 * i));
+}
+
+static void test_creation_claim(void)
+{
+    enum
+    {
+        FIRST = 0x140000,
+        END = 0x200000,
+        SLOT = 0x1a0105
+    };
+    uint8_t binding[80] = "HPCMEM2", name[] = "HPCLEASE";
+    memcpy(binding + 8, "HPCROOT1", 8);
+    claim_word(binding, 16, 200);
+    claim_word(binding, 20, 20);
+    memset(binding + 24, 0xa5, 32);
+    claim_word(binding, 56, 0x160105);
+    claim_word(binding, 60, 0x180105);
+    claim_word(binding, 64, 0x181121);
+    claim_word(binding, 68, FIRST);
+    claim_word(binding, 72, 0x12345678);
+    claim_word(binding, 76, 32768);
+    uint8_t record[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES], original[sizeof record];
+    assert(!hpclang_rpl_flash_creation_encode(FIRST, END, SLOT, binding, name, 8, record,
+                                              sizeof record));
+    /* Independent struct/zlib oracle for this complete immutable binding. */
+    assert(!memcmp(record + sizeof record - 4, "\x12\xf9\x28\x24", 4));
+    memcpy(original, record, sizeof record);
+    for (unsigned status = 0; status < 256; ++status) {
+        record[16] = (uint8_t)status;
+        enum hpclang_rpl_flash_creation_phase phase = 99;
+        int result = hpclang_rpl_flash_creation_inspect(FIRST, END, SLOT, record, sizeof record,
+                                                        binding, name, 8, &phase);
+        if (status == 0x7f || !(status & ~0x7e)) {
+            assert(!result);
+            assert(phase == (status == 0x7f   ? HPCLANG_RPL_FLASH_CREATION_INTENT
+                             : status == 0x7e ? HPCLANG_RPL_FLASH_CREATION_CREATED
+                             : status         ? HPCLANG_RPL_FLASH_CREATION_CLOSING
+                                              : HPCLANG_RPL_FLASH_CREATION_CLOSED));
+        } else {
+            assert(result < 0 && phase == 99);
+        }
+        /* The internal phase never changes native allocation visibility. */
+        uint8_t tail[sizeof record + 2];
+        memcpy(tail, record, sizeof record);
+        memset(tail + sizeof record, 255, 2);
+        struct image source = {tail, 2 * sizeof tail, 0x20a, 0, UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {read_nibble, &source};
+        struct hpclang_rpl_flash_allocation allocation;
+        assert(hpclang_rpl_flash_allocation_find(&reader, source.base, source.base + source.nibbles,
+                                                 source.base, &allocation) == 1);
+        assert(allocation.deleted && allocation.nibbles == 2 * sizeof record);
+    }
+    for (unsigned byte = 0; byte < sizeof record; ++byte) {
+        if (byte == 16)
+            continue;
+        memcpy(record, original, sizeof record);
+        record[byte] ^= 1;
+        enum hpclang_rpl_flash_creation_phase phase = 99;
+        assert(hpclang_rpl_flash_creation_inspect(FIRST, END, SLOT, record, sizeof record, binding,
+                                                  name, 8, &phase) < 0);
+        assert(phase == 99);
+    }
+    for (unsigned byte = 0; byte < sizeof binding; ++byte) {
+        binding[byte] ^= 1;
+        enum hpclang_rpl_flash_creation_phase phase = 99;
+        assert(hpclang_rpl_flash_creation_inspect(FIRST, END, SLOT, original, sizeof original,
+                                                  binding, name, 8, &phase) < 0);
+        assert(phase == 99);
+        binding[byte] ^= 1;
+    }
+    const uint32_t invalid_slots[] = {FIRST,    FIRST + 0x105,       0x160105, 0x180105,  0x181121,
+                                      0x1a0000, END - sizeof record, END,      UINT32_MAX};
+    for (unsigned i = 0; i < sizeof invalid_slots / sizeof invalid_slots[0]; ++i) {
+        memset(record, 0xa5, sizeof record);
+        uint8_t unchanged[sizeof record];
+        memcpy(unchanged, record, sizeof record);
+        assert(hpclang_rpl_flash_creation_encode(FIRST, END, invalid_slots[i], binding, name, 8,
+                                                 record, sizeof record) < 0);
+        assert(!memcmp(record, unchanged, sizeof record));
+    }
+    for (unsigned length = 0; length < sizeof record; ++length) {
+        enum hpclang_rpl_flash_creation_phase phase = 99;
+        assert(hpclang_rpl_flash_creation_inspect(FIRST, END, SLOT, original, length, binding, name,
+                                                  8, &phase) < 0);
+        assert(phase == 99);
+    }
+    uint8_t long_name[128];
+    memset(long_name, 'A', sizeof long_name);
+    assert(!hpclang_rpl_flash_creation_encode(FIRST, END, SLOT, binding, long_name, 127, record,
+                                              sizeof record));
+    enum hpclang_rpl_flash_creation_phase phase = 99;
+    assert(!hpclang_rpl_flash_creation_inspect(FIRST, END, SLOT, record, sizeof record, binding,
+                                               long_name, 127, &phase));
+    assert(phase == HPCLANG_RPL_FLASH_CREATION_INTENT);
+    for (unsigned fault = 0; fault < 5; ++fault) {
+        uint32_t length = fault == 0 ? 0 : fault == 1 ? 128 : 127;
+        uint32_t capacity = fault == 2 ? sizeof record - 1 : sizeof record;
+        long_name[3] = fault == 3 ? 0 : fault == 4 ? 127 : 'A';
+        uint8_t unchanged[sizeof record];
+        memcpy(unchanged, record, sizeof record);
+        assert(hpclang_rpl_flash_creation_encode(FIRST, END, SLOT, binding, long_name, length,
+                                                 record, capacity) < 0);
+        assert(!memcmp(record, unchanged, sizeof record));
+    }
+}
+
 int main(void)
 {
+    test_creation_claim();
     test_authority();
     test_native_library();
     test_native_word_padding();

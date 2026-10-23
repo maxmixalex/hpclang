@@ -78,6 +78,78 @@ static uint32_t little_word(const uint8_t *p)
     return p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
 }
 
+static void finish(struct hash_state *hash, uint8_t digest[32])
+{
+    uint32_t bits = hash->bytes * 8;
+    append(hash, 0x80);
+    while (hash->used != 56)
+        append(hash, 0);
+    for (unsigned i = 0; i < 4; ++i)
+        append(hash, 0);
+    for (unsigned i = 0; i < 4; ++i)
+        append(hash, (uint8_t)(bits >> (24 - 8 * i)));
+    for (unsigned i = 0; i < 32; ++i)
+        digest[i] = (uint8_t)(hash->h[i / 4] >> (24 - 8 * (i & 3)));
+}
+
+static uint8_t packed_nibble(const uint8_t *object, uint32_t at)
+{
+    return (object[at / 2] >> (4 * (at & 1))) & 15;
+}
+
+static void put_nibble(uint8_t *object, uint32_t at, uint8_t value)
+{
+    unsigned shift = 4 * (at & 1);
+    object[at / 2] = (uint8_t)((object[at / 2] & ~(15u << shift)) | value << shift);
+}
+
+int hpclang_rpl_recovery_identity_seal(uint8_t *object, uint32_t bytes, uint32_t at)
+{
+    if (!object || bytes < 5)
+        return 0;
+    uint32_t prologue = 0, length = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        prologue |= (uint32_t)packed_nibble(object, i) << (4 * i);
+        length |= (uint32_t)packed_nibble(object, i + 5) << (4 * i);
+    }
+    uint32_t span = length + 5;
+    if (prologue != 0x2b40 || span < 110 || (span + 1) / 2 > bytes || at < 10 || at > span - 100)
+        return 0;
+    const uint8_t marker[8] = "HPCROOT1";
+    for (unsigned i = 0; i < 96; ++i) {
+        uint8_t wanted = i < 16 ? (marker[i / 2] >> (4 * (i & 1))) & 15 : 0;
+        if (packed_nibble(object, at + i) != wanted)
+            return 0;
+    }
+    /* Every failure check precedes edits to this owned memory buffer. */
+    for (unsigned i = 0; i < 8; ++i) {
+        put_nibble(object, at + 16 + i, (uint8_t)((span >> (4 * i)) & 15));
+        put_nibble(object, at + 24 + i, (uint8_t)((at >> (4 * i)) & 15));
+    }
+    struct hash_state hash = {.h = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f,
+                                    0x9b05688c, 0x1f83d9ab, 0x5be0cd19}};
+    uint8_t packed = 0;
+    for (uint32_t i = 0; i < span; ++i) {
+        uint8_t nibble = i >= span - 4 ? 0 : packed_nibble(object, i);
+        if (!(i & 1))
+            packed = nibble;
+        else
+            append(&hash, (uint8_t)(packed | nibble << 4));
+    }
+    if (span & 1)
+        append(&hash, packed);
+    uint8_t digest[32];
+    finish(&hash, digest);
+    for (unsigned i = 0; i < 64; ++i)
+        put_nibble(object, at + 32 + i, (digest[i / 2] >> (4 * (i & 1))) & 15);
+    uint32_t crc = 0;
+    for (uint32_t i = 5; i < span - 4; ++i)
+        crc = (crc >> 4) ^ (((crc ^ packed_nibble(object, i)) & 15) * 0x1081);
+    for (unsigned i = 0; i < 4; ++i)
+        put_nibble(object, span - 4 + i, (crc >> (4 * i)) & 15);
+    return 1;
+}
+
 int hpclang_rpl_recovery_identity_match(const struct hpclang_rpl_reader *reader, uint32_t object,
                                         const uint8_t expected[48])
 {
@@ -116,16 +188,10 @@ int hpclang_rpl_recovery_identity_match(const struct hpclang_rpl_reader *reader,
         return 0;
     if (span & 1)
         append(&hash, packed);
-    uint32_t bits = hash.bytes * 8;
-    append(&hash, 0x80);
-    while (hash.used != 56)
-        append(&hash, 0);
-    for (unsigned i = 0; i < 4; ++i)
-        append(&hash, 0);
-    for (unsigned i = 0; i < 4; ++i)
-        append(&hash, (uint8_t)(bits >> (24 - 8 * i)));
+    uint8_t digest[32];
+    finish(&hash, digest);
     for (unsigned i = 0; i < 32; ++i)
-        if (expected[16 + i] != (uint8_t)(hash.h[i / 4] >> (24 - 8 * (i & 3))))
+        if (expected[16 + i] != digest[i])
             return 0;
     return 1;
 }

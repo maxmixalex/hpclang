@@ -231,6 +231,146 @@ static void resumption_tests(void)
     assert(!programs);
 }
 
+static void staging_tests(void)
+{
+    prepare(0);
+    assert(!hpclang_rpl_flash_stage_authority(&io, ROOT, JOURNAL, journal, sizeof journal));
+    unsigned writes = programs;
+    assert(writes && flash[ROOT - FIRST] == 0x7f);
+    assert(!memcmp(flash + ROOT - FIRST + 1, authority + 1, sizeof authority - 1));
+    programs = 0;
+    assert(hpclang_rpl_flash_stage_authority(&io, ROOT, JOURNAL, journal, sizeof journal) ==
+           HPCLANG_RPL_FLASH_OCCUPIED);
+    assert(!programs);
+    uint8_t scratch[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    assert(hpclang_rpl_flash_sector_replay_bound(&replay_io, ROOT, JOURNAL, journal, sizeof journal,
+                                                 scratch,
+                                                 sizeof scratch) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(!programs && !erases);
+    assert(!hpclang_rpl_flash_finish_authority(&io, ROOT, JOURNAL, journal, sizeof journal));
+    assert(programs == 1 && flash[ROOT - FIRST] == 0x7e);
+    const uint16_t masks[] = {0, 0x00ff, 0xff00, 0x5555, 0xffff};
+    for (unsigned cut = 1; cut <= writes; ++cut) {
+        for (unsigned mask = 0; mask < sizeof masks / sizeof masks[0]; ++mask) {
+            prepare(0);
+            fail_program = cut;
+            program_mask = masks[mask];
+            assert(hpclang_rpl_flash_stage_authority(&io, ROOT, JOURNAL, journal, sizeof journal) ==
+                   HPCLANG_RPL_FLASH_DIRTY);
+            assert(programs == cut && flash[ROOT - FIRST] != 0x7e);
+            fail_program = 0;
+            assert(!hpclang_rpl_flash_finish_staged_authority(&io, ROOT, JOURNAL, journal,
+                                                              sizeof journal));
+            assert(flash[ROOT - FIRST] == 0x7f);
+            assert(!memcmp(flash + ROOT - FIRST + 1, authority + 1, sizeof authority - 1));
+            assert(!memcmp(flash, initial, ROOT - FIRST));
+            assert(!memcmp(flash + ROOT - FIRST + sizeof authority,
+                           initial + ROOT - FIRST + sizeof authority,
+                           sizeof flash - (ROOT - FIRST) - sizeof authority));
+            programs = 0;
+            assert(!hpclang_rpl_flash_finish_staged_authority(&io, ROOT, JOURNAL, journal,
+                                                              sizeof journal));
+            assert(!programs && !erases);
+        }
+    }
+    for (unsigned status = 0; status < 256; ++status) {
+        prepare(0);
+        memcpy(flash + ROOT - FIRST, authority, sizeof authority);
+        flash[ROOT - FIRST] = (uint8_t)status;
+        int result =
+            hpclang_rpl_flash_finish_staged_authority(&io, ROOT, JOURNAL, journal, sizeof journal);
+        if (status == 0xff || status == 0x7f)
+            assert(!result && flash[ROOT - FIRST] == 0x7f &&
+                   programs == (unsigned)(status == 0xff));
+        else
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && !programs && flash[ROOT - FIRST] == status);
+    }
+    for (unsigned fault = 0; fault < 4; ++fault) {
+        prepare(0);
+        memcpy(flash + ROOT - FIRST, authority, sizeof authority);
+        flash[ROOT - FIRST] = 0x7f;
+        if (fault == 0)
+            flash[ROOT - FIRST + 8] ^= 1;
+        else if (fault == 1)
+            flash[JOURNAL - FIRST + 100] ^= 1;
+        else if (fault == 2)
+            flash[ROOT - FIRST + sizeof authority] = 0;
+        else
+            fail_read = 1;
+        assert(hpclang_rpl_flash_finish_staged_authority(
+                   &io, ROOT, JOURNAL, journal, sizeof journal) == HPCLANG_RPL_FLASH_DIRTY);
+        assert(!programs && !erases);
+    }
+}
+
+static void activation_fixture(unsigned phase)
+{
+    prepare(0);
+    memcpy(flash + ROOT - FIRST, authority, sizeof authority);
+    flash[ROOT - FIRST] = phase;
+    /* A published successor must survive activation unchanged. */
+    memset(flash + ROOT - FIRST + sizeof authority, 0x53, 240);
+}
+
+static int activate(void)
+{
+    return hpclang_rpl_flash_activate_staged_authority(&io, ROOT, JOURNAL, journal, sizeof journal);
+}
+
+static void activation_tests(void)
+{
+    static uint8_t expected[sizeof flash];
+    for (unsigned phase = 0; phase < 256; ++phase) {
+        activation_fixture(phase);
+        memcpy(expected, flash, sizeof flash);
+        int result = activate();
+        if (phase == 0x7f || phase == 0x7e) {
+            assert(!result && programs == (unsigned)(phase == 0x7f));
+            expected[ROOT - FIRST] = 0x7e;
+        } else {
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && !programs);
+        }
+        assert(!memcmp(flash, expected, sizeof flash) && !erases);
+    }
+    activation_fixture(0x7f);
+    assert(!activate());
+    unsigned read_count = reads;
+    for (unsigned cut = 1; cut <= read_count; ++cut) {
+        activation_fixture(0x7f);
+        fail_read = cut;
+        assert(activate() == HPCLANG_RPL_FLASH_DIRTY);
+        fail_read = 0;
+        assert(!activate());
+        assert(programs == 1 && flash[ROOT - FIRST] == 0x7e);
+    }
+    for (unsigned mask = 0; mask < 2; ++mask) {
+        activation_fixture(0x7f);
+        fail_program = 1;
+        program_mask = mask ? 0xffff : 0;
+        assert(activate() == HPCLANG_RPL_FLASH_DIRTY);
+        assert(flash[ROOT - FIRST] == (mask ? 0x7e : 0x7f));
+        fail_program = 0;
+        assert(!activate());
+        assert(programs == (mask ? 1u : 2u));
+    }
+    for (unsigned fault = 0; fault < 3; ++fault) {
+        activation_fixture(0x7f);
+        if (fault == 0)
+            flash[ROOT - FIRST + 8] ^= 1;
+        else if (fault == 1)
+            flash[JOURNAL - FIRST + 100] ^= 1;
+        else
+            flash[JOURNAL - FIRST] = 0;
+        memcpy(expected, flash, sizeof flash);
+        assert(activate() == HPCLANG_RPL_FLASH_DIRTY && !programs);
+        assert(!memcmp(flash, expected, sizeof flash));
+    }
+    activation_fixture(0x7f);
+    silent = 1;
+    assert(activate() == HPCLANG_RPL_FLASH_DIRTY);
+    assert(flash[ROOT - FIRST] == 0x7f);
+}
+
 static void closure_tests(void)
 {
     prepare(1);
@@ -387,6 +527,47 @@ static void tombstone(uint32_t slot, uint32_t bytes)
     flash[slot - FIRST + 1] = (uint8_t)extent;
     flash[slot - FIRST + 2] = (uint8_t)(extent >> 8);
     flash[slot - FIRST + 3] = (uint8_t)(extent >> 16);
+}
+
+static void bound_same_bank_tests(void)
+{
+    const uint32_t slot = FIRST + 0x2005u, root = slot + sizeof journal;
+    uint8_t scratch[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    prepare_native_port(0x7e, 0x7e, root, slot);
+    tombstone(FIRST + 0x105u, slot - FIRST - 0x105u);
+    memcpy(image, flash, sizeof image);
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, slot, FIRST, image, journal,
+                                           sizeof journal) == 0);
+    assert(hpclang_rpl_flash_authority_encode(FIRST, END, root, slot, journal, sizeof journal,
+                                              authority, sizeof authority) == 0);
+    memcpy(flash + slot - FIRST, journal, sizeof journal);
+    memcpy(flash + root - FIRST, authority, sizeof authority);
+    memset(flash, 255, sizeof image);
+    memcpy(initial, flash, sizeof flash);
+    uint32_t target = 123;
+    assert(hpclang_rpl_flash_preflight_bound(&io, root, slot, scratch, sizeof scratch, &target) ==
+           HPCLANG_RPL_FLASH_SECTOR_READY);
+    assert(target == FIRST && !programs && !erases);
+    assert(!memcmp(initial, flash, sizeof flash));
+    assert(!memcmp(scratch, journal, sizeof journal));
+    assert(flash[0x100] == 255);
+    flash[slot - FIRST] = 0x7c;
+    target = 123;
+    assert(hpclang_rpl_flash_preflight_bound(&io, root, slot, scratch, sizeof scratch, &target) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(target == 123);
+    memcpy(flash, image, sizeof image);
+    assert(hpclang_rpl_flash_preflight_bound(&io, root, slot, scratch, sizeof scratch, &target) ==
+           HPCLANG_RPL_FLASH_SECTOR_RETIRING);
+    assert(target == FIRST && !programs && !erases);
+    uint8_t foreign[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, ROOT, FIRST, image, foreign,
+                                           sizeof foreign) == 0);
+    memcpy(flash + ROOT - FIRST, foreign, sizeof foreign);
+    target = 123;
+    assert(hpclang_rpl_flash_preflight_bound(&io, root, slot, scratch, sizeof scratch, &target) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(target == 123 && !programs && !erases);
 }
 
 static void bound_preflight_tests(void)
@@ -754,6 +935,75 @@ static void installed_preflight_tests(void)
         packed_word(library, at + 24, ROOT, 8);
     }
     seal_library(library);
+    /* A staged binding validates current storage as well as its desired image;
+     * neither an overlay hiding damage nor matching interior bytes is enough. */
+    for (unsigned fault = 0; fault < 21; ++fault) {
+        uint32_t j = JOURNAL + (fault == 16 || fault == 17 ? 8 : 0);
+        uint32_t a = fault == 18 ? j + sizeof journal : ROOT;
+        for (unsigned at = 56; at <= 88; at += 32) {
+            packed_word(library, at + 16, j, 8);
+            packed_word(library, at + 24, a, 8);
+        }
+        seal_library(library);
+        layout.admission_binding = 88;
+        packed_word(catalog_data, 126, 0x40222, 5);
+        prepare_native_port(0x7f, 0x7e, a, j);
+        memcpy(flash + LIBRARY - FIRST, library, sizeof library);
+        if (fault >= 2 && fault <= 5) {
+            const uint8_t wrong[] = {0xff, 0xfe, 0x7e, 0};
+            flash[a - FIRST] = wrong[fault - 2];
+        }
+        if (fault == 6)
+            flash[j - FIRST] = 0;
+        if (fault == 7)
+            flash[j - FIRST + 100] ^= 1;
+        if (fault == 8)
+            flash[a - FIRST + 17] ^= 1;
+        if (fault == 9)
+            flash[0x100] = 0;
+        if (fault == 1 || fault == 10) {
+            image[fault == 1 ? 4 : 0x100] = 0;
+            assert(!hpclang_rpl_flash_sector_encode(FIRST, END, j, FIRST, image, journal,
+                                                    sizeof journal));
+            assert(!hpclang_rpl_flash_authority_encode(FIRST, END, a, j, journal, sizeof journal,
+                                                       authority, sizeof authority));
+            memcpy(flash + j - FIRST, journal, sizeof journal);
+            memcpy(flash + a - FIRST, authority, sizeof authority);
+            flash[a - FIRST] = 0x7f;
+        }
+        if (fault == 11)
+            packed_word(catalog_data, 126, 0x40223, 5);
+        if (fault == 12)
+            flash[5 * 0x20000 + 0x101] = 0;
+        if (fault == 14)
+            flash[LIBRARY - FIRST + 40] ^= 1;
+        if (fault == 15)
+            layout.admission_binding = 56;
+        if (fault == 17)
+            tombstone(JOURNAL, sizeof journal + 8);
+        if (fault == 20)
+            flash[a - FIRST + sizeof authority] = 0;
+        reads = 0;
+        fail_read = fault == 13 ? 1 : 0;
+        memcpy(initial, flash, sizeof flash);
+        output = sentinel;
+        int result = hpclang_rpl_flash_preflight_staged_installed(
+            &io, &layout, &catalog, workspace, fault == 19 ? sizeof journal - 1 : sizeof workspace,
+            &output);
+        if (fault == 0 || fault == 1 || fault == 18)
+            assert(!result && output.library_slot == LIBRARY && output.journal_slot == j &&
+                   output.authority_slot == a && output.target == FIRST);
+        else
+            assert(result < 0 && !memcmp(&output, &sentinel, sizeof output));
+        assert(!programs && !erases && !memcmp(flash, initial, sizeof flash));
+    }
+    layout.admission_binding = 88;
+    packed_word(catalog_data, 126, 0x40222, 5);
+    for (unsigned at = 56; at <= 88; at += 32) {
+        packed_word(library, at + 16, JOURNAL, 8);
+        packed_word(library, at + 24, ROOT, 8);
+    }
+    seal_library(library);
     const uint8_t states[][2] = {{0x7e, 0x7e}, {0x7e, 0x7c}, {0x7c, 0}, {0, 0}};
 
     const int phases[] = {1, 2, 2, 0};
@@ -819,6 +1069,7 @@ static void installed_preflight_tests(void)
 
 int main(void)
 {
+    bound_same_bank_tests();
     bound_membership_tests();
     memset(initial, 255, sizeof initial);
     memset(image, 0x42, sizeof image);
@@ -831,6 +1082,8 @@ int main(void)
     initial[ROOT - FIRST - 1] = 0xa5;
     publication_tests();
     resumption_tests();
+    staging_tests();
+    activation_tests();
     closure_tests();
     bound_replay_tests();
     transaction_test();

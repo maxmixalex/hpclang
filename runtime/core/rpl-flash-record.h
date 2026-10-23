@@ -5,6 +5,42 @@
 
 #define HPCLANG_RPL_FLASH_INTENT_BYTES 44u
 
+#define HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES 240u
+#define HPCLANG_RPL_FLASH_CREATION_NAME_BYTES 127u
+
+enum hpclang_rpl_flash_creation_phase
+{
+    HPCLANG_RPL_FLASH_CREATION_INTENT,
+    HPCLANG_RPL_FLASH_CREATION_CREATED,
+    HPCLANG_RPL_FLASH_CREATION_CLOSING,
+    HPCLANG_RPL_FLASH_CREATION_CLOSED
+};
+
+/* Internal draft creation-claim format. A native deleted allocation (status 0,
+ * metadata 0) keeps the record invisible to Stock. Its separate phase byte at
+ * offset 16 moves FF -> 7F (intent) -> 7E (created) -> 00 (closed). Other subsets
+ * of 7E mean closing, never permission to activate/release. FF is incomplete.
+ * The immutable body binds its own physical slot, the complete 80-byte HPCMEM2
+ * binding and exact printable reservation name. CRC covers all immutable bytes.
+ *
+ * This codec does not publish Flash, reserve space, validate native membership,
+ * authenticate a root or prove that the name was absent. A future producer must
+ * establish absence/exclusion BEFORE committing intent, then verify fresh RAM
+ * creation BEFORE committing created. Trusted root binding, interruption/retry,
+ * startup exclusion and reclamation must be connected before using this format
+ * to authorize any native operation. Never discover/adopt it by a magic scan.
+ * No RAM pointer is stored. Do not erase/reuse while a bound root can survive.
+ * Encode emits INTENT; outputs change only on success (SPAN_OK).
+ */
+int hpclang_rpl_flash_creation_encode(uint32_t first, uint32_t end, uint32_t slot,
+                                      const uint8_t binding[80], const uint8_t *name,
+                                      uint32_t name_length, uint8_t *data, uint32_t capacity);
+int hpclang_rpl_flash_creation_inspect(uint32_t first, uint32_t end, uint32_t slot,
+                                       const uint8_t *data, uint32_t bytes,
+                                       const uint8_t expected_binding[80],
+                                       const uint8_t *expected_name, uint32_t name_length,
+                                       enum hpclang_rpl_flash_creation_phase *phase);
+
 struct hpclang_rpl_flash_intent
 {
     uint32_t old_slot, new_slot, old_bytes, new_bytes, old_crc, new_crc;

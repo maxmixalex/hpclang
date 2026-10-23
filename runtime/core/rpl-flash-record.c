@@ -43,6 +43,107 @@ static int separate(uint32_t a, uint32_t a_bytes, uint32_t b, uint32_t b_bytes)
     return a + a_bytes <= b || b + b_bytes <= a;
 }
 
+static int creation_binding(uint32_t first, uint32_t end, uint32_t slot, const uint8_t *binding,
+                            const uint8_t *name, uint32_t length)
+{
+    if (!binding || !name || !length || length > HPCLANG_RPL_FLASH_CREATION_NAME_BYTES ||
+        (first & 0x1ffffu) || first > end || end - first != 6u * 0x20000u ||
+        !intent_allocation(first, end, slot, HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES) ||
+        memcmp(binding, "HPCMEM2", 8) || memcmp(binding + 8, "HPCROOT1", 8))
+        return 0;
+    for (uint32_t i = 0; i < length; ++i)
+        if (name[i] < 33 || name[i] > 126)
+            return 0;
+    uint32_t span = read_le32(binding + 16), identity = read_le32(binding + 20);
+    uint32_t capacity = read_le32(binding + 76), target = read_le32(binding + 68);
+    if (span < 110u || span > 0x100004u || identity < 10u || identity > span - 100u ||
+        capacity < 80u || capacity > (0x80000u - 10u) / 2u || (target & 4095u) || target < first ||
+        target >= end || HPCLANG_RPL_FLASH_SECTOR_BYTES > end - target)
+        return 0;
+    const uint32_t slots[] = {read_le32(binding + 56), read_le32(binding + 60),
+                              read_le32(binding + 64)};
+    const uint32_t sizes[] = {((span + 15u) & ~7u) / 2u, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES,
+                              HPCLANG_RPL_FLASH_AUTHORITY_BYTES};
+    if (!separate(slot, HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES, target,
+                  HPCLANG_RPL_FLASH_SECTOR_BYTES))
+        return 0;
+    for (unsigned i = 0; i < 3; ++i) {
+        if (!intent_allocation(first, end, slots[i], sizes[i]) ||
+            !separate(slot, HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES, slots[i], sizes[i]) ||
+            !separate(slots[i], sizes[i], target, HPCLANG_RPL_FLASH_SECTOR_BYTES))
+            return 0;
+        for (unsigned j = 0; j < i; ++j)
+            if (!separate(slots[i], sizes[i], slots[j], sizes[j]))
+                return 0;
+    }
+    return 1;
+}
+
+static uint32_t creation_crc(const uint8_t *data)
+{
+    uint32_t crc = UINT32_MAX;
+    for (unsigned i = 0; i < HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES - 4u; ++i)
+        if (i != 16u)
+            crc = crc_byte(crc, data[i]);
+    return ~crc;
+}
+
+/* Keep repeated copies behind a local call: Thumb size optimization otherwise
+ * caches external memcpy's address through a GOT, unavailable in relocated roots. */
+__attribute__((noinline)) static void creation_copy(void *out, const void *in, uint32_t bytes)
+{
+    memcpy(out, in, bytes);
+}
+
+int hpclang_rpl_flash_creation_encode(uint32_t first, uint32_t end, uint32_t slot,
+                                      const uint8_t binding[80], const uint8_t *name,
+                                      uint32_t name_length, uint8_t *data, uint32_t capacity)
+{
+    if (!data || capacity < HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES ||
+        !creation_binding(first, end, slot, binding, name, name_length))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint8_t record[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES] = {0};
+    write_le32(record, (2u * sizeof record - 2u) << 8u);
+    creation_copy(record + 4, "HPCOWN1", 8);
+    write_le32(record + 12, slot);
+    record[16] = 0x7f;
+    record[17] = (uint8_t)name_length;
+    creation_copy(record + 20, binding, 80);
+    creation_copy(record + 100, name, name_length);
+    write_le32(record + sizeof record - 4u, creation_crc(record));
+    creation_copy(data, record, sizeof record);
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_flash_creation_inspect(uint32_t first, uint32_t end, uint32_t slot,
+                                       const uint8_t *data, uint32_t bytes,
+                                       const uint8_t expected_binding[80],
+                                       const uint8_t *expected_name, uint32_t name_length,
+                                       enum hpclang_rpl_flash_creation_phase *phase)
+{
+    if (!phase || !data || bytes != HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES ||
+        !creation_binding(first, end, slot, expected_binding, expected_name, name_length) ||
+        read_le32(data) != (2u * bytes - 2u) << 8u || memcmp(data + 4, "HPCOWN1", 8) ||
+        read_le32(data + 12) != slot || data[17] != name_length || data[18] || data[19] ||
+        memcmp(data + 20, expected_binding, 80) || memcmp(data + 100, expected_name, name_length) ||
+        read_le32(data + bytes - 4u) != creation_crc(data))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    for (uint32_t i = 100u + name_length; i < bytes - 4u; ++i)
+        if (data[i])
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    enum hpclang_rpl_flash_creation_phase value;
+    if (data[16] == 0x7fu)
+        value = HPCLANG_RPL_FLASH_CREATION_INTENT;
+    else if (data[16] == 0x7eu)
+        value = HPCLANG_RPL_FLASH_CREATION_CREATED;
+    else if (data[16] & ~0x7eu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    else
+        value = data[16] ? HPCLANG_RPL_FLASH_CREATION_CLOSING : HPCLANG_RPL_FLASH_CREATION_CLOSED;
+    *phase = value;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
 static int intent_bounds(uint32_t first, uint32_t end, uint32_t slot,
                          const struct hpclang_rpl_flash_intent *intent)
 {

@@ -13,6 +13,8 @@ SPEC = importlib.util.spec_from_file_location("installation_verify", SOURCE / "i
 VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)
 startup = importlib.import_module("startup")
+storage = importlib.import_module("store")
+staging = importlib.import_module("staging")
 
 
 class InstallationExecutionTests(unittest.TestCase):
@@ -93,7 +95,289 @@ class FreshInstallationExecutionTests(InstallationExecutionTests):
     fresh_copy = True
 
 
+class PlacementTests(unittest.TestCase):
+    def test_selection_conflict_and_immutable_flash(self):
+        flash = bytearray(b"\xff" * 0x200000)
+        # A deleted eight-byte allocation must still occupy space.
+        flash[0x140105:0x14010D] = bytes.fromhex("000e0000ffffffff")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            (before / "flash").write_bytes(flash)
+            with patch.object(VERIFY, "symbol_offsets", return_value={"placement_result": 0}):
+                for existing, words in (
+                    (False, (0, 0x14010D)),
+                    (True, (0xFFFFFFFA, 0xFFFFFFFF)),
+                ):
+                    (after / "flash").write_bytes(flash)
+                    (after / "sram").write_bytes(struct.pack("<2I", *words))
+                    VERIFY.verify_placement(before, after, root, "unused", 0, existing=existing)
+                    for index in (0, 1):
+                        changed = list(words)
+                        changed[index] ^= 1
+                        (after / "sram").write_bytes(struct.pack("<2I", *changed))
+                        with (
+                            self.subTest(existing=existing, word=index),
+                            self.assertRaises(ValueError),
+                        ):
+                            VERIFY.verify_placement(
+                                before, after, root, "unused", 0, existing=existing
+                            )
+                    (after / "sram").write_bytes(struct.pack("<2I", *words))
+                    changed = bytearray(flash)
+                    changed[0x140109] ^= 1
+                    (after / "flash").write_bytes(changed)
+                    with self.assertRaises(ValueError):
+                        VERIFY.verify_placement(before, after, root, "unused", 0, existing=existing)
+
+
+class PreparationTests(unittest.TestCase):
+    def test_complete_draft_coordinates_and_failure_staging(self):
+        _, original, _ = VERIFY.fixture()
+        library = 0x160105
+        journal = library + len(original)
+        authority = journal + 4124
+        _, expected, _ = VERIFY.fixture(journal_slot=journal, authority_slot=authority)
+        flash = b"\xff" * 0x200000
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            (before / "flash").write_bytes(flash)
+            (after / "flash").write_bytes(flash)
+            with patch.object(
+                VERIFY,
+                "symbol_offsets",
+                return_value={"preparation_result": 0, "prepared_library": 16},
+            ):
+                for existing in (False, True):
+                    words = (
+                        (0xFFFFFFFA,) + (0xFFFFFFFF,) * 3
+                        if existing
+                        else (0, library, journal, authority)
+                    )
+                    ram = struct.pack("<4I", *words) + (
+                        b"\xa5" * len(original) if existing else expected
+                    )
+                    (after / "sram").write_bytes(ram)
+                    VERIFY.verify_preparation(before, after, root, "unused", 0, existing=existing)
+                    for offset in (0, 4, 8, 12, 16, len(ram) - 1):
+                        changed = bytearray(ram)
+                        changed[offset] ^= 1
+                        (after / "sram").write_bytes(changed)
+                        with (
+                            self.subTest(existing=existing, offset=offset),
+                            self.assertRaises(ValueError),
+                        ):
+                            VERIFY.verify_preparation(
+                                before, after, root, "unused", 0, existing=existing
+                            )
+                    (after / "sram").write_bytes(ram)
+                    changed = bytearray(flash)
+                    changed[0x140100] ^= 1
+                    (after / "flash").write_bytes(changed)
+                    with self.assertRaises(ValueError):
+                        VERIFY.verify_preparation(
+                            before, after, root, "unused", 0, existing=existing
+                        )
+                    (after / "flash").write_bytes(flash)
+
+
+class StorageTests(unittest.TestCase):
+    def test_written_record_matches_draft_and_operation_count(self):
+        _, original, _ = VERIFY.fixture()
+        slot = 0x160105
+        journal = slot + len(original)
+        authority = journal + 4124
+        library, record, _ = VERIFY.fixture(journal_slot=journal, authority_slot=authority)
+        flash = b"\xff" * 0x200000
+        written = bytearray(flash)
+        written[slot : slot + len(record)] = record
+        ram = struct.pack("<6I", 0, slot, journal, authority, 0, 100) + record
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            (before / "flash").write_bytes(flash)
+            (after / "flash").write_bytes(written)
+            (after / "sram").write_bytes(ram)
+            with (
+                patch.object(storage, "verify_probe", return_value=0) as probe,
+                patch.object(
+                    storage,
+                    "symbol_offsets",
+                    return_value={
+                        "preparation_result": 0,
+                        "storage_result": 16,
+                        "prepared_library": 24,
+                    },
+                ),
+            ):
+                self.assertEqual(
+                    storage.verify_storage(before, after, root, "unused"), (slot, library, 100)
+                )
+                self.assertEqual(probe.call_args.kwargs["expected_flash"], written)
+                self.assertEqual(probe.call_args.kwargs["image"], "installation-store")
+                for offset in (0, 4, 8, 12, 16, 24, len(ram) - 1):
+                    changed = bytearray(ram)
+                    changed[offset] ^= 1
+                    (after / "sram").write_bytes(changed)
+                    with self.subTest(offset=offset), self.assertRaises(ValueError):
+                        storage.verify_storage(before, after, root, "unused")
+                changed = bytearray(ram)
+                struct.pack_into("<I", changed, 20, 0)
+                (after / "sram").write_bytes(changed)
+                with self.assertRaises(ValueError):
+                    storage.verify_storage(before, after, root, "unused")
+
+
+class CleanupTests(unittest.TestCase):
+    def test_abandoned_header_transitions_and_operation_counts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            with (
+                patch.object(storage, "verify_probe", return_value=0) as probe,
+                patch.object(storage, "symbol_offsets", return_value={"storage_result": 0}),
+            ):
+                for status, metadata, count in (
+                    (0xFB, 0x10, 3),
+                    (0xFB, 0, 2),
+                    (0xFA, 0, 1),
+                    (0, 0, 0),
+                ):
+                    prior = bytes([status, 0x36, 0, metadata, 0x40, 0x2B])
+                    (before / "flash").write_bytes(prior)
+                    (after / "sram").write_bytes(struct.pack("<2I", 0, count))
+                    self.assertEqual(
+                        storage.verify_cleanup(before, after, root, "unused", 0), count
+                    )
+                    self.assertEqual(
+                        probe.call_args.kwargs["expected_flash"],
+                        bytes([0, 0x36, 0, 0, 0x40, 0x2B]),
+                    )
+                    self.assertEqual(probe.call_args.kwargs["image"], "installation-cleanup")
+                    for result, operations in ((1, count), (0, count + 1)):
+                        (after / "sram").write_bytes(struct.pack("<2I", result, operations))
+                        with self.assertRaises(ValueError):
+                            storage.verify_cleanup(before, after, root, "unused", 0)
+                (before / "flash").write_bytes(bytes([0x53, 0x36, 0, 0x10]))
+                with self.assertRaises(ValueError):
+                    storage.verify_cleanup(before, after, root, "unused", 0)
+
+
+class StagingTests(unittest.TestCase):
+    def test_staged_oracle_and_replay_rejection_diagnostics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            flash = bytearray(b"\xff" * 0x200000)
+            for bank in range(0x140000, 0x200000, 0x20000):
+                flash[bank + 0x100 : bank + 0x105] = (0xF0 + ((bank // 0x20000 - 2) << 8)).to_bytes(
+                    5, "little"
+                )
+            (before / "flash").write_bytes(flash)
+            expected_dir = root / "expected"
+            VERIFY.prepare(before, expected_dir, VERIFY.JOURNAL_SLOT, VERIFY.TARGET, bound=True)
+            expected = bytearray((expected_dir / "flash").read_bytes())
+            expected[VERIFY.TARGET : VERIFY.TARGET + 4096] = flash[
+                VERIFY.TARGET : VERIFY.TARGET + 4096
+            ]
+            expected[VERIFY.AUTHORITY_SLOT] = 0x7F
+            values = [
+                0,
+                0,
+                0xFFFFFFFC,
+                0,
+                100,
+                0x7F,
+                0,
+                123,
+                VERIFY.JOURNAL_SLOT,
+                VERIFY.AUTHORITY_SLOT,
+                VERIFY.TARGET,
+                0,
+            ]
+            (after / "sram").write_bytes(struct.pack("<12I", *values))
+            with (
+                patch.object(staging, "verify_probe", return_value=0) as probe,
+                patch.object(staging, "symbol_offsets", return_value={"publication_result": 0}),
+            ):
+                self.assertEqual(staging.verify_staging(before, after, root, "unused", 123), 100)
+                self.assertEqual(probe.call_args.kwargs["expected_flash"], expected)
+                for offset in range(12):
+                    changed = values.copy()
+                    changed[offset] = 0 if offset == 4 else changed[offset] ^ 1
+                    (after / "sram").write_bytes(struct.pack("<12I", *changed))
+                    with self.subTest(offset=offset), self.assertRaises(ValueError):
+                        staging.verify_staging(before, after, root, "unused", 123)
+            flash[VERIFY.AUTHORITY_SLOT + 32] = 0
+            (before / "flash").write_bytes(flash)
+            with self.assertRaises(ValueError):
+                staging.staged_flash(before)
+
+
 class StartupInventoryTests(unittest.TestCase):
+    def test_eram_callback_uses_port1_bytes(self):
+        flash = bytearray(0x200000)
+        struct.pack_into("<II", flash, 0x248A0, 0x47FF1, 0x47FF2)
+        flash[0x47FF1:0x48000] = bytes([14, 96] + [128] * 13)
+        original = bytearray(0x80000)
+        header, target = 0x40020, 0x40080
+
+        def put(at, value, count):
+            for i in range(count):
+                offset = 0x20000 + (at + i - 0x40000) // 2
+                shift = 4 * ((at + i) & 1)
+                original[offset] = (original[offset] & ~(15 << shift)) | (
+                    ((value >> (4 * i)) & 15) << shift
+                )
+
+        put(header, 124, 3)
+        put(header + 18, target - header - 18, 5)
+        words = {0x8611D: 1, 0x86120: 124, 0x86123: header, 0x86128: 0x76543, 0x26C39: 0x76543}
+        words.update({0x26BBB + 7 * i: 0x12345 + i for i in range(16)})
+        actual = bytearray(64)
+        struct.pack_into("<3I", actual, 0, 0, 1, 14)
+        struct.pack_into("<4I", actual, 16, 124, header, 16, target)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            (before / "flash").write_bytes(flash)
+            (before / "sram").write_bytes(original)
+            (after / "sram").write_bytes(actual)
+            with (
+                patch.object(startup, "native_words", return_value=lambda at, n=5: words[at]),
+                patch.object(
+                    startup,
+                    "symbol_offsets",
+                    return_value={"startup_result": 0, "startup_entries": 16},
+                ),
+            ):
+                self.assertEqual(
+                    startup.verify_startup(before, after, root, "unused", 0),
+                    {"libraries": 1, "callbacks": 1},
+                )
+                put(header, 125, 3)
+                (before / "sram").write_bytes(original)
+                with self.assertRaises(ValueError):
+                    startup.verify_startup(before, after, root, "unused", 0)
+                put(header, 124, 3)
+                put(header + 18, 0x80000 - header - 18, 5)
+                (before / "sram").write_bytes(original)
+                with self.assertRaises(ValueError):
+                    startup.verify_startup(before, after, root, "unused", 0)
+
     def test_independent_layout_and_diagnostic_checks(self):
         flash = bytearray(0x200000)
         struct.pack_into("<II", flash, 0x248A0, 0x47FF1, 0x47FF2)
@@ -110,6 +394,7 @@ class StartupInventoryTests(unittest.TestCase):
         write_word(physical_header + 18, target - header - 18, 5)
         words = {0x8611D: 1, 0x86120: 221, 0x86123: header, 0x86128: 0x12345}
         words.update({0x26BBB + 7 * i: 0x12345 + i for i in range(16)})
+        words[0x26C39] = 0x76543
         ram = bytearray(64)
         struct.pack_into("<3I", ram, 0, 0, 1, 14)
         struct.pack_into("<4I", ram, 16, 221, header, 0, target)

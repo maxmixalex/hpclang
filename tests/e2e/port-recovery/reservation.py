@@ -10,7 +10,7 @@ import struct
 import zlib
 from types import SimpleNamespace
 
-from prepare import changed_library_title, prepare, reserve_bank_tail
+from prepare import changed_library_title, free_tail, prepare, reserve_bank_tail
 from verify import (
     home_object,
     home_string,
@@ -123,10 +123,13 @@ def require_marker(read):
 
 
 def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
+    from creation import creation_record
+
     root = args.output / "reservation"
     root.mkdir()
     build = args.configuration_build
     authority = args.slot + 4124
+    claim_slot = 0x1E0105  # Dedicated native fixture allocation, verified below.
     prefix = b"HPCMEM2"
     pack = packager()
     package = root / "package"
@@ -146,6 +149,8 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             str(args.slot),
             "--authority-slot",
             str(authority),
+            "--creation-claim-slot",
+            str(claim_slot),
             "--library-id",
             str(LIBRARY_ID),
             "--reservation-name",
@@ -182,6 +187,13 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     source = root / "install-source"
     bank = args.target & ~0x1FFFF
     reserve_bank_tail(clean, source, bank)
+    # Keep Stock installation from consuming the fixture's claim allocation.
+    # This is offline fixture construction, not durable publication evidence.
+    source_flash = bytearray((source / "flash").read_bytes())
+    if free_tail(source_flash, claim_slot & ~0x1FFFF) != claim_slot:
+        raise ValueError("Creation claim fixture does not own the expected erased tail")
+    source_flash[claim_slot : claim_slot + 4] = b"\0" + (478).to_bytes(3, "little")
+    (source / "flash").write_bytes(source_flash)
     original = reader(clean)
     original_count = original(0x8611D, 3)
     if not 0 < original_count < 128:
@@ -252,6 +264,23 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             read(0x86120 + 16 * i, 3) for i in range(count)
         } != original_ids | {LIBRARY_ID}:
             raise ValueError("Guarded library did not preserve the native catalog")
+        claim_flash = bytearray((baseline / "flash").read_bytes())
+        artifact_bytes = (package / artifact).read_bytes()
+        installed_slot, _ = installed_recovery(
+            claim_flash, artifact_bytes, LIBRARY_ID, args.target, read=read
+        )
+        header = bound_header(
+            artifact_bytes,
+            layout["identity_object_nibble"],
+            installed_slot,
+            args.slot,
+            args.target,
+            claim_flash,
+        )
+        if claim_flash[claim_slot : claim_slot + 240] != b"\0\xde\x01\0" + b"\xff" * 236:
+            raise ValueError("Stock consumed or changed the reserved claim fixture")
+        claim_flash[claim_slot : claim_slot + 240] = creation_record(header, NAME, claim_slot, 0x7E)
+        (baseline / "flash").write_bytes(claim_flash)
         return baseline
 
     def reservation_package(state, library, label):
@@ -423,6 +452,9 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
         "bank-identity",
         "dirty-tail",
         "library-identity",
+        "claim-missing",
+        "claim-intent",
+        "claim-binding",
         *binding_faults,
     ):
         fault = root / ("admission-" + label + "-fault")
@@ -447,6 +479,16 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             )
         elif label == "dirty-tail":
             flash[authority + 32 + 4] = 0
+        elif label == "claim-missing":
+            flash[claim_slot + 4 : claim_slot + 240] = b"\xff" * 236
+        elif label == "claim-intent":
+            flash[claim_slot + 16] = 0x7F
+        elif label == "claim-binding":
+            wrong_binding = bytearray(flash[claim_slot + 20 : claim_slot + 100])
+            wrong_binding[24] ^= 1
+            flash[claim_slot : claim_slot + 240] = creation_record(
+                wrong_binding, NAME, claim_slot, 0x7E
+            )
         (fault / "flash").write_bytes(flash)
         retained = expected_reservation
         if label in binding_faults:
@@ -528,6 +570,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
                 "admission_gap": admission_gap,
                 "rejected": rejected,
                 "absent_reservation": True,
+                "creation_claim_slot": claim_slot,
             },
             indent=2,
         )

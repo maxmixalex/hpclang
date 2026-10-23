@@ -425,13 +425,642 @@ results or scope facts change. M8.0 remains the primary track. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
-Current delivery checkpoints:
+Current batch through `92acb946` includes retryable claim closure, native combined
+cancellation, unregistered-root pair cancellation, complete real-root cleanup,
+RAM-bounded CODE packaging, independent acceptance suites and one-shot installer
+release. Local acceptance is complete below; CI acceptance remains pending.
 
-- **CI submission batch:** bounded configuration resolution, captured ROM-bank
+Previous CI submission: `af3e2a2e` includes the five implementation commits since
+`50eadbea`, including the missing creation-layout CI artifact fix. Local acceptance
+is recorded below. A later check finds Quality 39886905107, Objects 39886905191
+and Runtime 39886905212 successful. Core 39886905229 completes its unit/package,
+identity and recovery jobs, but both installation jobs are cancelled at the
+30-minute job limit while progressing through the combined suite. CI acceptance
+and M8.0 remain open. The local runner now separates installation, publication,
+real-template and resource-creation suites into independent clean-boot jobs with all existing
+checks retained. The complete HP50g creation suite passes from a fresh boot
+(about 11 minutes). The original combined installation/publication run also
+passes, taking about 35 minutes locally, beyond the unchanged CI job limit.
+The isolated template suite initially reached its previously uncompleted
+recovery step without Flash writes; a 55-second restart control did not help.
+The retained 150,186-byte
+one-shot installer leaves only 22,776 bytes between the native stacks before
+fault injection. Removing only that completed installer raises the gap to
+194,409 bytes; the same injected fault then repairs in 1,923 operations and
+passes the unchanged second-restart oracle. The real-store test now consumes
+its one-shot HOME binding while preserving HPCTEMPLATE, and checks absence
+explicitly. Fresh complete template-suite runs pass on HP49g+ and HP50g:
+25,428 storage operations, 1,923 recovery operations, exact full Flash/catalog,
+source preservation and unchanged second restart. This does not relax the
+separate low-memory/resource-ownership requirements. Publication reuses the same
+native installed-baseline helper, with its own fresh boot and evidence. Its
+standalone entry passes conflicts, write failure, activation rejection,
+publication, closed-repeat and both cancellation paths in about 14 minutes.
+Both template suites take about 8 minutes. All 88 recovery Python tests,
+pinned formatting (453 native / 84 Python files) and strict docs pass.
+
+Current delivery checkpoints:
+- **Real-root cleanup integration (locally verified; CI acceptance pending):**
+  the maintained installer now cancels its same-owned staged pair, discards the
+  original fresh RAM reservation and closes/repeats its creation claim. The new
+  oracle compares complete Flash, closed envelopes and claim, consumed receipt,
+  resource absence, retained template, execution guards and restart behavior.
+  ARM build/package and 88 recovery Python tests pass. HP49g+ and HP50g both
+  pass the complete cleanup oracle (27,511 Flash operations each) and monitored
+  restart with zero additional writes. Restart monitoring is now explicitly
+  enabled; the initial check otherwise read the prior saved operation counter.
+  Pinned formatting and strict docs pass. The combined image has 35,076
+  initialized bytes, verified intact on both models. Packaging now
+  derives its copy limit from the main-RAM window instead of the conservative
+  32 KiB cap: Saturn CE decrements the five-nibble A field. Complete source plus
+  runtime envelope bounds remain enforced; count/extent tests cover the former
+  boundary and 64 KiB; native execution above 32 KiB passes on both models.
+  Root retirement, post-reset ownership, early startup and reclamation remain open.
+- **Unregistered-root cancellation (locally verified; CI acceptance pending):** real installation
+  has not registered its new root when resource creation finishes, so the
+  registered-library cancellation gate cannot be reused unchanged. Added a
+  separate same-owned complete-pair primitive: compare the retained READY journal,
+  full unarmed authority and unchanged target; finish the journal tombstone before
+  clearing authority metadata/status. It supports interrupted cancellation but
+  rejects armed/publication states, damaged bodies and out-of-order closure.
+  No RAM release, root retirement or post-reset adoption is implied. ARM build
+  and focused ASan/UBSan pass, including every read cut, all status bytes and
+  partial/failed/lost-ack/silent programming. The full installation ASan/UBSan
+  regression, pinned formatting and strict docs also pass. Real-root native
+  integration remains pending.
+- **Native creation cancellation (locally verified; CI acceptance pending):** a maintained
+  combined witness publishes INTENT, creates RAM, commits CREATED, stages the
+  transaction, cancels it, discards its original fresh reservation and closes the
+  claim under the same invocation. Repeat closure must not write. Its independent
+  oracle checks full Flash, consumed receipt, resource absence, unrelated HOME,
+  execution guards/Stock return and unchanged closed records after restart.
+  The fresh-cancellation path deliberately omits the unrelated already-armed
+  success shortcut. ARM packaging passes within the unchanged loader limit;
+  87 Python tests, Ruff, pinned formatting and strict docs pass. HP49g+ and HP50g
+  both pass the complete cancellation/release/closure/repeat and restart oracle.
+  This is lifecycle fixture integration, not real-root installation ownership
+  reconstruction.
+- **Creation-claim closure (locally verified; CI acceptance pending):** the final record primitive
+  compares the original INTENT's immutable bytes, accepts only CREATED/partial
+  CLOSING/CLOSED, and clears the phase without touching adjacent allocations.
+  Transaction closure, safe RAM release and uninterrupted ownership remain caller
+  prerequisites; matching bytes cannot authorize post-restart adoption. ARM build
+  and packaging pass. Host tests cover all phases, each immutable-byte corruption,
+  every read cut, partial/failed/lost-ack writes and silent programming failure;
+  the full installation ASan/UBSan suite passes, followed by focused sanitizer
+  acceptance of the additional silent-write and invalid-original cases. The native
+  lifecycle fixture above now passes; real-root cleanup/ownership integration
+  remains open, and this primitive does not grant release permission.
+- **Real-root resource creation (locally verified; submitted in `af3e2a2e`, CI pending):** after the durable
+  INTENT, the real installation witness creates the bound 32 KiB HOME string in
+  the same exclusive invocation, retaining the original creation receipt and
+  immutable snapshot. It commits CREATED through receipt/content validation,
+  then repeats completion without additional Flash writes. Authority stays 7F;
+  registration/activation and restart ownership are not granted by this result.
+  Independent verification compares the complete resource, claim and Flash, and
+  requires resource persistence after restart. Local callback wrappers avoid
+  unsupported ARM GOT relocations without relaxing packaging. ARM build/package,
+  static analysis (excluding the native fixed-address diagnostic) and 66 Python
+  tests pass. Initial uploads exceeded Stock memory before execution. The snapshot
+  now reuses the no-longer-needed source-template copy after sealing/storing the
+  prepared root, reducing the package from 214,210 to 181,450 bytes. Template
+  buffers now explicitly require word alignment. Both reduced-footprint native
+  name-rejection cases pass. Normal runs write root/pair/INTENT, then resource
+  creation returns NOSPACE (-3), retaining execution with no CREATED claim.
+  Captured diagnostics show 27,500 Flash operations and an empty receipt.
+  An explicit owned in-place preparation API now retains all placement/sealing
+  checks, accepts only exact source/destination identity and leaves outputs
+  untouched on failure (the owned draft is disposable). Copying APIs still reject
+  overlap. The store witness aliases its two template symbols, then reuses that
+  buffer for the resource snapshot after Flash storage. Package size is 130,602
+  bytes; the original HOME template and full 32 KiB resource remain required.
+  ARM build/package, static analysis, 66 Python tests and the full host sanitizer
+  suite pass, including ten new in-place cases. Both native name-rejection cases
+  pass. Normal creation now returns INCOMPLETE (-14) after native writes, with
+  no receipt/CREATED transition; captured initialized execution bytes have changed.
+  This is not a passing resource install. Nibble-level comparison of both saved
+  captures finds the execution copy relocated from physical SRAM nibble offset
+  0xd0150 to 0xc012d: exactly 0x10023 nibbles, the resource plus its directory
+  entry. The CPU remains at the old copy. The witness ran from movable USEROB
+  without execution protection. Next validate Stock-owned TEMP execution before
+  resource creation and reject unsafe placement before any Flash publication;
+  retain ownership and staged state meanwhile.
+  A subsequent HP50g one-shot RCL/PURGE execution creates the exact 32 KiB
+  resource: all six stage results are zero, the original receipt is populated,
+  and Flash operation count is 27,501. Full verification still fails Stock return:
+  the 4 KiB stack low guard is overwritten and entry deliberately retains control.
+  TEMP execution and sufficient measured stack space both need maintained
+  acceptance; neither successful stage diagnostics nor process exit proves return.
+  The witness now validates the complete live image against one TEMP allocation
+  before publication and uses its bounds as mutation fences. Maintained E2E adds
+  USEROB rejection and consumes only the one-shot installer binding for the valid
+  path. Its guarded stack is 8 KiB; duplicate inventory diagnostics stay in the
+  dedicated witnesses. ARM packaging passes at 131,002 bytes (31,560 initialized),
+  with unchanged loader/relocation checks. Compiler stack reports, 87 Python tests,
+  strict docs and pinned formatting pass. HP49g+ and HP50g now pass the complete
+  maintained sequence: existing-name rejection, unsafe USEROB execution rejection,
+  exact resource/CREATED publication, repeat without additional writes, intact
+  code/stack guards, Stock return and unchanged root/resource after restart.
+  Each performs 27,505 Flash operations. Authority remains unarmed; this does not
+  close ownership reconstruction, startup ordering, activation or reclamation.
+- **Real-root creation intent (locally verified; submitted in `af3e2a2e`, CI pending):** before any root write,
+  the native witness resolves HOME and rejects an existing HPCLEASE name. After
+  staging the real root's pair, it publishes INTENT at the fourth planned extent,
+  binding the resealed root identity, all coordinates, journal CRC, name and RAM
+  capacity. No RAM resource is created yet; this does not reconstruct ownership
+  after a return/reset. Independent full-Flash verification includes the claim.
+  ARM build/package and 66 Python tests pass. Both native storage/restart cases
+  pass with 27,500 operations each. Existing-name cases initially hit Stock's
+  remote-command limit; setup/execution are now separate short commands. Both
+  saved rejection captures pass after correcting the verifier to expect the
+  prepared (unwritten) slot in diagnostics: zero Flash operations, original string
+  and template preserved. Strict docs and pinned formatting pass.
+- **Real-root transaction staging (locally verified; submitted in `af3e2a2e`, CI pending):** the maintained
+  claim-bound storage witness now writes its real recovery library, READY journal
+  and unarmed authority in the same exclusive invocation, using the four-extent
+  plan rather than fixture addresses. Each write callback is confined to its owned
+  allocation. Failed pair publication retains the invocation. The creation claim
+  stays erased; no RAM ownership or activation is implied. The independent oracle
+  reconstructs all records and compares complete Flash, allowing planned records
+  in different banks. ARM build/package, analysis and 66 Python tests pass;
+  Initial saved inputs contained an older template; both programs rejected it
+  without changing Flash. The runner now checks source-template equality before
+  execution. Both current-template writes and restarts completed. Initial restart
+  verification rejected known staged records; the corrected verifier requires their
+  exact independent bytes and native allocation boundaries before interpreting only
+  their statuses as tombstones. Both saved captures pass the complete verifier:
+  27,378 operations each, root 0x160105, journal 0x157e75, authority 0x158e91.
+  Physical Flash, source template and native root registration survive restart.
+  CI artifact review also found the creation-template layout JSON missing from
+  the upload list; it is now included and the workflow parses successfully.
+- **Adjacent-allocation activation (locally verified; submitted in `af3e2a2e`, CI pending):** integration
+  review found that publication retry requires an erased successor, whereas a
+  completed staged authority may precede an already-published creation claim.
+  A separate activation primitive accepts only exact 7F/7E and complete READY
+  journal/binding, changing only its phase byte and preserving the successor.
+  Partial-publication retry keeps its erased-tail requirement. ARM build and
+  static analysis and full host sanitizer tests pass (all 256 phases, every read
+  failure, failed/silent writes and lost acknowledgements). The existing native
+  publication witness now uses this primitive after staged admission and fresh
+  receipt validation; HP49g+/HP50g both pass activation and transaction closure
+  with 1,958 Flash operations each. Strict docs and pinned formatting pass. Complete
+  installer integration, fresh receipt checks and safe startup remain required.
+- **Staged creation admission (locally verified; submitted in `af3e2a2e`, CI pending):** the
+  streaming gate requires exact unarmed authority 7F, READY journal and CREATED
+  claim, checking root/catalog and native boundaries in both current and proposed
+  Flash views. Current damage cannot be excused by the recovery image. Host
+  ASan/UBSan coverage passes all 256 authority and claim values, including direct
+  staged output checks. ARM build/static analysis, 66 Python tests, strict docs
+  and pinned formatting pass. HP49g+/HP50g both pass complete creation, staging
+  and read-only admission sequences, rejecting a wrong binding while preserving
+  Flash, catalog, reservation and unrelated HOME data. Publication leaves one
+  checked stack result; the next command clears it, and exact input/output depths
+  are verified. At that checkpoint, separate programs stayed within the then
+  conservative 32 KiB packaging limit (superseded by the RAM-bound check above).
+  Ownership, safe startup, activation and cancellation remain separate requirements.
+
+Batch `50eadbea` is submitted for CI: admission, four-extent
+planning/drafts, intent publication, receipt-gated completion and native real-root
+storage/restart. All 452 native and 84 Python files pass the pinned CI formatters.
+One later CI check finds Quality 39839641114, Objects 39839637487 and Runtime
+39839637491 successful. Core 39839637484 failed in both installation jobs because
+the artifact omitted template-creation-layout.json; local f43009f0 adds it. That
+fix is not submitted yet, so CI acceptance and M8.0 completion remain open.
+- **Claim-bound real library storage (locally verified; CI pending):** the existing
+  selected-slot writer now has a maintained claim-bound template variant using
+  the same preparation and storage code. Independent verification reconstructs
+  the exact library from all three bound addresses, checks the four extents and
+  original erased contents, and compares the complete resulting Flash. Restart
+  must discover the same library without changes. Complete ARM build, Ruff and
+  66 Python tests pass. Both native storage/restart runs pass with 25,329 Flash
+  programming operations each; all unrelated Flash and source data remain intact. Journal,
+  authority and claim publication/activation remain separate open work.
+- **Real claim-bound template preparation (locally verified; CI pending):** normal
+  and claim-bound templates share the build generator. A maintained native
+  witness loads the actual sealed recovery/admission library, plans four extents,
+  patches its owned claim coordinate and reseals it in RAM. The independent
+  verifier checks complete draft bytes, all four erased-tail boundaries, source,
+  catalog, CODE/guards and zero Flash writes. ARM build/static analysis, Ruff and
+  66 Python tests pass. Both native executions completed; their initial verifier
+  failed on an incorrectly wired argument. After correcting it, both saved
+  captures pass the maintained full verifier without repeating execution. Storage/publication of this integrated root and
+  restart ownership remain open.
+- **Native creation publication (locally verified; CI pending):** a maintained
+  witness checks name absence and the fixture's exact erased tail, publishes
+  INTENT with a driver-level partial write/retry, creates the RAM reservation,
+  and commits CREATED through the receipt gate; repeating completion must make
+  no writes. The independent verifier checks exact full Flash, RAM binding,
+  unrelated HOME data, owning CODE, stack guards and Flash busy accounting.
+  Both initial runs passed publication/receipt/Flash checks but failed the
+  unrelated-variable check because the fixture had not created that variable.
+  Setup now creates it before execution; both corrected runs pass in full.
+  The full ARM build, ARM analysis, Ruff and Flash-record ASan/UBSan pass. Native compilation exposed a GOT-based external memcpy reference in the
+  creation encoder; a local noinline copy helper restores relocatable calls,
+  with the strict relocation gate unchanged. This fixture is not the production
+  claim-bound root installer, restart ownership, cancellation or reclamation.
+- **Receipt-gated CREATED transition (locally verified; CI pending):** the RAM
+  wrapper rechecks the original receipt, full snapshot and claim binding/name
+  before the Flash primitive verifies all immutable bytes and changes only the
+  INTENT-to-CREATED phase bit. CREATED is idempotent for the same owned attempt;
+  all other phases reject. Tests cover 256 phases plus receipt/content/name/
+  binding mismatches, read failure and both failed/lost-ack writes, preserving
+  unrelated Flash, RAM and receipts. Complete ARM build, mutation and
+  installation ASan/UBSan suites, ARM analysis and strict docs pass. Native producer
+  integration and restart ownership remain open.
+- **Creation-intent publication primitive (locally verified; CI pending):** writes
+  immutable bytes, then the deleted envelope, then INTENT last. Same-attempt
+  retry accepts compatible incomplete bytes or an exact published INTENT, never
+  later phases or occupied following storage. Tests exercise every programming
+  boundary with four partial-write masks, all 256 phases, binding corruption,
+  occupied end markers, read failure and occupied fresh publication. Complete
+  ARM build, full host ASan/UBSan, all 15 ARM analysis contexts and strict docs
+  pass. Native producer
+  integration must still establish name absence and owned allocation before
+  publication; native integration, cancellation and restart ownership remain open.
+- **Claim-aware installation drafts (locally verified; CI pending):** preparation
+  preserves cross-port/catalog namespace checks, plans four extents, rebinds the
+  trusted layout's claim field before identity sealing, and revalidates placement
+  before publishing output coordinates. Nine host scenarios compare the entire
+  draft to independently packaged bytes and reject invalid/overlapping claim
+  fields, missing output and read failures without publishing coordinates. ARM
+  build/static analysis, Ruff, strict docs and the complete host ASan/UBSan
+  suite pass.
+  Native preparation/publication, interruption and reclamation remain open.
+
+- **Creation-claim space planning (locally verified; CI pending):** the shared
+  erased-tail planner now supports library, journal, authority and creation-claim
+  extents together, retrying bank combinations if the claim cannot fit. Existing
+  three-extent callers retain their selection order. Eight new host scenarios
+  cover split/same-bank placement, backtracking, insufficient space, target
+  exclusion, read/dirty failures and unchanged outputs/Flash. The complete host
+  installation suite passes ASan/UBSan, and all 15 ARM static-analysis contexts
+  pass. Claim-aware draft integration is described below; durable publication
+  remains open.
+
+- **Creation-claim runtime admission (locally verified; CI pending):** the reader
+  revalidates the installed transaction, exact binding and journal CRC, then
+  requires the claim to occupy a complete native deleted allocation rather than
+  an interior payload. Admission roots with a sealed claim slot require the
+  CREATED phase. The complete ARM build, Ruff and full installation host
+  ASan/UBSan suite pass, as do ARM static analysis, 66 recovery Python tests
+  and strict docs. Both HP49g+/HP50g pass guarded low-memory recovery and
+  repeated restart and RAM-loss recovery. Both also reject missing, intent-only
+  and mismatched-binding claims without RAM deletion or Flash operations.
+  Both maintained native suites now pass in full, including resource-guard
+  regression cases. These are local results, not CI acceptance.
+  The native fixture constructs claims offline, so this is not evidence of a
+  production publisher, restart ownership, startup ordering or reclamation.
+
+- **Sealed creation-slot packaging (locally verified; CI pending):** optional
+  `--creation-claim-slot` binds only an owned aligned initialized ELF placeholder
+  and records its generated admission-command coordinate before identity sealing.
+  Missing slot/identity, wrong placeholders and header/end/transaction overlap
+  reject without replacing outputs. Tests independently recompute the complete
+  identity digest, show that changing the slot invalidates it, and preserve an
+  identical unsymbolized word. All 21 packager and 66 recovery Python tests pass;
+  the full ARM build passes. Packaging the same real recovery/admission ELFs with
+  the previous/current tools produces byte-identical default libraries and equal
+  layouts. Runtime claim admission and claim-aware placement/draft follow-ups
+  are recorded above; durable creation publication and lifetime/reclamation
+  remain open.
+
+- **Persistent creation-claim format (locally verified; CI pending):** an internal
+  `HPCOWN1` codec stores the exact reservation name and complete installation/
+  transaction binding in a 240-byte native deleted allocation. A separate
+  monotonic phase distinguishes intent, verified creation and closure; CRC
+  excludes only that mutable phase. Tests cover all 256 phase bytes, each
+  immutable-byte fault, each binding-byte mismatch, truncation, overlap/bounds,
+  name/capacity errors and unchanged outputs, with an independent CRC oracle.
+  The full Flash-record ASan/UBSan suite and ARM analysis pass. Both models pass
+  the maintained offline five-phase Stock restart probe with exact Flash/catalog
+  and zero Flash operations. This validates the codec and native visibility only:
+  sealed-root allocation binding, publication before RAM creation, interrupted
+  creation/retry, admission and reclamation are not implemented by this codec.
+
+- **CI tool parity correction (locally verified; CI pending):** `22103fb5` Quality
+  (39825721704) still rejects two cast/unary-operator spaces in bound replay.
+  Previous local checks used system clang-format 18, while Quality selects the
+  pinned ATfE 22.1.0 formatter. Passing the former did not fix or validate the
+  CI failure. The two lines are now formatted with ATfE; all 452 tracked native
+  sources pass that formatter, and all 83 tracked Python sources pass pinned
+  Ruff after normalizing only checkout line endings to Git's LF form. Objects
+  (39825721928) passed; Core (39825722002) is running and Runtime (39825721891)
+  is queued at this check. No repeated polling or CI acceptance is claimed.
+
+- **Fresh receipt activation gate (locally verified; CI pending):** publication now
+  stages/retries an unarmed authority, validates the exact staged installation
+  and rechecks its original creation receipt and entire reservation snapshot
+  before activation. The shared read-only checker rejects wrong address,
+  capacity, name, content, missing objects and read errors without writes or
+  receipt changes. Both native models pass normal publication (1,958 Flash
+  operations) and a maintained rejection witness with a mismatched receipt
+  after successful staging. Rejection preserves exact unarmed Flash, reservation,
+  unrelated HOME data, catalog, CODE/guards and retained IRQ ownership. Full
+  mutation ASan/UBSan, ARM analysis, 66 recovery Python tests and Ruff pass.
+  This is an invocation-scoped activation prerequisite; durable creation proof,
+  interruption/restart ownership, startup ordering and reclamation remain open.
+
+- **Same-bank admission parity (locally verified; CI pending):** the installation suite
+  now checks both buffered and low-memory streaming admission against a journal
+  and adjacent authority behind the target bank header. Six cases cover READY
+  recovery, valid retirement, retirement before repair, closed records against
+  new damage, a competing journal and an authority read failure. Successful
+  paths agree on phase and exact installed coordinates; rejection leaves output
+  and all Flash unchanged. The full installation suite passes ASan/UBSan and
+  clang-format 18. This strengthens admission coverage; durable creation proof,
+  interrupted RAM creation, startup ordering and reclamation remain open.
+- **Previous submission CI (`1deb8872`):** Runtime (39483875385) and Objects
+  (39483875257) passed. Quality (39483875241) rejected two formatting lines
+  in bound replay; the earlier local clang-format 18 check did not match CI's
+  pinned ATfE formatter (see correction above). Core (39483875319)
+  failed both real-template storage paths at the busy-state verifier. The HP50g
+  artifact stops in ARM code with operation 23,813 still busy (1,524,028 of
+  1,524,032 status reads), under the fixed 17-second execution sequence. The
+  local harness now exposes an execution budget; real-template storage uses
+  60 seconds while retaining full Flash, catalog, CODE and busy-state checks.
+  Both models now pass complete storage with 24,569 programming operations,
+  exact busy-read totals, full Flash/catalog/CODE and source preservation.
+  All 66 recovery Python tests, Ruff and strict docs pass. This harness
+  follow-up is submitted with CI acceptance pending.
+
+- **Fresh reservation cancellation cleanup (submitted, CI pending):** an internal discard
+  operation checks the original name, creation receipt address/capacity and
+  complete untouched snapshot before removing a reservation. Success consumes
+  the receipt; pre-write rejection preserves RAM, while any failure after a
+  write attempt retains the invocation as INCOMPLETE. The mutation ASan/UBSan
+  suite covers mismatches, every lost-write acknowledgement and failed final
+  readback. Both HP49g+/HP50g pass the maintained create/stage/cancel/discard
+  path with unrelated HOME data, exact Flash/catalog and CODE/guards preserved.
+  The witness executes from Stock-preserved TEMPOB, avoiding movable USEROB;
+  separate directory-check frames keep removal within its 4 KiB stack.
+  ARM analysis and Python checks pass. This is same-invocation cancellation
+  cleanup, not ownership reconstruction after reset, active workspace release
+  or Flash reclamation. Commit `4ac72852` is included in the current submission.
+
+- **Installed transaction recovery (submitted, CI pending):** the real planner places
+  the library in the second user bank and the journal/authority in the first
+  bank's free tail. Injecting damage into that first bank's header after a
+  real installation leaves both native models unrepaired. A new host regression
+  reproduces the cause: bound replay discovers journals through the damaged
+  current bank header before applying the validated target image. The local fix
+  scans the restored view with separate image/scanner buffers, while retiring
+  transactions still require equality with the actual target. The regression,
+  66 Python tests, ARM analysis and complete authority ASan/UBSan suite pass.
+  Additional focused sanitizer checks preserve Flash/output on rejection of
+  unfinished retirement and competing journals. Both native models pass fresh
+  real-template installation, recovery/retirement with 1,923 SST operations,
+  exact remaining Flash/catalog/source preservation and a second boot with zero
+  writes. This path is connected to maintained installation E2E; commit `a9b720f4`
+  is included in the current submission, with CI acceptance pending. Fault preparation validates tails and sector overlap
+  instead of requiring a separate empty bank. This injected transaction does
+  not prove production activation authority or safe reclamation.
+
+- **Current submission batch:** damaged-bank bound recovery (`a9b720f4`)
+  and fresh reservation cancellation cleanup (`4ac72852`) follow the previous
+  real-template/staging submission (`1deb8872`). Both models pass the maintained
+  native paths described above; final complete ARM build and strict docs pass.
+  CI acceptance is pending; new runs are not polled. M8.0 is not closed.
+
+- **Real recovery template integration (local, open):** packaging the actual
+  guarded recovery/admission ELF images produces a 49,588-byte native record.
+  Embedding that record in the installation witness exceeds the recovery CODE
+  then-conservative 32 KiB initialized-image packaging limit; native packaging
+  rejected it at that checkpoint. The RAM-bound check above supersedes that cap.
+  The small empty-configuration installation fixture therefore does not prove
+  real-template installation. A separate-input prototype now passes native
+  preparation on HP49g+/HP50g: the installer verifies the full template against
+  its compiled sealed identity, and its 16,596-byte initialized image fits the
+  loader bound (138,706-byte package). The complete 49,588-byte prepared record
+  matches an independently rebound/sealed package; placement, owning CODE,
+  stack guards and startup inventory pass. The source template, Flash and
+  library catalog remain unchanged, with no Flash programming operations.
+  HP50g also rejects a different valid sealed library before copying or
+  preparation, preserving Flash/catalog/CODE/guards with no programming.
+  Both models additionally store the complete independently rebound record at
+  the selected `0x160105` slot with 24,761 SST operations, preserving every
+  other Flash byte and the executing CODE/guards/catalog. Stock restart
+  discovers the exact library at that slot without changing Flash. The write
+  witness initializes 20,436 bytes and packages to 146,474 bytes.
+  The maintained build now generates the real template, sealed identity and
+  layout constants from the current recovery/admission ELFs. Separate input
+  loading and both preparation/storage witnesses are included in installation
+  E2E; the workflow carries their layout artifact. A clean repository build
+  matches the tested packages exactly. Both HP49g+/HP50g pass the maintained
+  preparation, storage, restart, source-preservation and wrong-template
+  rejection flow. The maintained preparation/storage initialized images are
+  16,684/20,520 bytes, with packages of 138,882/146,634 bytes. Sixty-three recovery
+  Python tests, ARM analysis and formatting pass. These are local results;
+  CI acceptance and the full transaction lifecycle remain open.
+  Next: connect real installation to transaction recovery and safe reclamation.
+
+- **Unarmed transaction staging (local):** new internal staging
+  and staging-retry operations store the complete authority body at `7F`,
+  without enabling replay. Retry accepts only compatible `FF` or complete `7F`;
+  it cannot downgrade an activation/closure state. Explicit activation uses
+  the existing authority-finishing operation. A native staging witness on both
+  HP49g+/HP50g writes the independently encoded journal/binding, rejects
+  installed replay preflight and repeats staging without further writes.
+  Exact other Flash, target, catalog and owning CODE/guards are preserved;
+  both runs observe 1,953 SST operations. Eleven verifier tests, ARM packaging
+  and core ARM analysis pass, as does the complete authority ASan/UBSan suite.
+  Both native models restart with exact Flash/catalog preserved and unchanged
+  cumulative SST counters. The maintained staging/restart flow is now connected
+  to installation E2E and passes on both native models.
+  A read-only staged-installation preflight now verifies complete `7F`/READY
+  records, actual allocation boundaries and exact library/catalog identity in
+  both current and proposed views. It rejects a damaged current target rather
+  than hiding it with the journal image. Twenty-one host scenarios cover
+  alternate valid target contents, contiguous/separate placement, wrong phases,
+  corrupt data/catalog/root, gaps/interior records, read failure and insufficient
+  scratch; errors preserve outputs and all storage. The complete authority
+  ASan/UBSan suite, core ARM analysis and both native integrated flows pass.
+  Status `7F` alone is not installation provenance or RAM ownership: an older
+  interrupted direct publication can have the same bytes. This step still
+  needs the trusted fresh-installation claim and resource lifecycle.
+
+- **Cleanup/inventory CI submission:** the locally validated cleanup
+  (`0dbd6429`) and Port 1 inventory (`444bbe8f`) changes are submitted together
+  with their maintained E2E paths. CI acceptance is pending; new runs are not
+  polled. Startup entry selection, durable installation authority and resource
+  reclamation remain M8.0 requirements.
+
+- **Port 1 startup inventory extension:** the read-only native witness
+  now resolves ERAM catalog bindings through the existing validated Port 1
+  mapping, keeping its Saturn-window bounds separate from Flash geometry.
+  The independent oracle reads the corresponding saved SRAM bytes and rejects
+  mismatched IDs/out-of-window callbacks. Ten verifier tests, ARM packaging and
+  ARM static analysis pass. Both native models report the expected 62 libraries
+  and 17 callbacks with a Port 1 library installed, preserving all Port 1 bytes,
+  Flash, catalog and owning CODE. The maintained Port 1 setup/inventory flow
+  also passes on HP50g and is included in installation E2E. This extends
+  callback coverage, not startup authorization or durable installation
+  ownership. The proposed internal use of research ID 4 is awaiting
+  maintainer confirmation; the public recovery packager's ID policy is unchanged.
+
+- **Abandoned-library cleanup implementation:** tail
+  recovery now accepts a complete CRC-checked unpublished library only as the
+  final allocation, clears its metadata before status, and preserves its
+  payload. Live libraries and partial removal states are not adopted. Host
+  installation tests pass with 126 interruption combinations across fourteen
+  unpublished statuses and all three cleanup writes, including retry and
+  unchanged payload checks. Both HP49g+/HP50g clean the saved `0xFB` native
+  interruption in three SST operations, with exact other Flash bytes, original
+  catalog, owning CODE and stack guards preserved. Nine Python verifier tests
+  pass. Both models additionally restart and finish cleanup after cuts at the
+  metadata and live-status writes, requiring only the remaining two or one
+  operations. The maintained storage suite now includes final-commit
+  interruption, Stock restart and cleanup; integrated runs pass on both models.
+  These are local results, not CI acceptance or M8.0 closure.
+  Broader regression exposed an overly permissive zero-metadata path for
+  backups; the implementation now restricts odd unpublished cancellation
+  markers to parsed libraries. The existing damaged-backup rejection test is
+  retained unchanged. The narrowed implementation passes the installation
+  ASan/UBSan suite and ARM static analysis. Both native models also pass the
+  narrowed zero-metadata retry, with exactly two remaining writes and preserved
+  Flash/catalog/guards. The complete Flash creation/write ASan/UBSan regressions
+  finish successfully, as does a focused run of the unchanged partial-backup
+  recovery/corruption-rejection tests. Implementation at `0dbd6429` is included
+  in the accumulated submission above.
+
+- **Interrupted fresh-library commit gap (local):** on both HP49g+/HP50g,
+  cutting the final status program at SST operation 286, busy read 1, mask
+  `0x0400` leaves status `0xFB` at slot `0x157e75`. All other Flash bytes match
+  the successful stored draft. Stock restarts normally, preserves that Flash
+  and keeps the original 61-library catalog without registering ID 1703.
+  Before the local cleanup change, C tail recovery against both saved native
+  states returned DIRTY with zero writes: hidden-library cleanup was not covered
+  by the backup-only path.
+  The cleanup implementation above addresses this bounded interruption case;
+  matching payload bytes still do not authorize completing a live installation.
+  These results do not establish
+  arbitrary torn-state boot safety or durable installation ownership.
+
+- **Previous placement/storage CI submission:** the accumulated placement, namespace exclusion, grouped
+  space planning, runtime sealing, draft preparation and selected-slot storage
+  work is submitted together after local validation. The native preparation
+  checks reuse existing E2E launches; storage adds one write and one restart
+  phase per installation model. A later check of submitted `7c958c30` finds
+  Quality successful (39471377075), Core running (39471377029), and Objects
+  (39471377195) / Runtime (39471377067) queued. CI acceptance remains pending;
+  no repeated polling or M8.0 closure.
+
+- **Local selected-slot library storage:** an internal storage primitive now
+  revalidates all six banks, library-ID absence and the exact selected tail before
+  appending at the planned address. Ordinary create still chooses its first free
+  slot; this explicit variant allows installation planning to choose another
+  bank without silently moving the record. Fourteen host cases pass ASan/UBSan:
+  all six bank locations, gaps/interior/out-of-range addresses, selected-tail
+  exhaustion, later read/damage/ID conflicts and a failed program followed by
+  verified discard. Bytes outside the selected allocation remain unchanged.
+  Both HP49g+/HP50g now prepare and store the exact rebound library at the
+  selected address through the SST driver, with busy-read operation counts
+  checked. Full Flash differs only by that record; prepared content, native
+  catalog, owning CODE and guards validate. A subsequent Stock restart discovers
+  the same library at the same slot with exact Flash preserved. The maintained
+  installation suite now includes storage and restart verification. Eight
+  verifier tests and all witness package builds pass; strict PIC checks remain
+  enabled. This stores only a library and inherits append's returned-error
+  cleanup contract; durable
+  installation claims, registration and power-loss/startup recovery remain open.
+
+- **Local installation draft preparation:** the runtime now validates an owned
+  sealed template, plans all three allocations with namespace exclusion, updates
+  both layout-named HPCBIND1 descriptors in separate staging RAM, reseals the
+  identity/CRC and repeats placement checks before returning coordinates.
+  The complete prepared record matches an independent Python-packaged reference.
+  Eleven preparation scenarios pass ASan/UBSan, including invalid/overlapping
+  layout offsets, corrupted templates, short/aliased staging and a Flash read
+  failure after the draft is populated. Failures preserve coordinate outputs;
+  staging is explicitly disposable, while source/Flash/catalog remain intact.
+  ARM build/static analysis pass. Both HP49g+/HP50g now execute the complete
+  path: absent-ID drafts match independently repackaged bytes, and existing-ID
+  rejection preserves sentinel coordinates/staging. Independent allocation
+  walks validate all three extents, without holes or target overlap. Exact
+  Flash, catalog, owning CODE and stack guards remain intact; no Flash operations
+  occur. The maintained missing/matched E2E launches include these checks without
+  extra boots. Seven verifier tests pass, including altered draft/coordinates,
+  failed-output/staging and Flash-change rejection. This remains a draft, not
+  durable ownership, registration, safe startup or permission to publish.
+  These lifecycle gates remain open; this follow-up is local, not CI acceptance.
+
+- **Local runtime identity sealing:** an owned packed-library template can now
+  receive its HPCROOT1 span/offset/digest and native CRC in RAM, matching the host
+  packager. All twenty independent hashlib/native-CRC vectors match byte for
+  byte across descriptor/object nibble alignment and SHA padding boundaries.
+  Invalid bounds, damaged/nonempty placeholders and insufficient capacity leave
+  the input unchanged; allocation padding is preserved. Identity ASan/UBSan and
+  ARM build/static analysis pass. The native preparation fixtures above also
+  exercise sealing, without granting permission to authenticate arbitrary code:
+  trusted template/layout provenance remains required. The draft-preparation
+  step connects rebinding and final placement checks; installation publication
+  and lifetime gates remain open.
+
+- **Local fresh-installation space planning:** installation preflight can now
+  place the library, journal and authority together after namespace exclusion.
+  It validates all bank tails and searches bank combinations, consumes tails
+  without gaps and keeps every extent outside the selected target sector.
+  Separate banks are supported; it backtracks when placing the library in the
+  first candidate would consume the only space large enough for the journal.
+  Eleven space cases plus the twelve namespace cases pass ASan/UBSan in the
+  installation suite, including insufficient pair space, target overlap,
+  malformed/read-failed Flash and unchanged failure outputs. Successful split
+  layouts also pass the existing journal/authority encoders. ARM build/static
+  analysis pass. The native preparation fixtures above now exercise grouped
+  planning as part of the full draft path. It reserves no bytes and grants no
+  authority: exclusive storage ownership, owned publication, registration,
+  startup and reclamation remain
+  required. This is local work, not a new CI submission or milestone closure.
+
+- **Local cross-port installation preflight:** the recovery installation planner
+  combines read-only Flash selection with complete caller-supplied Port 0/1
+  chains and a strictly ordered native catalog. Live unregistered RAM libraries
+  conflict too; malformed later RAM records/catalog entries and unreadable views
+  reject without publishing an address. Empty ports require readable terminators.
+  Twelve host scenarios cover success, each RAM port, catalog and Flash conflicts,
+  read failures, malformed chains/catalogs and missing views; all preserve Flash,
+  RAM and catalog bytes. The installation suite passes ASan/UBSan and ARM static
+  analysis passes. The maintained installation witness now captures Port 0 from
+  the native start pointer and Port 1 through the validated RAM mapping. Both
+  HP49g+/HP50g pass absent-ID selection and existing Flash-library rejection:
+  an independent allocation walk checks the chosen address, exact Flash remains
+  unchanged, and the existing owning-CODE, guards, catalog and startup-inventory
+  checks pass. These checks reuse the existing missing/matched E2E launches.
+  Six verifier tests pass, including wrong-result/address and changed-Flash
+  rejection. Unregistered RAM conflicts have host coverage only: native
+  preparation showed that ordinary Port 0/1 STO already registers the library
+  on both models, so those fixtures cannot prove an unregistered conflict.
+  Separate native probes reject each RAM-port conflict on both models with
+  exact library content/terminator preserved, unchanged catalog and zero Flash
+  writes. Port 1's ERAM callback inventory is outside the original startup
+  inventory fixture; its conflict result is not an inventory acceptance claim.
+  Stable complete mappings, storage reservation,
+  registration, early startup and durable ownership remain caller/installer
+  obligations; ordinary storage APIs retain per-port semantics.
+
+- **Local installation placement planning:** a read-only library planner now
+  validates all six Port 2 banks and selects the same erased allocation as
+  creation under a stable view, with no programming callback required. Creation
+  shares its selection implementation. Existing IDs, including unregistered
+  Flash libraries, remain conflicts; matching deleted payloads are not adopted.
+  This provides coordinates before installation metadata is finalized, without
+  reserving storage or granting publication authority. Actual C against saved
+  HP49g+/HP50g Stock states agrees with an independent allocation parser and
+  preserves the output on an existing-library conflict. Cross-port/catalog
+  exclusion, owned publication, registration and early entry remain installer
+  requirements; the ordinary storage API retains its per-port semantics.
+  ARM build/static analysis and complete Flash creation/write ASan/UBSan
+  regressions pass, including selection, duplicates, read failures, no-space,
+  interrupted writes and recovery. Planning rejects before changing its output.
+  This follow-up is local, separate from the submitted batch below.
+
+- **Accepted CI batch:** bounded configuration resolution, captured ROM-bank
   validation, native startup inventory, partial bank-header recovery coverage
-  and the retained-RAM prerequisite below are submitted together on
-  `m8-flash-write` after local validation. CI acceptance remains pending; no
-  additional M8 milestone is complete.
+  and the retained-RAM prerequisite below passed all four workflows at
+  `b31a3a6b`: Quality `39462737479`, Core `39462737456`, Runtime `39462737482`
+  and Objects `39462737472`. PR #4 merged that exact head into main at
+  `97275d3a`; the active branch incorporated main without conflict. Main CI is
+  not awaited. The later placement/preparation work remains local; no additional
+  M8 milestone is complete.
 
 - **Retained-RAM installation prerequisite:** reservation creation now checks
   that HOME's oldest item is the inline null-named hidden directory before any
@@ -584,7 +1213,7 @@ Current delivery checkpoints:
   `39450806503`, Runtime `39450806511` and Objects `39450806502` are queued.
   This is not a completed M8 stage.
 
-- **Accepted delivery:** all four workflows at `96bcf1f5` pass: Quality
+- **Earlier accepted delivery:** all four workflows at `96bcf1f5` pass: Quality
   (`39442340894`), Core (`39442341248`), Runtime (`39442340864`) and Objects
   (`39442340824`). PR #3 merged that exact submitted head into main as
   `b10699df`. Main CI is not awaited. The newer creation/resource-binding work

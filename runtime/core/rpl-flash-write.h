@@ -58,6 +58,12 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * FF tails are discarded. Backups with any hidden non-FF status value
  * are tombstoned only after validating their complete CRC, extent, metadata and
  * padding. Their bodies remain unchanged and never become visible.
+ * A CRC-valid library at the final allocation may likewise be abandoned only
+ * when its hidden status is a strict NOR predecessor of live 53. First clear
+ * metadata, then a required live bit, then the remaining status bits; retry
+ * recognizes the zero-metadata bounded tail. Preserve its payload and never
+ * publish it. Live libraries, partially removed libraries, malformed bodies
+ * and hidden libraries followed by another allocation are not discarded.
  * Zero metadata with an even hidden status identifies an interrupted discard
  * at the bank tail, accepted only with a bounded halfword allocation covering
  * the revalidated discard plan and an erased remainder.
@@ -116,6 +122,51 @@ int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const
  * Each typed create function rejects the other object's encoding. */
 int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                      uint32_t bytes, uint32_t *attempted_slot);
+
+/* Store a library at the caller-selected exact erased tail. Revalidate every
+ * bank, ID absence and the selected tail/capacity before attempting a write.
+ * A gap, interior address or insufficient selected tail is rejected even when
+ * another bank has room. Same append failure/cleanup and exclusive-mapping
+ * contract as create_library. No cross-port exclusion, registration, durable
+ * ownership or startup permission is inferred from the supplied coordinates. */
+int hpclang_rpl_flash_create_library_at(const struct hpclang_rpl_flash_io *io,
+                                        const uint8_t *record, uint32_t bytes, uint32_t slot);
+
+/* Read-only selection for a complete encoded library record. Validate every
+ * Port 2 bank/allocation/tail and require its ID to be absent from that port,
+ * including unregistered libraries. Return the same erased slot creation would
+ * select under the same stable view; program16 may be NULL. Output changes only
+ * on WRITTEN. Uses create_library's INVALID/FAILED/DIRTY/EXISTS/NOSPACE results.
+ * This neither reserves storage nor proves cross-port/catalog uniqueness,
+ * registration, startup priority or ownership of an existing matching library.
+ * An installer must retain exclusive ownership and revalidate after changing
+ * its encoded record; the selected address alone never authorizes a write. */
+int hpclang_rpl_flash_plan_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                   uint32_t bytes, uint32_t *slot);
+
+struct hpclang_rpl_flash_recovery_space
+{
+    uint32_t library_slot, journal_slot, authority_slot;
+};
+
+/* Read-only placement of a fresh native-aligned library and one recovery pair.
+ * Validate all banks and ID absence, then allocate each extent from an erased
+ * tail, without holes or overlap with target's 4 KiB sector. Search all bank
+ * combinations; the pair need not share the library's bank. Output changes only
+ * on success. This reserves nothing and does not seal descriptors, establish
+ * cross-port exclusion, authorize publication or prove safe startup ordering. */
+int hpclang_rpl_flash_plan_recovery_space(const struct hpclang_rpl_flash_io *io,
+                                          const uint8_t *record, uint32_t bytes, uint32_t target,
+                                          struct hpclang_rpl_flash_recovery_space *space);
+
+/* Same complete-bank planning, including a separate 240-byte creation claim.
+ * Search alternate placements when the first three extents leave no claim tail.
+ * Both disjoint outputs change only on success. No storage is reserved and no
+ * publication, cross-port exclusion or creation provenance is established. */
+int hpclang_rpl_flash_plan_creation_space(const struct hpclang_rpl_flash_io *io,
+                                          const uint8_t *record, uint32_t bytes, uint32_t target,
+                                          struct hpclang_rpl_flash_recovery_space *space,
+                                          uint32_t *claim_slot);
 
 /* Resolve one installed library against the complete expected native record.
  * Validate all six bank identities, live records and erased tails, then require
@@ -237,6 +288,49 @@ int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint
 int hpclang_rpl_flash_finish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                     const uint8_t *record, uint32_t bytes);
 
+/* Publish a codec-valid INTENT creation record at a caller-owned erased tail.
+ * The installer must establish the exact allocation, sealed root binding,
+ * reservation-name absence and exclusion BEFORE calling, and retain exclusion
+ * through RAM creation. This primitive does not establish those prerequisites.
+ * Verify immutable body, publish the deleted envelope, then phase 7F last.
+ * The following end marker must be erased. FAILED/OCCUPIED occur before writes;
+ * DIRTY retains exclusive ownership and prohibits native return/RAM creation.
+ * No erase, RAM allocation, CREATED activation or lifecycle permission. */
+int hpclang_rpl_flash_publish_creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                              const uint8_t *record, uint32_t bytes);
+
+/* Retry the SAME owned attempt with its original exact expected INTENT bytes.
+ * Phase FF permits NOR-compatible partial body/envelope; phase 7F requires the
+ * complete record and is idempotent. Reject every later/unknown phase and any
+ * occupied following end marker without writes. DIRTY retains ownership.
+ * Compatible bytes are not provenance: no discovery/adoption or reconstructed
+ * cross-reset ownership is provided. Use before publishing an adjacent object. */
+int hpclang_rpl_flash_finish_creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                             const uint8_t *record, uint32_t bytes);
+
+/* Commit CREATED only after the installer revalidates its original fresh RAM
+ * receipt, entire snapshot, exact claim binding/name and exclusive invocation.
+ * The expected record is the original INTENT. Compare all immutable bytes and
+ * require actual INTENT or CREATED (lost-ack retry), then clear only phase bit 0.
+ * All other phases, partial envelopes and changed bodies reject without writes.
+ * DIRTY retains ownership and forbids transaction activation/native return.
+ * This primitive does not verify RAM or reconstruct ownership after restart;
+ * a matching Flash record alone never authorizes this transition. */
+int hpclang_rpl_flash_complete_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                        const uint8_t *intent, uint32_t bytes);
+
+/* Close an owned CREATED claim only AFTER its transaction has been closed and
+ * its resource safely released. The caller must establish those prerequisites
+ * under uninterrupted ownership; this primitive never discovers/adopts RAM or
+ * authorizes release. Compare the original INTENT's entire immutable record,
+ * then clear only the phase byte. Accept CREATED, NOR-compatible partial CLOSING
+ * and CLOSED (lost acknowledgement); reject INTENT and every other phase.
+ * An occupied following allocation is allowed and preserved. No erase or RAM
+ * writes. DIRTY retains ownership; same-owned retries remain possible with the
+ * original bytes. Matching contents do not reconstruct ownership after reset. */
+int hpclang_rpl_flash_close_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                     const uint8_t *intent, uint32_t bytes);
+
 /* Bind one caller-reserved erased authority allocation to an already durable
  * ready journal. Verify the complete journal, then publish/verify the binding
  * body before its ARMED status. Neither journal nor target is modified.
@@ -249,6 +343,39 @@ int hpclang_rpl_flash_finish_sector(const struct hpclang_rpl_flash_io *io, uint3
 int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                         uint32_t journal_slot, const uint8_t *journal,
                                         uint32_t journal_bytes);
+
+/* Store the same binding body but stop at durable status 7F (UNPUBLISHED).
+ * Requires the same owned erased allocation and exact READY journal as publish.
+ * Target and journal remain unchanged; replay/preflight must still reject this
+ * phase. Use finish_staged_authority for a cut during staging, then explicitly
+ * activate_staged_authority after the installer's resource/ownership prerequisites.
+ * A complete 7F record is not itself durable installation provenance or RAM
+ * ownership: an interrupted older direct publication can have the same bytes. */
+int hpclang_rpl_flash_stage_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                      uint32_t journal_slot, const uint8_t *journal,
+                                      uint32_t journal_bytes);
+
+/* Retry this SAME owned staging attempt without enabling it. Only FF with a
+ * compatible partial body or 7F with the complete expected body is accepted.
+ * A repeated complete stage makes no writes. Reject FE/ARMED/CLOSING/CLOSED
+ * without writes; never reinterpret activation as a fresh staging attempt.
+ * Validates the whole body and erased end marker before its first write.
+ * DIRTY retains ownership. This does not reconstruct a trusted claim after reset. */
+int hpclang_rpl_flash_finish_staged_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                              uint32_t journal_slot, const uint8_t *journal,
+                                              uint32_t journal_bytes);
+
+/* Activate a complete, owned staged allocation after installation/resource and
+ * startup-safety checks. Require the exact READY journal and complete authority
+ * body; accept only 7F or already-ARMED 7E (lost acknowledgement). Change only the
+ * phase byte. Unlike publication retry, the successor need not be erased: a
+ * later allocation may already exist. Caller proves native allocation boundaries,
+ * trusted root, creation ownership, fresh RAM receipt and exclusive stable views.
+ * This primitive does not establish those prerequisites or adopt an old record.
+ * DIRTY retains ownership; no target write may start until success. */
+int hpclang_rpl_flash_activate_staged_authority(const struct hpclang_rpl_flash_io *io,
+                                                uint32_t slot, uint32_t journal_slot,
+                                                const uint8_t *journal, uint32_t journal_bytes);
 
 /* Resume this SAME reserved transaction after a publication cut, including a
  * lost acknowledgement of ARMED. Requires the exact durable READY journal and

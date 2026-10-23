@@ -377,6 +377,206 @@ address is useful only within the current exclusive invocation. It must not be
 saved as a persistent identity across native allocation, garbage collection or
 restart; durable installation/transaction binding remains required.
 
+`hpclang_rpl_recovery_reservation_check_created` revalidates that original
+receipt against HOME, the required hidden directory, exact address/capacity and
+the complete untouched snapshot without changing RAM or consuming the receipt.
+The installation publication witness now stages/retries an unarmed authority,
+validates the installed staged transaction and rechecks the fresh receipt before
+activating it. A separate negative witness changes the receipt capacity after
+staging: it must retain execution with interrupts disabled and the authority
+unarmed, preserving the reservation, unrelated HOME data, catalog, CODE and stack
+guards. The receipt remains an exclusive-invocation capability; this sequence
+does not reconstruct creation provenance after reset or authorize later reuse.
+
+An internal draft `HPCOWN1` creation claim reserves 240 bytes as a native deleted
+allocation (status and metadata zero), so Stock skips its payload. A separate
+phase byte records intent (`7F`), verified creation (`7E`) and closure (`00`);
+other subsets of `7E` are closing, and `FF` is incomplete. The immutable CRC
+covers its physical slot, complete `HPCMEM2` binding, exact printable name and
+canonical padding. The codec checks record/target/library/journal/authority
+separation, name limits and exact expected binding. It stores no RAM address.
+Offline native fixtures cover incomplete, intent, created, closing and closed
+payloads; they are invisible to Stock and preserve Flash/catalog across restart.
+
+The optional sealed admission root now binds the claim allocation and checks
+the runtime record as described below. A production publisher remains open:
+the exclusive producer must verify name absence before publishing intent and revalidate the
+fresh creation receipt before publishing created. Cuts during either publication
+need explicit retry/cancellation handling. A matching decoded record alone must
+never authorize adoption, activation or RAM release, and its storage must not be
+erased/reused while a bound root or transaction can survive. These remain open
+integration requirements, including interrupted native RAM creation.
+
+The internal `hpclang_rpl_flash_publish_creation_intent` primitive now writes a
+validated claim into a caller-owned erased allocation. It verifies the immutable
+body, publishes the native deleted envelope, and commits phase `7F` last.
+`hpclang_rpl_flash_finish_creation_intent` retries that same owned attempt: phase
+`FF` permits compatible partial writes; phase `7F` requires exact complete bytes
+and performs no writes. Other phases and an occupied following end marker reject.
+Neither entry establishes allocation ownership or reservation-name absence;
+the installer must prove both and retain exclusion. A partial write retains
+ownership and prohibits returning to Stock or starting RAM creation. Native
+producer integration, cancellation and restart ownership remain required;
+the receipt-gated CREATED transition is described below.
+`hpclang_rpl_recovery_reservation_complete_creation` connects the original
+creation receipt and untouched snapshot check to the durable CREATED transition.
+It takes the name and binding from the trusted original INTENT, checks the full
+RAM object and its header, then calls `hpclang_rpl_flash_complete_creation`.
+The Flash primitive compares every immutable byte and permits only INTENT or
+CREATED; it clears the single phase bit and verifies readback. A repeated CREATED
+acknowledgement makes no writes. No RAM bytes or receipt fields change. All views
+must remain exclusively owned in the same invocation; neither entry supplies
+name-absence-before-intent ordering, restart provenance or startup safety.
+The maintained `installation-creation` native witness exercises name-absence
+checking, an exact fresh fixture tail, a driver-level partial INTENT write and
+retry, native RAM creation, then receipt-gated CREATED and an idempotent repeat.
+Its verifier independently constructs the complete expected Flash and checks
+reservation contents, unrelated HOME data, native catalog, owning CODE, guards
+and Flash busy accounting. The fixture's claim address is explicit and checked;
+it is not yet a production claim-bound root installation or a power-loss test.
+`hpclang_rpl_recovery_installation_staged` validates an exact unarmed authority
+and READY journal without a sector scratch buffer. It checks native allocation
+boundaries and root/catalog identity in both current and proposed Flash views;
+staging never justifies damage to current Flash. The companion
+`hpclang_rpl_recovery_installation_creation_staged` additionally requires the
+exact CREATED claim, complete binding/journal CRC and its deleted allocation
+boundary in both views. Both are read-only; original ownership, fresh receipt
+validation and startup ordering remain separate activation prerequisites.
+The native fixture stages its pair after creation, then invokes a separate small
+admission program to reject a wrong transaction binding and accept the exact one.
+Neither program activates the authority or erases target data.
+The claim-bound real-template storage witness additionally publishes its READY
+journal and staged authority after the root, following the four-extent plan in
+one exclusive invocation. Every driver callback is bounded to the current owned
+allocation; a publication failure retains the invocation. The claim allocation
+remains erased and target data is unchanged. Its independent verifier reconstructs
+all records at the planned coordinates and checks complete Flash before and after
+Stock restart. This is unarmed installation staging, not resource creation,
+activation, recovery ownership reconstruction or startup-order acceptance.
+The subsequent creation-intent extension resolves HOME and checks name absence
+before the first root write. After root and pair publication, it encodes HPCOWN1
+at the fourth planned extent using the resealed identity and exact transaction
+CRC. It stops at INTENT without creating RAM or arming the authority. The name
+check and Flash publication share one exclusive invocation; returning or resetting
+does not turn the claim into permission to adopt a later same-name object. The
+maintained negative case supplies an existing string and requires rejection before
+Flash programming, preserving that string and the input template.
+The real-root resource extension continues within that same exclusive invocation:
+it creates the 32 KiB string from an immutable bound snapshot, retains the fresh
+receipt, and calls receipt-gated creation completion before returning. A repeated
+completion must make no extra Flash writes. The authority remains staged (7F).
+Native verification compares all resource bytes and the CREATED claim, and checks
+that root, Flash and resource survive Stock restart. Persistence does not by itself
+approve adopting a recreated resource or satisfy safe early startup/activation.
+The witness reuses its owned, word-aligned preparation buffer for the immutable
+resource snapshot after the root has been stored. The Flash library and original
+HOME template remain separate and verified; no extra 32 KiB CODE
+allocation is needed.
+The installer must not execute inside movable USEROB while creating that HOME
+resource. Its entry supplies the complete live image bounds, including stack and
+buffers; before Flash publication the witness validates their physical mapping
+and containment in one TEMP allocation, then uses those bounds as mutation
+fences. The one-shot test retains the executable on the RPL stack while purging
+only its HOME binding before evaluation. Original input templates are preserved.
+This contract permits the tested USEROB creation without TEMP allocation or GC;
+it is not permission to relocate the running image. Negative coverage executes
+directly from USEROB and requires rejection with unchanged Flash. Stack guards
+and the subsequent Stock-return check remain mandatory after successful creation.
+`hpclang_rpl_recovery_installation_prepare_creation_in_place` explicitly accepts
+an exclusively owned mutable template as both source and destination. It performs
+the same namespace, four-extent, layout, identity, resealing and repeated placement
+checks as copying preparation. Partial overlap and separate destinations are
+rejected; the copying APIs continue to reject all aliases. A failed operation may
+have changed the owned draft, which must then be discarded, while output geometry
+and Flash remain unchanged. The real store witness aliases its source/prepared
+buffers for this API, preserving the original HOME template separately. After the
+root is stored, the same buffer becomes the immutable resource snapshot; validation
+checks complete stored library bytes and snapshot contents at their respective
+lifetimes rather than requiring both copies to remain resident simultaneously.
+`hpclang_rpl_flash_activate_staged_authority` handles the later phase transition
+without treating the record as an unfinished tail. It requires the exact READY
+journal, complete authority body and phase 7F (or 7E for a lost acknowledgement),
+and changes only the authority phase byte. An occupied successor is preserved.
+The existing publication-retry interfaces still require an erased end marker.
+This primitive does not replace installation admission, fresh receipt validation,
+original ownership or safe startup checks; callers must establish those first.
+`hpclang_rpl_flash_close_creation` is the final claim-record transition after
+the caller has closed the transaction and safely released its resource under
+uninterrupted ownership. It compares every immutable byte against the original
+INTENT, accepts CREATED, partial CLOSING or already CLOSED, and clears only the
+phase byte. INTENT, unknown phases and changed records reject without writes;
+an occupied adjacent allocation is preserved. Failed or unconfirmed programming
+retains ownership and permits a same-owned retry. This primitive does not inspect
+RAM, authorize its removal, reconstruct ownership after reset or reclaim Flash.
+The combined native cancellation witness exercises fresh INTENT/CREATED and
+transaction staging before cancellation, releases only its original untouched
+reservation, then closes the claim and repeats that closure without programming.
+Its oracle requires exact Flash contents, a consumed receipt, absence of the
+released variable, preservation of unrelated HOME data and the catalog, normal
+Stock return and unchanged closed records on restart. This tests same-invocation
+cleanup; it does not reconstruct the receipt across a native return or reset.
+Real-root installation has a separate pre-registration boundary:
+`hpclang_rpl_flash_cancel_staged_pair` accepts the original READY journal and the
+coordinates of a complete pair published by the same exclusive invocation. It
+checks both immutable bodies and the unchanged target, then finishes the journal
+tombstone before clearing authority metadata and status. A partially cancelled
+pair can be retried under that same ownership; armed or partially published
+records, body mismatches and reversed cancellation order reject. This primitive
+does not discover allocation ownership, inspect the root/catalog, release RAM or
+authorize a restart adoption. The existing registered-library cancellation API
+retains its native membership and exact root/catalog checks; both share the
+ordered envelope commit implementation.
+The internal packager accepts optional `--creation-claim-slot` for a guarded
+admission ELF with a sealed identity. It patches only the aligned initialized
+`hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and
+rejects bank-header/end-marker overlap or overlap with journal/authority storage.
+The optional layout field `admission_creation_nibble` includes the native
+allocation envelope, like the other binding coordinates. The slot is patched
+before sealing, so changing it changes the root digest; an identical placeholder
+without that symbol is left untouched. Missing symbols/identity and invalid
+geometry leave existing output files unchanged. This provides packaging support,
+not native allocation ownership. Packaging the same existing images without
+the option retains byte-identical output. Claim-aware placement and draft
+preparation are described below.
+
+The internal `hpclang_rpl_flash_plan_creation_space` planner searches erased
+native tails for the library, journal, authority and 240-byte claim together.
+If a three-extent placement leaves no room for the claim, it tries other bank
+combinations. All extents exclude the target sector and do not overlap; outputs
+change only on success. The original three-extent planner uses the same logic
+without allocating a claim and preserves its selection order. Neither planner
+reserves Flash.
+
+`hpclang_rpl_recovery_installation_prepare_creation` applies that planning after
+the existing cross-port/catalog namespace check. The caller supplies the trusted
+layout's `admission_creation_nibble`, including the allocation envelope; the
+field must not overlap identity or transaction descriptors. Preparation updates
+the claim address before resealing, then revalidates all four placements. Source
+and output coordinates remain unchanged on failure; staging is disposable.
+This prepares bytes in RAM and does not publish a claim or establish ownership.
+The maintained `installation-template-creation` witness uses the actual sealed
+recovery/admission template and checks its entire rebound draft against the
+independent packager. Both native models verify four erased-tail extents, source
+and catalog preservation, CODE/stack guards and zero Flash writes. Ordinary and
+claim-bound variants share the same build generator. Integrated root storage and
+publication remain separate requirements.
+The `installation-template-creation-store` variant uses the same selected-slot
+writer. Its verifier decodes the stored claim coordinate, independently rebuilds
+the library, checks all four extents and preserves every byte outside the library.
+A subsequent Stock restart must discover the exact stored library. This stores
+the root only; it does not publish the journal, authority or creation claim.
+The internal `hpclang_rpl_recovery_installation_creation` reader revalidates
+the installed transaction and journal CRC against the caller's trusted binding.
+It requires the record to occupy an exact native deleted allocation boundary,
+not an interior payload, and validates its full binding, name and phase. Pending
+transactions use the validated restored view for allocation membership; closed
+transactions use actual Flash. Outputs change only on success. Admission with
+a sealed claim slot additionally requires CREATED before checking the RAM
+reservation. An unbound placeholder preserves the existing admission path.
+This is a read-only gate, not creation provenance or permission to release RAM.
+Native tests build the claims offline; the production publisher, interrupted
+creation and lifetime/reclamation integration remain required.
+
 The internal 80-byte `HPCMEM2` payload header records the full sealed
 `HPCROOT1` identity, physical library/journal/authority coordinates, target,
 status-independent journal CRC and exact RAM capacity. It contains no RAM
@@ -474,15 +674,20 @@ tests reject collateral writes, incomplete replay, corrupt journals and truncate
 state.
 
 `tests/e2e/port-recovery/prepare.py` creates a separate fault-state directory
-from a clean HP49g+/HP50g Stock boot. It validates the six native bank identities and
-an empty journal bank, preserves the target sector in a CRC-protected journal,
+from a clean HP49g+/HP50g Stock boot or an installed recovery fixture. It validates
+the six native bank identities, allocation chain and erased journal tail,
+preserves the target sector in a CRC-protected journal,
 then erases that sector in the copied Flash image. The original state and any
 existing destination are preserved. The copied state must undergo hardware
 reset before transfer so Stock rebuilds its catalog from the damaged Flash.
 This is explicit offline fault injection, not a model of an erase/program pulse
 interrupted while the chip is busy.
 Targets may be aligned sectors anywhere inside the first user bank; the journal
-must remain in a separate empty bank. This permits body-only faults that leave
+and optional authority must fit at a real free allocation boundary, leave an
+erased end marker and avoid the target sector. They may share its bank. Bound
+replay scans the validated restored view so a damaged bank header does not hide
+its own journal; scanner scratch cannot overwrite that image. Retiring phases
+still compare the actual target before applying this view. This permits body-only faults that leave
 the bank identity and earlier library headers intact. The configuration fixture
 derives its Stock 2.15 library-229 callback sector from the saved catalog and
 Flash header, verifies the expected bank mapping and rejects a target sharing
@@ -492,7 +697,16 @@ does not by itself prove which earlier factory callbacks executed or were skippe
 
 `tests/e2e/port-recovery/run.py` orchestrates the fresh firmware boot, offline
 fault preparation, hardware reset, USB transfer and independent verification.
-It then performs another hardware reset and compares the complete native library
+The `--suite` option separates independent acceptance flows: `recovery` (the
+default) tests replay and interruption; `identity` checks sealed admission;
+`installation` covers lookup, staging and creation/cancellation fixtures;
+`publication` covers resource conflicts, publication, repeat and cancellation;
+`template` tests the real recovery library's preparation, storage and recovery;
+`creation` tests its bound RAM creation, rejection and complete cancellation
+lifecycle. Each suite starts with a fresh firmware boot and writes its own
+evidence directory. CI runs all six on both models; splitting the flows does
+not remove checks or require a saved state from another job.
+The recovery suite then performs another hardware reset and compares the complete native library
 catalog against the clean boot (IDs, bindings, bank switches and flags, independent
 of ordering). The repaired Flash and retained journal must remain unchanged, the
 stack empty and execution back in Stock ROM. This catches recovery that returns
