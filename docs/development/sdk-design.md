@@ -1289,6 +1289,31 @@ the member is `hpgcc_20/sources/ARMToolbox/masd_source/ARMTBX_3_SOURCES.DIR`.
 The 1.1 comparison uses `ARMToolbox/masd_source48/SYSMEM.ARM` and
 `ARMToolbox/masd_source/SYSMEM.ARM` in the retained 39G-support release archive.
 
+For runtime observations, set `HPCLANG_E2E_CAPTURE_STAGE_POOL=1` on a Stock
+harness invocation. At each existing memory checkpoint the host reads the
+boot page's native-state pointer, ARMSYS page count/table/block fields and the
+original coarse table through the stage mapping. It requires the table address
+to match the active stage descriptor and every observed page to have a valid,
+distinct physical mapping. HP39's two native workspace pages are recorded
+separately from the stage count. Inconsistent or repurposed native registers
+reject the observation; it does not guess a count from trailing table contents.
+
+Each checkpoint writes immutable `*-pool-ID.json` with version 1, checkpoint
+ID, model, RW bytes, stage/native-workspace page counts, native OS block pointer,
+table address and physical page addresses. The pointer is not an allocation
+size. The normal memory report and its acknowledgement remain unchanged.
+Stock run setup removes previous pool reports. No guest bytes, fields, symbols
+or allocations are added by this observer.
+
+Run `tests/e2e/ui/verify.py stock FAMILY --pool` to require both pool reports,
+correct target identity, 36 KiB RW, valid unique physical pages and identical
+pool observations before PASS and after runtime cleanup. The ordinary UI
+pixel/memory/return checks still apply. Initial HP50g execution with the
+unmodified launcher records 94 distinct pages (376 KiB) and a 36 KiB RW arena.
+This measures the supplied mapped pool, not native allocator metadata,
+installation storage or transfer-time peak usage. Other models remain under
+validation; the observer is opt-in rather than a completed six-model gate.
+
 Stock startup has an earlier admission boundary than the application's RW
 budget. Stage0 must fit the linked stage1 memory extent (including its prefix,
 alignment gaps and BSS) plus a complete stage stack page in the supplied pool.

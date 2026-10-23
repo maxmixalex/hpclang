@@ -419,6 +419,19 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Local host-side pool observer (2026-10-23): optional Stock capture reads the
+existing boot/native state and original coarse table without changing guest
+code or storage. It checks descriptor/table agreement and distinct physical
+pages and emits immutable per-checkpoint reports. The UI `--pool` verifier
+requires both records and stable geometry across cleanup. Host ASan/UBSan
+rejection tests, Python report tests, formatting and Ruff pass. The unmodified
+HP50g launcher passes UI pixels/reports/return and both pool observations:
+94 pages (376 KiB), 9 RW pages, with 64 pages outside stage/code/workspace/stack
+and the capped RW mapping. Other five Stock models run in sequence on exec
+session 49539 (PID 84275); the earlier instrumented HP39g+ experiment remains
+live separately on exec session 78905 (PID 83388). The new observer is opt-in;
+six-model acceptance and native allocator/installation/transfer totals remain open.
+
 Local native-pool observation (2026-10-23): an isolated test-only stage records
 its incoming geometry before the UI runs. HP50g Stock passes the complete UI
 and normal return; its retained witness reports 94 stage-pool pages (376 KiB),
