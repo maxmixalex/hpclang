@@ -452,8 +452,10 @@ terminated after this confirmed defect, not restarted because of elapsed time.
 Local fix `3425073b` publishes timing checkpoint ID 2 before PASS and retains the single
 post-cleanup memory checkpoint ID 1. Strict return checks are unchanged. A fresh
 six-model Direct matrix passes in separate v2 output directories, including
-timing, pixels, memory and return; HP39g+ Stock now also passes both reports,
-independent pixels and normal return. The remaining Stock matrix is still running.
+timing, pixels, memory and return; HP39g+ and HP39gs Stock now also pass both
+reports, independent pixels and normal return. HP39gs reports 2,424/8,192
+touched stack bytes, 18,892/22,888 heap bytes and observed frame/input maxima
+18,913/610 us over 9/34 samples. The remaining Stock matrix is still running.
 The changed UI sources pass ARM analysis and pinned formatting; report verifier tests pass.
 
 Current minimum-RW admission follow-up (local, 2026-10-23): optional
@@ -467,8 +469,9 @@ pool, independent pixels, memory/timing reports and normal return. Eight host
 tests, relocated installed-SDK C/C++/six-model packaging, Ruff/format and ARM
 analysis (using the repository's fixed-address MMIO exclusion) pass. Default
 launchers without a minimum remain byte-identical on all six models. Focused
-HP39g+/HP50g Stock tests are running separately; the existing timing-only Stock
-matrix remains live. This adds an admission condition, not a reduced Stock
+HP39g+ Stock passes pixels, both reports and normal return; HP50g is running
+on the same focused queue. The existing timing-only Stock matrix remains live.
+This adds an admission condition, not a reduced Stock
 allocation policy or whole-system resource proof. No milestone is closed.
 Local `a1aae4e8` adds a launcher-memory report that accounts for code, RW minimum/ceiling,
 linked stage, stage stack, MMU workspace and HP39 Stock's native workspace.
@@ -480,21 +483,24 @@ allocator policy/overhead and separate LCD DMA allocations remain excluded.
 The report-only change produces byte-identical six-model launchers. Whole-app
 admission and actual Stock reservation reduction remain open. No new CI submission
 or M8.2/M8.3 completion is claimed.
-Submitted repair (2026-10-23): `5959159a` on `m8-flash-write` includes safe
+Accepted repair (2026-10-23): `5959159a` on `m8-flash-write` includes safe
 admission folding, maintained copy-size preflight and the four preceding
 startup-evidence commits. Local dual-model recovery, the separate size-check
 supplement, 93 Python tests, Ruff/format and strict docs pass. The batch is
-pushed for CI. After the independent UI work, a one-time check finds Quality
-39928737438 and Objects 39928737244 successful, Core 39928737294 in progress
-and Runtime 39928737278 queued. No repeated polling. CI acceptance, merge and M8.0
-completion are not claimed. The previous `3d1a665e` failure is historical
-submission evidence, not the result of this repair.
+pushed for CI. Quality 39928737438, Objects 39928737244, Core 39928737294 and
+Runtime 39928737278 now all pass, including both native recovery/retirement
+models and the maintained direct-call relocation cases. Storage 39916501477
+and Font Gallery 39916501572 passed at `3d1a665e`; subsequent changes touch
+only recovery packaging/tests and this roadmap. PR #7 merges this accepted
+batch into main as `2baebace`. The local UI timing/accounting/MIN_RW follow-up
+is excluded from that merge. Main's newly triggered CI is not polled.
+M8.0 remains open; the earlier failed recovery run is historical evidence.
 The direct-call root-discovery follow-up and maintained native code-relocation
 acceptance are submitted together after local verification. Both models pass
 fresh standard Stock startup, all 88 existing native cases and three new direct
 call cases. Host sanitizers, ARM compilation/analysis, pinned formatting and
-strict docs pass. CI acceptance for this new batch remains pending; newly
-triggered workflows are not polled. This is not M8.0 completion.
+strict docs pass. These changes are included in the accepted PR #7 batch
+above. This is not M8.0 completion.
 
 The completed `3d1a665e` CI results are Quality 39916501552, Objects 39916501560,
 Storage 39916501477, Font Gallery 39916501572 and Runtime 39916501501 successful.
