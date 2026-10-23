@@ -104,6 +104,10 @@ if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
         target_sources(admission PRIVATE "${CORE}/${module}.c")
     endforeach()
     configure_recovery_image(admission)
+    # The predicate must fit before it can release the low-memory reservation.
+    # Fold only functions whose address identity is insignificant; retain the
+    # same validation, 4 KiB stack and strict position-relative relocation gate.
+    target_link_options(admission PRIVATE -Wl,--icf=safe)
     target_compile_definitions(admission PRIVATE
         HPCLANG_PREDICATE_STACK_BYTES=4096
         HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT=${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT})

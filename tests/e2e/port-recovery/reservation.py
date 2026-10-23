@@ -134,6 +134,18 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     pack = packager()
     package = root / "package"
     package.mkdir()
+    admission_symbols = pack.elf_symbols(build / "admission.elf", args.nm)
+    admission_bytes = (
+        len(
+            pack.package(
+                (build / "admission.bin").read_bytes(),
+                admission_symbols["__image_end"],
+                model=args.model,
+                fresh_copy=True,
+            )
+        )
+        - 8
+    )
     # Bind recovery and admission together through the maintained CLI. Keep
     # ordinary admission.hp reusable; only the library's hidden copy is compact.
     tool_bin = Path(args.nm).parent
@@ -328,6 +340,10 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     gap = (read(0x806F8) - read(0x806F3)) // 2
     if not 0 < gap < len(program) - 8:
         raise ValueError("Reservation fixture did not establish low-memory pressure")
+    if admission_bytes >= gap:
+        raise ValueError(
+            f"Admission copy needs {admission_bytes} bytes before RAM release; only {gap} free"
+        )
     fault = root / "fault"
     # Exercise partial header publication in the existing low-memory boot.
     # Body-sector configurations do not contain the native bank status byte.
@@ -425,6 +441,11 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     admission_gap = (admission_read(0x806F8) - admission_read(0x806F3)) // 2
     if not 0 < admission_gap < len(program) - 8:
         raise ValueError("Admission rejection fixture did not retain low-memory pressure")
+    if admission_bytes >= admission_gap:
+        raise ValueError(
+            f"Admission copy needs {admission_bytes} bytes before rejection; "
+            f"only {admission_gap} free"
+        )
     observed_slot, _ = installed_recovery(
         (admission_before / "flash").read_bytes(),
         observed_package,
@@ -562,6 +583,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
                 "status": "pass",
                 "model": args.model,
                 "initial_gap": gap,
+                "admission_copy_bytes": admission_bytes,
                 "reservation_bytes": RESERVE_BYTES,
                 "user_elements": USER_ELEMENTS,
                 "busy_operations": operations,

@@ -425,6 +425,18 @@ results or scope facts change. M8.0 remains the primary track. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
+Maintainer direction (2026-10-23): prioritize a useful bounded Port 2 delivery
+and accept explicit compromises rather than pursuing exhaustive perfection.
+Unknown execution-reference contexts may reject mutation; universal relocation,
+automatic reclamation and exhaustive fault-pattern coverage must not silently
+become prerequisites for every other M8 deliverable. Concrete changes to milestone
+acceptance still need a specific scope decision; this direction does not itself
+mark any retained requirement complete or authorize unsafe writes. Prefer a
+small documented supported operating envelope with verified failure behavior.
+The observed pre-recovery traversal into SRAM remains a known limitation to
+resolve or exclude from that envelope, not a reason to collect unlimited
+additional successful corruption samples.
+
 The direct-call root-discovery follow-up and maintained native code-relocation
 acceptance are submitted together after local verification. Both models pass
 fresh standard Stock startup, all 88 existing native cases and three new direct
@@ -432,10 +444,30 @@ call cases. Host sanitizers, ARM compilation/analysis, pinned formatting and
 strict docs pass. CI acceptance for this new batch remains pending; newly
 triggered workflows are not polled. This is not M8.0 completion.
 
-After the subsequent local startup investigation, a one-time check of `3d1a665e`
-finds Quality 39916501552, Objects 39916501560 and Storage 39916501477 successful;
-Font Gallery 39916501572 is running, Core 39916501547 and Runtime 39916501501
-are queued. No merge or repeated polling. The older `a728192f` Objects run
+The completed `3d1a665e` CI results are Quality 39916501552, Objects 39916501560,
+Storage 39916501477, Font Gallery 39916501572 and Runtime 39916501501 successful.
+Core 39916501547 fails only the HP49g+/HP50g recovery jobs; its other fourteen
+Stock jobs, runtime/unit tests and HP39 packaging pass. Both failures occur at
+guarded low-memory recovery with a nonempty native stack. The downloaded CI
+snapshots retain 20,902 bytes of free gap before the fault, while the admission
+runtime alone occupies 20,888 bytes before its native program envelope. Replaying
+the HP50g CI fault locally reproduces failure with zero Flash operations.
+Safe identical-code folding now reduces the admission runtime to 20,720 bytes,
+preserving its 4 KiB stack and passing the existing strict relocation/package
+gate. Both complete guarded-recovery suites have now terminated with PASS;
+logs and reservation/result.json were inspected on 2026-10-23. Each model
+retains a 20,902-byte initial gap, preserves 24,000 user elements, performs
+1,923 recovery operations and passes thirteen admission rejections,
+three resource guards, absent-reservation recovery and repeated restart.
+A separate supplement executes the newly added size calculation and both gap
+checks against the saved native states on both models: the packaged copy is
+20,802 bytes against 20,902-byte gaps; exact-fit and smaller gaps reject.
+The original full-run results remain unchanged. All 93 recovery-related Python
+tests, recovery-directory Ruff and formatting checks pass. This is local
+acceptance of the repair, not CI acceptance or milestone completion. Startup
+confinement and the other retained M8.0 requirements remain open.
+
+The older `a728192f` Objects run
 39911770970 also succeeded, while its Core/Runtime runs ended cancelled;
 those cancellations are not acceptance evidence.
 Submitted `02e81749` passes Quality (39903692796), Core runtime (39903692792,
