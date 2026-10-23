@@ -37,15 +37,19 @@ def verify_storage(
     image="installation-store",
     staged=False,
     closed=False,
+    existing_slot=None,
+    active=False,
 ):
     require(not closed or staged, "Closed installation requires staged records")
+    require(not active or (staged and not closed), "Activation requires an open staged transaction")
+    require(existing_slot is None or staged, "Existing root requires a transaction witness")
     prior = (before / "flash").read_bytes()
     actual = (after / "flash").read_bytes()
     changed = [i for i, (a, b) in enumerate(zip(prior, actual, strict=True)) if a != b]
     require(changed, "Selected-slot witness did not store a library")
-    slot = changed[0]
+    slot = changed[0] if existing_slot is None else existing_slot
     _, original, layout = make_fixture()
-    if staged:
+    if staged and existing_slot is None:
         from prepare import free_tail
 
         candidates = [free_tail(prior, bank) for bank in range(0x140000, 0x200000, 0x20000)]
@@ -80,15 +84,21 @@ def verify_storage(
     library, expected, _ = make_fixture(journal_slot=journal, authority_slot=authority, **extra)
     require(record == expected, "Stored record differs from independently rebound library")
     require(
-        prior[slot : slot + len(record)] == b"\xff" * len(record),
-        "Storage overwrote data",
+        prior[slot : slot + len(record)]
+        == (b"\xff" * len(record) if existing_slot is None else record),
+        "Storage overwrote data or changed the registered root",
     )
     expected_flash = bytearray(prior)
     expected_flash[slot : slot + len(record)] = record
     if staged:
         from creation import creation_record
 
+        name = layout["reservation"]["name"].encode("ascii")
+        capacity = layout["reservation"]["bytes"]
+
         records = staged_records(prior, journal, authority)
+        if active:
+            records[authority][0] = 0x7E
         for address, data in records.items():
             if closed:
                 data[:4] = b"\0" + (2 * len(data) - 2).to_bytes(3, "little")
@@ -97,19 +107,19 @@ def verify_storage(
         identity = b"".join(word(identity_at + 8 * i).to_bytes(4, "little") for i in range(12))
         crc = int.from_bytes(records[journal][-4:], "little")
         binding = b"HPCMEM2\0" + identity
-        binding += struct.pack("<6I", slot, journal, authority, TARGET, crc, 32768)
+        binding += struct.pack("<6I", slot, journal, authority, TARGET, crc, capacity)
         claim = extra["claim_slot"]
         expected_flash[claim : claim + 240] = creation_record(
-            binding, b"HPCLEASE", claim, 0 if closed else 0x7E
+            binding, name, claim, 0 if closed else 0x7E
         )
-        resource = binding + bytes((i * 37 + 11) & 255 for i in range(80, 32768))
+        resource = binding + bytes((i * 37 + 11) & 255 for i in range(80, capacity))
         if closed:
             from reservation import require_absent
 
-            require_absent(reader(after), b"HPCLEASE")
+            require_absent(reader(after), name)
         else:
             require(
-                home_string(reader(after), b"HPCLEASE") == resource,
+                home_string(reader(after), name) == resource,
                 "Created resource differs from the exact bound snapshot",
             )
     base = verify_probe(
@@ -117,6 +127,17 @@ def verify_storage(
     )
     symbols = symbol_offsets(build / (image + ".elf"), nm)
     ram = (after / "sram").read_bytes()
+    if active:
+        require(
+            struct.unpack_from("<3I", ram, base + symbols["storage_activation_result"]) == (0,) * 3,
+            "Registered activation lost its fresh receipt or repeated a write",
+        )
+    if existing_slot is not None:
+        require(
+            struct.unpack_from("<I", ram, base + symbols["storage_registered_admission_result"])[0]
+            == 0,
+            "Registered fresh creation failed staged admission",
+        )
     if closed:
         require(
             struct.unpack_from("<6I", ram, base + symbols["storage_cleanup_result"]) == (0,) * 6,
@@ -156,7 +177,8 @@ def verify_storage(
                 "Stored binding extent overlaps target",
             )
             require(
-                prior[address : address + size] == b"\xff" * size,
+                prior[address : address + size]
+                == (record if index == 0 and existing_slot is not None else b"\xff" * size),
                 "Stored binding extent was not erased",
             )
             for other, length in extents[:index]:

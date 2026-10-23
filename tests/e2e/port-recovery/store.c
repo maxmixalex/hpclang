@@ -1,6 +1,7 @@
 /* Fresh library storage witness. The predicate owns RAM execution, mappings
  * and interrupts. The creation variant also stages its planned transaction;
- * neither variant activates it or registers the root in the native catalog. */
+ * the registered activation variant arms it only after checking the original
+ * resource receipt. Native catalog registration precedes that invocation. */
 #include "rpl-flash-write.h"
 #include "sst-flash.h"
 #include <hpclang/time.h>
@@ -11,6 +12,13 @@ volatile uint32_t storage_result[2];
 #include "rpl-recovery-reservation.h"
 #include "rpl-stock-memory.h"
 #include "template.h"
+#ifdef HPCLANG_INSTALLATION_REGISTERED
+#include "rpl-recovery-installation.h"
+volatile uint32_t storage_registered_admission_result;
+#endif
+#ifdef HPCLANG_INSTALLATION_ACTIVATE
+volatile uint32_t storage_activation_result[3];
+#endif
 static uint8_t staged_image[HPCLANG_RPL_FLASH_SECTOR_BYTES];
 static uint8_t staged_journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
 static uint8_t staged_claim[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES];
@@ -161,7 +169,8 @@ static int resource_write(void *context, uint32_t at, uint8_t value)
 
 __attribute__((noinline)) static int
 create_resource(const uint32_t *map, const struct hpclang_rpl_flash_io *flash, uint32_t claim,
-                const struct hpclang_rpl_flash_recovery_space *space)
+                const struct hpclang_rpl_flash_recovery_space *space,
+                const struct hpclang_rpl_flash_catalog *catalog)
 {
     /* The source copy is dead after sealing/storing prepared_library. Reuse its
      * owned RAM instead of adding another 32 KiB to the native CODE object. */
@@ -179,16 +188,17 @@ create_resource(const uint32_t *map, const struct hpclang_rpl_flash_io *flash, u
                                          .user_limit = execution_end,
                                          .library_table = 0x8611d};
     snapshot_storage->kind = HPCLANG_OBJECT_STRING;
-    snapshot_storage->nibble_count = 10 + 2 * 32768;
+    snapshot_storage->nibble_count = 10 + 2 * template_reservation_bytes;
     snapshot_storage->native_prologue = 0x2a2c;
-    uint64_t header = 0x2a2cu | (uint64_t)(5 + 2 * 32768) << 20;
+    uint64_t header = 0x2a2cu | (uint64_t)(5 + 2 * template_reservation_bytes) << 20;
     for (unsigned i = 0; i < 5; ++i)
         snapshot_storage->data[i] = header >> (8 * i);
-    for (unsigned i = 0; i < 32768; ++i)
+    for (unsigned i = 0; i < template_reservation_bytes; ++i)
         snapshot_storage->data[5 + i] = i < 80 ? staged_claim[20 + i] : (uint8_t)(i * 37 + 11);
     const struct hpclang_object *snapshot = (const struct hpclang_object *)snapshot_storage;
-    int result = hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"HPCLEASE", 8,
-                                                         snapshot, &resource_receipt);
+    int result = hpclang_rpl_recovery_reservation_create(&io, template_reservation_name,
+                                                         template_reservation_name_length, snapshot,
+                                                         &resource_receipt);
     storage_stage_result[3] = result;
     if (result)
         return result;
@@ -204,6 +214,37 @@ create_resource(const uint32_t *map, const struct hpclang_rpl_flash_io *flash, u
     storage_stage_result[5] = result;
     if (result || storage_result[1] != operations)
         return result ? result : HPCLANG_RPL_FLASH_DIRTY;
+#ifdef HPCLANG_INSTALLATION_REGISTERED
+    result = hpclang_rpl_recovery_installation_creation_staged(
+        flash, EXPECTED_LIBRARY_ID, catalog, snapshot_storage->data + 5, claim,
+        template_reservation_name, template_reservation_name_length);
+    storage_registered_admission_result = result;
+    if (result)
+        return result;
+#else
+    (void)catalog;
+#endif
+#ifdef HPCLANG_INSTALLATION_ACTIVATE
+    result = hpclang_rpl_recovery_reservation_check_created(&reader, template_reservation_name,
+                                                            template_reservation_name_length,
+                                                            snapshot, &resource_receipt);
+    storage_activation_result[0] = result;
+    if (result)
+        return result;
+    owned_first = space->authority_slot;
+    owned_end = owned_first + HPCLANG_RPL_FLASH_AUTHORITY_BYTES;
+    result = hpclang_rpl_flash_activate_staged_authority(
+        flash, space->authority_slot, space->journal_slot, staged_journal, sizeof staged_journal);
+    storage_activation_result[1] = result;
+    if (result)
+        return result;
+    operations = storage_result[1];
+    result = hpclang_rpl_flash_activate_staged_authority(
+        flash, space->authority_slot, space->journal_slot, staged_journal, sizeof staged_journal);
+    storage_activation_result[2] = storage_result[1] - operations;
+    if (result || storage_activation_result[2])
+        return result ? result : HPCLANG_RPL_FLASH_DIRTY;
+#endif
 #ifdef HPCLANG_INSTALLATION_RESOURCE_CANCEL
     cleanup_journal = space->journal_slot;
     cleanup_authority = space->authority_slot;
@@ -220,7 +261,8 @@ create_resource(const uint32_t *map, const struct hpclang_rpl_flash_io *flash, u
     storage_cleanup_result[1] = storage_result[1] - operations;
     if (result || storage_cleanup_result[1])
         return result ? result : HPCLANG_RPL_FLASH_DIRTY;
-    result = hpclang_rpl_recovery_reservation_discard_created(&io, (const uint8_t *)"HPCLEASE", 8,
+    result = hpclang_rpl_recovery_reservation_discard_created(&io, template_reservation_name,
+                                                              template_reservation_name_length,
                                                               snapshot, &resource_receipt);
     storage_cleanup_result[2] = result;
     if (result)
@@ -249,8 +291,13 @@ create_resource(const uint32_t *map, const struct hpclang_rpl_flash_io *flash, u
 int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
                                const struct hpclang_rpl_flash_recovery_space *space,
                                uint32_t target, uint32_t claim, const uint8_t identity[48],
-                               const uint32_t *map)
+                               const uint32_t *map, const struct hpclang_rpl_flash_catalog *catalog)
 {
+#ifdef HPCLANG_INSTALLATION_REGISTERED
+    uint64_t now;
+    if (hpclang_time_read_us(&now))
+        return HPCLANG_RPL_FLASH_UNSUPPORTED;
+#endif
     for (uint32_t i = 0; i < sizeof staged_image; i += 2) {
         uint16_t word;
         if (!source->read16(source->context, target + i, &word))
@@ -269,10 +316,11 @@ int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
     const struct hpclang_rpl_flash_installed_recovery installed = {
         space->library_slot, space->journal_slot, space->authority_slot, target};
     uint8_t header[80];
-    if (!hpclang_rpl_recovery_reservation_header(identity, &installed, crc, 32768, header) ||
-        hpclang_rpl_flash_creation_encode(source->first, source->end, claim, header,
-                                          (const uint8_t *)"HPCLEASE", 8, staged_claim,
-                                          sizeof staged_claim))
+    if (!hpclang_rpl_recovery_reservation_header(identity, &installed, crc,
+                                                 template_reservation_bytes, header) ||
+        hpclang_rpl_flash_creation_encode(
+            source->first, source->end, claim, header, template_reservation_name,
+            template_reservation_name_length, staged_claim, sizeof staged_claim))
         return HPCLANG_RPL_FLASH_INVALID;
     struct hpclang_rpl_flash_io io = *source;
     io.program16 = program_owned;
@@ -296,7 +344,7 @@ int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
         storage_stage_result[2] = result;
     }
     if (!result)
-        result = create_resource(map, &io, claim, space);
+        result = create_resource(map, &io, claim, space, catalog);
     if (result)
         for (;;)
             __asm__ volatile("nop"); /* Retain this partially published installation. */

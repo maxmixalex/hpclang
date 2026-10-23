@@ -460,6 +460,47 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
+- **Registered creation/configuration integration (local, not submitted):** the
+  new preparation APIs require the exact registered root and reconstruct its
+  fresh four-extent plan before permitting a transaction. Focused and full host
+  sanitizer tests and ARM analysis/build pass. Both models pass registered
+  creation, staged admission, owned cancellation and unchanged restart, with
+  2,082 Flash operations each. Integration review then found that these creation
+  witnesses used HPCLEASE while the real admission descriptor uses HPCRES.
+  Those results do not establish automatic recovery through that descriptor.
+  The packager now exports name/capacity from the actual linked descriptor;
+  native generation, creation and the independent oracle consume that metadata.
+  Invalid or mismatched descriptors are rejected, and unsupported witness
+  capacity is rejected before root writes. Five template tests, including an
+  alternate name/capacity, all 91 recovery/package Python tests, Ruff, ARM packaging,
+  pinned formatting and strict docs pass. Fresh two-model flows with aligned
+  configuration pass creation/cancellation/restart (2,082 operations each),
+  followed by rejection of closed-transaction reuse with zero writes.
+  A new registered activation witness checks the original fresh resource
+  receipt after staged admission, arms the real authority and verifies an
+  idempotent repeat. Its reset test injects only target-sector damage; all
+  recovery records and the RAM resource must come from native installation.
+  ARM packaging passes. Both HP49g+ and HP50g native activation/recovery runs
+  pass: 2,077 operations create/arm the transaction, 1,923 restore the damaged
+  sector through the installed guard, and the second reset makes zero writes.
+  Complete Flash comparisons retain the root and claim; the reservation is
+  released and the original source template/catalog survive both resets.
+  A separate registration suite retains these growing integration cases without
+  extending the existing creation job. Complete fresh-boot registration and
+  creation suites are running on both models before submission. This proves
+  the isolated native-created recovery path, not arbitrary startup ordering,
+  claim reclamation or general reconstruction of ownership after interruption.
+  Those remaining gates and M8.0 stay open.
+- **Registration before resource creation (locally verified):** an
+  explicit claim-bound root-only installer uses the existing four-extent plan
+  and writes only the recovery library. The maintained creation suite verifies
+  complete Flash against that root alone, keeps journal/authority/claim extents
+  erased, checks the absence of a resource and consumed installer binding, then
+  requires Stock to register the unchanged root after reset without Flash writes.
+  ARM packaging and formatting pass; HP49g+ and HP50g native runs pass,
+  with 25,429 Flash operations each and zero additional writes on restart.
+  This establishes an inert registration boundary for the next fresh transaction;
+  transaction continuation, post-reset ownership and early startup remain open.
 - **Real-root cleanup integration (locally verified; CI acceptance pending):**
   the maintained installer now cancels its same-owned staged pair, discards the
   original fresh RAM reservation and closes/repeats its creation claim. The new

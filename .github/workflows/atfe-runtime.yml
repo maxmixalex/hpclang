@@ -216,6 +216,8 @@ jobs:
             build: configuration
           - name: creation
             build: configuration
+          - name: registration
+            build: configuration
           - name: publication
             build: configuration
           - name: identity

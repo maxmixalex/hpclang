@@ -43,7 +43,8 @@ int hpclang_installation_execution_ready(void);
 int hpclang_installation_stage(const struct hpclang_rpl_flash_io *io,
                                const struct hpclang_rpl_flash_recovery_space *space,
                                uint32_t target, uint32_t claim, const uint8_t identity[48],
-                               const uint32_t *map);
+                               const uint32_t *map,
+                               const struct hpclang_rpl_flash_catalog *catalog);
 #endif
 #endif
 
@@ -79,6 +80,12 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
         expected_library, preparation_bytes, EXPECTED_RECOVERY_BINDING, EXPECTED_ADMISSION_BINDING};
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
     uint32_t claim = UINT32_MAX;
+#ifdef HPCLANG_INSTALLATION_REGISTERED
+    preparation_result[0] =
+        (uint32_t)hpclang_rpl_recovery_installation_prepare_registered_creation_in_place(
+            io, &layout, EXPECTED_IDENTITY_NIBBLE, template_creation, catalog, EXPECTED_TARGET,
+            prepared_library, EXPECTED_LIBRARY_BYTES, &space, &claim);
+#else
     preparation_result[0] = (uint32_t)
 #ifdef HPCLANG_INSTALLATION_STORE
         hpclang_rpl_recovery_installation_prepare_creation_in_place(
@@ -87,6 +94,7 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
 #endif
             io, &layout, EXPECTED_IDENTITY_NIBBLE, template_creation, ports, catalog,
             EXPECTED_TARGET, prepared_library, EXPECTED_LIBRARY_BYTES, &space, &claim);
+#endif
     preparation_creation_slot = claim;
 #else
     preparation_result[0] = (uint32_t)hpclang_rpl_recovery_installation_prepare(
@@ -99,12 +107,16 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
 #ifdef HPCLANG_INSTALLATION_STORE
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
     if (!preparation_result[0]) {
+        if (template_reservation_bytes < 80 || template_reservation_bytes > 32768) {
+            stored_result = HPCLANG_RPL_FLASH_INVALID;
+            return;
+        }
         uint32_t home;
         struct hpclang_rpl_directory_entry_view entry;
         stored_result = hpclang_rpl_store_home_object(catalog->reader, &home);
         if (!stored_result) {
-            int found = hpclang_rpl_directory_find(catalog->reader, home,
-                                                   (const uint8_t *)"HPCLEASE", 8, &entry);
+            int found = hpclang_rpl_directory_find(catalog->reader, home, template_reservation_name,
+                                                   template_reservation_name_length, &entry);
             stored_result = found == HPCLANG_RPL_STORE_NOT_FOUND ? 0
                             : found                              ? found
                                                                  : HPCLANG_RPL_FLASH_EXISTS;
@@ -117,10 +129,12 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
         }
     }
 #endif
+#ifndef HPCLANG_INSTALLATION_REGISTERED
     if (!preparation_result[0])
         stored_result = hpclang_installation_store(io, prepared_library, EXPECTED_LIBRARY_BYTES,
                                                    space.library_slot);
-#ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+#endif
+#if defined(HPCLANG_INSTALLATION_TEMPLATE_CREATION) && !defined(HPCLANG_INSTALLATION_ROOT_ONLY)
     if (!preparation_result[0] && !stored_result) {
         uint8_t identity[48];
         for (unsigned i = 0; i < sizeof identity; ++i) {
@@ -130,7 +144,7 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
             identity[i] |= ((prepared_library[at / 2] >> (4 * (at & 1))) & 15) << 4;
         }
         stored_result = hpclang_installation_stage(io, &space, EXPECTED_TARGET, claim, identity,
-                                                   catalog->reader->context);
+                                                   catalog->reader->context, catalog);
     }
 #endif
 #endif
