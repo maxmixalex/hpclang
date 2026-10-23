@@ -2264,8 +2264,8 @@ triggered CI workflows pass at `d94580b4`, without closing an entire M8 stage.
 | M8.2 | Declaration, layout, input, effects and canvas implemented; integrated UI CI accepted; public C sketch technically reviewed. | Remaining smallest-target resource/update-cost criteria and submitted follow-up CI; names remain provisional until acceptance. |
 | M8.3 | Components, themes and renderer implemented; all-six Direct/Stock local memory-report and low-memory checks pass. | Whole-application physical-memory admission and remaining resource/CI acceptance; touched-stack watermarks alone are insufficient. |
 | M8.4 | Multiple graphics, keyboard, console and system adapter groups exist. Fixed-array line-input aliases pass all-six Direct/Stock locally. | Complete the retained historical API/application ledger, asynchronous KOS sound and decimal-format policy, plus remaining adapter groups and CI acceptance. |
-| M8.5 | Initial C++ UI/object wrappers accepted; additional owners verified locally. | Broader ownership/migration guidance, examples and pending integration acceptance. |
-| M8.6 | Integrated examples and relocated packaging have substantial local evidence. | Complete downstream scenarios, resource/error/return and release acceptance; retain the independent-launcher evaluation without presuming retirement. |
+| M8.5 | C++ UI/object wrappers and directory/iterator owners accepted in CI. | Broader ownership/migration guidance, public conventions and remaining examples/release work. |
+| M8.6 | Notebook cross-family persistence, classic Port 0 backup and HP49/50 file export accepted in CI; relocated packaging verified. | Remaining resource/error/return and release acceptance; retain the independent-launcher evaluation without presuming retirement. |
 
 The retained M8.0 implementation track is native-port work: establish
 complete execution-reference coverage for safe movement/registration, then
@@ -4315,7 +4315,10 @@ claim that `exit()` unwinds automatic C++ objects.
 All 95 host targets, focused ASan/UBSan and ARM C++ analysis pass. Object Basics
 passes HP39g+ Direct and HP48gII/HP50g Stock locally, including normal return.
 The relocated SDK gate passes C/C++, all six model builds/launchers and the
-three HP39 Aplet package variants. CI acceptance of these new owners is pending.
+three HP39 Aplet package variants. CI acceptance is complete in Runtime
+39928737278 at `5959159a`, merged by PR #7 as `2baebace`: Object Basics passes
+all six Stock models, including the real directory/iterator ownership fixture
+on classic models and the explicit unsupported-context behavior on HP39.
 
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications
@@ -4327,6 +4330,20 @@ three HP39 Aplet package variants. CI acceptance of these new owners is pending.
   deterministic resource generation as part of the installable SDK.
 
 #### M8.6 — Application and release acceptance
+
+Current scenario acceptance (reconciled 2026-10-23): Runtime
+[39928737278](https://github.com/maxmixalex/hpclang/actions/runs/39928737278)
+at `5959159a`, merged through PR #7 as `2baebace`, passes Notebook on all six
+Stock models, notebook-backup on HP48gII/HP49g+/HP50g, and notebook-export on
+HP49g+/HP50g. These fixtures link the installed example's actual app/store/export
+sources. The UI verifier checks text across three launches; backup exercises
+save/restore/replace/remove while preserving the primary save; export checks
+UTF-8 bytes and retained card content through independent host FAT tools.
+The application also reads civil time. These are original-ROM emulator results,
+not physical-device results. The relevant application/fixture sources are
+unchanged from that accepted commit. Earlier pending-Stock/CI descriptions
+below are implementation history, superseded by this acceptance. Resource
+limits, release documentation and independent-launcher evaluation remain open.
 
 The initial `examples/notebook` application connects the C UI and civil clock
 to native string persistence: HP39 Aplet-owned data or classic HOME. Saves are
@@ -4374,7 +4391,7 @@ The Runtime registry covers these separate Stock-only fixtures with per-model
 builds where needed. Local verification also passes all 91 host targets, SDK
 relocation and six-model builds, schema/negative-configuration checks, static
 analysis, shellcheck, actionlint, formatting and strict documentation. Formal CI
-acceptance for this integrated batch remains pending.
+acceptance for these integrated scenarios is recorded above.
 
 The public ARM bootstrap and synchronous KOS wrappers now return through `BX`
 after restoring LR, as required when ARMv4T callers use Thumb. The relocated SDK
@@ -4384,7 +4401,7 @@ three HP39 Aplet variants pass locally. Object Basics also passes HP39g+ and
 HP50g Stock startup and normal return with the corrected wrappers. These checks
 do not replace physical-device validation or close the remaining release goals.
 
-- [ ] Exercise non-trivial downstream applications combining UI, object data,
+- [x] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each
   hardware family and state exactly which scenarios were emulated or physical.
 - [ ] Validate release installation, reproducible assets, resource limits,
