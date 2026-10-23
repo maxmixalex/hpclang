@@ -1362,7 +1362,50 @@ fix is not submitted yet, so CI acceptance and M8.0 completion remain open.
   other metadata/object tears, earlier callback access and installation lifetime
   remain open. Local verification is not CI or M8 acceptance.
 
-- **Local pre-callback Flash access:** native read watchpoints on both models
+- **Local retained-identity allocation tears (2026-10-23):** six offline
+  interrupted-erase fixtures pass automatic recovery on HP49g+/HP50g. The bank
+  identity remains intact while the first allocation's three-byte length field
+  is ORed with `0x000001`, `0x000800` or `0x0fffff`, modelling selected erase
+  transitions from zero to one. Each starts from the same clean retained-RAM
+  fixture with its bound journal/authority, and retains the other target-sector
+  bytes. Both models restore exact whole-Flash contents except the authorized
+  journal/authority retirement, reconstruct the original catalog and empty
+  stack, preserve 24,000 user-array elements and release the matching reservation.
+  Busy-read evidence confirms recovery writes occurred. This is research-only
+  local evidence using the existing experimental recovery installation, not a
+  maintained CI case, actual mid-pulse interruption, second-reset check or
+  approval of internal ID 4. Other allocation fields, arbitrary erase patterns,
+  earlier callbacks and general startup safety remain open.
+
+- **Early ARM scan classification (2026-10-23):** inspection of both Stock 2.15
+  ROMs identifies the routine called at `0x2ed40` as a bank-type-dependent
+  checksum pass, rather than allocation/library traversal. Its instructions
+  at `0x272e0` dispatch types `0x0f`, `0x18`, `0x32` and `0x86`; every value
+  `F0` through `FF` instead branches to the next-bank step at `0x27428`, without
+  checksumming that bank's payload. Exact instruction/call-target checks pass
+  for both ROMs, whose complete inspected routine bytes agree. Thus the earlier
+  read watchpoint proves metadata access, but does not prove this ARM routine
+  follows torn Port 2 allocation lengths. The later Saturn metadata reads remain
+  a separate startup-safety requirement. This narrows the interpretation of the
+  historical watchpoint below; it does not establish complete startup safety.
+
+- **Saturn allocation traversal (locally observed, 2026-10-23):** independent
+  warm-start read watchpoints on both models observe the first allocation status
+  at Saturn address `0x4020a` with continuation `0x23956`, and its length at
+  `0x4020c` with continuation `0x239ee`. The relevant ROM instruction bytes
+  agree across models. Disassembly identifies status/library-prologue handling
+  before the length read; the subsequent traversal exits on zero length or
+  address-addition carry. This locates the actual allocation traversal separately
+  from the earlier ARM checksum pass; it is not proof that every malformed
+  library header is harmless. Three further offline erase fixtures per model
+  OR the first library's title-length byte with `0x04`, `0x80` or `0xec`, leaving
+  the bank identity, allocation length and remaining sector contents intact.
+  All six recover exact authorized Flash/catalog/empty-stack state, preserve
+  24,000 user-array elements and release the matching reservation. These remain
+  research-only local fixtures using the experimental recovery installation;
+  arbitrary library-header tears and supported early installation remain open.
+
+- **Local pre-callback Flash access (historical watchpoint):** native read watchpoints on both models
   observe the original ARM library scanner reading physical `0x140100`, inside
   the installation fixture's `0x140000` target sector, during warm startup.
   ROM instructions identify the bank-status load in the scanner called at
