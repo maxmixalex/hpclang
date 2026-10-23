@@ -428,8 +428,10 @@ rejection tests, Python report tests, formatting and Ruff pass. The unmodified
 HP50g launcher passes UI pixels/reports/return and both pool observations:
 94 pages (376 KiB), 9 RW pages, with 64 pages outside stage/code/workspace/stack
 and the capped RW mapping. Other five Stock models run in sequence on exec
-session 49539 (PID 84275); the earlier instrumented HP39g+ experiment remains
-live separately on exec session 78905 (PID 83388). The new observer is opt-in;
+session 49539 (PID 84275). The earlier instrumented HP39g+ experiment exits
+successfully, but its final snapshot no longer contains the marker, so it
+provides no pool measurement. The new observer captures while the application
+is still mapped and is opt-in;
 six-model acceptance and native allocator/installation/transfer totals remain open.
 
 Local native-pool observation (2026-10-23): an isolated test-only stage records
@@ -442,7 +444,8 @@ pages. The witness adds 64 B of stage storage and crosses a page boundary:
 this instrumented stage needs one more page than production. This observation
 does not measure native allocator block size/overhead or installation/transfer
 peaks, and is not a production minimum claim. The separate HP39g+ experiment
-is running on exec session 78905. Evidence lives under
+passes UI and return, but marker extraction finds no retained record in the
+final snapshot; no HP39g+ pool count is inferred. Evidence lives under
 `/work/oct23-native-pool-src/build`, with build/read scripts retained in
 `research/oct23-native-pool-witness.py` and `research/oct23-native-pool-read.py`.
 The first two setup attempts failed before application execution (missing PTY
