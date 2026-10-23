@@ -437,6 +437,13 @@ The observed pre-recovery traversal into SRAM remains a known limitation to
 resolve or exclude from that envelope, not a reason to collect unlimited
 additional successful corruption samples.
 
+Submitted repair (2026-10-23): `5959159a` on `m8-flash-write` includes safe
+admission folding, maintained copy-size preflight and the four preceding
+startup-evidence commits. Local dual-model recovery, the separate size-check
+supplement, 93 Python tests, Ruff/format and strict docs pass. The batch is
+pushed for CI; new runs have not been polled. CI acceptance, merge and M8.0
+completion are not claimed. The previous `3d1a665e` failure is historical
+submission evidence, not the result of this repair.
 The direct-call root-discovery follow-up and maintained native code-relocation
 acceptance are submitted together after local verification. Both models pass
 fresh standard Stock startup, all 88 existing native cases and three new direct
