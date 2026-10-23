@@ -1426,6 +1426,19 @@ fix is not submitted yet, so CI acceptance and M8.0 completion remain open.
   or make CRC a sufficient safety proof for arbitrary corruption. These remain
   startup requirements; experimental ID 4 is not approved for production.
 
+- **Pre-checksum catalog pass observed (local, 2026-10-23):** dual instruction
+  watchpoints on both models show the damaged first library taking
+  `0x23973 -> 0x23983 -> 0x23986` before any observed call at `0x23978` and
+  later checksum rejection at `0x2397f`. Original code at `0x09537` sets status
+  bit 10 for catalog preparation; the bypass branch records library-number
+  presence and counts distinct entries. Code at `0x09764` clears the bit before
+  the subsequent checked pass. Thus checksum rejection does not protect every
+  earlier header read. Both instrumented damaged runs still pass exact recovery,
+  catalog/stack, 24,000-element user-data and reservation-release checks. The
+  next startup obligation is bounding the unchecked header reads and catalog
+  preparation writes under torn metadata; this pass is not library configuration
+  execution. General startup safety and the production entry remain open.
+
 - **Local pre-callback Flash access (historical watchpoint):** native read watchpoints on both models
   observe the original ARM library scanner reading physical `0x140100`, inside
   the installation fixture's `0x140000` target sector, during warm startup.
