@@ -504,9 +504,19 @@ Current delivery checkpoints:
   The absolute-call oracle also checks the encoded target against the actual
   retained fixture object and preserves the original return opcode. This gives
   controlled native evidence for all three direct-call forms; it does not prove
-  arbitrary code provenance or hidden-address safety. Maintained native coverage
-  and complete execution coverage remain open; general relocation/reclamation
-  remains gated.
+  arbitrary code provenance or hidden-address safety. These cases are now part
+  of the maintained code-relocation verifier: the ordinary launcher starts a
+  test application that explicitly binds its own controlled continuation,
+  discovers its original return roots, creates the minimal Port 0 library through
+  the public API and grows the catalog using validated fixture reference repairs.
+  No patched platform copy or research snapshot is required. Each case starts
+  from the standard Stock suite's baseline and checks the independent RPL marker,
+  exact payload/absolute target, unchanged complete Flash and preservation of all
+  prior catalog IDs with exactly one new library 123 entry. Both fresh standard
+  Stock launches pass, followed by all 88 existing native cases and all three new
+  call cases on each model. ARM analysis and pinned C/Python formatting pass.
+  Opaque execution remains explicitly outside this controlled fixture's proof;
+  complete execution coverage and general relocation/reclamation remain gated.
 - **Post-recovery resource replacement (locally verified, submitted; CI pending):**
   after actual native recovery, Stock STO creates a new user string under the
   former reservation name. The native closure API rejects it before programming;

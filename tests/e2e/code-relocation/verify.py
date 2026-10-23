@@ -78,6 +78,11 @@ def verify(target, build, dist, state_root, output_root):
         f"PASS: {target}: ARM-side repair and {len(cases)} native reference/control cases",
         flush=True,
     )
+    from call_roots import verify_calls
+
+    verify_calls(
+        args, build, source, output / "call-roots", transfer=transfer, native_words=native_words
+    )
 
 
 def main():

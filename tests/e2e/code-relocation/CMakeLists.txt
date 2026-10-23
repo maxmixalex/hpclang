@@ -21,9 +21,11 @@ add_executable(hpclang_code_relocation_e2e
     ${HPCLANG_RUNTIME_EABI_SHIMS}
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
-    main.c "${CMAKE_CURRENT_BINARY_DIR}/cases.h")
+    main.c call-roots.c "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c"
+    "${CMAKE_CURRENT_BINARY_DIR}/cases.h")
 target_include_directories(hpclang_code_relocation_e2e PRIVATE
-    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core" "${CMAKE_CURRENT_BINARY_DIR}")
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core" "${CMAKE_CURRENT_BINARY_DIR}"
+    "${HPCLANG_ROOT}/platform/armtoolbox")
 target_compile_features(hpclang_code_relocation_e2e PRIVATE c_std_11)
 target_compile_options(hpclang_code_relocation_e2e PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
