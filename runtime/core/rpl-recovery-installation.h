@@ -79,6 +79,31 @@ int hpclang_rpl_recovery_installation_prepare_creation_in_place(
     const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *owned,
     uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim_slot);
 
+/* Prepare fresh transaction coordinates for an already registered inert root.
+ * The original source template and its identity/field offsets are trusted and
+ * stable. Reconstruct its fresh four-extent placement with only that candidate
+ * root virtually erased, then compare the entire resealed record and unique
+ * catalog binding against ACTUAL Flash. Other extents must still be erased;
+ * occupied slots, changed placement and existing transactions are not adopted.
+ * No writes, resource creation, release or restart-ownership authority. The
+ * exclusive mapping/catalog contract applies throughout. Source and staging
+ * cannot overlap; staging is disposable after failure. Coordinate outputs change
+ * only on success. This does not register a library or establish early startup. */
+int hpclang_rpl_recovery_installation_prepare_registered_creation(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    uint32_t identity_nibble, uint32_t claim_nibble,
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *staging,
+    uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim_slot);
+
+/* Same registered-root checks, reusing exactly layout->record as owned storage.
+ * Partial overlap and distinct buffers are rejected. The draft is disposable
+ * after failure; coordinate outputs still change only on complete success. */
+int hpclang_rpl_recovery_installation_prepare_registered_creation_in_place(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    uint32_t identity_nibble, uint32_t claim_nibble,
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *owned,
+    uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim_slot);
+
 /* Resolve a unique live library/catalog binding and compare its complete
  * content with the descriptor in the trusted executing admission image.
  * Read-only; no heap; output changes only on success (0). Other results use

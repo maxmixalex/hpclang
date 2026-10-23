@@ -422,7 +422,9 @@ def elf_symbols(elf: Path, nm: str) -> dict[str, int]:
     return symbols
 
 
-def recovery_layout(library, images, *, identity_offset=None, creation_offset=None):
+def recovery_layout(
+    library, images, *, identity_offset=None, creation_offset=None, reservation_offset=None
+):
     """Locate owned ELF descriptors through generated command links, never signatures.
 
     Nibble offsets include the native allocation's four-byte envelope. Consumers
@@ -456,6 +458,31 @@ def recovery_layout(library, images, *, identity_offset=None, creation_offset=No
         if len(expected) != 32 or data[descriptor : descriptor + 32] != expected:
             raise ValueError("Recovery descriptor does not match its generated command")
         layout[name + "_binding_nibble"] = 8 + descriptor
+        if name == "admission" and reservation_offset is not None:
+            if (
+                type(reservation_offset) is not int
+                or reservation_offset < 0
+                or reservation_offset % 4
+                or reservation_offset + 144 > len(initialized)
+            ):
+                raise ValueError("Reservation symbol is outside owned initialized storage")
+            reservation = initialized[reservation_offset : reservation_offset + 144]
+            capacity = int.from_bytes(reservation[8:12], "little")
+            length = int.from_bytes(reservation[12:16], "little")
+            encoded = reservation[16 : 16 + length]
+            if (
+                reservation[:8] != b"HPCRESV1"
+                or not 80 <= capacity <= (MAIN_RAM_NIBBLES - 10) // 2
+                or not 1 <= length <= 127
+                or any(byte < 33 or byte > 126 for byte in encoded)
+                or any(reservation[16 + length :])
+            ):
+                raise ValueError("Invalid bound recovery reservation descriptor")
+            reservation_at = start + source + 2 * reservation_offset
+            expected_reservation = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in reservation)
+            if data[reservation_at : reservation_at + 288] != expected_reservation:
+                raise ValueError("Reservation does not match its generated admission command")
+            layout["reservation"] = dict(name=encoded.decode("ascii"), bytes=capacity)
         if name == "admission" and creation_offset is not None:
             if (
                 type(creation_offset) is not int
@@ -491,6 +518,8 @@ def recovery_layout(library, images, *, identity_offset=None, creation_offset=No
             layout["identity_object_nibble"] = identity
     if identity_offset is not None and "identity_object_nibble" not in layout:
         raise ValueError("Recovery identity requires the owned admission image")
+    if reservation_offset is not None and "reservation" not in layout:
+        raise ValueError("Recovery reservation requires the owned admission image")
     return layout
 
 
@@ -815,6 +844,7 @@ def main() -> None:
             ),
             identity_offset=identity_offset,
             creation_offset=creation_offset,
+            reservation_offset=admission_symbols.get("hpclang_recovery_reservation"),
         )
         if identity_offset is not None:
             result = seal_recovery_identity(result, layout["identity_object_nibble"])

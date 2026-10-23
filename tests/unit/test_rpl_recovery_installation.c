@@ -616,6 +616,98 @@ static void in_place_creation_tests(const struct hpclang_rpl_flash_io *io,
     fail_address = UINT32_MAX;
 }
 
+static void registered_creation_tests(const struct hpclang_rpl_flash_io *io,
+                                      const struct hpclang_rpl_flash_catalog *catalog)
+{
+    const uint32_t root = FIRST + 0x20105;
+    const uint32_t journal = root + sizeof creation_expected;
+    const uint32_t authority = journal + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES;
+    const uint32_t claim = authority + HPCLANG_RPL_FLASH_AUTHORITY_BYTES;
+    const struct hpclang_rpl_flash_recovery_space sentinel = {1, 2, 3};
+    for (unsigned scenario = 0; scenario < 22; ++scenario) {
+        install(0, 1);
+        memset(flash + 0x20105, 255, 0x20000 - 0x105);
+        memcpy(flash + root - FIRST, creation_expected, sizeof creation_expected);
+        word(126, 0x40000 + 2 * (0x105 + 4) + 14 + 2 * creation_expected[9], 5);
+        uint8_t source[sizeof creation_original], saved_source[sizeof source];
+        uint8_t staging[sizeof source + 16], saved_catalog[sizeof catalog_data];
+        memcpy(source, creation_original, sizeof source);
+        memset(staging, 0xa5, sizeof staging);
+        if (scenario == 1)
+            word(120, 0, 3);
+        if (scenario == 2)
+            word(131, 0, 5);
+        if (scenario == 3)
+            flash[root - FIRST + 30] ^= 1;
+        if (scenario == 4)
+            flash[journal - FIRST] = 0;
+        if (scenario == 5)
+            flash[authority - FIRST + 4] = 0;
+        if (scenario == 6 || scenario == 21)
+            flash[claim - FIRST + 16] = 0;
+        if (scenario == 7)
+            flash[sizeof flash - 1] = 0;
+        if (scenario == 8)
+            source[30] ^= 1;
+        if (scenario == 12)
+            fail_address = root & ~1u;
+        if (scenario == 13) {
+            flash[journal - FIRST] = 0;
+            flash[journal - FIRST + 1] = 14;
+            flash[journal - FIRST + 2] = flash[journal - FIRST + 3] = 0;
+        }
+        if (scenario == 14) {
+            memcpy(flash + 0x40105, creation_expected, sizeof creation_expected);
+            memset(flash + 0x20105, 255, sizeof creation_expected);
+            word(131, 0x12345 + 10 * 10, 5);
+        }
+        if (scenario == 15) {
+            word(120, 2, 3);
+            memcpy(catalog_data + 139, catalog_data + 123, 16);
+        }
+        if (scenario == 16)
+            fail_after_staging = staging;
+        if (scenario == 17)
+            fail_address = END - 2;
+        memcpy(saved_source, source, sizeof source);
+        memcpy(saved_catalog, catalog_data, sizeof catalog_data);
+        memcpy(before, flash, sizeof flash);
+        const struct hpclang_rpl_flash_recovery_layout layout = {source, sizeof source,
+                                                                 creation_recovery_binding_nibble,
+                                                                 creation_admission_binding_nibble};
+        struct hpclang_rpl_flash_recovery_space space = sentinel;
+        uint32_t selected_claim = UINT32_MAX;
+        int result = scenario >= 18
+                         ? hpclang_rpl_recovery_installation_prepare_registered_creation_in_place(
+                               io, &layout, creation_identity_object_nibble,
+                               creation_admission_creation_nibble, catalog, FIRST,
+                               scenario == 19   ? staging
+                               : scenario == 20 ? source + 1
+                                                : source,
+                               sizeof source, &space, &selected_claim)
+                         : hpclang_rpl_recovery_installation_prepare_registered_creation(
+                               io, &layout, creation_identity_object_nibble,
+                               creation_admission_creation_nibble, catalog, FIRST,
+                               scenario == 10 ? source : staging, sizeof source - (scenario == 9),
+                               &space, scenario == 11 ? NULL : &selected_claim);
+        fail_after_staging = NULL;
+        if (!scenario || scenario == 18) {
+            assert(!result && space.library_slot == root && space.journal_slot == journal &&
+                   space.authority_slot == authority && selected_claim == claim);
+            assert(!memcmp(scenario == 18 ? source : staging, creation_expected,
+                           sizeof creation_expected));
+        } else {
+            assert(result < 0 && !memcmp(&space, &sentinel, sizeof space));
+            assert(selected_claim == UINT32_MAX);
+        }
+        for (unsigned i = sizeof source; i < sizeof staging; ++i)
+            assert(staging[i] == 0xa5);
+        assert(!memcmp(source, scenario == 18 ? creation_expected : saved_source, sizeof source));
+        assert(!memcmp(catalog_data, saved_catalog, sizeof catalog_data));
+        assert(!memcmp(flash, before, sizeof flash));
+    }
+}
+
 static void selected_creation_tests(const struct hpclang_rpl_flash_io *source)
 {
     struct hpclang_rpl_flash_io io = *source;
@@ -1203,6 +1295,7 @@ int main(void)
     creation_publication_tests(&io);
     creation_preparation_tests(&io, &catalog);
     in_place_creation_tests(&io, &catalog);
+    registered_creation_tests(&io, &catalog);
     placement_tests(&io, &catalog);
     space_tests(&io);
     creation_space_tests(&io);

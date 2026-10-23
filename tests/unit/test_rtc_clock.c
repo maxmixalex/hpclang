@@ -3,6 +3,28 @@
 
 int main(void)
 {
+    /* Saved process time is unrelated to the next process's timer origin. */
+    struct hpclang_datetime saved = {2026, 10, 23, 12, 34, 56};
+    struct hpclang_rtc_clock resumed;
+    uint8_t sample[7];
+    hpclang_rtc_clock_init(&resumed, &saved, 90000000);
+    assert(hpclang_rtc_clock_resume(&resumed, 250000, 100));
+    hpclang_rtc_clock_read(&resumed, 750099, sample);
+    assert(sample[0] == 0x56);
+    hpclang_rtc_clock_read(&resumed, 750100, sample);
+    assert(sample[0] == 0x57);
+    int64_t anchor = resumed.anchor_us;
+    assert(!hpclang_rtc_clock_resume(&resumed, 1000000, 100));
+    assert(!hpclang_rtc_clock_resume(&resumed, 0, -1));
+    assert(resumed.anchor_us == anchor);
+    hpclang_rtc_clock_stop(&resumed, 1, 750100);
+    anchor = resumed.anchor_us;
+    assert(!hpclang_rtc_clock_resume(&resumed, 1, 0));
+    assert(resumed.anchor_us == anchor);
+    assert(hpclang_rtc_clock_resume(&resumed, 0, 0));
+    hpclang_rtc_clock_read(&resumed, 90000000, sample);
+    assert(sample[0] == 0x57 && resumed.stopped);
+
     for (unsigned selector = 0; selector < 128; ++selector) {
         unsigned remainder = 127;
         uint64_t deadline = 0;

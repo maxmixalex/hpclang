@@ -53,6 +53,7 @@ def generate(library_path, layout_path, output):
     span = 5 + int(data[5:10][::-1], 16)
     at = layout["identity_object_nibble"]
     identity = bytes(int(data[i : i + 2][::-1], 16) for i in range(at, at + 96, 2))
+    name = layout["reservation"]["name"].encode("ascii")
     output.write_text(
         "/* Generated from the actual recovery/admission build. */\n#include <stdint.h>\n"
         + f"_Alignas(4) uint8_t expected_library[{len(record)}];\n"
@@ -64,6 +65,12 @@ def generate(library_path, layout_path, output):
         + ",".join(map(str, identity))
         + "};\n"
         + f"const uint32_t preparation_bytes = {len(record)}u, template_span = {span}u;\n"
+        + f"const uint32_t template_library_id = {layout['library_id']}u;\n"
+        + "const uint8_t template_reservation_name[] = {"
+        + ",".join(map(str, name))
+        + "};\n"
+        + f"const uint32_t template_reservation_name_length = {len(name)}u;\n"
+        + f"const uint32_t template_reservation_bytes = {layout['reservation']['bytes']}u;\n"
         + f"const uint32_t template_recovery_binding = {layout['recovery_binding_nibble']}u;\n"
         + f"const uint32_t template_admission_binding = {layout['admission_binding_nibble']}u;\n"
         + f"const uint32_t template_identity = {at}u;\n"
@@ -205,7 +212,11 @@ def verify_creation_template(args, before, prepared, library, layout, *, verify_
     print("Real claim-bound template matches independent four-extent draft", flush=True)
 
 
-def run_creation_name_collision(args, before, root, library, *, transfer, verify_busy_reads):
+def run_creation_name_collision(
+    args, before, root, library, layout, *, transfer, verify_busy_reads
+):
+    name = layout["reservation"]["name"]
+    require(name.isascii() and name.isidentifier(), "Collision fixture requires an identifier")
     phase = root / "creation-name-collision"
     image = "installation-template-creation-store"
     transfer(
@@ -216,19 +227,20 @@ def run_creation_name_collision(args, before, root, library, *, transfer, verify
         "CLAIMCOLLIDE",
         package_name=image + ".hp",
         remote_commands=[
-            "-95 CF HOME CLEAR \"existing user data\" 'HPCLEASE' STO",
+            f"-95 CF HOME CLEAR \"existing user data\" '{name}' STO",
             "'CLAIMCOLLIDE' RCL 'CLAIMCOLLIDE' PURGE",
         ],
     )
     verify_creation_name_collision(
-        args, before, phase, library, verify_busy_reads=verify_busy_reads
+        args, before, phase, library, layout, verify_busy_reads=verify_busy_reads
     )
 
 
-def verify_creation_name_collision(args, before, phase, library, *, verify_busy_reads):
+def verify_creation_name_collision(args, before, phase, library, layout, *, verify_busy_reads):
     verify_creation_rejection(args, before, phase, library, -6, verify_busy_reads=verify_busy_reads)
     require(
-        home_string(reader(phase / "state"), b"HPCLEASE") == b"existing user data",
+        home_string(reader(phase / "state"), layout["reservation"]["name"].encode("ascii"))
+        == b"existing user data",
         "Name collision changed the user's variable",
     )
     print("Real installation rejects a pre-existing resource name before Flash writes", flush=True)
@@ -268,7 +280,7 @@ def run_creation_storage(
 
     verify_source(before, library)
     run_creation_name_collision(
-        args, before, root, library, transfer=transfer, verify_busy_reads=verify_busy_reads
+        args, before, root, library, layout, transfer=transfer, verify_busy_reads=verify_busy_reads
     )
     root = root / "creation-storage"
     root.mkdir()
@@ -280,7 +292,7 @@ def run_creation_storage(
     )
     from reservation import require_absent
 
-    require_absent(reader(unsafe / "state"), b"HPCLEASE")
+    require_absent(reader(unsafe / "state"), layout["reservation"]["name"].encode("ascii"))
     print("Movable USEROB execution rejected before Flash publication", flush=True)
     stored = root / "stored"
     transfer(
@@ -324,8 +336,8 @@ def run_creation_storage(
     )
     verify_source(restart / "state", library)
     require(
-        home_string(reader(restart / "state"), b"HPCLEASE")
-        == home_string(reader(stored / "state"), b"HPCLEASE"),
+        home_string(reader(restart / "state"), layout["reservation"]["name"].encode("ascii"))
+        == home_string(reader(stored / "state"), layout["reservation"]["name"].encode("ascii")),
         "Restart changed the created recovery resource",
     )
     print("Claim-bound root and staged transaction survive Stock restart unchanged", flush=True)
@@ -386,7 +398,7 @@ def run_creation_cleanup(
         library_id=layout["library_id"],
     )
     verify_source(restart / "state", library)
-    require_absent(reader(restart / "state"), b"HPCLEASE")
+    require_absent(reader(restart / "state"), layout["reservation"]["name"].encode("ascii"))
     require(
         verify_busy_reads(args, restart) == 0,
         "Closed installation wrote Flash after reset",
@@ -396,6 +408,500 @@ def run_creation_cleanup(
         flush=True,
     )
     return {"slot": slot, "operations": operations}
+
+
+def run_creation_registration(
+    args, before, root, library, layout, *, transfer, emulator, completed, verify_busy_reads
+):
+    """Register the inert claim-bound root before creating transaction resources."""
+    from reservation import require_absent
+    from store import restart_storage, verify_storage
+
+    verify_source(before, library)
+    root = root / "creation-registration"
+    root.mkdir()
+    stored = root / "stored"
+    image = "installation-template-creation-root-store"
+    transfer(
+        args,
+        stored,
+        before,
+        args.build,
+        "ROOTSTORE",
+        package_name=image + ".hp",
+        consume=True,
+        execution_ms=60000,
+    )
+    slot, rebound, operations = verify_storage(
+        before,
+        stored / "state",
+        args.build,
+        args.nm,
+        make_fixture=partial(fixture, library, layout),
+        image=image,
+    )
+    verify_source(stored / "state", library)
+    require_absent(reader(stored / "state"), b"ROOTSTORE")
+    require_absent(reader(stored / "state"), layout["reservation"]["name"].encode("ascii"))
+    require(
+        verify_busy_reads(args, stored) == operations, "Root registration bypassed Flash polling"
+    )
+    restart = root / "restart"
+    restart_storage(
+        args,
+        stored,
+        restart,
+        rebound,
+        slot,
+        emulator=emulator,
+        completed=completed,
+        library_id=layout["library_id"],
+    )
+    verify_source(restart / "state", library)
+    require_absent(reader(restart / "state"), layout["reservation"]["name"].encode("ascii"))
+    require(verify_busy_reads(args, restart) == 0, "Inert root published a transaction after reset")
+    print(
+        "Claim-bound root registered before resource creation or transaction publication",
+        flush=True,
+    )
+    return {"slot": slot, "operations": operations}
+
+
+def run_registered_reuse(args, before, root, library, layout, *, transfer, verify_busy_reads):
+    from installation import verify_probe
+    from reservation import require_absent
+
+    image = "installation-template-creation-registered-store"
+    rejected = root / "registered-reuse-rejected"
+    transfer(
+        args, rejected, before, args.build, "REGRETRY", package_name=image + ".hp", consume=True
+    )
+    base = verify_probe(
+        before, rejected / "state", args.build, args.nm, -4, 0xFFFFFFFF, image=image
+    )
+    symbols = symbol_offsets(args.build / (image + ".elf"), args.nm)
+    ram = (rejected / "state/sram").read_bytes()
+    for name, words in (
+        ("storage_result", 2),
+        ("storage_stage_result", 6),
+        ("storage_cleanup_result", 6),
+    ):
+        require(
+            struct.unpack_from(f"<{words}I", ram, base + symbols[name]) == (0,) * words,
+            "Closed installation entered fresh transaction writes",
+        )
+    require(verify_busy_reads(args, rejected) == 0, "Closed installation reuse programmed Flash")
+    require_absent(reader(rejected / "state"), layout["reservation"]["name"].encode("ascii"))
+    verify_source(rejected / "state", library)
+    print(
+        "Closed registered installation rejected as a fresh transaction without writes", flush=True
+    )
+
+
+def run_registered_creation(
+    args, before, root, library, layout, slot, *, transfer, emulator, completed, verify_busy_reads
+):
+    from reservation import require_absent
+    from store import restart_storage, verify_storage
+
+    verify_source(before, library)
+    root = root / "registered-creation"
+    root.mkdir()
+    image = "installation-template-creation-registered-store"
+    stored = root / "stored"
+    transfer(
+        args,
+        stored,
+        before,
+        args.build,
+        "REGCREATE",
+        package_name=image + ".hp",
+        consume=True,
+        execution_ms=60000,
+    )
+    matched, rebound, operations = verify_storage(
+        before,
+        stored / "state",
+        args.build,
+        args.nm,
+        make_fixture=partial(fixture, library, layout),
+        image=image,
+        staged=True,
+        closed=True,
+        existing_slot=slot,
+    )
+    require(matched == slot, "Fresh transaction replaced its registered root")
+    verify_source(stored / "state", library)
+    require_absent(reader(stored / "state"), b"REGCREATE")
+    require(
+        verify_busy_reads(args, stored) == operations, "Registered creation bypassed Flash polling"
+    )
+    restart = root / "restart"
+    restart_storage(
+        args,
+        stored,
+        restart,
+        rebound,
+        slot,
+        emulator=emulator,
+        completed=completed,
+        library_id=layout["library_id"],
+    )
+    verify_source(restart / "state", library)
+    require_absent(reader(restart / "state"), layout["reservation"]["name"].encode("ascii"))
+    require(verify_busy_reads(args, restart) == 0, "Closed registered creation wrote after reset")
+    run_registered_reuse(
+        args,
+        restart / "state",
+        root,
+        library,
+        layout,
+        transfer=transfer,
+        verify_busy_reads=verify_busy_reads,
+    )
+    print(
+        "Registered root admits fresh creation and preserves complete cancellation across restart",
+        flush=True,
+    )
+    return {"slot": slot, "operations": operations}
+
+
+def run_activation_cuts(
+    args,
+    before,
+    reference,
+    root,
+    library,
+    layout,
+    journal,
+    authority,
+    operations,
+    *,
+    transfer,
+    emulator,
+    completed,
+    verify_busy_reads,
+):
+    """Cut the actual activation write before/after its sole changing bit lands."""
+    import re
+    import shutil
+    from reservation import require_absent
+    from verify import verify_flash, verify_restart
+
+    expected = (reference / "flash").read_bytes()
+    name = layout["reservation"]["name"].encode("ascii")
+    resource = home_string(reader(reference), name)
+    address = authority & ~1
+    value = int.from_bytes(expected[address : address + 2], "little")
+    bit = 1 << (8 * (authority & 1))
+    require(expected[authority] == 0x7E, "Reference transaction is not armed")
+    results = {}
+    for committed in (False, True):
+        label = "activation-cut-" + ("committed" if committed else "uncommitted")
+        cut = root / label
+        mask = bit if committed else 0
+        transfer(
+            args,
+            cut,
+            before,
+            args.build,
+            "REGCUT",
+            consume=True,
+            package_name="installation-template-creation-active-store.hp",
+            power_cut=(operations, 1, mask),
+        )
+        events = re.findall(
+            r"^hpclang-flash-cut operation=(\d+) address=(\d+) bytes=(\d+) "
+            r"value=(\d+) mask=(\d+) reads=(\d+)$",
+            (cut / "emulator.log").read_text(),
+            re.M,
+        )
+        require(
+            len(events) == 1
+            and tuple(map(int, events[0])) == (operations, address, 2, value, mask, 1),
+            "Power cut missed the native activation write",
+        )
+        torn = bytearray(expected)
+        if not committed:
+            torn[authority] = 0x7F
+        require(
+            (cut / "state/flash").read_bytes() == torn,
+            "Activation cut changed unrelated Flash or native-created records",
+        )
+        require(
+            home_string(reader(cut / "state"), name) == resource,
+            "Activation cut lost its native-created resource",
+        )
+        previous = cut / "state"
+        count = 0
+        for repeat in range(2):
+            phase = root / f"{label}-restart-{repeat}"
+            shutil.copytree(previous, phase / "state")
+            with emulator(
+                args,
+                phase,
+                "10000 capture home\n12000 finish-install\n",
+                ["--reset"],
+                flash_busy=True,
+                reset_checkpoint=True,
+            ) as child:
+                completed(child, 90)
+            state = phase / "state"
+            observed = verify_busy_reads(args, phase)
+            if committed and not repeat:
+                verify_flash(
+                    bytes(torn),
+                    (state / "flash").read_bytes(),
+                    journal,
+                    0x140000,
+                    retire=True,
+                    authority_slot=authority,
+                )
+                require(observed > 0, "Committed activation did not retire its transaction")
+                count = observed
+            else:
+                require(
+                    (state / "flash").read_bytes() == (previous / "flash").read_bytes(),
+                    "Unarmed or already recovered activation changed Flash",
+                )
+                require(observed == 0, "Unarmed or recovered transaction wrote on reset")
+            verify_restart(before, state, state)
+            verify_source(state, library)
+            if committed:
+                require_absent(reader(state), name)
+            else:
+                require(
+                    home_string(reader(state), name) == resource,
+                    "Uncommitted activation released its resource",
+                )
+            previous = state
+        results[label] = count
+    print(
+        "Activation power cuts distinguish committed authority without adopting unarmed resources",
+        flush=True,
+    )
+    return results
+
+
+def run_activation_ram_loss(
+    args, before, fault, root, layout, journal, authority, *, emulator, completed, verify_busy_reads
+):
+    """Recover the native-created Flash transaction with no installation RAM."""
+    import shutil
+    from prepare import clear_ram_images
+    from reservation import require_absent
+    from verify import require_stock_pc, verify_flash, verify_restart
+
+    previous = fault
+    operations = 0
+    for repeat in range(2):
+        phase = root / f"activation-ram-loss-{repeat}"
+        shutil.copytree(previous, phase / "state")
+        sequence = "10000 capture home\n12000 finish-install\n"
+        if not repeat:
+            clear_ram_images(phase / "state")
+            # Decline Stock's RAM recovery prompt: the Flash installation alone
+            # must supply its code, identity, claim and authoritative capsule.
+            sequence = "20000 tap f6\n40000 tap f6\n60000 capture home\n62000 finish-install\n"
+        with emulator(
+            args, phase, sequence, ["--reset"], flash_busy=True, reset_checkpoint=True
+        ) as child:
+            completed(child, 90)
+        state = phase / "state"
+        require_stock_pc(state)
+        observed = verify_busy_reads(args, phase)
+        if not repeat:
+            verify_flash(
+                (fault / "flash").read_bytes(),
+                (state / "flash").read_bytes(),
+                journal,
+                0x140000,
+                retire=True,
+                authority_slot=authority,
+            )
+            require(observed > 0, "RAM-loss recovery did not restore its transaction")
+            operations = observed
+        else:
+            require(
+                (state / "flash").read_bytes() == (previous / "flash").read_bytes(),
+                "RAM-loss recovery changed Flash on its second reset",
+            )
+            require(observed == 0, "RAM-loss recovery repeated Flash writes")
+        verify_restart(before, state, state)
+        require_absent(reader(state), layout["reservation"]["name"].encode("ascii"))
+        require_absent(reader(state), b"HPCTEMPLATE")
+        previous = state
+    print("Native-created recovery survives complete loss of installation RAM", flush=True)
+    return operations
+
+
+def run_registered_activation(
+    args, before, root, library, layout, slot, *, transfer, emulator, completed, verify_busy_reads
+):
+    """Arm a freshly created real transaction, then interrupt its target sector.
+
+    Only target damage is injected: root, journal, authority, claim and RAM
+    reservation must all come from the native installer. This isolated reset
+    fixture does not prove ordering before arbitrary user startup libraries.
+    """
+    import shutil
+    from reservation import require_absent
+    from store import verify_storage
+    from verify import verify_flash, verify_restart, verify_retired
+
+    root = root / "registered-activation"
+    root.mkdir()
+    stored = root / "stored"
+    image = "installation-template-creation-active-store"
+    transfer(
+        args, stored, before, args.build, "REGACTIVE", package_name=image + ".hp", consume=True
+    )
+    _, rebound, operations = verify_storage(
+        before,
+        stored / "state",
+        args.build,
+        args.nm,
+        make_fixture=partial(fixture, library, layout),
+        image=image,
+        staged=True,
+        existing_slot=slot,
+        active=True,
+    )
+    require(verify_busy_reads(args, stored) == operations, "Activation bypassed Flash polling")
+    require_absent(reader(stored / "state"), b"REGACTIVE")
+    verify_source(stored / "state", library)
+    obj = nibbles(rebound[8:])
+    at = layout["recovery_binding_nibble"] - 8
+    journal = int(obj[at + 16 : at + 24][::-1], 16)
+    authority = int(obj[at + 24 : at + 32][::-1], 16)
+    target = 0x140000
+    fault = root / "fault"
+    shutil.copytree(stored / "state", fault)
+    flash = bytearray((fault / "flash").read_bytes())
+    require(flash[target : target + 4096] != b"\xff" * 4096, "Target is already erased")
+    flash[target : target + 4096] = b"\xff" * 4096
+    (fault / "flash").write_bytes(flash)
+
+    def boot(source, label):
+        phase = root / label
+        phase.mkdir()
+        shutil.copytree(source, phase / "state")
+        with emulator(
+            args,
+            phase,
+            "10000 capture home\n12000 finish-install\n",
+            ["--reset"],
+            flash_busy=True,
+            reset_checkpoint=True,
+        ) as child:
+            completed(child, 90)
+        return phase / "state"
+
+    repaired = boot(fault, "recovered")
+    verify_flash(
+        bytes(flash),
+        (repaired / "flash").read_bytes(),
+        journal,
+        target,
+        retire=True,
+        authority_slot=authority,
+    )
+    verify_restart(before, repaired, repaired)
+    recovery_operations = verify_busy_reads(args, root / "recovered")
+    require(recovery_operations > 0, "Activated recovery did not use the Flash driver")
+    repeated = boot(repaired, "repeated")
+    verify_restart(before, repaired, repeated)
+    verify_retired(
+        (repaired / "flash").read_bytes(),
+        (repeated / "flash").read_bytes(),
+        journal,
+        target,
+        authority_slot=authority,
+    )
+    require(verify_busy_reads(args, root / "repeated") == 0, "Closed recovery repeated writes")
+    for state in (repaired, repeated):
+        verify_source(state, library)
+        require_absent(reader(state), layout["reservation"]["name"].encode("ascii"))
+    print("Native-created registered transaction recovered through its installed guard", flush=True)
+    cuts = run_activation_cuts(
+        args,
+        before,
+        stored / "state",
+        root,
+        library,
+        layout,
+        journal,
+        authority,
+        operations,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    ram_loss = run_activation_ram_loss(
+        args,
+        before,
+        fault,
+        root,
+        layout,
+        journal,
+        authority,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    return {
+        "operations": operations,
+        "recovery_operations": recovery_operations,
+        "cuts": cuts,
+        "ram_loss_operations": ram_loss,
+    }
+
+
+def run_registration(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
+    claim_before, claim_library, claim_layout = run_creation_template(
+        args, clean, root, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
+    registration = run_creation_registration(
+        args,
+        claim_before,
+        root,
+        claim_library,
+        claim_layout,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    registered_creation = run_registered_creation(
+        args,
+        root / "creation-registration/restart/state",
+        root,
+        claim_library,
+        claim_layout,
+        registration["slot"],
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    activation = run_registered_activation(
+        args,
+        root / "creation-registration/restart/state",
+        root,
+        claim_library,
+        claim_layout,
+        registration["slot"],
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    return {
+        "registration": registration,
+        "registered_creation": registered_creation,
+        "activation": activation,
+    }
 
 
 def run_creation(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
@@ -425,7 +931,10 @@ def run_creation(args, clean, root, *, transfer, emulator, completed, verify_bus
         completed=completed,
         verify_busy_reads=verify_busy_reads,
     )
-    return {"creation_storage": claim_storage, "creation_cleanup": claim_cleanup}
+    return {
+        "creation_storage": claim_storage,
+        "creation_cleanup": claim_cleanup,
+    }
 
 
 def run_template(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):

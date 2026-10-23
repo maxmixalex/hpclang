@@ -304,8 +304,9 @@ def configuration_recovery(args, clean):
         shutil.copytree(source, phase / "state")
         sequence = "10000 capture home\n12000 finish-install\n"
         if clear_ram:
-            ram = phase / "state/sram"
-            ram.write_bytes(bytes(ram.stat().st_size))
+            from prepare import clear_ram_images
+
+            clear_ram_images(phase / "state")
             # Stock asks whether to recover memory after RAM loss. Decline it;
             # recovery must come from the installed Flash library alone.
             sequence = "20000 tap f6\n40000 tap f6\n60000 capture home\n62000 finish-install\n"
@@ -515,10 +516,15 @@ def run(args):
         )
         return
 
-    if args.suite in ("template", "creation"):
-        from template import run_creation, run_template
+    if args.suite in ("template", "creation", "registration"):
+        from template import run_creation, run_registration, run_template
 
-        result = (run_creation if args.suite == "creation" else run_template)(
+        suites = {
+            "creation": run_creation,
+            "template": run_template,
+            "registration": run_registration,
+        }
+        result = suites[args.suite](
             args,
             clean / "state",
             args.output,
@@ -772,7 +778,15 @@ def main():
     parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument(
         "--suite",
-        choices=("recovery", "installation", "identity", "template", "creation", "publication"),
+        choices=(
+            "recovery",
+            "installation",
+            "identity",
+            "template",
+            "creation",
+            "publication",
+            "registration",
+        ),
         default="recovery",
     )
     parser.add_argument("--dist", type=Path, required=True, help="portable x50ng distribution")

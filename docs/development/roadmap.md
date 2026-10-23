@@ -428,15 +428,21 @@ post-M8 deferral. Only M8.1 is accepted complete.
 Current batch through `92acb946` includes retryable claim closure, native combined
 cancellation, unregistered-root pair cancellation, complete real-root cleanup,
 RAM-bounded CODE packaging, independent acceptance suites and one-shot installer
-release. Local acceptance is complete below; CI acceptance remains pending.
+release. Submitted head `59e3b88b` passes Quality 39894707699, Core runtime
+39894707696 (including all twelve Stock suite jobs), Objects 39894707697 and
+Runtime 39894707705. PR #5 merges that batch into main as `9b33e772`.
+Local registered-lifecycle follow-up `a2a13331` and activation-cut work are not
+included in that merge; their acceptance remains separate below. New main CI
+is not polled. M8.0 remains open.
 
 Previous CI submission: `af3e2a2e` includes the five implementation commits since
 `50eadbea`, including the missing creation-layout CI artifact fix. Local acceptance
 is recorded below. A later check finds Quality 39886905107, Objects 39886905191
 and Runtime 39886905212 successful. Core 39886905229 completes its unit/package,
 identity and recovery jobs, but both installation jobs are cancelled at the
-30-minute job limit while progressing through the combined suite. CI acceptance
-and M8.0 remain open. The local runner now separates installation, publication,
+30-minute job limit while progressing through the combined suite. That earlier
+submission was not accepted; its split-suite successor is accepted above.
+The runner now separates installation, publication,
 real-template and resource-creation suites into independent clean-boot jobs with all existing
 checks retained. The complete HP50g creation suite passes from a fresh boot
 (about 11 minutes). The original combined installation/publication run also
@@ -460,6 +466,107 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
+- **Native-created transaction with complete RAM loss (locally verified):**
+  added a registration-path check that clears SRAM before resetting the actual
+  installed/armed transaction, then declines Stock memory recovery. Initially both
+  models fail: Flash remains unchanged, busy operation count is zero, captures
+  are blank and the native Saturn mapping is unavailable. Retained-RAM recovery
+  and activation-cut checks still pass. Clean-Stock and inert-registered-root
+  cold-start controls both pass (61/62 catalog entries, zero writes). The armed
+  intact-target control and a damaged-target control preserving its bank header
+  both still fail at ROM PC 0x1dcd8 with zero writes, so erased target metadata
+  alone does not explain the failure. Transplanting the same transaction Flash
+  into the HP50g inert-root hardware snapshot passes both armed (two retirement writes)
+  and unarmed (zero writes) cold starts. x50ng preserves a separate 4 KiB on-chip
+  SRAM image across reset; the old RAM-loss setup cleared only external SRAM.
+  Shared injection now clears both images and rejects incomplete snapshots before
+  mutation; its 16 focused tests and Ruff pass. Clearing both alone lets HP50g
+  recover the damaged sector (1,923 writes, unchanged repeat), but HP49g+ still
+  fails before recovery. Neither USB/GPIO nor clock/timer/interrupt state alone
+  fixes HP49g+ in corrected case-preserving controls. Initial grouped controls
+  changed case-sensitive state keys and are invalid evidence. ROM disassembly
+  identifies the stop as waiting for a RAM readiness sentinel before copying
+  native state. HP49g+ whole-snapshot replacement passes; internal-SRAM-only
+  replacement fails. Replacing only RTC state passes full damaged-sector repair
+  (1,923 operations and unchanged repeat). The RTC loader restores an absolute
+  timer anchor from the previous process, although the new execution clock starts
+  at a different origin. The fix stores a within-second phase in version 2 and
+  rebases it on load; version 1 retains its committed calendar with phase zero.
+  Resume/stopped-clock/invalid-phase sanitizer tests and a CI-option emulator
+  build pass. Both original failing snapshots now pass without transplanting
+  device state or extending the timeout: 1,923 recovery writes, no resource/source
+  surviving RAM loss, rebuilt catalog and zero writes on the second reset.
+  Both output snapshots use valid version-2 fractional phases with obsolete
+  absolute anchors removed. Pinned formatting and Ruff pass. Complete fresh
+  registration suites, including activation cuts and RAM loss, now pass on both
+  models with the fixed emulator: HP50g 942.2 seconds, HP49g+ 949.6 seconds.
+  Each records 25,429 root-storage operations, 2,082 creation/cancellation
+  operations, 2,077 activation operations and 1,923 damaged-sector recovery
+  operations. Uncommitted/committed activation cuts require zero/two recovery
+  writes; complete RAM loss requires 1,923, and repeated resets require zero.
+  Both process exits and result files confirm success. This is local acceptance;
+  CI acceptance remains pending. General startup ordering and transaction
+  reclamation remain open.
+- **Complete registered integration (locally verified):** both fresh-boot
+  registration suites through `a2a13331` pass, taking 665/673 seconds on
+  HP50g/HP49g+ respectively. Activation-cut coverage passes separately as below.
+  Both full creation regression suites also pass (646/661 seconds). Later
+  RAM-loss coverage is not included in those passing registration results.
+- **Activation interruption boundary (locally verified, not submitted):** the
+  registration suite now cuts the actual final authority write before or after
+  its single changing phase bit reaches Flash. The oracle checks the exact
+  operation/address/value/mask/read event and the complete Flash image against
+  native-created records. Both reset paths retain the original template/catalog;
+  an uncommitted authority must preserve its resource without writes, while a
+  committed authority must recover/retire and release it. Both paths repeat reset
+  to check stability. HP49g+ and HP50g both pass: the uncommitted case makes zero
+  writes and retains the resource; the committed case retires the already intact
+  target transaction with two writes and releases the resource. Both second
+  resets make zero writes. These runs are separate from the completed
+  pre-cut registration/creation suites recorded above. This does not
+  reconstruct ownership of an interrupted unarmed resource or reclaim its claim.
+- **Registered creation/configuration integration (local, not submitted):** the
+  new preparation APIs require the exact registered root and reconstruct its
+  fresh four-extent plan before permitting a transaction. Focused and full host
+  sanitizer tests and ARM analysis/build pass. Both models pass registered
+  creation, staged admission, owned cancellation and unchanged restart, with
+  2,082 Flash operations each. Integration review then found that these creation
+  witnesses used HPCLEASE while the real admission descriptor uses HPCRES.
+  Those results do not establish automatic recovery through that descriptor.
+  The packager now exports name/capacity from the actual linked descriptor;
+  native generation, creation and the independent oracle consume that metadata.
+  Invalid or mismatched descriptors are rejected, and unsupported witness
+  capacity is rejected before root writes. Five template tests, including an
+  alternate name/capacity, all 91 recovery/package Python tests, Ruff, ARM packaging,
+  pinned formatting and strict docs pass. Fresh two-model flows with aligned
+  configuration pass creation/cancellation/restart (2,082 operations each),
+  followed by rejection of closed-transaction reuse with zero writes.
+  A new registered activation witness checks the original fresh resource
+  receipt after staged admission, arms the real authority and verifies an
+  idempotent repeat. Its reset test injects only target-sector damage; all
+  recovery records and the RAM resource must come from native installation.
+  ARM packaging passes. Both HP49g+ and HP50g native activation/recovery runs
+  pass: 2,077 operations create/arm the transaction, 1,923 restore the damaged
+  sector through the installed guard, and the second reset makes zero writes.
+  Complete Flash comparisons retain the root and claim; the reservation is
+  released and the original source template/catalog survive both resets.
+  A separate registration suite retains these growing integration cases without
+  extending the existing creation job. Complete fresh-boot registration and
+  creation suites through this checkpoint passed on both models, as recorded
+  above; the expanded registration suite also passes as recorded above. This proves
+  the isolated native-created recovery path, not arbitrary startup ordering,
+  claim reclamation or general reconstruction of ownership after interruption.
+  Those remaining gates and M8.0 stay open.
+- **Registration before resource creation (locally verified):** an
+  explicit claim-bound root-only installer uses the existing four-extent plan
+  and writes only the recovery library. The maintained creation suite verifies
+  complete Flash against that root alone, keeps journal/authority/claim extents
+  erased, checks the absence of a resource and consumed installer binding, then
+  requires Stock to register the unchanged root after reset without Flash writes.
+  ARM packaging and formatting pass; HP49g+ and HP50g native runs pass,
+  with 25,429 Flash operations each and zero additional writes on restart.
+  This establishes an inert registration boundary for the next fresh transaction;
+  transaction continuation, post-reset ownership and early startup remain open.
 - **Real-root cleanup integration (locally verified; CI acceptance pending):**
   the maintained installer now cancels its same-owned staged pair, discards the
   original fresh RAM reservation and closes/repeats its creation claim. The new
@@ -487,7 +594,7 @@ Current delivery checkpoints:
   and focused ASan/UBSan pass, including every read cut, all status bytes and
   partial/failed/lost-ack/silent programming. The full installation ASan/UBSan
   regression, pinned formatting and strict docs also pass. Real-root native
-  integration remains pending.
+  integration now passes in the real-root cleanup checkpoint above.
 - **Native creation cancellation (locally verified; CI acceptance pending):** a maintained
   combined witness publishes INTENT, creates RAM, commits CREATED, stages the
   transaction, cancels it, discards its original fresh reservation and closes the
@@ -509,8 +616,8 @@ Current delivery checkpoints:
   every read cut, partial/failed/lost-ack writes and silent programming failure;
   the full installation ASan/UBSan suite passes, followed by focused sanitizer
   acceptance of the additional silent-write and invalid-original cases. The native
-  lifecycle fixture above now passes; real-root cleanup/ownership integration
-  remains open, and this primitive does not grant release permission.
+  lifecycle fixture and real-root cleanup above now pass; post-reset ownership
+  integration remains open, and this primitive does not grant release permission.
 - **Real-root resource creation (locally verified; submitted in `af3e2a2e`, CI pending):** after the durable
   INTENT, the real installation witness creates the bound 32 KiB HOME string in
   the same exclusive invocation, retaining the original creation receipt and

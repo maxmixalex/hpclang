@@ -11,8 +11,12 @@ extern const uint8_t expected_identity[48];
 extern const uint32_t preparation_bytes, template_span;
 extern const uint32_t template_recovery_binding, template_admission_binding, template_identity;
 extern const uint32_t template_creation;
+extern const uint32_t template_library_id;
+extern const uint8_t template_reservation_name[];
+extern const uint32_t template_reservation_name_length, template_reservation_bytes;
 #pragma GCC visibility pop
 #define EXPECTED_LIBRARY_BYTES preparation_bytes
+#define EXPECTED_LIBRARY_ID template_library_id
 #define EXPECTED_RECOVERY_BINDING template_recovery_binding
 #define EXPECTED_ADMISSION_BINDING template_admission_binding
 #define EXPECTED_IDENTITY_NIBBLE template_identity
