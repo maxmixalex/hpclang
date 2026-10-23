@@ -12,6 +12,19 @@ import struct
 import zlib
 
 
+def clear_ram_images(state: Path) -> None:
+    """Model loss of both external and on-chip SRAM, preserving Flash/devices.
+
+    x50ng's hardware reset deliberately preserves both backing files. Validate
+    both before changing either so an incomplete snapshot is not silently used.
+    """
+    images = [(state / name, (state / name).stat().st_size) for name in ("sram", "s3c2410-sram")]
+    if any(size == 0 for _, size in images):
+        raise ValueError("RAM-loss injection requires both nonempty SRAM images")
+    for path, size in images:
+        path.write_bytes(bytes(size))
+
+
 def changed_library_title(library: bytes) -> bytes:
     """Change only a generated library title and repair its native CRC."""
     if library[:8] != b"HPHP49-C":

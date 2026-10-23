@@ -85,3 +85,11 @@ void hpclang_rtc_clock_stop(struct hpclang_rtc_clock *clock, int stopped, int64_
     clock->anchor_us = now_us;
     clock->stopped = !!stopped;
 }
+
+int hpclang_rtc_clock_resume(struct hpclang_rtc_clock *clock, uint32_t phase_us, int64_t now_us)
+{
+    if (phase_us >= 1000000u || (clock->stopped && phase_us) || now_us < 0)
+        return 0;
+    clock->anchor_us = now_us - phase_us;
+    return 1;
+}

@@ -466,6 +466,46 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
+- **Native-created transaction with complete RAM loss (locally verified):**
+  added a registration-path check that clears SRAM before resetting the actual
+  installed/armed transaction, then declines Stock memory recovery. Initially both
+  models fail: Flash remains unchanged, busy operation count is zero, captures
+  are blank and the native Saturn mapping is unavailable. Retained-RAM recovery
+  and activation-cut checks still pass. Clean-Stock and inert-registered-root
+  cold-start controls both pass (61/62 catalog entries, zero writes). The armed
+  intact-target control and a damaged-target control preserving its bank header
+  both still fail at ROM PC 0x1dcd8 with zero writes, so erased target metadata
+  alone does not explain the failure. Transplanting the same transaction Flash
+  into the HP50g inert-root hardware snapshot passes both armed (two retirement writes)
+  and unarmed (zero writes) cold starts. x50ng preserves a separate 4 KiB on-chip
+  SRAM image across reset; the old RAM-loss setup cleared only external SRAM.
+  Shared injection now clears both images and rejects incomplete snapshots before
+  mutation; its 16 focused tests and Ruff pass. Clearing both alone lets HP50g
+  recover the damaged sector (1,923 writes, unchanged repeat), but HP49g+ still
+  fails before recovery. Neither USB/GPIO nor clock/timer/interrupt state alone
+  fixes HP49g+ in corrected case-preserving controls. Initial grouped controls
+  changed case-sensitive state keys and are invalid evidence. ROM disassembly
+  identifies the stop as waiting for a RAM readiness sentinel before copying
+  native state. HP49g+ whole-snapshot replacement passes; internal-SRAM-only
+  replacement fails. Replacing only RTC state passes full damaged-sector repair
+  (1,923 operations and unchanged repeat). The RTC loader restores an absolute
+  timer anchor from the previous process, although the new execution clock starts
+  at a different origin. The fix stores a within-second phase in version 2 and
+  rebases it on load; version 1 retains its committed calendar with phase zero.
+  Resume/stopped-clock/invalid-phase sanitizer tests and a CI-option emulator
+  build pass. Both original failing snapshots now pass without transplanting
+  device state or extending the timeout: 1,923 recovery writes, no resource/source
+  surviving RAM loss, rebuilt catalog and zero writes on the second reset.
+  Both output snapshots use valid version-2 fractional phases with obsolete
+  absolute anchors removed. Pinned formatting and Ruff pass. Complete fresh
+  registration suites, now including activation cuts and RAM loss, are running
+  on both models with the fixed emulator before submission. General startup
+  ordering and transaction reclamation remain open.
+- **Complete registered integration (locally verified):** both fresh-boot
+  registration suites through `a2a13331` pass, taking 665/673 seconds on
+  HP50g/HP49g+ respectively. Activation-cut coverage passes separately as below.
+  Both full creation regression suites also pass (646/661 seconds). Later
+  RAM-loss coverage is not included in those passing registration results.
 - **Activation interruption boundary (locally verified, not submitted):** the
   registration suite now cuts the actual final authority write before or after
   its single changing phase bit reaches Flash. The oracle checks the exact

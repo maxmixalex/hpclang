@@ -779,21 +779,28 @@ def patch_rtc_clock(root: Path) -> None:
     replace_once(
         path,
         "    s3c2410_rtc_set_ticnt( rtc );\n    s3c2410_rtc_set_rtcalm( rtc );\n\n    return error;",
-        """    uint32_t version, seconds_lo, seconds_hi, anchor_lo, anchor_hi, valid;
-    if ( module_get_u32(module, key, "hpclang_clock_version", 0, &version) == 0 && version == 1 &&
+        """    uint32_t version, seconds_lo, seconds_hi, valid;
+    if ( module_get_u32(module, key, "hpclang_clock_version", 0, &version) == 0 &&
+         (version == 1 || version == 2) &&
          module_get_u32(module, key, "hpclang_clock_seconds_lo", 0, &seconds_lo) == 0 &&
          module_get_u32(module, key, "hpclang_clock_seconds_hi", 0, &seconds_hi) == 0 &&
-         module_get_u32(module, key, "hpclang_clock_anchor_lo", 0, &anchor_lo) == 0 &&
-         module_get_u32(module, key, "hpclang_clock_anchor_hi", 0, &anchor_hi) == 0 &&
          module_get_u32(module, key, "hpclang_clock_valid", 0, &valid) == 0 ) {
         rtc->clock.seconds = (int64_t)(((uint64_t)seconds_hi << 32) | seconds_lo);
-        rtc->clock.anchor_us = (int64_t)(((uint64_t)anchor_hi << 32) | anchor_lo);
         rtc->clock.valid = !!valid;
         rtc->clock.stopped = !!(rtc->rtccon & 8);
         uint8_t raw[7] = {rtc->bcdsec, rtc->bcdmin, rtc->bcdhour, rtc->bcddate,
                           rtc->bcdday, rtc->bcdmon, rtc->bcdyear};
         memcpy(rtc->clock.raw, raw, sizeof(raw));
         rtc->clock.weekday = raw[4];
+        /* Version 1 stored a process-local absolute anchor, which cannot be
+         * resumed in another process. Its committed calendar is still usable;
+         * start at a whole second when the fractional phase is unavailable. */
+        uint32_t phase = 0;
+        if ( version == 2 &&
+             module_get_u32(module, key, "hpclang_clock_phase_us", 0, &phase) != 0 )
+            return -EINVAL;
+        if ( !hpclang_rtc_clock_resume(&rtc->clock, phase, timer_get_clock()) )
+            return -EINVAL;
     }
     s3c2410_rtc_set_ticnt( rtc );
     s3c2410_rtc_set_rtcalm( rtc );
@@ -813,11 +820,13 @@ def patch_rtc_clock(root: Path) -> None:
     hpclang_rtc_clock_write(&rtc->clock, 0, raw[0], now_us);
     rtc->bcdsec = raw[0]; rtc->bcdmin = raw[1]; rtc->bcdhour = raw[2];
     rtc->bcddate = raw[3]; rtc->bcdday = raw[4]; rtc->bcdmon = raw[5]; rtc->bcdyear = raw[6];
-    module_set_u32(module, key, "hpclang_clock_version", 1);
+    module_set_u32(module, key, "hpclang_clock_version", 2);
     module_set_u32(module, key, "hpclang_clock_seconds_lo", (uint32_t)rtc->clock.seconds);
     module_set_u32(module, key, "hpclang_clock_seconds_hi", (uint64_t)rtc->clock.seconds >> 32);
-    module_set_u32(module, key, "hpclang_clock_anchor_lo", (uint32_t)rtc->clock.anchor_us);
-    module_set_u32(module, key, "hpclang_clock_anchor_hi", (uint64_t)rtc->clock.anchor_us >> 32);
+    module_set_u32(module, key, "hpclang_clock_phase_us",
+                   rtc->clock.stopped ? 0 : (uint32_t)(now_us - rtc->clock.anchor_us));
+    g_key_file_remove_key(key, module->name, "hpclang_clock_anchor_lo", NULL);
+    g_key_file_remove_key(key, module->name, "hpclang_clock_anchor_hi", NULL);
     module_set_u32(module, key, "hpclang_clock_valid", rtc->clock.valid);""",
         "RTC saved clock store",
     )

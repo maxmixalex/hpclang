@@ -304,8 +304,9 @@ def configuration_recovery(args, clean):
         shutil.copytree(source, phase / "state")
         sequence = "10000 capture home\n12000 finish-install\n"
         if clear_ram:
-            ram = phase / "state/sram"
-            ram.write_bytes(bytes(ram.stat().st_size))
+            from prepare import clear_ram_images
+
+            clear_ram_images(phase / "state")
             # Stock asks whether to recover memory after RAM loss. Decline it;
             # recovery must come from the installed Flash library alone.
             sequence = "20000 tap f6\n40000 tap f6\n60000 capture home\n62000 finish-install\n"

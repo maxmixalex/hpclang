@@ -14,6 +14,34 @@ SPEC.loader.exec_module(PREPARE)
 
 
 class RecoveryPrepareTests(unittest.TestCase):
+    def test_complete_ram_loss_preserves_nonvolatile_and_device_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            contents = {
+                "sram": b"external",
+                "s3c2410-sram": b"internal",
+                "flash": b"durable transaction",
+                "state": b"device registers",
+            }
+            for name, data in contents.items():
+                (state / name).write_bytes(data)
+            PREPARE.clear_ram_images(state)
+            for name, data in contents.items():
+                expected = bytes(len(data)) if name in ("sram", "s3c2410-sram") else data
+                self.assertEqual((state / name).read_bytes(), expected)
+
+    def test_incomplete_ram_snapshot_rejected_before_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            (state / "sram").write_bytes(b"retained")
+            with self.assertRaises(FileNotFoundError):
+                PREPARE.clear_ram_images(state)
+            self.assertEqual((state / "sram").read_bytes(), b"retained")
+            (state / "s3c2410-sram").write_bytes(b"")
+            with self.assertRaises(ValueError):
+                PREPARE.clear_ram_images(state)
+            self.assertEqual((state / "sram").read_bytes(), b"retained")
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)

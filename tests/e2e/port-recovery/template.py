@@ -683,6 +683,58 @@ def run_activation_cuts(
     return results
 
 
+def run_activation_ram_loss(
+    args, before, fault, root, layout, journal, authority, *, emulator, completed, verify_busy_reads
+):
+    """Recover the native-created Flash transaction with no installation RAM."""
+    import shutil
+    from prepare import clear_ram_images
+    from reservation import require_absent
+    from verify import require_stock_pc, verify_flash, verify_restart
+
+    previous = fault
+    operations = 0
+    for repeat in range(2):
+        phase = root / f"activation-ram-loss-{repeat}"
+        shutil.copytree(previous, phase / "state")
+        sequence = "10000 capture home\n12000 finish-install\n"
+        if not repeat:
+            clear_ram_images(phase / "state")
+            # Decline Stock's RAM recovery prompt: the Flash installation alone
+            # must supply its code, identity, claim and authoritative capsule.
+            sequence = "20000 tap f6\n40000 tap f6\n60000 capture home\n62000 finish-install\n"
+        with emulator(
+            args, phase, sequence, ["--reset"], flash_busy=True, reset_checkpoint=True
+        ) as child:
+            completed(child, 90)
+        state = phase / "state"
+        require_stock_pc(state)
+        observed = verify_busy_reads(args, phase)
+        if not repeat:
+            verify_flash(
+                (fault / "flash").read_bytes(),
+                (state / "flash").read_bytes(),
+                journal,
+                0x140000,
+                retire=True,
+                authority_slot=authority,
+            )
+            require(observed > 0, "RAM-loss recovery did not restore its transaction")
+            operations = observed
+        else:
+            require(
+                (state / "flash").read_bytes() == (previous / "flash").read_bytes(),
+                "RAM-loss recovery changed Flash on its second reset",
+            )
+            require(observed == 0, "RAM-loss recovery repeated Flash writes")
+        verify_restart(before, state, state)
+        require_absent(reader(state), layout["reservation"]["name"].encode("ascii"))
+        require_absent(reader(state), b"HPCTEMPLATE")
+        previous = state
+    print("Native-created recovery survives complete loss of installation RAM", flush=True)
+    return operations
+
+
 def run_registered_activation(
     args, before, root, library, layout, slot, *, transfer, emulator, completed, verify_busy_reads
 ):
@@ -786,7 +838,24 @@ def run_registered_activation(
         completed=completed,
         verify_busy_reads=verify_busy_reads,
     )
-    return {"operations": operations, "recovery_operations": recovery_operations, "cuts": cuts}
+    ram_loss = run_activation_ram_loss(
+        args,
+        before,
+        fault,
+        root,
+        layout,
+        journal,
+        authority,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    return {
+        "operations": operations,
+        "recovery_operations": recovery_operations,
+        "cuts": cuts,
+        "ram_loss_operations": ram_loss,
+    }
 
 
 def run_registration(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
