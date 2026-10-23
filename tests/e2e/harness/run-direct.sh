@@ -12,6 +12,21 @@ export HPCLANG_E2E_FRAME_PREFIX="$ROOT/build/$TARGET-frame"
 rm -f "$HPCLANG_E2E_FRAME_PREFIX"-*.pgm "$HPCLANG_E2E_FRAME_PREFIX"-*.lcd \
     "$HPCLANG_E2E_FRAME_PREFIX"-memory-*.json
 APP_DIR="$(realpath "$2")"
+unset HPCLANG_E2E_MIN_POOL_PAGES || true
+if [[ -f "$APP_DIR/launchers/memory.json" ]]; then
+    minimum_pool=$(python3 - "$APP_DIR/launchers/memory.json" "$TARGET" <<'PY'
+import json
+import sys
+with open(sys.argv[1]) as stream:
+    report = json.load(stream)
+if report["application"].get("required_rw_bytes") is not None:
+    print(report["models"][sys.argv[2]]["minimum_direct_pool_pages"])
+PY
+    )
+    if [[ -n "$minimum_pool" ]]; then
+        export HPCLANG_E2E_MIN_POOL_PAGES="$minimum_pool"
+    fi
+fi
 export TARGET
 
 while IFS= read -r line; do
@@ -116,6 +131,16 @@ export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 
 timeout 35s "$X50" "${X50_ARGS[@]}"
+if [[ -n "${HPCLANG_E2E_MIN_POOL_PAGES:-}" ]]; then
+    python3 - "$HPCLANG_X50NG_E2E_JSON" <<'PY'
+import json
+import sys
+with open(sys.argv[1]) as stream:
+    result = json.load(stream)
+if result.get("stage_preflight_rejections") != 4:
+    raise SystemExit("missing minimum-RW preflight rejection")
+PY
+fi
 if [[ "${HPCLANG_E2E_STORAGE_WITNESS:-0}" == 1 && "$HPCLANG_E2E_FAMILY" == hp4950 ]]; then
     verify_storage_media
 fi

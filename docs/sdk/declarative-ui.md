@@ -423,6 +423,13 @@ is published once after runtime cleanup, preserving Stock's return-monitoring
 boundary. These sampled emulator values are evidence for
 comparison, not a physical-device deadline or worst-case execution bound.
 
+The maintained artifact requests both `MIN_RW_BYTES 36864` and
+`MAX_RW_BYTES 36864`. Its Direct launch gate first rejects zero, one, oversized
+and one-below-required page counts without changing the temporary pool, caller
+registers or mappings, then runs the UI with exactly the required pool count.
+This verifies bounded admission for the tested UI allocation policy; the
+legacy Stock allocation policy and other system-memory costs remain separate.
+
 The standalone C and C++ examples also deliberately sleep for 20 milliseconds
 per event-loop iteration. They process one keyboard event per iteration and
 draw an accepted model change on the following iteration. That scheduling and

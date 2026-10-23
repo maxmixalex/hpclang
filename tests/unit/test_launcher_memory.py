@@ -47,6 +47,24 @@ class LauncherMemoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             LAUNCHERS.validate_rw_limit(self.header(0xFFFFFFFF), 1048576)
 
+    def test_required_rw_bounds_and_pool_accounting(self):
+        payload = self.header(1600) + bytes(8)
+        for minimum, maximum in ((None, None), (36864, None), (36864, 36864), (16384, 36864)):
+            LAUNCHERS.validate_rw_bounds(payload, minimum, maximum)
+        for minimum, maximum in ((4096, None), (36865, None), (True, None), (40960, 36864)):
+            with self.assertRaises(ValueError):
+                LAUNCHERS.validate_rw_bounds(payload, minimum, maximum)
+        report = LAUNCHERS.memory_report(payload, 30000, 9, ["hp39gs", "hp50g"], 36864, 36864)
+        self.assertEqual(report["application"]["required_rw_bytes"], 36864)
+        self.assertEqual(report["application"]["minimum_rw_pages"], 4)
+        for item in report["models"].values():
+            self.assertEqual(
+                item["minimum_direct_pool_pages"], item["direct_pool_pages_for_rw_ceiling"]
+            )
+            self.assertEqual(
+                item["minimum_stock_pool_pages"], item["stock_pool_pages_for_rw_ceiling"]
+            )
+
     def test_rejects_missing_or_wrong_header(self):
         for header in (b"", b"HPC1", self.header(0)[:15], b"HPCZ" + self.header(0)[4:]):
             with self.assertRaises(ValueError):

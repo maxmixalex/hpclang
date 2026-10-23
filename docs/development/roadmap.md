@@ -452,9 +452,24 @@ terminated after this confirmed defect, not restarted because of elapsed time.
 Local fix `3425073b` publishes timing checkpoint ID 2 before PASS and retains the single
 post-cleanup memory checkpoint ID 1. Strict return checks are unchanged. A fresh
 six-model Direct matrix passes in separate v2 output directories, including
-timing, pixels, memory and return; the fresh Stock matrix is still running.
+timing, pixels, memory and return; HP39g+ Stock now also passes both reports,
+independent pixels and normal return. The remaining Stock matrix is still running.
 The changed UI sources pass ARM analysis and pinned formatting; report verifier tests pass.
 
+Current minimum-RW admission follow-up (local, 2026-10-23): optional
+MIN_RW_BYTES/--min-rw-bytes establishes an application requirement independent
+of MAX_RW_BYTES. Packaging rejects invalid/conflicting bounds and impossible
+pool totals; stage0 checks the complete required pool before copy/mapping/stack
+changes, and stage1 rechecks RW admission. The maintained UI requests exactly
+36 KiB. All six Direct models pass zero/one/oversized/one-below-required refusal
+with unchanged caller state and full pool, then UI execution on the exact minimum
+pool, independent pixels, memory/timing reports and normal return. Eight host
+tests, relocated installed-SDK C/C++/six-model packaging, Ruff/format and ARM
+analysis (using the repository's fixed-address MMIO exclusion) pass. Default
+launchers without a minimum remain byte-identical on all six models. Focused
+HP39g+/HP50g Stock tests are running separately; the existing timing-only Stock
+matrix remains live. This adds an admission condition, not a reduced Stock
+allocation policy or whole-system resource proof. No milestone is closed.
 Local `a1aae4e8` adds a launcher-memory report that accounts for code, RW minimum/ceiling,
 linked stage, stage stack, MMU workspace and HP39 Stock's native workspace.
 CMake regenerates a deleted report. Seven host tests and the relocated installed

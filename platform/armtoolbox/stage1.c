@@ -1489,6 +1489,13 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
 #endif
     uint32_t rw_needed = 1u + (hpc1->rw_static_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE +
                          HPCLANG_STACK_MIN / HPCLANG_PAGE_SIZE;
+#ifdef HPCLANG_MIN_RW_BYTES
+    _Static_assert(HPCLANG_MIN_RW_BYTES > 0 && HPCLANG_MIN_RW_BYTES % HPCLANG_PAGE_SIZE == 0 &&
+                       HPCLANG_MIN_RW_BYTES / HPCLANG_PAGE_SIZE <= HPCLANG_RW_PAGE_CAPACITY,
+                   "invalid application RW minimum");
+    if (rw_needed < HPCLANG_MIN_RW_BYTES / HPCLANG_PAGE_SIZE)
+        rw_needed = HPCLANG_MIN_RW_BYTES / HPCLANG_PAGE_SIZE;
+#endif
 
     if (rw_count < rw_needed || rw_count > HPCLANG_RW_PAGE_CAPACITY)
         return -4;

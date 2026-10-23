@@ -37,6 +37,13 @@ def validate_rw_limit(payload: bytes, limit: int | None) -> None:
         raise ValueError("maximum RW bytes cannot contain the boot page, static data and stack")
 
 
+def validate_rw_bounds(payload: bytes, minimum: int | None, maximum: int | None) -> None:
+    validate_rw_limit(payload, maximum)
+    validate_rw_limit(payload, minimum)
+    if minimum is not None and maximum is not None and minimum > maximum:
+        raise ValueError("minimum RW bytes exceeds maximum RW bytes")
+
+
 def run(*args: str | Path) -> str:
     result = subprocess.run(args, capture_output=True, text=True)
     if result.returncode:
@@ -45,10 +52,15 @@ def run(*args: str | Path) -> str:
 
 
 def memory_report(
-    payload: bytes, stage_size: int, stage_minimum_pages: int, models: list[str], limit: int | None
+    payload: bytes,
+    stage_size: int,
+    stage_minimum_pages: int,
+    models: list[str],
+    limit: int | None,
+    minimum: int | None = None,
 ) -> dict:
     """Account for pool pages without claiming to size the native allocation."""
-    validate_rw_limit(payload, limit)
+    validate_rw_bounds(payload, minimum, limit)
     if type(stage_size) is not int or stage_size <= 0:
         raise ValueError("invalid linked stage extent")
     if type(stage_minimum_pages) is not int or not 1 < stage_minimum_pages <= MAX_RW_PAGES:
@@ -59,6 +71,7 @@ def memory_report(
         raise ValueError("HPC1 image size does not match its payload")
     code_pages = (image + PAGE_BYTES - 1) // PAGE_BYTES
     rw_minimum_pages = 1 + (static + PAGE_BYTES - 1) // PAGE_BYTES + STACK_BYTES // PAGE_BYTES
+    admitted_rw_pages = max(rw_minimum_pages, (minimum or 0) // PAGE_BYTES)
     # The linked stage minimum already includes the live stage stack page.
     # stage1 then adds a distinct L2 workspace, application code and RW pages.
     fixed_pages = stage_minimum_pages + 1 + code_pages
@@ -73,6 +86,7 @@ def memory_report(
             "boot_pages": 1,
             "stack_bytes": STACK_BYTES,
             "minimum_rw_pages": rw_minimum_pages,
+            "required_rw_bytes": minimum,
             "rw_ceiling_bytes": limit,
         },
         "launcher": {
@@ -84,9 +98,9 @@ def memory_report(
         "models": {
             model: {
                 "stock_native_workspace_pages": 2 if MODELS[model] <= 3 else 0,
-                "minimum_direct_pool_pages": fixed_pages + rw_minimum_pages,
+                "minimum_direct_pool_pages": fixed_pages + admitted_rw_pages,
                 "minimum_stock_pool_pages": fixed_pages
-                + rw_minimum_pages
+                + admitted_rw_pages
                 + (2 if MODELS[model] <= 3 else 0),
                 "direct_pool_pages_for_rw_ceiling": None
                 if limit is None
@@ -115,8 +129,9 @@ def build(
     wrap: bool = True,
     hp39_armsys_probe: bool = False,
     max_rw_bytes: int | None = None,
+    min_rw_bytes: int | None = None,
 ) -> None:
-    validate_rw_limit(payload.read_bytes(), max_rw_bytes)
+    validate_rw_bounds(payload.read_bytes(), min_rw_bytes, max_rw_bytes)
     output.mkdir(parents=True, exist_ok=True)
     scratch = output / "objects"
     scratch.mkdir(exist_ok=True)
@@ -162,8 +177,12 @@ def build(
             platform / source,
             name,
             *(
-                [f"-DHPCLANG_MAX_RW_BYTES={max_rw_bytes}"]
-                if source == "stage1.c" and max_rw_bytes is not None
+                [
+                    f"-DHPCLANG_{name}_RW_BYTES={value}"
+                    for name, value in (("MAX", max_rw_bytes), ("MIN", min_rw_bytes))
+                    if value is not None
+                ]
+                if source == "stage1.c"
                 else []
             ),
         )
@@ -205,6 +224,16 @@ def build(
 
     bundle = scratch / "bundle.S"
     original = payload.read_bytes()
+    report = memory_report(
+        original, stage_size, minimum_pool_pages, models, max_rw_bytes, min_rw_bytes
+    )
+    early_pool_pages = minimum_pool_pages
+    if min_rw_bytes is not None:
+        early_pool_pages = next(iter(report["models"].values()))["minimum_direct_pool_pages"]
+        if any(
+            item["minimum_stock_pool_pages"] > MAX_RW_PAGES for item in report["models"].values()
+        ):
+            raise ValueError("minimum RW requirement cannot fit the launcher page pool")
     compressor = zlib.compressobj(level=9, wbits=-15)
     compressed = compressor.compress(original[16:]) + compressor.flush()
     packed_payload = scratch / "application.bin"
@@ -219,7 +248,7 @@ def build(
 .global __stage1_min_pool_pages
 .global __hpc1_blob_start, __hpc1_blob_end, __hpc1_blob_size
 .set __stage1_memory_size, {stage_size}
-.set __stage1_min_pool_pages, {minimum_pool_pages}
+.set __stage1_min_pool_pages, {early_pool_pages}
 __stage1_blob_start:
 .incbin "{assembly_path(stage1)}"
 __stage1_blob_end:
@@ -245,7 +274,6 @@ __hpc1_blob_end:
         if wrap:
             # Use the same native object envelope as repository execution tests.
             run(sys.executable, root / "tools/armtoolbox-wrap.py", binary, output / (model + ".hp"))
-    report = memory_report(original, stage_size, minimum_pool_pages, models, max_rw_bytes)
     (output / "memory.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
 
@@ -262,6 +290,11 @@ def main() -> None:
         help="cap application-visible RW bytes (page aligned); does not reduce the Stock reservation",
     )
     parser.add_argument("--hp39-armsys-probe", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--min-rw-bytes",
+        type=lambda value: int(value, 0),
+        help="require this page-aligned application RW size before launching",
+    )
     args = parser.parse_args()
     build(
         Path(__file__).resolve().parents[1],
@@ -272,6 +305,7 @@ def main() -> None:
         wrap=not args.raw_only,
         hp39_armsys_probe=args.hp39_armsys_probe,
         max_rw_bytes=args.max_rw_bytes,
+        min_rw_bytes=args.min_rw_bytes,
     )
 
 

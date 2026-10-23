@@ -91,7 +91,8 @@ def main():
             raise AssertionError("C++ counter launcher declaration changed")
         counter_cmake.write_text(
             counter_source.replace(
-                launcher_call, "hpclang_target_launchers(declarative_ui_cpp MAX_RW_BYTES 36864)"
+                launcher_call,
+                "hpclang_target_launchers(declarative_ui_cpp MIN_RW_BYTES 36864 MAX_RW_BYTES 36864)",
             )
         )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
@@ -158,7 +159,7 @@ endforeach()
         counter_args = (
             (build / "counter/declarative_ui_cpp-launchers.args").read_text().splitlines()
         )
-        if counter_args[-2:] != ["--max-rw-bytes", "36864"]:
+        if counter_args[-4:] != ["--min-rw-bytes", "36864", "--max-rw-bytes", "36864"]:
             raise AssertionError("Relocated SDK lost the requested application RW limit")
         commands = json.loads((build / "compile_commands.json").read_text())
         for command in commands:
@@ -193,6 +194,8 @@ endforeach()
             ceiling = 36864 if name == "declarative_ui_cpp" else None
             if memory["application"]["rw_ceiling_bytes"] != ceiling:
                 raise AssertionError(f"{name}: memory report lost its configured RW ceiling")
+            if memory["application"]["required_rw_bytes"] != ceiling:
+                raise AssertionError(f"{name}: memory report lost its required RW size")
             if len(memory["models"]) != 6 or not memory["excludes"]:
                 raise AssertionError(f"{name}: incomplete memory report scope")
             embedded = (output / f"{name}-launchers/objects/application.bin").read_bytes()

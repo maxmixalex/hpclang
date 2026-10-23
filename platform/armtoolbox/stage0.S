@@ -64,7 +64,8 @@ hpclang_armtoolbox_stage0:
     /* Reject an undersized pool before publishing a mapping, switching SP or
      * copying stage1. The later C checks cannot protect these earlier writes.
      * Keep one complete page above the copied/zeroed stage for its live stack.
-     * Stage1 separately admits application code, RW and its MMU workspace. */
+     * With MIN_RW_BYTES, the bundled minimum also includes application code,
+     * required RW and the MMU workspace. Stage1 rechecks the full layout. */
     ldr     r2, [r10, #0x914]
     cmp     r2, #256
     bhi     .Lrelease_kos
