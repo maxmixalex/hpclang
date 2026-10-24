@@ -732,7 +732,7 @@ The maintained `tests/e2e/hpgcc-window` client now passes all six Direct and all
 six Stock targets: four real 30 ms callbacks, synchronous consumed user events,
 four repaint cycles, independent final-frame pixels and settled native return.
 This native fixture uses HPG mono double buffering. Its Runtime CI manifest now
-runs the same client and pixel verifier; these changes have not been pushed.
+runs the same client and pixel verifier; formal CI acceptance remains pending.
 Typed-key/modifier
 events 3..6, historical widgets and the complete `win.h` umbrella remain work
 in progress, not supported names with empty implementations.

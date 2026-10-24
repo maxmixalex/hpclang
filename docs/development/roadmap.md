@@ -509,12 +509,16 @@ reservation verification requires before-reset.json, which the stale local
 watchdog emulator never emitted. Its executable lacks the reset-checkpoint
 feature. Earlier phase evidence is retained; no complete-suite pass is claimed.
 The exact CI Runtime emulator is unpacked at `/work/oct24-ci-current-x50ng`
-and does include that feature. Guarded reservation supplements run on 56280
-and 8541 in `/work/oct24-flash-clock-ci-reservation-{hp49gplus,hp50g}`, using
-saved clean states and unchanged maintained verification. HP49g+ now passes
-guarded low-memory recovery and repeated restart with the required snapshot;
-rejection cases remain running. Publication validation
-passes HP49g+; the HP50g half continues on 38155. Both
+and does include that feature. Guarded reservation supplements pass on both
+models in `/work/oct24-flash-clock-ci-reservation-{hp49gplus,hp50g}`, using
+saved clean states and unchanged maintained verification. Both result.json files
+report pass: 20,902-byte gap, 20,802-byte admission, 1,923 busy operations,
+thirteen admission rejections, three resource guards and absent-reservation
+recovery. HP50g runner 8541 exits 0. HP49g+ runner 56280 completes verification
+and writes its pass result, then exits 1 only because the outer diagnostic
+wrapper prints after closing its redirected log; the maintained verifier itself
+returned successfully. The original failed full-suite evidence is unchanged.
+Both native publication/rejection/cancellation suites pass (38155 exit 0). Both
 recovery runs additionally pass interrupted recovery and journal retirement
 with unchanged catalogs after reset. Both models also pass automatic STARTUP
 replay/retirement and the second warmstart, plus bank-header/body fault and
@@ -533,7 +537,12 @@ the complete Flash exhaustive tests (`/work/oct24-flash-clock-unit-test.log`).
 Whole tracked-source format and lint checks pass; logs are
 `/work/oct24-window-final-{format,lint}.log`. Objects failure logs confirm the
 same PC 0x00000008 crash on both models. Focused host/ARM static analysis and
-strict docs pass. Full regression and CI acceptance remain pending.
+strict docs pass. The prior push's six workflows were checked again before
+submission: Quality/Storage/Gallery pass, Core/Objects/Runtime fail as detailed
+above. This reviewed Flash repair, window adapter and diagnostic batch is
+submitted on `m8-flash-write`; new CI is not polled. Audio restoration, transfer
+stall and main blank-display failures remain investigated but unresolved, and
+no formal CI acceptance or M8 completion is claimed.
 Later local window-audit/dispatch changes are outside that head.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
@@ -4849,7 +4858,8 @@ below are retained.
   event/timer/mono-double-buffer repaint fixture, not original widget clients.
   Runtime CI wiring (`762705eb`) adds three Direct family jobs and six Stock
   model jobs using the standard context/family verifier. Generated matrix,
-  seven planner tests and verifier Ruff/format checks pass. Not pushed or CI accepted.
+  seven planner tests and verifier Ruff/format checks pass. Included in the
+  current submission; formal CI acceptance remains pending.
 
 #### M8.5 — Modern C++ and migration
 
