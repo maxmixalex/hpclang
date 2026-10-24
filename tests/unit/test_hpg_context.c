@@ -12,6 +12,8 @@
 #include "win-repaint.h"
 #include <wincore.h>
 #include <winprogress.h>
+#include <wintext.h>
+#include <winimg.h>
 #include <winkeys.h>
 #include "hpgcc-keyboard.h"
 #define HPCLANG_HPCONIO_NO_AUTOINIT
@@ -926,6 +928,125 @@ static void progress_widgets(void)
     hpg_cleanup();
 }
 
+static void text_widget_pixels(void)
+{
+    assert(!hpclang_win_reset());
+    window_time = 0;
+    hpg_set_mode_gray16(1);
+    char bits[256 * 3] = {0};
+    const unsigned char a[] = {1, 2, 4}, b[] = {7, 5, 7};
+    for (unsigned row = 0; row < 3; ++row) {
+        bits['A' * 3 + row] = (char)a[row];
+        bits['B' * 3 + row] = (char)b[row];
+        bits[28 * 3 + row] = 7;
+    }
+    hpg_font_t *font = hpg_alloc_font(bits, 256, 3, 3);
+    win_widget_t *entry = win_text_new_entry(2);
+    assert(font && entry);
+    win_widget_set_font(entry, font);
+    win_widget_set_size(entry, 8, 6);
+    win_text_set_text(entry, "AB");
+    win_add_widget(entry);
+    assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+    for (int y = 0; y < 6; ++y)
+        for (int x = 0; x < 8; ++x) {
+            int ink = 0;
+            if (y >= 1 && y <= 3) {
+                if (x >= 1 && x <= 3)
+                    ink = a[y - 1] & (1u << (x - 1));
+                if (x >= 4 && x <= 6)
+                    ink = b[y - 1] & (1u << (x - 4));
+            }
+            assert(hpg_get_pixel(NULL, x, y) == (ink ? 255 : 0));
+        }
+    win_keytyped_t key = {KB_RT, 0, 0, 0, 0};
+    assert(win_post_event(WIN_KEY_TYPED, &key) == 1);
+    window_time = 500000;
+    assert(hpclang_win_step(1) == 1);
+    assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+    for (int y = 0; y < 6; ++y)
+        for (int x = 0; x < 8; ++x) {
+            int ink = 0;
+            if (y >= 1 && y <= 3) {
+                if (x >= 1 && x <= 3)
+                    ink = a[y - 1] & (1u << (x - 1));
+                if (x >= 4 && x <= 6)
+                    ink = 1;
+            }
+            assert(hpg_get_pixel(NULL, x, y) == (ink ? 255 : 0));
+        }
+    assert(!strcmp(win_text_get_text(entry), "AB"));
+    key.keycode = KB_BKS;
+    assert(win_post_event(WIN_KEY_TYPED, &key) == 1);
+    assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+    assert(!strcmp(win_text_get_text(entry), "B"));
+    for (int y = 0; y < 6; ++y)
+        for (int x = 0; x < 8; ++x)
+            assert(hpg_get_pixel(NULL, x, y) == (x >= 1 && x <= 3 && y >= 1 && y <= 3 ? 255 : 0));
+    win_remove_widget(entry);
+    win_widget_destroy(entry);
+    hpg_free_font(font);
+    assert(!hpclang_win_error() && !hpclang_win_reset());
+    hpg_cleanup();
+}
+
+static void image_widget_pixels(void)
+{
+    assert(!hpclang_win_reset());
+    hpg_set_mode_gray16(1);
+    hpg_t *image = hpg_alloc_gray16_image(2, 2);
+    char bits[] = {0x55, (char)0xaa};
+    hpg_pattern_t *pattern = hpg_alloc_pattern(bits, 2, 0);
+    assert(image && pattern);
+    hpg_set_color(image, 119);
+    hpg_draw_pixel_on(image, 0, 0);
+    hpg_set_color(image, 255);
+    hpg_draw_pixel_on(image, 1, 1);
+    win_widget_t *widget = win_img_new(pattern, image);
+    assert(widget);
+    int w, h;
+    win_widget_get_size(widget, &w, &h);
+    assert(w == 2 && h == 2);
+    win_widget_set_location(widget, 1, 1);
+    win_widget_set_size(widget, 5, 4);
+    win_add_widget(widget);
+    assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+    for (int y = 0; y < 6; ++y)
+        for (int x = 0; x < 8; ++x) {
+            int expected = 0;
+            if (x >= 1 && x < 6 && y >= 1 && y < 5)
+                expected = ((unsigned char)bits[(y - 1) % 2] & (1u << ((x - 1) % 8))) ? 255 : 0;
+            if (x >= 1 && x < 3 && y >= 1 && y < 3)
+                expected = x == 1 && y == 1 ? 119 : x == 2 && y == 2 ? 255 : 0;
+            assert(hpg_get_pixel(NULL, x, y) == expected);
+        }
+    assert(hpg_get_pattern(NULL) == NULL);
+    win_remove_widget(widget);
+    hpg_clip_reset(NULL);
+    hpg_clear();
+    assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+    assert(hpg_get_pixel(NULL, 1, 1) == 0);
+    win_widget_destroy(widget);
+    /* Destruction must preserve borrowed sources for reuse by another widget. */
+    assert(hpg_get_pixel(image, 0, 0) == 119);
+    widget = win_img_new(pattern, NULL);
+    win_widget_get_size(widget, &w, &h);
+    assert(w == 0 && h == 0);
+    win_widget_set_size(widget, 3, 2);
+    win_add_widget(widget);
+    assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+    assert(hpg_get_pixel(NULL, 0, 0) == 255 && hpg_get_pixel(NULL, 1, 0) == 0);
+    win_remove_widget(widget);
+    win_widget_destroy(widget);
+    widget = win_img_new(NULL, NULL);
+    assert(widget);
+    win_widget_destroy(widget);
+    hpg_free_pattern(pattern);
+    hpg_free_image(image);
+    assert(!hpclang_win_error() && !hpclang_win_reset());
+    hpg_cleanup();
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -1024,6 +1145,8 @@ int main(void)
     window_frames();
     widget_pixels();
     progress_widgets();
+    text_widget_pixels();
+    image_widget_pixels();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

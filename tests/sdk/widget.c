@@ -1,5 +1,8 @@
 #include <wincore.h>
 #include <winprogress.h>
+#include <wintext.h>
+#include <winimg.h>
+#include <string.h>
 
 static int paint(void *event, void *data)
 {
@@ -56,5 +59,29 @@ int main(void)
     double value = win_progress_get_value(slider);
     win_remove_widget(slider);
     win_widget_destroy(slider);
-    return !focused || !destroyed || value != 3.5 || hpclang_win_error();
+    char title[] = "Text entry", initial[] = "Hello";
+    win_widget_t *label = win_text_new_label(title);
+    win_widget_t *entry = win_text_new_entry(12);
+    if (!label || !entry) {
+        if (label)
+            win_widget_destroy(label);
+        if (entry)
+            win_widget_destroy(entry);
+        return 3;
+    }
+    win_text_set_text(entry, initial);
+    win_add_widget(label);
+    win_add_widget(entry);
+    int correct = !strcmp(win_text_get_text(entry), initial);
+    win_remove_widget(entry);
+    win_remove_widget(label);
+    win_widget_destroy(entry);
+    win_widget_destroy(label);
+    win_widget_t *picture = win_img_new(NULL, NULL);
+    if (!picture)
+        return 4;
+    win_add_widget(picture);
+    win_remove_widget(picture);
+    win_widget_destroy(picture);
+    return !focused || !destroyed || !correct || value != 3.5 || hpclang_win_error();
 }
