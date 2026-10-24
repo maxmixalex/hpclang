@@ -1562,3 +1562,28 @@ text, image, progress, keyboard and settled-return gates all pass on six Direct
 models (32162 exit 0). A wrong disabled-color pixel is rejected. Stock process
 86659 runs in `/work/oct24-menu-src`, artifact `/work/oct24-menu-native-arm`;
 Stock completion and CI acceptance remain open.
+
+### Checkbox adapter (independent following batch)
+
+`wincheckbox.h` supplies six actual exported checkbox functions, correcting the
+historical header's unrelated text-function declarations. Labels are borrowed;
+selection setters normalize booleans without implicit repaint/repack. Plain W
+toggles, arrows transfer focus, and a borrowed soft menu exposes a CHK action
+while focused. Unbind before destroying the menu. Focused rebinding immediately
+moves that action; invalid indices/types/null labels use the window error latch.
+
+Each installation allocates its toggle event afresh so removed descriptors can
+survive a window reset without reusing stale global event IDs. Initial gained
+notifications precede installation; menu publication waits until handlers exist.
+An explicit bound flag distinguishes a lost binding from the next control's new
+binding during removal. Singleton removal also clears its action. The renderer
+retains the historical selected/unselected pattern and uses checked preferred
+sizes and saturated off-clip offsets.
+
+Focused ASan/UBSan tests pass borrowed labels, multiline sizes, normalized state,
+modifier suppression, first-install menu activation, two-control focus/removal,
+focused rebinding/unbinding, reset/reinstall with event-number reuse, singleton
+cleanup and invalid inputs. ARMv4T compilation and analysis pass. Logs use
+`/work/oct24-checkbox-{build,tests}.log`. Work is isolated on
+`m8-checkbox-controls` with `/work/oct24-checkbox-src`; original-source
+comparison, production pixels, SDK and native acceptance remain open.

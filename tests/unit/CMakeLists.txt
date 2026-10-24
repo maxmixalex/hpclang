@@ -878,3 +878,9 @@ hpclang_unit(win_softmenu_reference "${HPCLANG_ROOT}/tests/compat/win-softmenu.c
     "${HPCLANG_ROOT}/runtime/core/win-focus.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
 target_include_directories(test_win_softmenu_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
     "${HPCLANG_ROOT}/include")
+
+hpclang_unit(win_checkbox test_win_checkbox.c ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-checkbox.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_checkbox PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")

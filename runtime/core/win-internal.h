@@ -8,4 +8,5 @@ int hpclang_win_fail(int error);
 int hpclang_win_dispatch_active(void);
 int hpclang_win_widget_installed(win_widget_t *);
 void *hpclang_win_widget_data(win_widget_t *, void (*destroy)(win_widget_t *));
+int hpclang_win_softmenu_valid(win_widget_t *);
 #endif

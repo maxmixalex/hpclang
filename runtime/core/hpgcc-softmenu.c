@@ -28,6 +28,10 @@ static struct softmenu *data(win_widget_t *widget)
 {
     return hpclang_win_widget_data(widget, destroy);
 }
+int hpclang_win_softmenu_valid(win_widget_t *widget)
+{
+    return data(widget) != NULL;
+}
 static struct softmenu *slot(win_widget_t *widget, int index)
 {
     struct softmenu *menu = data(widget);
