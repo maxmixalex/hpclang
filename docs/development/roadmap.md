@@ -4634,8 +4634,16 @@ below are retained.
   behavior. The [compatibility review](hpgcc-compat.md#historical-window-adapter-feasibility)
   maps each family onto the accepted UI and records source hashes, gaps and
   concrete acceptance cases. An owned state/event bridge is needed; no family
-  is silently omitted or declared compatible. Other versions and original
-  application execution remain open; this is static evidence only.
+  is silently omitted or declared compatible. The subsequent four-archive audit
+  finds 104 identical window source/header files and 13 identical installed
+  headers in 1.1/2.0 after newline normalization. The scanned 1.0.3 and HPGCC3
+  sources contain no `win_` references; HPGCC3 has its distinct C++ `gui.h` API.
+  `tools/audit-hpgcc-windows.py` reproduces the counts, archive hashes and file
+  comparison without extracting or redistributing sources. The original 1.1
+  `examples/win/simple.c` supplies a concrete multi-control acceptance candidate,
+  including four slider orientations and a documented 64-line layout issue.
+  The audit and Ruff checks pass locally; actual adapter/original-application
+  execution remains open. This is static evidence only.
 
 #### M8.5 — Modern C++ and migration
 

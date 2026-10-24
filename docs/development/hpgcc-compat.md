@@ -594,9 +594,38 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 ## Historical window adapter feasibility
 
 The 2026-10-24 review reads the retained HPGCC 1.1/39g distribution's
-`sources/win` headers and implementations (`/work/hpgcc39-review` locally).
-This is static source evidence for that version, not a four-generation or
-runtime compatibility claim. No `win*` compatibility header is installed yet.
+`sources/win` headers and implementations (`/work/hpgcc39-review` locally),
+then compares all four original release archives. This is static source
+evidence, not runtime compatibility. No `win*` compatibility header is installed yet.
+
+| Release | Source/header files scanned | Window-family evidence |
+| --- | ---: | --- |
+| 1.0.3 beta | 309 | No `win_` references or installed `win*` headers in the scanned C/C++ sources/headers. |
+| 1.1 with 39g support | 685 | 104 window implementation/header files and 13 installed window headers. Also includes `examples/win/simple.c`. |
+| 2.0 SP2 | 712 | All 104 window source/header files and all 13 installed headers match 1.1 after newline normalization; neither comparison has missing or changed files. |
+| HPGCC3 R004.revA | 552 | No `win_` references in the scanned sources/headers. `libs_workspace/headers/gui.h` instead exposes C++ `gApplication`, `gForm`, `gControl` and related classes. This is a distinct GUI API, not evidence for `win*` aliases. |
+
+Reproduce the comparison with Python 3.11 or newer:
+
+```sh
+python tools/audit-hpgcc-windows.py /path/to/original-archives > window-audit.json
+```
+
+The tool reads caller-supplied archives without extracting their paths or
+redistributing source. Its report contains archive SHA-256 identities, the
+scanned file counts, reference filenames and exact normalized comparisons.
+The reviewed archives are:
+
+```text
+hpgcc-1.0.3-beta-Linux.tar.bz2
+7041e368bcc47b2d4014f49a8e4ef8039716057415a0091cf80912c0fa115500
+hpgcc1.1-with-39g-support-windows.zip
+572fd81addd205a7e2bdc1a5ff3f893abaa2ea7ba990766c7f09da6a36226020
+hpgcc-2.0-SP2-Linux.tar.bz2
+e4f9d632e65316101717f39c00523c2f43608a11156d4a4d4e8fae3195771029
+hpgcc3_R004.revA.tar.gz
+a984795493f2e4cf79001e0f95824b9c76f20df6d38a071eb8f9deb7a650165d
+```
 
 | Historical behavior and primary source | Existing service and required bridge |
 | --- | --- |
@@ -628,8 +657,14 @@ common/_win_timer_generator.c
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter
-work, not approved omissions. Before acceptance, compare the other historical
-versions and run original widget applications with documented edits. Required
+work, not approved omissions. The cross-version comparison establishes a common
+1.1/2.0 implementation baseline; it does not establish a binary ABI or cover
+HPGCC3's different GUI object model. Before acceptance, run original widget
+applications with documented edits. The retained 1.1 `examples/win/simple.c`
+is a concrete candidate: it combines a four-action soft menu, label, editable
+text, menu-bound checkbox and all four slider orientations. Its bottom slider
+starts at y=65, so 64-line models require an explicit layout/scrolling adaptation;
+dropping that control would not preserve the example. Required
 tests include priority/tie ordering, nested dispatch during removal, borrowed
 payload lifetime, timer catch-up versus delay, removal during callbacks,
 focus/menu transitions, exhausted storage and exit cleanup. Cross-model UI
