@@ -4954,6 +4954,16 @@ below are retained.
   `/work/oct24-menu-sanitizer-{build,tests}.log`. Original-source comparison,
   real pixels, SDK and native acceptance remain open. Uses separate source
   `/work/oct24-menu-src`; running text/image batches remain unchanged.
+  Menu follow-up `dfe576d6` passes real HPG full-frame cells/labels/disabled
+  colors/page-two checks for 64/80-line displays and both buffering modes.
+  Original 1.1/2.0 comparisons cover all eight APIs and match 6,840 lines;
+  wrong four-byte label negative rejected. Reference shims only rename the
+  duplicate disabled-color symbol and replace the external alloca declaration
+  with the host intrinsic header; first link failure retained. Three sanitizer
+  targets pass. SDK 74007 exits 0 (C/C++, six launchers, three Aplet variants,
+  notebooks, 517 reproducible outputs), log `/work/oct24-menu-sdk.log`. Native
+  menu acceptance remains open. Text Stock 18243 now passes HP39g+/HP39gs and
+  continues HP40gs; image Stock 82374 passes HP39g+ and continues HP39gs.
   Whole text/image analysis 54292 exited before source enumeration because
   its isolated mirror lacked Git metadata. Setup failure log retained at
   `/work/oct24-controls-analysis-setup-failure.log`; corrected process 89153
