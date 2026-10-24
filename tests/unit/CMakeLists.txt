@@ -282,6 +282,8 @@ hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-box.c"
+    "${HPCLANG_ROOT}/runtime/core/win-box-axis.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-choose.c"
     "${HPCLANG_ROOT}/runtime/core/win-choices.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-checkbox.c"
@@ -921,3 +923,9 @@ hpclang_unit(win_box test_win_box.c ${win_adapter_sources}
     "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-box.c" "${HPCLANG_ROOT}/runtime/core/win-box-axis.c")
 target_include_directories(test_win_box PRIVATE "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/include")
+
+hpclang_unit(win_box_reference "${HPCLANG_ROOT}/tests/compat/win-box.c" ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-box.c" "${HPCLANG_ROOT}/runtime/core/win-box-axis.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_box_reference PRIVATE "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/include")

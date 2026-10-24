@@ -238,6 +238,24 @@ def verify_choose(prefix):
     print(f"PASS {prefix}: chooser labels, modal scroll/selection and footer edges in both buffers")
 
 
+def verify_box(prefix):
+    for base in (1500, 1600):
+        for frame in range(3):
+            path = Path(f"{prefix}-{base + frame}.pgm")
+            width, height, pixels = read_pgm(path)
+            if width != 132 or height not in (64, 80):
+                raise AssertionError(f"{path}: unsupported box geometry")
+            for y in range(height):
+                for x in range(width):
+                    ink = False
+                    if frame < 2:
+                        ink = 5 <= x < 21 and 15 <= y < 25 and (x + y) % 2 == 0
+                        ink |= 19 <= y <= 21 and x == 32 + y - 19
+                    if pixels[y * width + x] != (0 if ink else 255):
+                        raise AssertionError(f"{path}: unexpected grouped-layout pixel at {x},{y}")
+    print(f"PASS {prefix}: nested grid geometry, pattern/text and group removal in both buffers")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -255,6 +273,7 @@ def main():
         verify_menu(Path(f"build/{target}-frame"))
         verify_checkbox(Path(f"build/{target}-frame"))
         verify_choose(Path(f"build/{target}-frame"))
+        verify_box(Path(f"build/{target}-frame"))
 
 
 if __name__ == "__main__":

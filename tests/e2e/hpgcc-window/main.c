@@ -7,6 +7,7 @@
 #include <winsoftmenu.h>
 #include <wincheckbox.h>
 #include <winchoose.h>
+#include <winbox.h>
 #include <string.h>
 #include <hpkeyb49.h>
 #include <limits.h>
@@ -572,6 +573,92 @@ static int choose_check(int buffered)
     hpg_free_font(font);
     return hpclang_win_error() ? -1 : hpclang_win_reset();
 }
+
+static int box_check(int buffered)
+{
+    hpg_set_mode_gray16(buffered);
+    physical_edges = 0;
+    win_widget_t *root = win_box_new(), *inner = win_box_new(), *menu = win_softmenu_new();
+    win_widget_t *a = win_checkbox_new("A"), *b = win_choose_new();
+    if (!root || !inner || !menu || !a || !b)
+        return -1;
+    win_choose_add(b, "one");
+    win_choose_add(b, "two");
+    win_checkbox_set_menu(a, menu, 0);
+    win_choose_set_menu(b, menu, 0);
+    win_box_add(inner, a);
+    win_box_add(inner, b);
+    win_box_add(root, menu);
+    win_box_add(root, inner);
+    win_add_widget(root);
+    win_add_event_handler(WIN_KEY_PRESSED, INT_MAX, physical, (void *)(uintptr_t)1);
+    win_add_event_handler(WIN_KEY_RELEASED, INT_MAX, physical, NULL);
+    if (!win_widget_has_focus(a) || text_tap(KB_W) || !win_checkbox_is_selected(a) ||
+        text_tap(KB_DN) || !win_widget_has_focus(b) || text_tap(KB_W) ||
+        win_choose_get_index(b) != 1 || text_tap(KB_A) || text_tap(KB_UP) || text_tap(KB_F) ||
+        win_choose_get_index(b) != 0)
+        return -1;
+    win_box_remove(root, inner);
+    if (text_tap(KB_A) || win_choose_get_index(b) != 0)
+        return -1;
+    win_box_add(root, inner);
+    if (!win_widget_has_focus(a) || text_tap(KB_A) || win_checkbox_is_selected(a) ||
+        text_tap(KB_DN) || !win_widget_has_focus(b) || text_tap(KB_A))
+        return -1;
+    win_remove_widget(root); /* Removal also closes a descendant modal. */
+    if (physical_edges != 20 || hpclang_win_error())
+        return -1;
+    win_checkbox_set_menu(a, NULL, 0);
+    win_choose_set_menu(b, NULL, 0);
+    win_widget_destroy(root);
+    win_widget_destroy(inner);
+    win_widget_destroy(a);
+    win_widget_destroy(b);
+    win_widget_destroy(menu);
+    if (hpclang_win_reset())
+        return -1;
+    char glyphs[256 * 3] = {0};
+    glyphs['A' * 3] = 1;
+    glyphs['A' * 3 + 1] = 2;
+    glyphs['A' * 3 + 2] = 4;
+    char bits[] = {0x55, (char)0xaa};
+    hpg_font_t *font = hpg_alloc_font(glyphs, 256, 3, 3);
+    hpg_pattern_t *pattern = hpg_alloc_pattern(bits, 2, 0);
+    root = win_box_new();
+    inner = win_box_new_padding(2, 0);
+    a = win_img_new(pattern, NULL);
+    b = win_text_new_label("A");
+    if (!font || !pattern || !root || !inner || !a || !b)
+        return -1;
+    win_widget_set_font(b, font);
+    win_box_add_with(inner, a, 0, 0, 1, 1, 8, 8, WIN_BOX_FILL, WIN_BOX_FILL);
+    win_box_add_with(inner, b, 0, 1, 1, 1, 4, 4, WIN_BOX_TRAILING, WIN_BOX_CENTER);
+    win_box_add_with(root, inner, 0, 0, 1, 1, -1, -1, WIN_BOX_FILL, WIN_BOX_FILL);
+    win_widget_set_location(root, 5, 15);
+    win_widget_set_size(root, 30, 10);
+    win_box_layout(root);
+    win_box_layout(inner);
+    for (unsigned frame = 0; frame < 3; ++frame) {
+        if (frame < 2)
+            win_add_widget(root);
+        hpg_clip_reset(NULL);
+        hpg_clear();
+        if (win_post_event(WIN_REPAINT_EVENT, NULL) || hpclang_win_error())
+            return -1;
+        hpg_flip();
+        if (checkpoint((buffered ? 1600 : 1500) + frame))
+            return -1;
+        if (frame < 2)
+            win_remove_widget(root);
+    }
+    win_widget_destroy(root);
+    win_widget_destroy(inner);
+    win_widget_destroy(a);
+    win_widget_destroy(b);
+    hpg_free_pattern(pattern);
+    hpg_free_font(font);
+    return hpclang_win_error() ? -1 : hpclang_win_reset();
+}
 int main(void)
 {
     errno = 0;
@@ -590,6 +677,8 @@ int main(void)
         failure = failure ? failure : 16;
     if (!failure && (choose_check(0) || choose_check(1)))
         failure = failure ? failure : 17;
+    if (!failure && (box_check(0) || box_check(1)))
+        failure = failure ? failure : 18;
     /* Successful allocations may retain errno from an internal failed growth
      * attempt. Attribute errors to this mode switch, not prior successful work. */
     errno = 0;

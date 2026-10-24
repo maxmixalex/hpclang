@@ -17,6 +17,7 @@
 #include <winsoftmenu.h>
 #include <wincheckbox.h>
 #include <winchoose.h>
+#include <winbox.h>
 #include <hpclang/device.h>
 #include <winkeys.h>
 #include "hpgcc-keyboard.h"
@@ -1271,6 +1272,72 @@ static void choose_widget_pixels(void)
     display_height = 6;
 }
 
+static void box_widget_pixels(void)
+{
+    struct hpclang_surface *saved = display;
+    display_width = 48;
+    display_height = 32;
+    display = hpclang_surface_create_mono(49, 32);
+    assert(display);
+    display->width = 48;
+    for (int buffered = 0; buffered < 2; ++buffered) {
+        assert(!hpclang_win_reset());
+        hpg_set_mode_gray16(buffered);
+        char glyphs[256 * 3] = {0};
+        glyphs['A' * 3] = 1;
+        glyphs['A' * 3 + 1] = 2;
+        glyphs['A' * 3 + 2] = 4;
+        char bits[] = {0x55, (char)0xaa};
+        hpg_font_t *font = hpg_alloc_font(glyphs, 256, 3, 3);
+        hpg_pattern_t *pattern = hpg_alloc_pattern(bits, 2, 0);
+        win_widget_t *root = win_box_new(), *grid = win_box_new_padding(2, 0);
+        win_widget_t *picture = win_img_new(pattern, NULL), *label = win_text_new_label("A");
+        assert(font && pattern && root && grid && picture && label);
+        win_widget_set_font(label, font);
+        win_box_add_with(grid, picture, 0, 0, 1, 1, 8, 8, WIN_BOX_FILL, WIN_BOX_FILL);
+        win_box_add_with(grid, label, 0, 1, 1, 1, 4, 4, WIN_BOX_TRAILING, WIN_BOX_CENTER);
+        win_box_add_with(root, grid, 0, 0, 1, 1, -1, -1, WIN_BOX_FILL, WIN_BOX_FILL);
+        win_widget_set_location(root, 5, 15);
+        win_widget_set_size(root, 30, 10);
+        win_box_layout(root);
+        win_box_layout(grid);
+        for (int cycle = 0; cycle < 2; ++cycle) {
+            win_add_widget(root);
+            hpg_clip_reset(NULL);
+            hpg_clear();
+            assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+            for (int y = 0; y < 32; ++y)
+                for (int x = 0; x < 48; ++x) {
+                    int expected = 0;
+                    if (5 <= x && x < 21 && 15 <= y && y < 25 && ((x - 5 + y - 15) % 2 == 0))
+                        expected = 255;
+                    if (19 <= y && y <= 21 && x == 32 + y - 19)
+                        expected = 255;
+                    assert(hpg_get_pixel(NULL, x, y) == expected);
+                }
+            win_remove_widget(root);
+            hpg_clip_reset(NULL);
+            hpg_clear();
+            assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+            for (int y = 0; y < 32; ++y)
+                for (int x = 0; x < 48; ++x)
+                    assert(!hpg_get_pixel(NULL, x, y));
+        }
+        win_widget_destroy(root);
+        win_widget_destroy(grid);
+        win_widget_destroy(picture);
+        win_widget_destroy(label);
+        hpg_free_pattern(pattern);
+        hpg_free_font(font);
+        assert(!hpclang_win_error() && !hpclang_win_reset());
+        hpg_cleanup();
+    }
+    hpclang_surface_destroy(display);
+    display = saved;
+    display_width = 8;
+    display_height = 6;
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -1374,6 +1441,7 @@ int main(void)
     menu_widget_pixels();
     checkbox_widget_pixels();
     choose_widget_pixels();
+    box_widget_pixels();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

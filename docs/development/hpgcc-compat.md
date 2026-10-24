@@ -4,6 +4,20 @@ This page records the M7 source-compatibility inventory. Historical names are in
 
 ## Sources and method
 
+Box acceptance follow-up compares all seven public APIs and the original
+preferred-size helper from both unchanged 1.1/2.0 releases: 144 dense,
+positive-weight grid/alignment/padding cases across surplus/deficit sizes match
+48,816 trace lines (SHA256
+`5b9a06f2d72d31a27c0cee044026699e31d69bc76b57c0213289fac6d19f57f7`).
+The original zero-weight/NULL-child/lifecycle defects are excluded from parity
+and covered by independent repair tests. Wrong padding is rejected. Eleven
+related sanitizer targets pass, including production HPG nested layout and
+group removal pixels in both buffers. Six Direct models pass 40 added GPIO
+edges/model, nested focus/menu controls, dynamic membership, modal removal,
+full-frame pattern/text layout/removal and settled return. Missing label pixels
+are rejected. Process 74185 continues Stock; full 153-test regression 37870 and
+whole analysis 18338 run. Logs `/work/oct24-box-*`; CI acceptance remains open.
+
 Local box adapter follow-up supplies all seven `winbox.h` functions, explicit
 grid layout and nested grouping. Children are borrowed with one parent; cycles
 and bound-child destruction are rejected. Group installation is iterative and

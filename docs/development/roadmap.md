@@ -20,6 +20,24 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Box acceptance follow-up compares unchanged original 1.1/2.0 box sources:
+144 dense positive-weight grid/alignment/padding cases and repeated available
+sizes match 48,816 lines (SHA256
+`5b9a06f2d72d31a27c0cee044026699e31d69bc76b57c0213289fac6d19f57f7`).
+Wrong padding is rejected; original zero-weight/placeholder/lifecycle defects
+remain separately tested repairs. Eleven related sanitizer targets pass,
+including actual HPG nested pattern/text geometry and removal in both buffers.
+Six-model Direct passes 40 additional GPIO edges/model for grouped controls,
+dynamic membership/focus/menu bindings and descendant modal removal, with
+independent full-frame layout/removal pixels and settled return. Missing label
+pixel is rejected. Combined process 74185 now runs Stock on the fixed box
+artifact; full 153-test regression 37870 and whole analysis 18338 run separately.
+Logs `/work/oct24-box-*`; no Stock/full-regression/CI acceptance is claimed.
+
+Chooser full regression 29287 completes all 150 tests in 1359.26 seconds.
+Together with 368-source analysis it covers the pre-box implementation. Fixed
+return-check Direct passes all six models; process 69407 continues Stock.
+
 Box public follow-up implements all seven APIs, explicit weighted grid layout,
 NULL placeholders and nested borrowed children. The widget foundation walks
 groups outside callbacks, rolls back failed installation, rejects cycles and
