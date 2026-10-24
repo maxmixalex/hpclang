@@ -439,6 +439,21 @@ changing its tree; later audio and C++ storage-owner work remains local and
 separately unaccepted. Fresh PR/main CI runs were not polled.
 This does not complete M8.
 
+Batch review (2026-10-24, before submission): canonical and KOS mode matrices
+pass all six Direct/Stock targets. The KOS-entry normal-exit matrix now also
+passes all six Direct/Stock targets; the same queue (21588) has advanced to
+immediate exit. Earlier canonical-API immediate-exit evidence remains recorded
+below and does not substitute for the pending complete KOS-entry matrix.
+The current tracked tree is copied into `/work/oct24-prepush-src`. Final whole
+lint/format and all 173 Python tests pass. Whole-project analysis remains live
+on session 71555, covering 326 sources and 1,339 configurations from 4,047
+compile entries. Logs are `/work/oct24-prepush-{lint,format,python,analysis}.log`.
+KOS immediate exit now passes all six Direct models and HP49g+/HP50g/HP48gII
+Stock; HP39 Stock continues on the same queue. C++ owners retain their
+separate native Storage and focused sanitizer evidence; the final SDK gate
+includes 389 reproducible release outputs and HP39 footprint regeneration.
+This batch is not yet submitted; remaining local/CI gates stay explicit.
+
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
 actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
 bytes and native object nibbles, validating the native encoded extent. Raw-only
