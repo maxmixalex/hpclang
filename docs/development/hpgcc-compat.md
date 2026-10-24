@@ -4,6 +4,38 @@ This page records the M7 source-compatibility inventory. Historical names are in
 
 ## Sources and method
 
+### Current window validation follow-up
+
+Box dimension guard `b57503fd` makes the nonempty grid allocation invariant
+explicit. Three sanitizer tests and both 48,816-line original-source comparisons
+pass; the full 373-source analysis now passes. The preceding box implementation
+also completes all 153 sanitizer tests in 1408.86 seconds. These are local gates.
+
+The monolithic window payload exhausted HP39g+ Stock heap when requesting
+16-level double buffering. A diagnostic run records `ENOMEM` (12), mailbox
+`0x4641782c`, 36 KiB boot RW, and frames 100..122 before failure. The failed
+request preserves the preceding single-buffer mode, so correct content pixels
+alone did not prove double buffering. Logs and snapshots are preserved in
+`/work/oct24-mode-diag-*`; this is distinct from the earlier final errno check.
+
+The maintained native fixture now checks the actual surface levels and whether
+`hpg_flip()` exchanges the back page after every mode request. CI splits the
+same checks into two universal applications: `hpgcc-window` covers keyboard,
+progress, text, image, menu and checkbox; `hpgcc-window-dialogs` covers chooser
+and nested box/grouping. Both retain final event/timer rendering and settled
+return checks. Both run on all six models in Direct and Stock contexts. CMake
+group 0 retains the monolithic diagnostic build (`verify.py --suite all`).
+
+Payloads are 63,648 and 65,488 bytes (16 code pages each), compared with the
+72,048-byte monolith. The build rejects either fixture above 16 code pages;
+this is a fixture budget, not a general application memory guarantee. All six
+Direct models pass for both groups. HPC files and all six raw launchers match
+the maintained builds byte-for-byte. Eight planning tests, both ARM analysis
+configurations, verifier dispatch and missing-frame rejection pass. Stock
+processes 51945/76541 continue; no Stock or CI acceptance is claimed yet.
+
+The earlier component snapshots below retain their original validation stage.
+
 Box acceptance follow-up compares all seven public APIs and the original
 preferred-size helper from both unchanged 1.1/2.0 releases: 144 dense,
 positive-weight grid/alignment/padding cases across surplus/deficit sizes match

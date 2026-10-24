@@ -256,24 +256,27 @@ def verify_box(prefix):
     print(f"PASS {prefix}: nested grid geometry, pattern/text and group removal in both buffers")
 
 
-def main():
+def main(suite="foundation"):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
     parser.add_argument("family", choices=("hp39", "hp48", "hp4950"))
+    parser.add_argument("--suite", choices=("foundation", "dialogs", "all"), default=suite)
     args = parser.parse_args()
     targets = Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines()
     if not targets:
         raise AssertionError("No executed targets to verify")
     for target in targets:
         verify(Path(f"build/{target}-pass.pgm"))
-        verify_keys(Path(f"build/{target}-frame"))
-        verify_controls(Path(f"build/{target}-frame"))
-        verify_text(Path(f"build/{target}-frame"))
-        verify_image(Path(f"build/{target}-frame"))
-        verify_menu(Path(f"build/{target}-frame"))
-        verify_checkbox(Path(f"build/{target}-frame"))
-        verify_choose(Path(f"build/{target}-frame"))
-        verify_box(Path(f"build/{target}-frame"))
+        if args.suite in ("foundation", "all"):
+            verify_keys(Path(f"build/{target}-frame"))
+            verify_controls(Path(f"build/{target}-frame"))
+            verify_text(Path(f"build/{target}-frame"))
+            verify_image(Path(f"build/{target}-frame"))
+            verify_menu(Path(f"build/{target}-frame"))
+            verify_checkbox(Path(f"build/{target}-frame"))
+        if args.suite in ("dialogs", "all"):
+            verify_choose(Path(f"build/{target}-frame"))
+            verify_box(Path(f"build/{target}-frame"))
 
 
 if __name__ == "__main__":
