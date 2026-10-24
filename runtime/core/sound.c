@@ -4,6 +4,7 @@
 #include <hpclang/time.h>
 #include "clock-internal.h"
 #include "sound-engine.h"
+#include "exit-hooks.h"
 
 static const uintptr_t registers[] = {0x07600000, 0x07600004, 0x07600008, 0x07600024, 0x07600028,
                                       0x0760002c, 0x07a00010, 0x07100008, 0x07100000, 0x07100010};
@@ -22,11 +23,19 @@ static struct hpclang_sound_saved saved;
 
 int hpclang_sound_active(void)
 {
+    return saved.owned ||
+           (hpclang_exit_hooks.sound_async_active && hpclang_exit_hooks.sound_async_active());
+}
+
+int hpclang_sound_blocking_active(void)
+{
     return saved.owned;
 }
 
 void hpclang_sound_restore(void)
 {
+    if (hpclang_exit_hooks.sound_async)
+        hpclang_exit_hooks.sound_async();
     hpclang_sound_release(&bus, &saved);
 }
 
@@ -39,6 +48,10 @@ int hpclang_sound_play(uint32_t frequency_hz, uint32_t duration_ms, hpclang_soun
     }
     if (!duration_ms)
         return 0;
+    if (hpclang_sound_active()) {
+        errno = EBUSY;
+        return -1;
+    }
     if (hpclang_device_info()->family == HPCLANG_FAMILY_UNKNOWN) {
         errno = ENOSYS;
         return -1;

@@ -19,6 +19,7 @@ add_executable(hpclang_system_services_e2e
     irq.S
     watchdog-irq.c
     watchdog-irq.S
+    sound-async.c
     power.c
     console.c)
 

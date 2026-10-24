@@ -4,6 +4,8 @@
 #include <hpclang/device.h>
 #include <hpclang/sound.h>
 #include "sound-engine.h"
+#include "exit-hooks.h"
+struct hpclang_exit_hooks hpclang_exit_hooks;
 
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 static uint64_t now, acquired_at, released_at;

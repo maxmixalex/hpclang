@@ -4433,11 +4433,32 @@ below are retained.
   admission rollback and restoration. They forbid bank exchange from ISR.
   The maintained native fixture now dispatches through this session; HP50g
   Direct passes with independent pixels/input/return and pre-cleanup peripheral
-  restoration. ARM build/analysis pass. HP50g Stock is running on session 97813
+  restoration. ARM build/analysis pass. HP50g Stock passed on session 97813
   in `/work/oct24-sound-session-src`, artifact `/work/oct24-sound-session-artifact`,
   logs `/work/oct24-sound-session-{direct,stock}-hp50g.log`. Public API/HPGCC
   flags, CPU interrupt-state lifetime and normal/immediate-exit wiring remain
   open; host session close tests alone do not establish exit-path acceptance.
+  Public-interface work in progress adds `hpclang_sound_start/status/stop`, an
+  owned ARM IRQ entry, optional cleanup/activity hooks, blocking-tone exclusion,
+  CPU interrupt-mask collection and unexpected-IRQ failure cleanup. Wrapper
+  ASan/UBSan tests mock the session while checking masks/hooks/errors; real-engine
+  session tests remain separate. Blocking API and existing runtime-exit tests
+  pass, but that exit test stubs sound cleanup and is not new native exit proof.
+  ARM build/static analysis pass. The first maintained native public test
+  rejects overlapping requests, replaces a tone, busy-waits without SDK calls,
+  checks autonomous peripheral restoration, collects the IRQ lease and cancels
+  another tone. HP50g Direct fails its IRQ-vector restoration check after
+  replacement: initial result 0x7c0b, refined result 0x7c2c. It is NOT accepted.
+  Artifacts `/work/oct24-sound-api-artifact` and `-v2-artifact`, failed results
+  `/work/oct24-sound-api-failed-direct` and `-v2-failed-direct` are retained.
+  A diagnostic result encoding accidentally allowed unsigned arithmetic to
+  turn a zero vector into success; its apparent pass is invalid evidence.
+  A further diagnostic records expected vector low bits 0x79b4. The isolated
+  no-replacement variant passes Direct (session 2127 exit 0), narrowing the
+  defect to replacement/collection rather than autonomous shutdown alone.
+  Its source currently lives in `/work/oct24-sound-api-src`; the repository
+  retains the strict replacement test. No API Stock run or CI submission is
+  claimed; repair replacement restoration before advancing public acceptance.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;

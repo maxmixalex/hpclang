@@ -122,6 +122,8 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/watchdog-alarm.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/irq-owner.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-session.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-async.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-async-entry.S"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-playback.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/time-math.c"

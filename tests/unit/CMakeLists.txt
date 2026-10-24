@@ -360,6 +360,10 @@ hpclang_unit(sound_session test_sound_session.c
     "${HPCLANG_ROOT}/runtime/core/watchdog-alarm.c"
     "${HPCLANG_ROOT}/runtime/core/irq-owner.c")
 target_include_directories(test_sound_session PRIVATE "${HPCLANG_ROOT}/runtime/core")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    hpclang_unit(sound_async test_sound_async.c "${HPCLANG_ROOT}/runtime/core/sound-async.c")
+    target_include_directories(test_sound_async PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+endif()
 hpclang_unit(sound_playback test_sound_playback.c
     "${HPCLANG_ROOT}/runtime/core/sound-playback.c"
     "${HPCLANG_ROOT}/runtime/core/sound-engine.c"
