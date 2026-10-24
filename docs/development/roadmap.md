@@ -4862,6 +4862,22 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Local native window-key fixture (after 8403e215, not pushed): the maintained
+  `hpgcc-window` client now requests real emulator GPIO transitions through the
+  shared KI/KJ mailbox. Each of single/double-buffer gray16 modes checks 22 edges
+  and five typed callbacks, covering one-shot/locked Alpha, plain digits, shifted
+  lowercase, right-shift unmapped characters and releases. The independent
+  verifier checks every pixel in 44 captured status frames per model, gray-9
+  locked Alpha, white background and real single/double-page exchange. Corrupting
+  a locked-Alpha pixel is rejected. All six Direct models pass, including the
+  existing timer/repaint final image and settled return (35844/62504 exit 0).
+  ARM analysis, six-model compilation, Ruff and formatting pass. Evidence:
+  `/work/oct24-win-physical-direct-evidence` and
+  `/work/oct24-win-physical-{hp39,hp48,hp4950}.log`. Stock all-six execution is
+  running in process 32221 with dedicated `oct24-win-physical-stock-*` assets and
+  logs; no Stock result is claimed yet. Shipped-example native execution and CI
+  acceptance remain separate. No new push was made.
+
   Local modifier-indicator integration (after 526669a8, not pushed): the default
   priority-2000000000 repaint handler sets historical Alpha/Shift segments from
   current held/latch states: white off, black on/held, gray 9 locked Alpha.

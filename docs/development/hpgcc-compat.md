@@ -771,6 +771,16 @@ SDK builds, six-model launchers and three HP39 Aplet variants pass, with 453
 byte-identical outputs from two clean builds (`/work/oct24-win-keys-sdk.log`).
 This validates header delivery and application packaging, not physical input.
 
+The maintained window fixture additionally passes all six Direct models with
+real GPIO input: 22 press/release transitions and five expected typed callbacks
+in each of single/double-buffer gray16 modes. An independent verifier checks all
+pixels in 44 LCD/status captures per model and actual page exchange. One-shot
+and locked Alpha, digits, left-shift lowercase and right-shift unmapped keys are
+covered; a corrupted locked-Alpha status pixel is rejected. The original timer,
+final-frame and settled-return checks still pass. Stock execution of this new
+fixture is running; neither it nor shipped-example native execution is claimed
+complete. This is emulator GPIO evidence, not a physical-calculator test.
+
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter
