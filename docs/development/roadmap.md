@@ -4861,6 +4861,27 @@ below are retained.
   seven planner tests and verifier Ruff/format checks pass. Included in the
   current submission; formal CI acceptance remains pending.
 
+
+  Local typed-key foundation (after submission 95348ce8): `win-key-state` now
+  owns Alpha/left/right latch and held states independently of the physical
+  polling generator. It preserves the original character tables, one-shot
+  clearing before typed callbacks, synchronous typed/modifier/repaint order,
+  callback return values and reentrant state observations. Injected post failures
+  latch errno after partial delivery; later input cannot silently replay it.
+  Two focused ASan/UBSan targets pass, including failed typed/modifier/repaint
+  stages, nested failure propagation and valid callback -1. The optional
+  `tests/compat/check-win-key-state.py` compiles caller-supplied HPGCC 1.1 and
+  2.0 key handlers: both match 94,253 trace lines across 2,304 modifier/key
+  setups plus three nested cases. SHA-256:
+  `b18361346679d3a36ac3ec45bad31b67a73a1983eae1ccbfdbdfdabd615f665f`.
+  An intentionally wrong alpha character is rejected by the same comparison.
+  Host/ARM analysis, formatter/Ruff and a six-model launcher build pass; evidence
+  is `/work/oct24-win-key-state-{test,parity,negative,arm,host-analysis,arm-analysis}.log`.
+  This is internal source-compatibility behavior for historical KB_* values;
+  public typed/modifier handlers, model interpretation, indicators and native
+  physical-key acceptance remain open. Existing public window generators are
+  unchanged. This local work is outside PR #10's submitted head.
+
 #### M8.5 — Modern C++ and migration
 
 The installed SDK now includes `docs/migration.md`, linked from Getting started

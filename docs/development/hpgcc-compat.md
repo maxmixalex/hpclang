@@ -737,6 +737,20 @@ Typed-key/modifier
 events 3..6, historical widgets and the complete `win.h` umbrella remain work
 in progress, not supported names with empty implementations.
 
+An internal `win-key-state` engine now reproduces the original default key
+handler's Alpha/Shift latches, held-state metadata and character tables. Its
+injected synchronous post preserves one-shot clearing before typed callbacks,
+modifier snapshots after those callbacks, and nested modifier notification order.
+Failures of typed/modifier/repaint posts are latched after partial delivery;
+a callback returning -1 remains a completed dispatch result. It is not yet
+connected to the public window generator or model-specific text interpretation.
+`tests/compat/check-win-key-state.py <archive-directory>` compiles caller-supplied
+1.1/2.0 sources under ASan/UBSan and compares 94,253 trace lines, including held
+Alpha, crossed shifts and nested callbacks. Both references match; a deliberately
+wrong alpha mapping is rejected. Focused failure tests, host/ARM analysis and
+six-model launcher compilation pass. Public keyboard integration and physical
+input/indicator acceptance remain required.
+
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter

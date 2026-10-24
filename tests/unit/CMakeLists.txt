@@ -49,6 +49,15 @@ target_include_directories(test_sst_flash PRIVATE "${HPCLANG_ROOT}/runtime/core"
 hpclang_unit(rtc_tick test_rtc_tick.c "${HPCLANG_ROOT}/runtime/core/rtc-tick.c")
 target_include_directories(test_rtc_tick PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(win_key_state test_win_key_state.c
+    "${HPCLANG_ROOT}/runtime/core/win-key-state.c")
+target_include_directories(test_win_key_state PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+hpclang_unit(win_key_state_reference "${HPCLANG_ROOT}/tests/compat/win-key-state.c"
+    "${HPCLANG_ROOT}/runtime/core/win-key-state.c")
+target_include_directories(test_win_key_state_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+
 hpclang_unit(win_events test_win_events.c "${HPCLANG_ROOT}/runtime/core/win-events.c")
 target_include_directories(test_win_events PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
