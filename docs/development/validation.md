@@ -1,5 +1,24 @@
 # Validation
 
+## Installed SDK release reproducibility
+
+`tests/sdk/check.py` installs and relocates the SDK, then builds its external
+C/C++ clients in two distinct source and build directories. With identical
+toolchain and configuration, it requires byte-identical generated font C/header
+resources, HPC1 images, six-model raw/wrapped launchers and memory reports.
+When the Aplet tool/assets are supplied, it also compares the three HP39 Aplet
+envelopes, companion files and host-side footprint reports. The SDK gate checks
+each Aplet report against the actual file sizes and regenerates a deleted report
+through the normal CMake build. A missing output or any byte difference
+fails the gate. Both builds use the installed package, not checkout headers.
+
+This checks the maintained SDK examples under `MinSizeRel`. It does not claim
+identical output across compiler versions, platforms, debug configurations or
+arbitrary application sources (for example, sources embedding build timestamps
+or absolute paths). ELF/debug metadata and CMake dependency/cache files are
+outside this release-artifact comparison. Existing execution and Stock-return
+gates independently validate runtime behavior.
+
 ## Stock setup contracts
 
 Focused classic Stock applications may provide `stock-setup.json` with exactly

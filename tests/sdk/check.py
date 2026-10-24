@@ -98,9 +98,15 @@ def main():
         )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
         shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
+        shutil.copytree(package / "examples/hpgcc-window", application / "window")
+        shutil.copyfile(application / "window/main.c", application / "window.cpp")
         shutil.copytree(package / "examples/hpgcc-console", application / "console")
         shutil.copytree(package / "examples/notebook", application / "notebook")
         shutil.copyfile(root / "tests/sdk/numeric-input.cpp", application / "numeric-input.cpp")
+        for suffix in ("c", "cpp"):
+            shutil.copyfile(root / "tests/sdk/sound.c", application / f"sound.{suffix}")
+            shutil.copyfile(root / "tests/sdk/widget.c", application / f"widget.{suffix}")
+        shutil.copytree(package / "examples/storage-cpp", application / "storage")
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
@@ -108,11 +114,25 @@ def main():
                 "hpclang_add_application(numeric_input numeric-input.cpp)\n"
                 "target_compile_features(numeric_input PRIVATE cxx_std_17)\n"
                 "hpclang_target_launchers(numeric_input)\n"
+                "hpclang_add_application(sound_c sound.c)\n"
+                "hpclang_add_application(sound_cpp sound.cpp)\n"
+                "hpclang_target_launchers(sound_c)\n"
+                "hpclang_target_launchers(sound_cpp)\n"
+                "add_subdirectory(storage)\n"
+                "add_subdirectory(window)\n"
+                "hpclang_add_application(window_cpp window.cpp)\n"
+                "target_compile_features(window_cpp PRIVATE cxx_std_23)\n"
+                "hpclang_target_launchers(window_cpp)\n"
+                "hpclang_add_application(widget_c widget.c)\n"
+                "hpclang_add_application(widget_cpp widget.cpp)\n"
+                "target_compile_features(widget_cpp PRIVATE cxx_std_23)\n"
+                "hpclang_target_launchers(widget_c)\n"
+                "hpclang_target_launchers(widget_cpp)\n"
             )
         if args.aplet_tool:
             with (application / "CMakeLists.txt").open("a") as source:
                 source.write("""
-foreach(application IN ITEMS hello_c hello_cpp numeric_input)
+foreach(application IN ITEMS hello_c hello_cpp numeric_input sound_c sound_cpp window_cpp widget_c widget_cpp)
     foreach(model IN ITEMS hp39gplus hp39gs hp40gs)
         hpclang_target_aplet(${application} MODEL ${model} NAME "SDK example"
             AUTHOR hpclang TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")
@@ -123,7 +143,9 @@ endforeach()
                 ("devices", "declarative_ui"),
                 ("counter", "declarative_ui_cpp"),
                 ("objects", "object_cpp"),
+                ("storage", "storage_cpp"),
                 ("timer", "hpgcc_timer"),
+                ("window", "hpgcc_window"),
                 ("console", "hpgcc_console"),
                 ("notebook", "notebook"),
             ):
@@ -137,12 +159,7 @@ endforeach()
 """.replace("TARGET_NAME", target)
                     )
         build = work / "build"
-        run(
-            "cmake",
-            "-S",
-            str(application),
-            "-B",
-            str(build),
+        configure_options = [
             "-DCMAKE_BUILD_TYPE=MinSizeRel",
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
             f"-DCMAKE_PREFIX_PATH={sdk}",
@@ -155,8 +172,8 @@ endforeach()
                 if args.aplet_tool
                 else []
             ),
-            env=env,
-        )
+        ]
+        run("cmake", "-S", str(application), "-B", str(build), *configure_options, env=env)
         run("cmake", "--build", str(build), "--parallel", "2", env=env)
         counter_args = (
             (build / "counter/declarative_ui_cpp-launchers.args").read_text().splitlines()
@@ -169,17 +186,29 @@ endforeach()
             for forbidden in (str(root), str(prefix)):
                 if forbidden in serialized:
                     raise AssertionError(f"Nonrelocatable build dependency: {forbidden}")
+        reproducible_outputs = []
         for name, output in (
             ("hello_c", build),
             ("hello_cpp", build),
             ("numeric_input", build),
+            ("sound_c", build),
+            ("sound_cpp", build),
+            ("storage_cpp", build / "storage"),
             ("declarative_ui", build / "devices"),
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
+            ("hpgcc_window", build / "window"),
+            ("window_cpp", build),
+            ("widget_c", build),
+            ("widget_cpp", build),
             ("hpgcc_console", build / "console"),
             ("notebook", build / "notebook"),
         ):
+            reproducible_outputs.extend(
+                (output / filename).relative_to(build)
+                for filename in (f"{name}.hpc", f"{name}-launchers/memory.json")
+            )
             elf = (output / f"{name}.elf").read_bytes()
             hpc = (output / f"{name}.hpc").read_bytes()
             if elf[:4] != b"\x7fELF" or int.from_bytes(elf[18:20], "little") != 40:
@@ -220,6 +249,9 @@ endforeach()
                 "hp50g",
             ):
                 launcher = output / f"{name}-launchers" / model
+                reproducible_outputs.extend(
+                    launcher.with_suffix(suffix).relative_to(build) for suffix in (".bin", ".hp")
+                )
                 binary = launcher.with_suffix(".bin").read_bytes()
                 wrapped = launcher.with_suffix(".hp").read_bytes()
                 sizes = memory["serialized"]["models"][model]
@@ -235,6 +267,17 @@ endforeach()
                     )
                 if args.aplet_tool and model in ("hp39gplus", "hp39gs", "hp40gs"):
                     bundle = output / f"{name}-aplet" / model
+                    reproducible_outputs.extend(
+                        (bundle / filename).relative_to(build)
+                        for filename in (
+                            "HPGCC000.000",
+                            "HPCRESET.000",
+                            "LIB275L.000",
+                            "HP39DIR.000",
+                            "HP39DIR.CUR",
+                            "footprint.json",
+                        )
+                    )
                     aplet = (bundle / "HPGCC000.000").read_bytes()
                     if not aplet.startswith(b"HP39BinB\x0bSDK example") or embedded not in aplet:
                         raise AssertionError(f"{name}/{model}: invalid installable Aplet")
@@ -246,10 +289,61 @@ endforeach()
                     ):
                         if not (bundle / asset).stat().st_size:
                             raise AssertionError(f"missing Aplet companion: {asset}")
+                    footprint = json.loads((bundle / "footprint.json").read_text())
+                    files = {
+                        filename: (bundle / filename).stat().st_size
+                        for filename in (
+                            "HPGCC000.000",
+                            "HPCRESET.000",
+                            "LIB275L.000",
+                            "HP39DIR.000",
+                            "HP39DIR.CUR",
+                        )
+                    }
+                    if (
+                        footprint["version"] != 1
+                        or footprint["input_launcher_file_bytes"] != len(wrapped)
+                        or footprint["embedded_launcher_bytes"] != len(wrapped) - 8
+                        or footprint["aplet_file_bytes"] != len(aplet)
+                        or footprint["aplet_non_launcher_bytes"] != len(aplet) - len(wrapped) + 8
+                        or footprint["files"] != files
+                        or footprint["bundle_file_bytes"] != sum(files.values())
+                        or not footprint["excludes"]
+                    ):
+                        raise AssertionError(f"{name}/{model}: Aplet footprint accounting mismatch")
+        # Clean builds in distinct source/output directories must publish the
+        # same resources. CMake caches, debug/ELF metadata and dependency files
+        # are not portable release artifacts and are deliberately excluded.
+        for directory in build.rglob("hpclang-fonts"):
+            reproducible_outputs.extend(
+                path.relative_to(build)
+                for path in directory.rglob("*")
+                if path.is_file() and path.suffix in (".c", ".h")
+            )
+        if not any("hpclang-fonts" in path.parts for path in reproducible_outputs):
+            raise AssertionError("No generated font resources in reproducibility gate")
+        repeated_source = work / "second source directory"
+        repeated_build = work / "second clean build"
+        shutil.copytree(application, repeated_source)
+        run(
+            "cmake",
+            "-S",
+            str(repeated_source),
+            "-B",
+            str(repeated_build),
+            *configure_options,
+            env=env,
+        )
+        run("cmake", "--build", str(repeated_build), "--parallel", "2", env=env)
+        for relative in reproducible_outputs:
+            if (build / relative).read_bytes() != (repeated_build / relative).read_bytes():
+                raise AssertionError(f"Nonreproducible installed SDK output: {relative}")
+        print(f"Installed SDK: {len(reproducible_outputs)} release outputs byte-identical PASS")
         # A missing declared output must be regenerated without touching source.
         missing = [build / "hello_c-launchers/hp50g.hp", build / "hello_cpp-launchers/memory.json"]
         if args.aplet_tool:
             missing.append(build / "hello_cpp-aplet/hp39gs/HPCRESET.000")
+            missing.append(build / "hello_c-aplet/hp40gs/footprint.json")
         for path in missing:
             path.unlink()
         run("cmake", "--build", str(build), "--parallel", "2", env=env)

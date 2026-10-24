@@ -6,6 +6,7 @@
 #include <hpclang/time.h>
 #include <errno.h>
 #include "keyboard-key-map.h"
+#include "hpgcc-keyboard.h"
 
 static unsigned model(void)
 {
@@ -37,21 +38,30 @@ int keyb_isAnyKeyPressed(void)
     hpclang_keyboard_read(&state);
     return state.bits != 0;
 }
-void keyb_getmatrix(keymatrix *ptr)
+int hpclang_hpgcc_keymatrix_read(keymatrix *ptr)
 {
     if (!ptr) {
         errno = EINVAL;
-        return;
+        return -1;
     }
-    ptr->full = 0;
     if (!model())
-        return;
+        return -1;
+    int saved = errno;
     struct hpclang_keyboard_state state;
     hpclang_keyboard_read(&state);
+    ptr->full = 0;
     for (unsigned col = 0; col < HPCLANG_KEYBOARD_COLUMNS; ++col)
         ptr->full |= ((state.bits >> (col * 7)) & UINT64_C(0x7f)) << (col * 8 + 1);
     ptr->full |= ((state.bits >> HPCLANG_KEYBOARD_GPF4) & UINT64_C(7)) << 60;
     ptr->full |= ((state.bits >> HPCLANG_KEYBOARD_ON) & UINT64_C(1)) << 63;
+    errno = saved;
+    return 0;
+}
+void keyb_getmatrix(keymatrix *ptr)
+{
+    if (ptr)
+        ptr->full = 0;
+    (void)hpclang_hpgcc_keymatrix_read(ptr);
 }
 int keyb_isKeyPrM(int keycode)
 {

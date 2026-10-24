@@ -1,6 +1,7 @@
 #include <hpclang/abi.h>
 #include <hpclang/target.h>
 #include <hpclang/time.h>
+#include "clock-internal.h"
 #include "irq.h"
 #include "stock-flash.h"
 
@@ -15,7 +16,7 @@ void hpclang_flash_write16(void *context, uint32_t address, uint16_t value);
 static uint32_t flash_time_us(void *context)
 {
     (void)context;
-    return (uint32_t)hpclang_time_monotonic_us();
+    return (uint32_t)hpclang_time_monotonic_us_masked();
 }
 
 struct flash_owner

@@ -1262,6 +1262,69 @@ static uint32_t s3c2410_timer_read( void* opaque, target_phys_addr_t offset )"""
     )
 
 
+def patch_watchdog_clock(root: Path, args: argparse.Namespace) -> None:
+    """Schedule watchdog expiry from PCLK, preserving fractional count phase."""
+    for name in ("watchdog-clock.h", "watchdog-model.inc"):
+        shutil.copy2(args.headless_header.parent / name, root / "src" / name)
+    path = root / "src/s3c2410/s3c2410_watchdog.c"
+    replace_once(
+        path,
+        '#include "s3c2410_intc.h"',
+        '#include "s3c2410_intc.h"\n#include "../watchdog-clock.h"',
+        "watchdog clock API",
+    )
+    replace_once(
+        path,
+        "    unsigned long interval;",
+        "    struct hpclang_watchdog_clock clock;",
+        "watchdog clock state",
+    )
+    source = path.read_text()
+    first = source.index("static void s3c2410_watchdog_tick(")
+    last = source.index("static int s3c2410_watchdog_load(", first)
+    replace_once(
+        path,
+        source[first:last],
+        '#include "../watchdog-model.inc"\n\n',
+        "watchdog count and register model",
+    )
+    replace_once(
+        path,
+        "    for ( i = 0; i < watchdog->nr_regs; i++ ) {\n"
+        "        reg = &watchdog->regs[ i ];\n\n"
+        "        if ( NULL == reg->name )\n            continue;\n\n"
+        "        module_set_u32",
+        "    hpclang_watchdog_sync(watchdog);\n"
+        "    for ( i = 0; i < watchdog->nr_regs; i++ ) {\n"
+        "        reg = &watchdog->regs[ i ];\n\n"
+        "        if ( NULL == reg->name )\n            continue;\n\n"
+        "        module_set_u32",
+        "watchdog save current count",
+    )
+    header = root / "src/s3c2410/s3c2410_watchdog.h"
+    replace_once(
+        header,
+        "extern int s3c2410_init_module_watchdog( hdw_t* hdw_state );",
+        "extern int s3c2410_init_module_watchdog( hdw_t* hdw_state );\n"
+        "extern void s3c2410_watchdog_clock_changed( hdw_t* hdw_state );",
+        "watchdog clock transition declaration",
+    )
+    power = root / "src/s3c2410/s3c2410_power.c"
+    replace_once(
+        power,
+        '#include "s3c2410_timer.h"',
+        '#include "s3c2410_timer.h"\n#include "s3c2410_watchdog.h"',
+        "power watchdog notification API",
+    )
+    replace_once(
+        power,
+        "    s3c2410_timer_clock_changed(hdw_state, old_pclk);",
+        "    s3c2410_timer_clock_changed(hdw_state, old_pclk);\n"
+        "    s3c2410_watchdog_clock_changed(hdw_state);",
+        "watchdog PCLK notification",
+    )
+
+
 def patch_sd_card_identity(root: Path) -> None:
     """Keep a virtual card's serial tied to its backing file, not its contents."""
     path = root / "src/s3c2410/s3c2410_sdi.c"
@@ -1362,6 +1425,7 @@ def main() -> None:
     patch_lcd_scanout(root)
     patch_sd_card_identity(root)
     patch_power_clock(root, args)
+    patch_watchdog_clock(root, args)
 
 
 if __name__ == "__main__":

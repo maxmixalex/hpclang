@@ -20,6 +20,7 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Principles
 
+- before each subsequent remote push, inspect the previous push's CI and failed-job logs; record unresolved causes explicitly and do not treat cancelled or pending runs as passes; do not poll newly pushed CI;
 - one application ABI: HPC1 / hpclang v1;
 - one common ARMv4T runtime;
 - thin platform implementations: `hp39`, `hp48`, and `hp4950`;
@@ -419,13 +420,131 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Maintainer push rule (2026-10-24): before every subsequent remote push, inspect
+the preceding push's CI and investigate failures. Record pending/failed runs
+explicitly; do not replace their acceptance with a newer submission.
+
 2026-10-24 acceptance: all six workflows pass at `64d223d9` (Quality
 39935566666, Core 39935566642, Runtime 39935566879, Objects 39935566875,
 Storage 39935566853 and Font Gallery 39935566811). Runtime includes every
 Direct family and all six Stock UI targets. PR #8 merged the timing, linked
 memory-report, minimum-RW admission and installed C example budget batch into
 main as `17444cb7`. Later pool-observer, serialized-report, sketch-review and
-migration-guide changes remain a separate batch; this does not complete M8.
+migration-guide changes were pushed separately as `d409b014` after all six
+local Stock observations, relevant host/sanitizer/Python checks, SDK packaging,
+Ruff and strict docs passed. On the subsequent check, Quality 40050688500,
+Storage 40050688494, Runtime 40050688507 and Objects 40050688481 pass. Runtime's
+three Direct UI families and all six Stock UI/pool jobs pass. Core 40050688514
+now also passes, including every native Port lifecycle job. Font Gallery
+40050688484 passes after its cancelled publisher was re-run. All six workflows
+therefore pass at exactly `d409b01453cddc77fc60932ac20d52f06dee4052`.
+[PR #9](https://github.com/maxmixalex/hpclang/pull/9) merged this accepted batch
+into main as `23338a57`. The local work branch merged that ancestry without
+changing its tree. The later audio, C++ storage-owner and SDK batch is submitted
+separately as described below and is not CI accepted. Fresh PR/main CI runs
+were not polled.
+This does not complete M8.
+
+Batch submission (2026-10-24): canonical and KOS mode matrices
+pass all six Direct/Stock targets. The KOS-entry normal-exit matrix now also
+passes all six Direct/Stock targets. KOS-entry immediate exit now also passes
+all six Direct/Stock targets; the final HP39 Stock log records all three
+model checks and normal return. The original queue has terminated.
+The current tracked tree is copied into `/work/oct24-prepush-src`. Final whole
+lint/format and all 173 Python tests pass. Whole-project analysis completed
+on session 71555 across 326 sources and 1,339 configurations from 4,047
+compile entries. It returned exit 1 for one unchecked `rewind()` error in the
+new stream-owner host test; the other 325 sources passed. The test now uses
+checked `fseek()`. Its exact host analysis configuration and ASan/UBSan test
+both pass after correction; no runtime code changed. Logs are
+`/work/oct24-prepush-{lint,format,python,analysis}.log` and
+`/work/oct24-prepush-stream-{analysis,build,test}.log`.
+KOS exit results are retained in `/work/oct24-kos-{exit,immediate}-{direct,stock}-results`,
+with family logs under `/work/oct24-kos-*`. C++ owners retain their
+separate native Storage and focused sanitizer evidence; the final SDK gate
+includes 389 reproducible release outputs and HP39 footprint regeneration.
+This reviewed batch is submitted on `m8-flash-write`; fresh CI is not polled.
+Formal CI acceptance remains open. All original M8 milestone requirements
+remain retained.
+
+Subsequent single CI inspection at exact head `99168c1be049b815ffc318a1db9ecd2dc9ea247e`:
+Quality 40061641240, Storage 40061641296 and Gallery 40061641275 pass. Core
+40061641258 fails 14 native Port lifecycle jobs; Objects 40061641226 fails both
+Stock object-mutation jobs. Runtime 40061641253 has now finished with thirteen
+failed jobs: ten Port jobs have the same PC 0x00000008 crash; HP40gs Stock
+system-services fails before execution after 90 s without transfer progress;
+Direct system-services-immediate/hp39 (HP40gs only) and Stock immediate/HP40gs
+report 0x46417b0a, an audio-register restoration check. The exact CI immediate
+build passes its first local HP40gs Direct replay (9526 exit 0). An isolated
+diagnostic copy preserves the first error and distinguishes PWM/watchdog
+mismatches; original assertions and production code remain unchanged. Further
+reproduction runs under `/work/oct24-audio-diag-{src,results}`. Eight isolated
+old-emulator diagnostic runs pass (46900 exit 0). Exact CI binary + CI emulator
+repetition passes eight iterations (65205 exit 0) under
+`/work/oct24-audio-ci-pair-results`. Six additional diagnostic runs sharing one
+CPU with two busy workers also pass (47545 exit 0), with separate register
+snapshots under `/work/oct24-audio-contention-results`. The maintained test now
+preserves an earlier failure instead of overwriting it with an audio mismatch;
+PWM register mismatches report 0x7b20+i, watchdog mismatches 0x7bb0+i, for the
+seven existing checked registers. Passing requirements are unchanged. All three
+HP39 Direct targets, their independent system verifier and ARM analysis pass
+for this diagnostic change (73004 exit 0). Logs use
+`/work/oct24-audio-diagnostics-maintained-*`. The original audio failure remains
+unresolved; these are diagnostic improvements, not a claimed runtime repair. Main Core
+40059453759 separately fails HP49g+ recovery after retirement resume with a
+blank Stock display. Neither failure is accepted or dismissed as transient.
+Downloaded branch recovery/publication logs show execution at unmapped
+`0x00000008`. The exact CI recovery build reproduces locally with matching
+registers on the current watchdog emulator (`/work/oct24-ci-recovery-repro`,
+session 2634 exit 1). The older-emulator comparison also exits 1 with identical
+registers (9666; `/work/oct24-ci-recovery-old-emulator.log`). The clock's newly
+added SWI guard is called inside Flash query/busy modes, where ROM exception
+instructions cannot be fetched. Local repair `4c87835f` uses an IRQ-masked
+clock helper for production Flash and all recovery witness timeout callbacks; the SST bus contract explicitly
+excludes ROM SWI entry from callbacks during query/busy modes.
+The focused ASan/UBSan clock test passes, including no supervisor entry and
+last-value/errno preservation on clock failure. All four recovery build variants
+compile. Both native recovery runs pass the first two busy-operation power cuts
+that previously crashed. Both runs ultimately exit 1 (94903/44621): guarded
+reservation verification requires before-reset.json, which the stale local
+watchdog emulator never emitted. Its executable lacks the reset-checkpoint
+feature. Earlier phase evidence is retained; no complete-suite pass is claimed.
+The exact CI Runtime emulator is unpacked at `/work/oct24-ci-current-x50ng`
+and does include that feature. Guarded reservation supplements pass on both
+models in `/work/oct24-flash-clock-ci-reservation-{hp49gplus,hp50g}`, using
+saved clean states and unchanged maintained verification. Both result.json files
+report pass: 20,902-byte gap, 20,802-byte admission, 1,923 busy operations,
+thirteen admission rejections, three resource guards and absent-reservation
+recovery. HP50g runner 8541 exits 0. HP49g+ runner 56280 completes verification
+and writes its pass result, then exits 1 only because the outer diagnostic
+wrapper prints after closing its redirected log; the maintained verifier itself
+returned successfully. The original failed full-suite evidence is unchanged.
+Both native publication/rejection/cancellation suites pass (38155 exit 0). Both
+recovery runs additionally pass interrupted recovery and journal retirement
+with unchanged catalogs after reset. Both models also pass automatic STARTUP
+replay/retirement and the second warmstart, plus bank-header/body fault and
+low-memory configuration recovery before the missing-checkpoint failure.
+Both Stock object-mutation suites pass complete primary execution, return and
+all lifecycle invocations (19519 exit 0). Evidence is preserved separately in
+`/work/oct24-flash-clock-object-evidence` before other native runs reuse captures.
+Main's original retirement-cut state resets successfully on both current and
+old emulators (36805/29165 exit 0), with the original restart verifier accepting
+61 catalog entries and Flash preservation. The exact CI emulator also passes
+the same saved-state verifier (81178 exit 0; 61 entries). Evidence is in
+`/work/oct24-main-retirement-resume-{repro,old-emulator,ci-emulator}`. The blank display
+failure remains unreproduced, not claimed fixed. Whole host
+ASan/UBSan build and all 134 CTest targets pass (1072 exit 0; 729.62 s), including
+the complete Flash exhaustive tests (`/work/oct24-flash-clock-unit-test.log`).
+Whole tracked-source format and lint checks pass; logs are
+`/work/oct24-window-final-{format,lint}.log`. Objects failure logs confirm the
+same PC 0x00000008 crash on both models. Focused host/ARM static analysis and
+strict docs pass. The prior push's six workflows were checked again before
+submission: Quality/Storage/Gallery pass, Core/Objects/Runtime fail as detailed
+above. This reviewed Flash repair, window adapter and diagnostic batch is
+submitted on `m8-flash-write`; new CI is not polled. Audio restoration, transfer
+stall and main blank-display failures remain investigated but unresolved, and
+no formal CI acceptance or M8 completion is claimed.
+Later local window-audit/dispatch changes are outside that head.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
 actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
@@ -438,6 +557,23 @@ passes. The expanded relocated SDK size-accounting check and all three HP39
 C/C++ Aplet families pass, as do Ruff/format and strict docs.
 This records file/object geometry, not native overhead, HP39 Aplet containers
 or transfer/install peak memory; those resource requirements remain open.
+
+Local HP39 Aplet footprint follow-up (2026-10-24): `package-aplet.py` now emits
+`footprint.json` alongside its five transfer files. It reports actual per-file
+and bundle bytes, the wrapped input launcher, its embedded extent and the
+remaining Aplet envelope/support bytes, explicitly excluding protocol,
+calculator allocation and installation/runtime peaks. CMake declares the report
+as an output; the SDK gate checks its arithmetic, regeneration and reproducibility.
+The existing Storage launcher produces a 67,486-byte Aplet with a 66,504-byte
+embedded launcher and 982 other bytes; its complete five-file bundle is
+69,188 bytes on each HP39 model. All fifteen transfer files are byte-identical
+before/after this reporting change (`/work/oct24-aplet-size-parity`). Existing
+packager rejection tests, Ruff and strict docs pass. The expanded SDK gate
+passes on session 57150 (exit 0), including all 389 release-output byte
+comparisons, six-model builds, all three HP39 Aplet variants and deleted-report
+regeneration (`/work/oct24-aplet-footprint-sdk.log`). This is local work,
+not CI accepted.
+Native resident overhead and transfer/installation peaks remain open.
 
 Local host-side pool observer (2026-10-23): optional Stock capture reads the
 existing boot/native state and original coarse table without changing guest
@@ -460,12 +596,12 @@ The design record contains the mapped-pool ledger for all six launches.
 The local Runtime workflow enables capture and requires `--pool` for Stock UI,
 uploading the linked memory report alongside runtime observations. YAML parsing,
 verifier shell syntax and all six retained UI report/pixel flows pass; this
-workflow change is not yet submitted.
+workflow change is CI accepted at `d409b014` and merged through PR #9.
 The earlier instrumented HP39g+ experiment exits
 successfully, but its final snapshot no longer contains the marker, so it
 provides no pool measurement. The new observer captures while the application
 is still mapped and is opt-in;
-six-model local observation is complete, while CI acceptance and native
+six-model local observation and CI acceptance are complete, while native
 allocator/installation/transfer totals remain open.
 
 Local native-pool observation (2026-10-23): an isolated test-only stage records
@@ -4282,6 +4418,279 @@ below are retained.
   during a busy loop; System Services E2E now maintains this check and passes all
   six Direct targets locally. Owned dispatch,
   absolute-deadline handling and autonomous audio shutdown remain unfinished.
+  Local 2026-10-24 follow-up adds internal absolute-deadline acquire/advance
+  helpers: long remaining intervals are clamped before narrowing, early delivery
+  rearms from the current timestamp, and on-time/late delivery releases the
+  timer without scheduling an extra period. Host ASan/UBSan tests cover the
+  UINT64_MAX boundary, repeated expiry, source-mask preservation, invalid state
+  and complete register restoration; ARMv4T Thumb compilation passes with
+  warnings treated as errors. This is a tested timer primitive, not production
+  IRQ/audio integration. The clock sampling/serialization, dispatcher, autonomous
+  audio stop, preemption and Stock timer ownership requirements remain open.
+  A further local clock change serializes foreground monotonic sampling,
+  initialization and civil-time rebasing with IRQ/FIQ masking, and supplies an
+  internal already-masked read path that does not enter the supervisor bridge.
+  This prevents a future owned IRQ handler from observing torn 64-bit state or
+  half-published epochs. A Linux MMIO fixture executes the real clock code under
+  ASan/UBSan and checks masked RTC access, unchanged failure outputs, original
+  mask restoration, nested masked callers and backward-date monotonicity.
+  The System Services ARM image and all six launchers build; repository-policy
+  ARM static analysis passes. All six Direct System Services targets pass with
+  independent pixels and normal return. The first Stock queue (session 10232)
+  terminated before application execution because copied CRLF sequence files
+  were rejected. After normalizing the container sequences, the Stock-only
+  retry completed on session 66673 (exit 0) using `/work/oct24-clock-system`,
+  with `oct24-clock-stock-*-v2.log` preserving separate evidence. All six Stock
+  models pass full System Services, independent pixels/input and normal return.
+  Together with the prior six-model Direct results, this clock-state slice is
+  locally verified; it has not yet been submitted to CI.
+  The maintained IRQ fixture now dispatches from its ARM exception entry into
+  Thumb C, preserves interrupted errno, samples through the already-masked clock
+  path, rearms an early timer expiry and releases at the absolute deadline.
+  Foreground code only runs a bounded busy loop. The fixture requires multiple
+  deliveries, deadline completion, released ownership and the existing exact
+  IRQ bank/vector/mask/stack-guard restoration checks. Its fresh ARM build and
+  static analysis pass; all six Direct models pass the complete fixture,
+  independent input pixels and normal return. Session 50299 exits successfully;
+  the tested artifact is `/work/oct24-irq-deadline-artifact`.
+  This is native integration evidence, not yet the production sound dispatcher
+  or autonomous audio-stop implementation.
+  The next local slice adds `sound-playback`, an internal paired PWM2 output /
+  PWM4 deadline owner. Alarm admission precedes tone admission; tone failure
+  restores the alarm, and completion/cancellation restores both resources.
+  Shared-register ASan/UBSan tests cover continued playback across early expiry,
+  64-bit deadlines, conflict rollback, stopped-counter/mux/pin restoration,
+  double-start rejection and idempotent cancellation. The maintained real IRQ
+  fixture now starts an 880 Hz tone and advances this engine while foreground
+  code only spins; it compares the audio registers with their original values
+  before foreground cleanup can repair them. ARM build, static analysis and
+  all six Direct System Services runs pass, including independent pixels and
+  normal return. Session 76793 completes successfully using
+  `/work/oct24-irq-audio-artifact`. The combined sound, alarm, playback and real
+  clock-state host fixtures all pass ASan/UBSan.
+  This verifies configuration and autonomous restoration, not audible hardware
+  output. Public asynchronous entry points, production IRQ lifetime, preemption,
+  exit integration and a usable Stock deadline channel remain unfinished.
+  A read-only HP50g Stock entry probe now confirms PWM4 and PWM3 are both
+  running (`TCON=0x00598909`, `TCFG1=0x00033333`); automatically falling back to
+  PWM3 would take an existing owner. Its ordinary System Services/pixel/return
+  checks pass, and memory report 3 records the entry state before admission.
+  Evidence: `/work/oct24-timer-observe-hp50g.log`, report under
+  `/work/oct24-timer-observe-src/build`, artifact
+  `/work/oct24-timer-observe-artifact`; isolated probe source is retained as
+  `research/oct24-timer-observation-irq.c`. Session 42113 completed successfully.
+  Saved post-return UI states on all six models have watchdog `WTCON=0x910`,
+  with enable clear. This suggests an independent interrupt-only deadline
+  candidate; it does not prove availability at every application entry. The
+  Linux S3C2410 driver supports interrupt-only operation with reset disabled.
+  However, the pinned emulator's watchdog adds raw prescaler/divider PCLK ticks
+  to a microsecond timer clock without conversion. Correct and independently
+  verify that timing model before using watchdog E2E as deadline evidence;
+  no watchdog runtime acquisition or public fallback is enabled yet.
+  Local emulator repair now replaces per-tick scheduling with a PCLK-based
+  counter model retaining fractional cycles. Register reads advance the live
+  count, WTDAT changes only the next reload, and PCLK transitions settle elapsed
+  time at the old rate before preserving the remaining phase at the new rate.
+  Interrupt and reset outputs remain distinct; late expiries coalesce at the
+  interrupt controller. Separate counter-arithmetic and actual register-overlay
+  fixtures pass ASan/UBSan, including one million fine-grained observations,
+  delayed processing, rate changes, stopped counters, reset-only and IRQ-only
+  modes. The Python tool suite, Ruff/format and patched emulator build pass.
+  Six-model Direct System Services plus HP50g Stock regression completed on
+  session 65553 (exit 0) using `/work/oct24-watchdog-x50ng`; all six Direct
+  models and HP50g Stock pass. These existing payloads test startup/return and
+  interference, not a new application watchdog backend. Guest watchdog lease,
+  active IRQ timing and Stock availability tests remain required.
+  A subsequent internal `watchdog-alarm` lease now borrows only disabled
+  watchdogs without pending IRQ9, leaving busy owners untouched. Its running
+  configuration always disables reset and uses PCLK/128, upward-rounded final
+  periods and bounded 65535-count chunks for absolute 64-bit deadlines.
+  Acquire leaves IRQ9 masked; rearm preserves its current mask; release restores
+  the original stopped control/reload/count/mask and retains unrelated sources.
+  Host ASan/UBSan tests check arithmetic with independent 128-bit expectations,
+  UINT64_MAX deadlines, zero-write rejection, reset exclusion on every control
+  write, cancellation/late completion and restoration. ARMv4T Thumb compile
+  with warnings as errors and repository-policy static analysis pass. This
+  local engine is included in the SDK source list. A subsequent maintained
+  watchdog IRQ fixture validates the inherited L1 section for 0x07800000 before
+  MMIO access (HP50g saved Stock table independently maps it to 0x53000000).
+  It requires actual IRQ9 delivery on every model: busy/no-pending admission
+  rejection cannot count as a timing pass. An initial 1 ms expiry rearms toward
+  an absolute 100 ms deadline while foreground executes only a busy loop;
+  dispatch samples the masked clock, preserves errno and stops PWM2 audio.
+  Before foreground cleanup it checks watchdog/audio registers, banked IRQ
+  state, stack canary, SWI/vector and unrelated source/mask restoration.
+  HP50g Direct passes full System Services, independent pixels/input and return
+  on `/work/oct24-watchdog-irq-artifact` (session 59581 exit 0). ARM build and
+  policy static analysis pass. Full six-model Direct then Stock queue runs on
+  session 68284 / PID 110928 in `/work/oct24-watchdog-irq-src`, using the repaired
+  emulator; logs are `/work/oct24-watchdog-irq-{direct,stock}-*.log`. Wider native
+  acceptance of this primitive is now local: all six Direct and all six Stock
+  models pass; session 68284 completed with exit 0. Public API integration has
+  separate validation below and is not covered by this earlier matrix.
+  A local follow-up extracts controller/vector/banked-stack lifetime into
+  `irq-owner`: callers hold IRQ/FIQ masked, supply one source plus aligned ARM
+  entry/stack, and serialize exclusive ownership. It masks all sources before
+  switching, retains source latches while releasing the old selection, routes
+  all sources to IRQ for the exclusive lease, enables
+  only its owned IRQ source, and restores the original controller/vector/bank
+  from foreground after peripheral shutdown. Invalid or repeated admission
+  performs no writes; release is idempotent. ASan/UBSan checks switching order,
+  alignment/source rejection, busy rejection and complete bank/mask/vector
+  restoration. The watchdog fixture now uses this runtime engine while its
+  independent bank oracle and pre-cleanup peripheral checks remain in place.
+  ARM build and policy analysis pass. The first native extraction retained
+  unrelated Stock FIQ routing and timed out in IRQ entry (session 95426 exit 1).
+  Inspection of the pinned controller model shows FIQ requests are processed
+  before IRQ arbitration, independently of INTMSK. The original passing fixture
+  cleared INTMOD; restoring that exclusive routing policy fixes HP50g Direct.
+  Failed results remain in `/work/oct24-irq-owner-failed-direct` and the first
+  artifact/logs. Corrected artifact `/work/oct24-irq-owner-v2-artifact` passes
+  HP50g Direct and Stock System Services/pixels/input/return; session 89836
+  completed with exit 0 in `/work/oct24-irq-owner-src`, with logs named
+  `oct24-irq-owner-v2-*-hp50g.log`. Host sanitizers and ARM analysis pass again.
+  This does not alter the ongoing earlier matrix. Public asynchronous sound,
+  production dispatch/preemption and exit cleanup remain unimplemented.
+  The next local `sound-session` engine combines PWM2, watchdog and IRQ leases
+  into one lifetime. Start installs controller ownership before peripherals;
+  any admission failure unwinds in reverse lifetime order. Non-replacing
+  overlaps reject unchanged; replacement stops our old session before admitting
+  the new tone, with explicit stopped-on-new-admission-failure semantics.
+  IRQ advance preserves errno, rejects backward/failed clocks, stops peripherals
+  autonomously and masks controller sources. It retains its executing IRQ bank
+  until foreground close/next start; close is idempotent and restores that bank,
+  vector and original routing/masks last. No user callbacks or allocation occur.
+  Shared-register ASan/UBSan integration tests execute all four real engines,
+  covering completion, rearm, overlap, replacement, cancellation, clock errors,
+  admission rollback and restoration. They forbid bank exchange from ISR.
+  The maintained native fixture now dispatches through this session; HP50g
+  Direct passes with independent pixels/input/return and pre-cleanup peripheral
+  restoration. ARM build/analysis pass. HP50g Stock passed on session 97813
+  in `/work/oct24-sound-session-src`, artifact `/work/oct24-sound-session-artifact`,
+  logs `/work/oct24-sound-session-{direct,stock}-hp50g.log`. Public API/HPGCC
+  flags, CPU interrupt-state lifetime and normal/immediate-exit wiring remain
+  open; host session close tests alone do not establish exit-path acceptance.
+  Public-interface work in progress adds `hpclang_sound_start/status/stop`, an
+  owned ARM IRQ entry, optional cleanup/activity hooks, blocking-tone exclusion,
+  CPU interrupt-mask collection and unexpected-IRQ failure cleanup. Wrapper
+  ASan/UBSan tests mock the session while checking masks/hooks/errors; real-engine
+  session tests remain separate. Blocking API and existing runtime-exit tests
+  pass, but that exit test stubs sound cleanup and is not new native exit proof.
+  ARM build/static analysis pass. The first maintained native public test
+  rejects overlapping requests, replaces a tone, busy-waits without SDK calls,
+  checks autonomous peripheral restoration, collects the IRQ lease and cancels
+  another tone. HP50g Direct fails its IRQ-vector restoration check after
+  replacement: initial result 0x7c0b, refined result 0x7c2c. It is NOT accepted.
+  Artifacts `/work/oct24-sound-api-artifact` and `-v2-artifact`, failed results
+  `/work/oct24-sound-api-failed-direct` and `-v2-failed-direct` are retained.
+  A diagnostic result encoding accidentally allowed unsigned arithmetic to
+  turn a zero vector into success; its apparent pass is invalid evidence.
+  A further diagnostic records expected vector low bits 0x79b4. The isolated
+  no-replacement variant passes Direct (session 2127 exit 0), narrowing the
+  defect to replacement/collection rather than autonomous shutdown alone.
+  Its source currently lives in `/work/oct24-sound-api-src`; the repository
+  retains the strict replacement test. No API Stock run or CI submission is
+  claimed; repair replacement restoration before advancing public acceptance.
+  Correction after direct register/IRQ-entry tracing: the runtime restoration
+  was not defective. The fixed two-million-iteration test loop could finish
+  before the requested 10 ms on the emulator; status correctly returned running
+  and retained the IRQ lease. Later checks overwrote that earlier failure with
+  a vector mismatch. Traces show the original vector (0x0003f9b4 on HP50g) is
+  saved across replacement and restored by collection. An IRQ-entry witness
+  remained untouched in the failing run, confirming the expiry had not fired.
+  The maintained test now busy-polls the PWM running bit with a twenty-million
+  iteration failure bound, without SDK calls or foreground clock advancement.
+  It checks restored peripheral registers before collecting the IRQ lease and
+  stops subsequent restoration comparisons if status still reports running.
+  The strict replacement/cancellation assertions remain; no runtime restoration
+  workaround was added. Diagnostic source/script and reports remain under
+  `/work/oct24-sound-vector-src` and `research/oct24-trace-sound-vector.py`.
+  The corrected public API artifact `/work/oct24-sound-api-fixed-artifact`
+  passes all six Direct and all six Stock targets, including independent
+  pixels/input. Session 70552 completed with exit 0 from
+  `/work/oct24-sound-api-fixed-src`,
+  logs `oct24-sound-api-fixed-{direct,stock}-*.log`. ARM build and policy analysis
+  pass. Native normal/immediate-exit proof and HPGCC mode compatibility remain
+  open; public integration is not yet fully accepted or pushed.
+  Native exit follow-up: `HPCLANG_E2E_SOUND_EXIT=exit` or `_Exit` selects an
+  asynchronous exit variant through `tools/build-e2e.sh system-services`; the
+  default `blocking` retains the earlier callback-exit test. Each variant starts
+  a 60-second tone after borrowing the economy profile and exits while PWM and
+  watchdog are active. A test-only linker wrapper observes the real sound
+  cleanup before power/launcher/host restoration, checking fourteen peripheral,
+  controller and vector registers, the independent IRQ-bank snapshot, CPU masks
+  and cleared optional hooks without calling stop/status. All six Direct models
+  pass both normal exit and `_Exit`; both also pass HP50g Stock locally.
+  Both ARM variants build; session 74777 completed with exit 0 from
+  `/work/oct24-sound-exit-src`, with artifacts
+  `/work/oct24-sound-{exit,immediate}-artifact` and matching logs. A separate
+  negative control omits the real release in the test wrapper only, under
+  `/work/oct24-sound-exit-negative-src` (session 92952, terminal exit 1) fails
+  as intended with `0x46417d03` before host return: CPU interrupt masks remain
+  borrowed when cleanup is omitted. Its `build/hp50g-e2e.json` records the
+  failure. Strict docs and shell syntax pass. Full exit acceptance remains
+  pending; these changes are local only.
+  Maintained CI entry points `system-services-exit` and
+  `system-services-immediate` now build these same variants (both HPC1 images
+  are byte-identical to the locally exercised artifacts). The Runtime suite
+  manifest schedules each on all three Direct families and all six Stock
+  targets, while retaining the blocking-exit suite. The seven existing planner
+  tests, complete-manifest coverage check, shell syntax and both six-launcher
+  ARM builds pass locally. These gates are not yet pushed or CI accepted.
+  The compatibility guide now describes the implemented watchdog/IRQ/public
+  lifetime and its current evidence instead of presenting superseded primitive
+  experiments as current blockers. Historical KOS flags remain unfinished.
+  Local KOS adapter follow-up: `kos.h` now exposes `kos_beep` and
+  `kos_CheckBeepEnd` through owned async playback. An internal per-request client
+  identity prevents stale KOS policy after canonical replacement/cancellation.
+  Old-request bit 0 controls admission; bit 1 controls waiting/query behavior.
+  Rejected overlap returns zero and waits on the old request, matching the ROM
+  wrapper. All six ROM entry validations are instruction-identical: 1..15000 Hz,
+  nonzero duration, invalid result -51 (the adapter additionally sets EINVAL).
+  Runtime ownership/clock errors return -1/errno; canonical tones are not
+  implicitly replaced. Other mode bits do not change the two policies.
+  ASan/UBSan tests cross sixteen old states with four incoming modes, including
+  nested waiting/replacement, invalid calls, failed replacement, asynchronous
+  failure and canonical-client isolation. ARM policy analysis and six launchers
+  pass. All six Direct models pass measured waiting, actual PWM replacement and
+  rejection, no-SDK autonomous stop, mixed-client isolation and exact restoration
+  plus independent pixels/input. Source `/work/oct24-kos-sound-src`, artifact
+  `/work/oct24-kos-sound-artifact`, logs `oct24-kos-sound-{direct,stock}-*.log`;
+  session 98967 / PID 130857 continues the Stock matrix. Installed-SDK C/C++
+  sound clients pass the relocation/package gate with all six launchers
+  (session 31182, exit 0), alongside existing SDK clients and model-specific
+  Notebook builds. Ruff/format and ARM analysis pass. Full Stock and CI
+  acceptance are not yet claimed.
+  Subsequent batch review: KOS mode tests now also pass HP49g+/HP50g/HP48gII
+  Stock, including independent input/pixel checks; HP39 Stock continues on the
+  original process. The exit fixture now starts through `kos_beep(..., 1)` so
+  the compatibility entry point itself is active at normal/immediate exit,
+  extending the earlier canonical-API exit evidence. ARM analysis passes both
+  variants; full Direct/Stock runs are active on session 21588 from
+  `/work/oct24-kos-exit-src`, using `/work/oct24-kos-{exit,immediate}-artifact`
+  and matching logs. All six Direct targets pass KOS normal exit; Stock normal
+  exit is running, with immediate-exit runs following in that queue.
+  Complete source lint/format passes after quoting the shell mode string
+  (`sound_exit="exit"`) and normalizing copied Python CRLF to LF in the container
+  only; no unrelated formatting edits enter the repository. Full 126-target
+  ASan/UBSan host regression runs on session 24974 and whole-project Clang
+  analysis on 93989; neither is yet claimed complete. Logs are
+  `/work/oct24-audio-all-host.log`, `oct24-audio-analysis.log`, and the corrected
+  `oct24-audio-{lint,format}-v2.log`. Public docs now clarify that a failed
+  replacement preflight preserves the old tone, whereas failure after its
+  cancellation leaves it stopped, matching the tested implementation.
+  The whole-project Clang pass has now completed: 323 sources and 1,336 unique
+  configurations from 3,935 compile entries, analysis exit 0. The first combined
+  command still returns failure for its earlier lint/CRLF issues; the separate
+  corrected lint/format runs both pass. Full sanitizer regression subsequently
+  completed: all 126 targets pass in 1,403.11 seconds, with the terminal CTest
+  log ending at 2026-10-24 03:49 UTC. This suite covers the audio baseline;
+  the later C++ storage owners have their separate focused sanitizer evidence.
+  KOS mode validation subsequently completed on session 98967 (exit 0): all six
+  Direct and all six Stock targets pass, including the independent physical
+  input/pixel verifier. Logs are `/work/oct24-kos-sound-{direct,stock}-*.log`.
+  The full KOS-entry normal/immediate-exit matrix remains live on session 21588;
+  passing the mode matrix does not close that separate cleanup requirement.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
@@ -4303,6 +4712,575 @@ below are retained.
 - [ ] Evaluate useful historical `win*` adapters on the accepted UI core where
   semantics fit. Keep raw KOS/Saturn/MMU migration guidance explicit, and
   preserve unsupported-context errors rather than supplying silent stubs.
+  The 2026-10-24 first source review covers HPGCC 1.1/39g's actual window
+  implementation: synchronous snapshot dispatch, priority/tie order, idle-driven
+  timer catch-up/delay, separate widget removal/destruction and stateful control
+  behavior. The [compatibility review](hpgcc-compat.md#historical-window-adapter-feasibility)
+  maps each family onto the accepted UI and records source hashes, gaps and
+  concrete acceptance cases. An owned state/event bridge is needed; no family
+  is silently omitted or declared compatible. The subsequent four-archive audit
+  finds 104 identical window source/header files and 13 identical installed
+  headers in 1.1/2.0 after newline normalization. The scanned 1.0.3 and HPGCC3
+  sources contain no `win_` references; HPGCC3 has its distinct C++ `gui.h` API.
+  `tools/audit-hpgcc-windows.py` reproduces the counts, archive hashes and file
+  comparison without extracting or redistributing sources. The original 1.1
+  `examples/win/simple.c` supplies a concrete multi-control acceptance candidate,
+  including four slider orientations and a documented 64-line layout issue.
+  The audit and Ruff checks pass locally; actual adapter/original-application
+  execution remains open. This is static evidence only.
+  The subsequent internal `win-events` module implements bounded synchronous
+  snapshot dispatch: priority/newer-tie order, callback results, nested mutation,
+  first-matching duplicate removal, preflight exhaustion and busy reset.
+  `win_events` ASan/UBSan tests cover these cases plus self-removal and borrowed
+  stack arguments; host/ARM analysis and C/C++ six-model launcher builds pass.
+  Evidence uses `/work/oct24-win-events-{tests,arm}` and corresponding
+  build/analysis logs. This is local implementation, not submitted or CI accepted;
+  no public `win*` API, idle/timer loop or widget integration is claimed.
+  The optional `tests/compat/check-win-events.py` differential gate then compiles
+  the actual three historical event functions from both 1.1/2.0 archives with
+  documented host-only initialization/stdlib glue and an `alloca` declaration
+  adjustment. Both sanitized references match the candidate's complete 4,836-line
+  trace across deterministic sequences, duplicates, nested mutation and
+  self-removal. Reversed tie ordering is rejected by a negative control.
+  Logs are `/work/oct24-win-events-{reference,negative}.log`; this is local
+  host semantic evidence, not calculator UI/loop acceptance or a bundled-source
+  CI test. Formatting/Ruff and strict docs pass.
+  The reference gate additionally compiles seven original timer functions and
+  supplies a controlled clock. Eight ASan/UBSan scenarios pass on both versions:
+  periodic catch-up versus post-callback delay, equal-deadline order, earliest
+  duplicate removal, queued versus executing cancellation, event-return stop
+  and nested processing. `/work/oct24-win-timer-reference.log` records both
+  matching timer traces and the unchanged 4,836-line dispatcher comparisons.
+  The internal foreground timer bridge now implements this contract with a
+  caller-owned fixed pool and injectable monotonic clock. Both original
+  versions match its eight scenario traces exactly. Bounded pumping retains
+  due work; executing slots cannot be reused; event preflight failures retain
+  undelivered work. Clock and deadline failures are explicit and do not replay
+  delivered callbacks. Three focused ASan/UBSan targets, host/ARM analysis and
+  C/C++ six-model launcher builds pass locally. Evidence is retained in
+  `/work/oct24-win-timers-{build,differential,analysis,arm}.log`.
+  Public window interfaces, the device clock/idle loop and widget integration
+  remain open; this internal implementation has not been submitted to CI.
+  The subsequent internal `win-loop` joins idle dispatch with the event/timer
+  foundation. Entry clears a prior quit; consuming idle does not quit; a quit
+  completes the current snapshot; nested runs share the historical quit flag.
+  A bounded run retains registrations and pending timers. The host integration
+  exercises keyboard/repaint/timer priority, timed quit, callback consumption,
+  nested quit and snapshot exhaustion/retry; all four focused sanitizer targets
+  pass. Host/ARM static analysis and six-model C/C++ launcher builds also pass;
+  logs are `/work/oct24-win-loop-{build,analysis,arm}.log`. The ARM build needed
+  the ATFE bin directory on PATH for `llvm-ar`; the corrected build passes.
+  Actual keyboard and renderer generators, public adapters and calculator
+  loop acceptance remain open. Source anchors are the original `win_init.c`,
+  `win_event_loop.c` and `win_event_quit.c`; no historical source is bundled.
+  The internal `win-keyboard` generator now polls the existing six-model
+  historical matrix adapter through a checked read path. Changed physical bits
+  dispatch in ascending order; the baseline updates before callbacks, preserving
+  nested snapshot semantics. Per-key consumption does not suppress other keys.
+  Read errors preserve the baseline; a partially failed dispatch latches failure
+  so the future owner must unwind rather than silently lose/replay transitions.
+  Six focused sanitizer targets pass, including all 60 physical bits on each
+  model, mixed press/release, nesting and failure. Host/ARM analysis and six-model
+  C/C++ builds pass (`/work/oct24-win-keyboard-{build,analysis,arm}.log`). These
+  are host-controlled physical snapshots and build evidence, not calculator
+  window interaction acceptance. Idle-loop error propagation, actual renderer
+  integration, public interfaces and widget behavior remain open. Not pushed.
+  The next local integration adds `win-drivers`: idle callbacks connect the
+  keyboard generator and timer pump to the loop, and the device clock adapter
+  delegates to checked `hpclang_time_read_us` (microsecond intervals). A separate
+  first-error latch stops the loop without confusing callback consumption with
+  failure; nested runs, quit and later errno changes cannot hide that cause.
+  Six sanitizer targets pass, including timed quit through the full driver path,
+  unsupported keyboard context, clock failure, nested error preservation and
+  exhaustion inside nested key dispatch. Host/ARM analysis, C/C++ six-model
+  launcher builds and strict docs pass. Logs are
+  `/work/oct24-win-drivers-{build,analysis,arm}.log`. Host tests control the
+  physical and clock sources; native interaction acceptance, actual repaint,
+  public window APIs and widgets remain open. This batch remains local.
+  The internal repaint coordinator now follows `win_repaint.c` and
+  `_win_repaint_generator.c`: coalesce requests, clear pending before preparing
+  the target, dispatch repaint synchronously and present afterward. A request
+  made while painting survives; ordinary quit/consumption still presents the
+  current frame. Checked begin/present hooks and nested dispatch failures latch
+  the loop error and skip remaining stages without replay. Seven sanitizer
+  targets, host/ARM analysis and six-model C/C++ builds pass, including nested
+  repaint, request coalescing, next-frame requests and failures at every stage.
+  Logs: `/work/oct24-win-repaint-{build,analysis,arm}.log`. Hooks are controlled
+  in these tests; actual surface/UI rendering, original window clients and
+  native pixel/return acceptance remain open. Not pushed.
+  Checked HPG frame hooks now connect repaint to real surface drawing and the
+  existing display lease: clear the current target, then publish or flip while
+  preserving its selected mode/buffering. They do not adopt a foreign clean
+  display lease; `hpg_cleanup` retains release ownership. Host pixel integration
+  covers 2/4/16 levels with one/two pages, two distinct frames, old-pixel clearing,
+  flip-timeout front preservation and foreign-lease rejection. Eight sanitizer
+  targets, host/ARM analysis, six-model C/C++ builds and strict docs pass.
+  Evidence: `/work/oct24-win-hpg-{build,analysis,arm}.log`. Actual raster code is
+  exercised with a host display-session fixture; calculator window pixels and
+  return, declarative widget state bridging and public interfaces remain open.
+  Legacy single-buffer primitives may publish during drawing, so these hooks
+  do not claim atomic frames. This extension is local and not CI accepted.
+  Public `winevent.h`/`wintimer.h` now expose lazy event, loop, repaint and timer
+  adapters with explicit checked error/step/reset extensions. Custom IDs start
+  at 8; positive milliseconds convert to the checked microsecond clock. The
+  bounded default has 64 handlers (three internal), 256 snapshot entries and
+  32 timers, with latched exhaustion instead of silent void-call failure.
+  Nine sanitizer targets pass, including callback -1 versus dispatch failure,
+  millisecond timing, active-reset rejection and capacity limits. The new
+  `examples/hpgcc-window` actually links these APIs and builds its HPC1 and all
+  six launchers; host/ARM analysis passes. Logs are
+  `/work/oct24-win-public-{build,analysis,arm}.log`. This is local only: native
+  example execution, installed-SDK acceptance, typed-key/modifier generation,
+  widget bridges and a complete `win.h` remain open; no scope reduction.
+  Installed-SDK follow-up: the maintained relocation gate now copies the shipped
+  window example and also compiles it as C++23. Both clients build all six
+  launchers and all three HP39 Aplet variants without source-tree dependencies.
+  The complete gate passes (session 43086 exit 0): 453 release artifacts are
+  byte-identical across two clean builds, all six model-specific Notebook builds
+  pass, and deleted-output regeneration remains checked. Evidence is
+  `/work/oct24-win-sdk.log`; Ruff/format and strict docs pass. This closes local
+  window SDK installation/relocation validation, not native execution, full
+  compatibility, or CI acceptance. Getting started and migration now link the
+  bounded event/timer example and explain its error query and unfinished scope.
+  Maintained `hpgcc-window` E2E now exercises four real 30 ms timer callbacks,
+  synchronous user-event consumption, four repaint cycles and normal return.
+  All six Direct targets pass locally (session 2448 exit 0). An independent
+  full-frame verifier checks the final 10-by-10 rectangle and cleared background
+  on every capture; a corrupted-frame negative control is rejected. The ARM
+  payload analysis, formatter and verifier Ruff checks pass. Artifact:
+  `/work/oct24-window-e2e-artifact`; logs: `/work/oct24-window-direct-*.log`;
+  captures/results: `/work/oct24-prepush-src/build`. Original window-client/widget
+  acceptance and CI remain open. No new push occurred.
+  All six Stock targets now pass (94697 exit 0), including independent full-frame
+  pixel verification and settled return. Assets and logs are
+  `/work/oct24-window-stock-assets` and `/work/oct24-window-stock-*.log`;
+  complete model captures/state are preserved in `/work/oct24-window-stock-evidence`.
+  This closes local six-model Direct/Stock acceptance of the maintained public
+  event/timer/mono-double-buffer repaint fixture, not original widget clients.
+  Runtime CI wiring (`762705eb`) adds three Direct family jobs and six Stock
+  model jobs using the standard context/family verifier. Generated matrix,
+  seven planner tests and verifier Ruff/format checks pass. Included in the
+  current submission; formal CI acceptance remains pending.
+
+
+  Installed-example native witness (local research, not an SDK code change):
+  the exact installed `examples/hpgcc-window/main.c` is compiled with only its
+  main symbol renamed and linked to a cleanup observation wrapper. It captures
+  frame 500 before actual cleanup and checks the frame-19 rectangle at x61..70,
+  y12..21 with a white background. The initial HP39g+ wrapper placed PASS after
+  cleanup, so the unchanged return observer correctly rejected a missing screen
+  transition despite actual return and correct example pixels. That failed
+  evidence is retained in `/work/oct24-window-example-late-pass-failure`.
+  The wrapper now reports at the pre-cleanup observation point and keeps actual
+  cleanup/return. Process 81150 exits 0: all six Direct models pass the exact
+  final-frame pixels and settled return. Sources/runner live in
+  `/work/oct24-window-example-native` and
+  host `research/oct24-window-example-native`; this run exercises the shipped
+  default timer animation, not scripted digit/ON input. Whole static analysis
+  30552 has now exited 0 after completing all 345 sources.
+
+  Current local window acceptance: all six corrected Stock models pass real
+  GPIO input, 44 independent status frames per model, page exchange, final
+  rectangle/background pixels and settled return. Final process 68792 exits 0;
+  HP40gs 96971, HP39g+ 69002 and HP50g 59175 also exit 0. All six preserved JSON
+  records report pass/returned/return_settled, with every frame/register pair in
+  `/work/oct24-win-settled-stock-<model>-evidence`. Earlier six-model Direct
+  validation and post-indicator SDK gates pass; the corrected fixture also
+  passes HP48gII Direct. Full 136-test ASan/UBSan regression passes (68707 exit
+  0, 671.25 seconds); full format/lint pass with all 4,556 tracked files in the
+  container quality index. Whole host/ARM static analysis passes (30552 exit
+  0, all 345 sources completed). Logs are
+  `/work/oct24-window-full-unit-tests.log` and
+  `/work/oct24-window-final-{format,lint,analysis}.log`.
+  CI submission/acceptance, shipped-example Stock execution and widget APIs remain
+  open. Below are retained earlier checkpoints; their pending labels describe
+  those checkpoints, not the current native matrix.
+
+  Independent following control batch: branch `m8-widget-controls` in
+  `research/m8-widget-controls`, commit `da17a3f9`, adds `wintext.h` labels and
+  editable fields. It uses `/work/oct24-controls-src` and separate sanitizer
+  build `/work/oct24-text-tests`; the current progress-batch source/artifact and
+  running processes are unchanged. Text storage capacity is separate from the
+  historical keyboard insertion limit; programmatic replacement may exceed the
+  limit without changing it. Tests pass insertion bounds, cursor movement,
+  three deletion modes, focus, cursor rendering-call positions, mutable-buffer
+  shortening, aliased replacement, and allocation-failure preservation/cleanup.
+  ARMv4T compile/analysis pass; logs `/work/oct24-text-{build,tests}.log`.
+  This is not yet integrated into m8-flash-write, its SDK, native matrix or CI.
+  Text follow-up `9cf24d5f` compares all three original source files/four public
+  APIs from both HPGCC 1.1/2.0 versions over the same window foundation. Both
+  match 13,837 lines (SHA256
+  `5053bfb5a00912b263eb38c7acfd6beb75966317959c7c8e9df2a9246b9c0534`),
+  including six label layouts, four entry limits, high bytes, programmatic
+  over-limit replacement and 512 editing actions. Both use unsigned char like
+  ARM. Wrong shifted-backspace precedence is rejected. Logs:
+  `/work/oct24-text-{reference,negative}.log`. Three sanitizer targets pass,
+  including production HPG custom-font pixels for glyphs/cursor/deletion
+  (`/work/oct24-text-pixels-tests.log`). Strict docs pass. SDK clients expanded
+  in `a0e285df`; full relocated SDK process 14789 exits 0: C/C++, six-model
+  launchers, three HP39 Aplet variants, notebooks and 517 byte-identical outputs
+  pass (`/work/oct24-text-sdk.log`). Text native/CI acceptance remains pending.
+  Text native follow-up `308da748` passes all six Direct models (68819 exit 0):
+  52 physical GPIO edges per model cover insertion limits, cursor movement,
+  three deletion behaviors and focus; complete-frame checks verify multiline
+  labels and entry glyphs in both buffer modes. All saved return records pass;
+  a missing label pixel is rejected. Stock process 18243 now runs. Initial
+  isolated setup failures (emulator symlink and CRLF sequence) occurred before
+  payload execution and are retained in `/work/oct24-text-direct-setup-failure.log`
+  and `/work/oct24-text-stock-sequence-failure.log`. SDK follow-up `d699fe5e`
+  records completed acceptance. Integrate this batch after the frozen batch.
+  Independent image follow-up `0716c8d8` adds `winimg.h`: borrowed optional
+  image/pattern, preferred image size, clipped pattern-before-image painting,
+  allocation cleanup and detached repaint on removal. Real HPG ASan/UBSan
+  composition/clipping/removal/resource-reuse tests and ARM compile/analysis
+  pass. Corrected test expectations use the relative pattern origin and fit
+  the host display; initial failure log is retained. SDK process 55970 exits 0: C/C++, six launchers, three Aplet variants,
+  notebooks and 517 byte-identical outputs pass (`/work/oct24-image-sdk.log`).
+  Image follow-up `9b07487e` passes unchanged 1.1/2.0 source comparisons:
+  32 resource/transparency/geometry cases, 577 matching lines, missing-pattern
+  negative rejected. Reference and HPG pixel sanitizer targets pass. All six
+  Direct models pass image-over-pattern frames and settled return (1287 exit 0),
+  using separate `/work/oct24-image-native-src` and `/work/oct24-image-native-arm`.
+  Image Stock 82374, full 143-test regression 63047 and whole analysis 54292 run.
+  Text-only Stock 18243 passes HP39g+ and continues HP39gs on its original
+  artifact. Logs use `/work/oct24-image-*` and `/work/oct24-controls-*`.
+  Stock completion and CI acceptance remain open.
+  Following menu batch `556ea3ee` on `m8-menu-controls` implements all eight
+  soft-menu APIs: 30 copied labels, five pages, modifiers/event payloads,
+  enabled/colors and insert/delete packing. It repairs unsigned backward-page
+  underflow, the duplicate disabled-color symbol and stale occupancy on gap
+  packing. Construction uses model facts without display acquisition; drawing
+  adapts to 64/80 lines. Focused ASan/UBSan and ARM compile/analysis pass, logs
+  `/work/oct24-menu-sanitizer-{build,tests}.log`. Original-source comparison,
+  real pixels, SDK and native acceptance remain open. Uses separate source
+  `/work/oct24-menu-src`; running text/image batches remain unchanged.
+  Menu follow-up `dfe576d6` passes real HPG full-frame cells/labels/disabled
+  colors/page-two checks for 64/80-line displays and both buffering modes.
+  Original 1.1/2.0 comparisons cover all eight APIs and match 6,840 lines;
+  wrong four-byte label negative rejected. Reference shims only rename the
+  duplicate disabled-color symbol and replace the external alloca declaration
+  with the host intrinsic header; first link failure retained. Three sanitizer
+  targets pass. SDK 74007 exits 0 (C/C++, six launchers, three Aplet variants,
+  notebooks, 517 reproducible outputs), log `/work/oct24-menu-sdk.log`. Native
+  menu acceptance remains open. Text Stock 18243 now passes HP39g+/HP39gs and
+  continues HP40gs; image Stock 82374 passes HP39g+ and continues HP39gs.
+  Whole text/image analysis 54292 exited before source enumeration because
+  its isolated mirror lacked Git metadata. Setup failure log retained at
+  `/work/oct24-controls-analysis-setup-failure.log`; corrected process 89153
+  runs the original full scope. Regression 63047 and Stock 18243/82374 remain live.
+  Native menu follow-up `a7a5068a` passes all six Direct models (32162 exit 0):
+  56 GPIO edges/ten selection callbacks per model, page wrap, disabled-item
+  suppression, complete two-page glyph/color captures in both buffer modes
+  and settled return. Wrong disabled-color pixel negative is rejected. Menu
+  Stock process 86659 runs from `/work/oct24-menu-src` with its fixed artifact.
+  Full text/image host/ARM analysis passes (89153 exit 0, 357 sources), log
+  `/work/oct24-controls-analysis.log`; full 143-test regression remains live.
+  Final frozen-batch verification: all six Stock models pass independent
+  keyboard/control pixels and settled return (9966 exit 0). Full ASan/UBSan
+  regression passes all 140 tests in 1351.00 seconds (10200 exit 0), log
+  `/work/oct24-progress-full-tests.log`. Together with six-model Direct, SDK,
+  format/lint and 352-source analysis, local batch gates pass. CI submission
+  and acceptance remain open; earlier running entries below are historical.
+
+  Final pre-push inspection: every workflow on 0a7c2d8d passes on both push
+  and PR runs. Core 40073586985/40073583179 and Runtime
+  40073586999/40073583151 are now terminal success, joining Quality, Storage,
+  Objects and Gallery. No unfinished or failed jobs remain on that head.
+  This does not establish fixes for older intermittent transport/audio causes.
+  Component source audit matches all 4,572 tracked files to the verified mirror;
+  strict docs pass (`/work/oct24-component-final-docs.log`). The ready component
+  batch retains all 140 sanitizer, SDK and six-model Direct/Stock evidence.
+
+  Pre-next-push CI inspection of 0a7c2d8d: both Quality (40073587007 /
+  40073583118), Storage (40073587032 / 40073583077) and Objects (40073587006 /
+  40073583192) runs pass. Both Gallery runs 40073586972 /
+  40073583076 pass. PR Core 40073586985 passes; push Core 40073583179 runs.
+  Runtime's aggregate queued label does not mean no work: 40073586999 has
+  102 successful / 15 unfinished jobs; 40073583151 has 115 successful /
+  two unfinished jobs. Neither reports a failed job at this inspection.
+  Preceding 95348ce8 Runtime runs were cancelled by workflow concurrency after
+  101 and 90 successful jobs respectively, not accepted as whole-suite passes.
+  The older transport/audio failures remain unresolved; a passing Objects run
+  does not establish a transport repair. Recheck before the actual next push.
+
+  Pre-push component-batch validation at 2e7cfcc5: a CRLF-normalized audit
+  of all 4,572 tracked files confirms runtime/tests match the writable container
+  mirror. Only roadmap/compatibility status text differed; both were synced.
+  The mirror Git index includes all current files. Full format/lint pass, logs
+  `/work/oct24-progress-{format,lint}.log`. Full 140-target ASan/UBSan regression
+  runs in process 10200, logs `/work/oct24-progress-full-{build,tests}.log`.
+  Whole host/ARM analysis passes (37052 exit 0, 352 sources), log
+  `/work/oct24-progress-analysis.log`. Full sanitizer result remains pending.
+  Stock process 9966 remains active; HP39g+ directory transfer completed and
+  payload packet sends are progressing. Keep the same processes until terminal.
+
+  Native progress/component Direct acceptance now passes all six models:
+  the maintained hpgcc-window fixture adds four real slider instances, 16 GPIO
+  edges and eight value-change events per model across single/double buffering.
+  It verifies focus, 50-to-60 value changes, removal/destruction/reset, then
+  recreates four static 60% controls for independent full-frame pixel checks
+  (checkpoints 300/400). The verifier checks all orientations, blank background,
+  status column and 16-level LCD mode; a missing filled pixel is rejected.
+  Existing 44 keyboard frames/page exchange and final animation/settled return
+  continue to pass. All six saved JSONs confirm pass/returned/return_settled.
+  Process 53782 exits 0; artifact `/work/oct24-progress-native-arm`, evidence
+  `/work/oct24-progress-direct-<model>-evidence`, logs of the same prefix.
+  This native phase checks taps; repeat/blink timing retains host evidence.
+  Stock assets are prepared from this exact artifact. The first research runner
+  lacked RUNNER_TEMP and exited before emulation; log retained at
+  `/work/oct24-progress-stock-setup-failure.log`. Corrected six-model Stock
+  process 9966 is live, with `/work/oct24-progress-stock-<model>.log` and matching
+  evidence directories. HP39g+/HP39gs Stock now pass input, all 46 captured frames,
+  page exchange, final animation and settled return; the same process continues
+  with HP40gs. Remaining Stock models and CI acceptance are pending; local only.
+
+  Progress-control source differential now passes both HPGCC 1.1/2.0:
+  `tests/compat/check-win-progress.py` compiles all eight unchanged original
+  progress functions against the same production window/widget/event/timer
+  foundation as the candidate. Host device glue records rendering calls and
+  supplies time/key input. Twenty-four orientation/range/focusability scenarios
+  produce 7,011 identical lines, including bounds, preferred sizes, rendering,
+  blink pattern bytes, value-change events, delayed/periodic repeats, release
+  cancellation and focus transitions. SHA256:
+  `de1f7cea4a937a58bdf295c8dcd4cddd3de7b55ef7c96b96f66db5e458ba0784`.
+  Deliberately reversed horizontal increment keys are rejected. The candidate
+  harness is a maintained ASan/UBSan CTest target and passes. Logs:
+  `/work/oct24-progress-{reference,negative}.log`; reference process 78872
+  exits 0. Invalid-input extensions and callback-removal safety retain their
+  separate sanitizer tests; this differential does not claim original behavior
+  for those extensions. Native control/application acceptance remains open.
+
+  Local concrete progress/slider adapter: `winprogress.h` now implements all
+  eight historical entry points, four orientations, range/value/increment,
+  key-driven changes and boundary focus transfer, delayed/periodic repeat,
+  release cancellation, blink pattern and change events. Removal during a value
+  notification cannot rearm repeat timers. Internal component-type checking
+  rejects accidental cross-control casts. Invalid nonfinite configuration and
+  unsafe integer conversions are checked; failed packing keeps prior dimensions.
+  Three focused sanitizer targets pass, including production HPG pixel maps,
+  repeat timing, focus transitions, callback removal, published blink pixels,
+  NaN and preferred-size overflow. ARMv4T compile/analysis pass. Logs:
+  `/work/oct24-progress-tests.log`; original mistaken back-page blink assertion
+  retained in `/work/oct24-progress-back-page-test-failure.log`. The SDK C/C++
+  client now exercises the progress API. Full gate passes (64824 exit 0):
+  C/C++, six-model launchers, three HP39 Aplet variants, all model-specific
+  Notebook builds and 517 reproducible release outputs. Log:
+  `/work/oct24-progress-sdk.log`. Formatting and strict docs pass.
+  Original-progress-source differential and native control execution remain
+  open. Local work only; no new push or CI acceptance.
+
+  Custom-component original-source differential now passes: the optional
+  `tests/compat/check-win-widgets.py` compiles 21 unchanged original functions
+  from each caller-supplied HPGCC 1.1/2.0 archive with host-only structural glue.
+  Both match all 86,172 candidate trace lines across 384 focusability/insertion
+  scenarios: properties, preferred-size/packing, transparency bit semantics,
+  paint call ordering, focus callback observations, forward/backward traversal,
+  and removal with/without moving focus. SHA256:
+  `6bf7816d0ba81810fb8ce3e32ffeb3dd353446af16e8d251bebe54d608d4d2ca`.
+  The comparison avoids the original dangling-cursor removal UB; the separate
+  sanitizer suite verifies that repaired case. A deliberately incorrect boolean
+  transparency assignment is rejected. Logs:
+  `/work/oct24-win-widget-{reference,negative}.log`; process 37724 exits 0.
+  The candidate harness is also a maintained ASan/UBSan CTest target and passes.
+  This proves host semantics only; native custom components, concrete controls
+  and original multi-control application acceptance remain open. Local only.
+
+  Local public custom-component follow-up: `winwidget.h`/`wincore.h` now
+  expose allocation, lifecycle, focus, geometry, borrowed fonts/colors and base
+  painting. Runtime profile includes the adapters. Reset rejects installed
+  widgets; destruction rejects active callbacks/snapshots. Event/timer removal
+  remains usable after a latched error, permitting component cleanup. Failed
+  construction retains caller data ownership, and invalid/overflowing geometry
+  preserves prior bounds. Lifecycle reentrant membership mutation is EBUSY.
+  Four focused ASan/UBSan targets pass: focus, public events, custom widgets and
+  real HPG context. Pixel assertions cover exclusive clipping, inherited
+  patterned XOR background, solid foreground and transparency. ARMv4T compile
+  and focused Clang analysis pass; log `/work/oct24-win-widget-tests.log`.
+  The relocated SDK gate now includes C/C++23 custom-component clients, six
+  launchers and three HP39 Aplet variants. Process 14783 exits 0: complete
+  relocated-SDK gate passes, including all model-specific Notebook builds and
+  517 byte-identical release outputs across clean builds. Log:
+  `/work/oct24-win-widget-sdk.log`. Strict docs pass. Native
+  custom-component execution, original-source differential, concrete controls
+  and the complete historical win.h remain open. These are local changes only.
+
+  Local widget foundation after 0a7c2d8d: `win-focus` implements caller-owned
+  component membership, insertion before the current cursor, forward/backward
+  focus traversal, installation/removal callbacks and repaint ordering. It
+  retains historical lost/gained notifications when traversal stays on the
+  same node, and historical cursor-based has-focus for passive components.
+  Removing the final focusable component now leaves a valid surviving cursor
+  instead of the historical dangling node. Duplicate membership is rejected;
+  lifecycle callback reentry into mutation/traversal returns EBUSY. Queries
+  remain usable during callbacks. Event snapshot lifetime is a separate public
+  adapter responsibility; this module does not yet expose winwidget/wincore.
+  Focused ASan/UBSan tests pass, including explicit callback traces and 9,216
+  combinations of four-component focusability, insertion and removal order.
+  ARMv4T compilation and focused Clang analysis pass; log
+  `/work/oct24-win-focus-tests.log`. Original-source differential execution,
+  public integration, concrete controls and native widget acceptance remain
+  open. This is local work only, not part of the submitted CI batch.
+
+  Submission update: the complete local window-key/indicator batch and Kermit
+  diagnostics are pushed as `0a7c2d8d` in draft PR #10. All 136 sanitizer tests,
+  full host/ARM analysis, formatting/lint and strict docs pass locally.
+  Preceding-head CI was inspected immediately before this push; new-head CI
+  has not been polled. CI acceptance and merge remain pending.
+
+  Latest preceding-head CI inspection (95348ce8): push Core 40068703216 now
+  passes, as do both Quality/Storage/Gallery runs and push Objects. PR Core
+  40068713317 also passes; both Runtime runs queue. PR Objects 40068713236's
+  pre-execution HP39g+ transfer stall remains unresolved with evidence below.
+  This inspection preceded the 0a7c2d8d push; no merge was made.
+
+  Build-input audit at d2375cdc: 4,556 tracked files were compared with the
+  writable container mirror after CRLF normalization. Runtime and test sources
+  matched; only five documents and one build-help line were stale. After syncing
+  those six files, all 4,556 match. A fresh CMake install verifies getting-started,
+  migration and the window README byte-for-byte against current sources
+  (`/work/oct24-window-documentation-install.log`). This supplements earlier SDK
+  runtime/build evidence without claiming the old installed documentation was
+  current. Development roadmap/compatibility documents are not SDK install paths.
+
+  Full regression started at 5f1cd1c6: all host targets rebuild successfully
+  with ASan/UBSan enabled for C/C++. The 136-test CTest suite runs in process
+  68707 (`/work/oct24-window-full-unit-{build,tests}.log`); no full-suite pass
+  is claimed yet. Native Stock processes 68792 and 96971 remain live with
+  separate target directories. These are existing runs, not restarted attempts.
+
+  Latest local window/transport checkpoint: fixed HP39g+ Stock now passes
+  (69002 exit 0), including independent final pixels, 44 status frames, page
+  exchange and settled return. Evidence is preserved separately in
+  `/work/oct24-win-settled-stock-hp39gplus-evidence`; the original failed state
+  remains intact. Process 68792 runs fixed HP39gs, HP48gII and HP49g+ sequentially
+  and preserves each result. Original process 32221 is terminal (exit 1), with
+  all three HP39 failures retained. Fixed HP40gs now runs in 96971 after saving
+  its original failed state. Fixed HP50g Stock and HP48gII Direct already
+  pass. The complete fixed Stock matrix is not yet accepted.
+
+  CI transfer diagnostics now append send-window, last NAK, NAK count and resend
+  count since advancing ACK to watchdog failures. This changes no timeout or
+  success criterion; NAK/retry traffic still cannot renew the idle budget.
+  Twelve watchdog/HP39 gate unit tests and Ruff pass. Replaying the actual
+  40068713236 log in 137-character chunks yields window 48, last NAK 48,
+  three NAKs and five resends. The receiver's NAK packets have valid block
+  checks. This narrows the stalled transfer evidence but does not establish its
+  root cause or repair it. The new diagnostics are local and not pushed.
+
+  Updated pre-push CI investigation, 95348ce8: PR Objects 40068713236 fails
+  only Stock object-catalog/HP39g+ (job 120798037735); push Objects 40068703277
+  passes. Downloaded Kermit evidence proves completed HP39DIR.CUR/HP39DIR.000,
+  followed by unfinished HPGCC000.000 with no acknowledged progress for 90s.
+  The host gate fails before payload execution (PC 0x000044c4, no object phase),
+  rather than an object-runtime assertion. Logs/artifacts are retained under
+  host `research/ci-40068713236-{failed.log,catalog}`. Transport root cause is
+  unresolved; a passing companion run is not treated as a repair. Core push
+  40068703216 is running; Core PR/Runtime and one Gallery run still queue.
+  No new push, merge or overall CI acceptance.
+
+  Fixed window-key validation, 72b187cb: HP48gII Direct and HP50g Stock both
+  pass input, 44 status frames, page exchange, final pixels and settled return
+  (59175 exit 0). HP50g evidence is preserved in
+  `/work/oct24-win-settled-stock-hp50g-evidence`. Fixed HP39g+ Stock now runs
+  in 69002 using the candidate settled build. Original 32221 has failed both
+  HP39g+ and HP39gs at 0x46417806 and continues HP40gs; those failures remain
+  recorded, with HP39gs state also preserved. The fixed all-six matrix remains
+  incomplete. Do not restart either live process based on observation latency.
+
+  Stock key-fixture failure and local correction (after 8db74b41): original
+  process 32221 reports HP39g+ runtime failure 0x46417806 and continues HP39gs;
+  completion of one target was not a pass. Saved SRAM resolves the historical
+  matrix to bits 7/60 (launch Enter plus requested Alpha), with two physical
+  edges and one typed callback on the first request, before any status frame.
+  Evidence is preserved in `/work/oct24-win-physical-stock-hp39gplus-failure`.
+  The fixture now announces entry through an LCD checkpoint and waits, bounded,
+  for actual launch-key release before installing observers/injecting test keys.
+  All subsequent extra edges still fail. It also preserves the first keyboard
+  failure instead of replacing it with the final timer-summary error. Six-model
+  compilation and ARM analysis pass; fixed native reruns are not yet accepted.
+  Process 59175 checks fixed HP48gII Direct and HP50g Stock, in different target
+  state directories from the still-live original HP39 run. Candidate build is
+  `/work/oct24-win-physical-settled-arm`; logs use `/work/oct24-win-settled-*`.
+
+  Post-indicator SDK acceptance (local 342d54c6): the complete relocated-SDK
+  gate passes C/C++23 applications, all six launchers, all three HP39 Aplet
+  variants, per-model Notebook builds and 453 byte-identical release outputs
+  (`/work/oct24-win-indicator-sdk.log`, process 71681 exit 0). This includes
+  8403e215's checked indicator implementation. Stock keyboard validation remains
+  live in process 32221; no result or restart is inferred from transfer latency.
+  The compatibility guide's stale "no installed win headers" and conditional
+  widget-scope wording is corrected: three public headers are implemented;
+  full widgets and win.h remain required M8.4 work.
+
+  Local native window-key fixture (after 8403e215, not pushed): the maintained
+  `hpgcc-window` client now requests real emulator GPIO transitions through the
+  shared KI/KJ mailbox. Each of single/double-buffer gray16 modes checks 22 edges
+  and five typed callbacks, covering one-shot/locked Alpha, plain digits, shifted
+  lowercase, right-shift unmapped characters and releases. The independent
+  verifier checks every pixel in 44 captured status frames per model, gray-9
+  locked Alpha, white background and real single/double-page exchange. Corrupting
+  a locked-Alpha pixel is rejected. All six Direct models pass, including the
+  existing timer/repaint final image and settled return (35844/62504 exit 0).
+  ARM analysis, six-model compilation, Ruff and formatting pass. Evidence:
+  `/work/oct24-win-physical-direct-evidence` and
+  `/work/oct24-win-physical-{hp39,hp48,hp4950}.log`. Stock all-six execution is
+  running in process 32221 with dedicated `oct24-win-physical-stock-*` assets and
+  logs; no Stock result is claimed yet. Shipped-example native execution and CI
+  acceptance remain separate. No new push was made.
+
+  Local modifier-indicator integration (after 526669a8, not pushed): the default
+  priority-2000000000 repaint handler sets historical Alpha/Shift segments from
+  current held/latch states: white off, black on/held, gray 9 locked Alpha.
+  Existing HPG PAINT/XOR and page buffering apply. A checked internal indicator
+  hook propagates display errors; public void HPG behavior is preserved. Six
+  internal handlers leave 58 application slots. Four focused sanitizer targets
+  pass, including modifier colors, repaint consumption, first-error propagation
+  and actual HPG status-page/publication behavior. Six-model ARM builds and host
+  analysis pass (`/work/oct24-win-indicator-{tests,arm,analysis}.log`). Native
+  physical input and indicator pixels remain open; prior SDK/native evidence
+  predates this indicator change.
+
+  Pre-next-push CI inspection of 95348ce8: Quality 40068713244/40068703255,
+  Storage 40068713251/40068703345, Gallery 40068713225 and Objects 40068703277
+  pass. Objects 40068713236 is running; Core 40068713317/40068703216,
+  Runtime 40068713291/40068703319 and Gallery 40068703246 are queued.
+  No completed failures were present at inspection. No CI acceptance or merge
+  is claimed, and no new push was made; inspect remaining results before pushing.
+
+  Local public typed-key integration (after 20c24cf2, not pushed): `winkeys.h`
+  exposes historical typed/modifier event constants and payload fields. The
+  service installs priority-2000000000 press/release translators, preserving
+  synchronous borrowed/nested payloads, early event consumption and failure
+  latching. Mapping keeps the historical numeric key namespace on HP39 too;
+  native text interpretation is separate. Modifier repaint notifications do not
+  begin/present frames; indicator drawing was subsequently connected above.
+  Three focused sanitizer targets pass,
+  including public polled-matrix transitions, nested callbacks and invalid keys;
+  host analysis and six-model ARM builds pass. Native physical input, indicators,
+  and CI acceptance remain open. The installed window example now consumes typed
+  digits to move the rectangle and ON to quit. Its C/C++23 relocated-SDK builds,
+  six-model launchers, all three HP39 Aplet variants and 453 byte-identical release
+  outputs pass (`/work/oct24-win-keys-sdk.log`, process 11638 exit 0). This closes
+  new-header SDK build/package acceptance, not native physical-key execution.
+
+  Local typed-key foundation (after submission 95348ce8): `win-key-state` now
+  owns Alpha/left/right latch and held states independently of the physical
+  polling generator. It preserves the original character tables, one-shot
+  clearing before typed callbacks, synchronous typed/modifier/repaint order,
+  callback return values and reentrant state observations. Injected post failures
+  latch errno after partial delivery; later input cannot silently replay it.
+  Two focused ASan/UBSan targets pass, including failed typed/modifier/repaint
+  stages, nested failure propagation and valid callback -1. The optional
+  `tests/compat/check-win-key-state.py` compiles caller-supplied HPGCC 1.1 and
+  2.0 key handlers: both match 94,253 trace lines across 2,304 modifier/key
+  setups plus three nested cases. SHA-256:
+  `b18361346679d3a36ac3ec45bad31b67a73a1983eae1ccbfdbdfdabd615f665f`.
+  An intentionally wrong alpha character is rejected by the same comparison.
+  Host/ARM analysis, formatter/Ruff and a six-model launcher build pass; evidence
+  is `/work/oct24-win-key-state-{test,parity,negative,arm,host-analysis,arm-analysis}.log`.
+  This is internal source-compatibility behavior for historical KB_* values;
+  public handlers were subsequently connected as above; model interpretation, indicators and native
+  physical-key acceptance remain open. This local work is outside PR #10's submitted head.
 
 #### M8.5 — Modern C++ and migration
 
@@ -4354,6 +5332,41 @@ three HP39 Aplet package variants. CI acceptance is complete in Runtime
 all six Stock models, including the real directory/iterator ownership fixture
 on classic models and the explicit unsupported-context behavior on HP39.
 
+Local M8.5 stream ownership slice (2026-10-24): `hpclang/storage.hpp` adds
+allocation-free C++17 `owned_stream` and `owned_stream_directory`. Move/adopt/
+release semantics preserve exclusive close responsibility; explicit checked
+`close()` consumes the handle even on failure, while destructor/reset cleanup
+preserves errno. Documentation distinguishes cleanup from successful data
+persistence and retains ordinary scope versus exit/_Exit behavior.
+Host ASan/UBSan uses real stdio and the real FatFs namespace, covering move
+replacement, self-move, adoption/release, missing-open preservation, buffered
+reads, close failure, stale-media directory close and no double close.
+The Storage E2E now executes these owners through its real C++ translation unit
+on supported HP49g+/HP50g storage paths; other models retain explicit unsupported
+context checks. The first version passes all six Direct targets and relocated
+SDK builds. Move assignment was then expressed as close-old followed by
+transfer-new, avoiding the analyzer's impossible alias path between independent
+live fopen results; updated sanitizer tests and ARM analysis pass.
+Final artifacts `/work/oct24-storage-cpp-v2-artifact` are built from
+`/work/oct24-storage-cpp-src`; full Direct and HP49g+/HP50g SD-transport Stock
+verification completed on session 45311 (exit 0): all six Direct context checks
+and both HP49g+/HP50g Stock storage paths pass. The expanded installed SDK C++ client and
+six-model package gate pass on session 59414 (exit 0). Logs use
+`oct24-storage-cpp-v2-{direct,stock}-*.log` and `oct24-storage-cpp-sdk-v2.log`.
+This slice is locally verified; CI acceptance remains pending and M8.5 is not complete.
+
+The installed `examples/storage-cpp` now exposes the stream owners as a
+standalone C++17 application, with explicit SD/model/input requirements and
+checked read/close results. The relocation gate consumes that installed example
+instead of a test-only duplicate and retains six-model launcher and optional
+HP39 Aplet checks. Ruff, C++ formatting, ARM static analysis and strict docs
+pass. The expanded relocation gate passes on session 24066; its optional
+HP39g+/HP39gs/HP40gs C/C++ Aplet variant also passes on session 5520.
+Logs are `/work/oct24-storage-example-sdk.log` and
+`/work/oct24-storage-example-aplet.log`. These validate installed packaging;
+the native owner behavior retains the separately recorded Storage E2E evidence.
+The example is locally verified and has not yet been pushed for CI acceptance.
+
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications
   first-class and exercise destruction/exit behavior.
@@ -4364,6 +5377,18 @@ on classic models and the explicit unsupported-context behavior on HP39.
   deterministic resource generation as part of the installable SDK.
 
 #### M8.6 — Application and release acceptance
+
+Local release reproducibility follow-up (2026-10-24): the installed SDK gate
+now performs a second clean build from a copied external source directory.
+It compares generated font C/headers, HPC1 images, all six raw/wrapped launchers
+and memory reports, plus three HP39 Aplet envelopes and companions when enabled.
+The expanded run passes all 353 release-output byte comparisons, relocated
+C/C++ packaging, all six model-specific Notebook builds and the three HP39
+Aplet variants (session 77295, exit 0), logged in
+`/work/oct24-sdk-reproducible.log`. Ruff and strict docs pass. This is a same-toolchain,
+same-configuration check of maintained clients, excluding ELF/debug/build-system
+metadata; it does not close resource limits or the broader release milestone.
+CI acceptance has not yet been submitted.
 
 Current scenario acceptance (reconciled 2026-10-23): Runtime
 [39928737278](https://github.com/maxmixalex/hpclang/actions/runs/39928737278)
@@ -4468,6 +5493,16 @@ For each stage, implement and validate locally before batching a meaningful
 CI submission. Keep host semantic tests separate from calculator integration
 and pixel witnesses, select affected E2E suites, and preserve normal PASS and
 return gates. A pushed CI run is not a reason to stop independent work or poll.
+
+## Deferred research — HP39gs / HP40gs ROM storage
+
+User idea recorded on 2026-10-24; **not scheduled for implementation or added as an M8 acceptance gate**.
+
+- Investigate an optional hpclang ROM/Flash write service for HP39gs and HP40gs, making usable ROM space available for fonts and other persistent application resources. Per the user's hardware constraint, HP39g+ is excluded from this proposal.
+- Reference: [HP39GS-Explorer](https://github.com/Yanye0xFF/HP39GS-Explorer). Its README describes an HP39gs 2.22 custom firmware image containing a GB2312 font and installation through the bootloader. This is evidence for image-based font storage, not proof of a safe in-application write API or HP40gs compatibility.
+- Research input: the user's complete real-machine ROM dumps are stored locally at `D:\Works\Calc\HP 39gs 相关文档\ROM`. The directory exists; its dumps have not been analyzed for this proposal or added to the repository.
+- Future feasibility work should establish per-model Flash commands and erase geometry, genuinely available regions, protection of firmware/bootloader and existing data, execution during writes, and recovery after interrupted writes. ROM corruption and loss of bootability are acknowledged risks; the idea does not authorize hardware flashing now.
+- Preserve the normal SDK's no-required-ROM-replacement principle. This remains an optional research direction, separate from the retained M8 native Port 0/1/2 work and current audio acceptance.
 
 ## Additional M7–M8 acceptance requirements
 

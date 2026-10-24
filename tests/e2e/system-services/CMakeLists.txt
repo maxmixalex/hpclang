@@ -17,12 +17,26 @@ add_executable(hpclang_system_services_e2e
     checks.c
     irq.c
     irq.S
+    watchdog-irq.c
+    watchdog-irq.S
+    sound-async.c
+    kos-sound.c
     power.c
     console.c)
 
 target_include_directories(
     hpclang_system_services_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 target_compile_features(hpclang_system_services_e2e PRIVATE c_std_11)
+set(HPCLANG_E2E_SOUND_EXIT "blocking" CACHE STRING "Sound exit fixture: blocking, exit, _Exit")
+if(NOT HPCLANG_E2E_SOUND_EXIT STREQUAL "blocking")
+    if(NOT HPCLANG_E2E_SOUND_EXIT MATCHES "^(exit|_Exit)$")
+        message(FATAL_ERROR "Invalid HPCLANG_E2E_SOUND_EXIT")
+    endif()
+    target_sources(hpclang_system_services_e2e PRIVATE sound-exit.c)
+    target_compile_definitions(hpclang_system_services_e2e PRIVATE
+        HPCLANG_E2E_ASYNC_EXIT=${HPCLANG_E2E_SOUND_EXIT})
+    target_link_options(hpclang_system_services_e2e PRIVATE -Wl,--wrap=hpclang_sound_restore)
+endif()
 target_compile_options(hpclang_system_services_e2e PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)

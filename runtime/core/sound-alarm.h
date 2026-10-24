@@ -47,4 +47,19 @@ int hpclang_sound_alarm_rearm(const struct hpclang_sound_alarm_bus *bus,
                               struct hpclang_sound_alarm *alarm, uint32_t delay_us);
 void hpclang_sound_alarm_release(const struct hpclang_sound_alarm_bus *bus,
                                  struct hpclang_sound_alarm *alarm);
+
+/* Absolute monotonic deadlines, in microseconds. Caller samples time while
+ * serialized with the clock and timer owners; these helpers never read a clock
+ * or enable interrupts. Acquire requires deadline > now (otherwise EINVAL).
+ * Advance returns 0 after rearming the remaining interval, 1 after reaching
+ * the deadline and releasing the lease, or -1 on invalid state/rearm failure.
+ * The caller stops audio on completion/error and owns IRQ dispatch/teardown.
+ * Long intervals are chunked without narrowing or adding to the timestamp.
+ * A late handler completes immediately rather than scheduling another period.
+ */
+int hpclang_sound_alarm_acquire_until(const struct hpclang_sound_alarm_bus *bus,
+                                      struct hpclang_sound_alarm *alarm, uint64_t clock_num,
+                                      uint64_t clock_den, uint64_t now, uint64_t deadline);
+int hpclang_sound_alarm_advance(const struct hpclang_sound_alarm_bus *bus,
+                                struct hpclang_sound_alarm *alarm, uint64_t now, uint64_t deadline);
 #endif

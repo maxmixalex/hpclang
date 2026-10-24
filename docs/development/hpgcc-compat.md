@@ -573,7 +573,7 @@ Raw KOS entry numbers and calling conventions remain **Migration/Internal**. Por
 
 ## win widget/event library
 
-The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if real ports justify it**. Recreating historical widgets before stable display/input/time/object services would invert the dependency order.
+The HPGCC 1.1/2.0 widget family remains a retained **M8.4 adapter requirement**. The display/input/time/object foundations and bounded event/timer/key adapters support that work; widget ownership, focus, layout and original-application acceptance remain unfinished.
 
 ## Compatibility matrix
 
@@ -588,8 +588,337 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 | HPGCC2/3 `FS*` | bounded source adapter above owned FatFs storage | Adapter | M7.2d implemented; Storage #53 green |
 | Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e bounded application subset complete; Runtime #338 green; M7.3f public mutation implemented and accepted |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
-| `win*` widgets | future UI toolkit | Migration, adapter later | later |
+| `winevent.h`, `wintimer.h`, `winkeys.h` | Bounded foreground event/timer/key service over native input, time and HPG | Adapter implemented locally; see exact validation below | M8.4, CI pending |
+| `winwidget.h`, `wincore.h` | Custom component lifecycle, focus, geometry and base painting | Local sanitizer/pixel and relocated SDK checks pass; native acceptance pending | M8.4 |
+| `winprogress.h` | Four-orientation progress/slider, focus, repeat and blinking cursor | Local host/SDK/reference and six-model Direct checks pass; Stock pending | M8.4 |
+| Concrete `win*` controls and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
+
+## Historical window adapter feasibility
+
+The 2026-10-24 review reads the retained HPGCC 1.1/39g distribution's
+`sources/win` headers and implementations (`/work/hpgcc39-review` locally),
+then compares all four original release archives. This is static source
+evidence, separate from the subsequent implementation and runtime checks below.
+The installed `winevent.h`, `wintimer.h` and `winkeys.h` now expose working
+event/timer/key adapters. `winwidget.h`/`wincore.h` now add custom components;
+concrete controls and the full `win.h` umbrella remain open.
+
+| Release | Source/header files scanned | Window-family evidence |
+| --- | ---: | --- |
+| 1.0.3 beta | 309 | No `win_` references or installed `win*` headers in the scanned C/C++ sources/headers. |
+| 1.1 with 39g support | 685 | 104 window implementation/header files and 13 installed window headers. Also includes `examples/win/simple.c`. |
+| 2.0 SP2 | 712 | All 104 window source/header files and all 13 installed headers match 1.1 after newline normalization; neither comparison has missing or changed files. |
+| HPGCC3 R004.revA | 552 | No `win_` references in the scanned sources/headers. `libs_workspace/headers/gui.h` instead exposes C++ `gApplication`, `gForm`, `gControl` and related classes. This is a distinct GUI API, not evidence for `win*` aliases. |
+
+Reproduce the comparison with Python 3.11 or newer:
+
+```sh
+python tools/audit-hpgcc-windows.py /path/to/original-archives > window-audit.json
+```
+
+The tool reads caller-supplied archives without extracting their paths or
+redistributing source. Its report contains archive SHA-256 identities, the
+scanned file counts, reference filenames and exact normalized comparisons.
+The reviewed archives are:
+
+```text
+hpgcc-1.0.3-beta-Linux.tar.bz2
+7041e368bcc47b2d4014f49a8e4ef8039716057415a0091cf80912c0fa115500
+hpgcc1.1-with-39g-support-windows.zip
+572fd81addd205a7e2bdc1a5ff3f893abaa2ea7ba990766c7f09da6a36226020
+hpgcc-2.0-SP2-Linux.tar.bz2
+e4f9d632e65316101717f39c00523c2f43608a11156d4a4d4e8fae3195771029
+hpgcc3_R004.revA.tar.gz
+a984795493f2e4cf79001e0f95824b9c76f20df6d38a071eb8f9deb7a650165d
+```
+
+| Historical behavior and primary source | Existing service and required bridge |
+| --- | --- |
+| `common/win_post_event.c` snapshots the current handler chain and invokes it synchronously until a handler returns nonzero. `win_add_event_handler.c` orders higher priorities first and newer equal-priority handlers first. Changes to registration affect nested/future dispatch, not the copied outer chain. | UI actions are application messages, not this dispatcher. Preserve synchronous return values, nested dispatch and snapshot lifetimes in a separate compatibility event layer. Do not defer an event carrying borrowed stack data. |
+| `common/win_init.c` installs keyboard, repaint and timer generators on the idle event in that priority order. `win_event_loop.c` repeatedly dispatches idle until quit. | A compatibility loop can drive existing keyboard, UI and clock services, but must preserve ordering, callback consumption and quit behavior. Rendering must occur outside the declarative view's pure construction phase. |
+| `common/_win_timer_generator.c` invokes due timers from the idle handler. Periodic timers advance the previous deadline and may catch up repeatedly; delay timers schedule from the time after the callback. Nonzero callback results remove the timer. | Use monotonic time in foreground dispatch. The RTC coalescing adapter and asynchronous audio IRQ are not substitutes for these timer semantics. Define and test invalid intervals and callback-side cancellation before publishing adapters. |
+| `common/win_remove_widget.c` deinstalls handlers and updates focus; `win_widget_destroy.c` invokes destruction and frees memory separately. | Retained compatibility objects must own state and stable UI keys, with distinct install/remove/destroy operations. Removing a declarative node alone does not satisfy old pointer ownership or an in-progress event snapshot. |
+| `text/win_text_new.c` maintains editable byte text, cursor state and a blink timer; `win_text_set_text.c` copies replacement text. `checkbox` owns selection and updates menu bindings. | Labels, controlled `hpclang_ui_text_input` and `hpclang_ui_toggle` provide rendering/input foundations. A bridge must accept proposals into its own state before redeclaration, translate legacy byte text explicitly and preserve getter lifetimes. Direct aliases would change who owns the model. |
+| `choose/win_choose_set_choice.c` uses a past-end selection for NULL or an unmatched choice; `win_choose_get_choice.c` then returns NULL. `winsoftmenu.h` provides up to 30 entries with enabled states and associated events. | Compose selection/menu views from existing controls while retaining no-selection, dynamic option identity, menu paging and model-specific function-key routing. A fixed six-button view is insufficient. |
+| `progress/win_progress_set_value.c` clamps a double to its range. `win_progress_new.c` implements four orientations, slider key-repeat, focus changes at limits and change events. | The canvas callback can render a progress view, but the compatibility layer must retain numeric state, orientation, repeat timing and focus behavior. A painted rectangle alone is not a slider adapter. |
+| `winbox.h` exposes positioned/spanning children and alignment; `winimg.h` combines an HPG pattern and image. | Compare legacy layout results with row/column/scroll composition, and preserve borrowed image lifetimes and clipping through the canvas/surface backend. Do not silently discard positioning or spans. |
+
+Header/source discrepancies also need explicit treatment: this distribution's
+`wincheckbox.h` names `win_text_get_text` and `win_text_is_selected` in its
+checkbox declarations. A declaration inventory must be checked against actual
+exported implementations and application use before generating aliases.
+
+Source fingerprints for the dispatch/timing findings (SHA-256):
+
+```text
+common/win_post_event.c
+19399f4eb254d1175eedc230a4f786dfe1e27a8b9013eba91ed95f000b9e06d9
+common/win_add_event_handler.c
+be05eb8b7ecc671078ad2a2cb0547433c319a55d9f74235098e1727d9c30331a
+common/_win_timer_generator.c
+04033bf94a0c72d7df31d10ee0c39da56cd7c313c01cbe933a5436d77488c0cf
+```
+
+The internal `win-timers` scheduler now preserves the original queue ordering,
+periodic catch-up, post-callback delay, cancellation and nested processing.
+It uses caller-owned slots and an injected monotonic clock; no hardware IRQ or
+allocation is involved. A callback budget retains outstanding due work. Event
+preflight failures retain the undelivered timer; clock/rescheduling failures
+after delivery release that timer without replaying its callback. Both 1.1
+and 2.0 original implementations match eight scenario traces under ASan/UBSan.
+Additional focused tests cover capacity, budget, clock and overflow failures;
+host/ARM analysis and six-model C/C++ launcher builds pass. The public interface
+and device-clock integration are described below; widget integration remains open.
+
+The internal `win-loop` now dispatches idle through this event bus. It retains
+the original entry-time quit reset and shared quit flag for nested runs. A
+handler consuming idle does not terminate the loop; requesting quit allows the
+current snapshot to finish. Bounded runs leave pending timers and registrations
+intact. Host integration checks the keyboard/repaint/timer priority sequence,
+timed quit, consumption, nesting and failed-dispatch retry. Those generators
+are controlled test callbacks. Subsequent device-input/rendering/public adapter
+integration and its native evidence are described below.
+
+The internal `win-keyboard` generator now uses the existing model-aware
+historical matrix reader, with an explicit checked read result. As in the
+original `_win_key_generator.c`, it updates the baseline before callbacks and
+dispatches changed bit numbers in ascending order. Nested polling sees that
+baseline; consumption applies to one key event. Codes remain physical matrix
+positions, including HP39's distinct modifier labels, rather than text. Read
+failure leaves the baseline unchanged. Dispatch failure is latched and requires
+the owning loop to stop and unwind before reinitialization, since an earlier
+key may already have been delivered. Host tests exercise all 60 physical inputs
+on all six model mappings, mixed transitions, nesting and partial failure.
+The internal `win-drivers` idle callbacks now connect this generator and the
+timer pump to the loop. Their device-clock callback uses checked
+`hpclang_time_read_us`, with timer intervals in microseconds. A dedicated loop
+failure latch preserves the first errno across nested runs, quit and later
+callbacks. This is separate from historical handler consumption; an ordinary
+nonzero callback still does not quit or fail the loop. Driver failures consume
+idle and propagate to the caller; the owner must unwind before reinitializing.
+Host integration covers timed quit, keyboard/clock failures and insufficient
+snapshot capacity during nested key dispatch. Subsequent native interaction,
+repaint and public API validation are described below; widgets remain open.
+
+The internal repaint coordinator preserves the original request lifecycle:
+requests coalesce, pending clears before target preparation, repaint dispatch
+is synchronous, and presentation follows even when a handler consumes the
+event or requests ordinary quit. Requests raised during painting remain pending
+for another frame; explicit nested repaint retains that sequencing. Checked
+prepare/present hooks allow the future rendering owner to propagate failures
+through the loop latch, skipping later stages without replaying drawing.
+Host tests cover coalescing, re-request, nesting, consumption/quit and each
+failure stage. Their hooks record calls rather than draw pixels; surface/UI
+integration and calculator rendering acceptance remain unfinished.
+
+Checked HPG frame hooks now provide a concrete repaint backend: acquire or
+reuse HPG's display lease, clear the current surface, and publish/flip after
+the callbacks. Existing grayscale and buffering choices remain intact, and a
+foreign clean display lease returns `EBUSY`. HPG cleanup retains ownership of
+release. Pixel tests use actual HPG/surface code across 2/4/16 levels and both
+buffering modes, checking successive frames, stale-pixel clearing, failed-flip
+front preservation and ownership conflicts. Their display session is a host
+fixture; the separate native event/timer/repaint acceptance is described below. Legacy
+single-buffer draw calls can publish before the final hook; no atomic-frame
+guarantee is introduced. Declarative widget bridging remains separate work.
+
+`winevent.h`, `wintimer.h` and `winkeys.h` expose event/timer/key services and the repaint
+request. They preserve user IDs starting at 8, synchronous callback results and
+positive millisecond timer intervals. The checked `hpclang_win_error`,
+`hpclang_win_step` and `hpclang_win_reset` extensions make failures of historical
+void functions observable. Default limits are 64 handlers (six reserved),
+256 concurrent snapshot entries and 32 timers; exhaustion latches `ENOSPC`.
+Reset is rejected during callbacks and does not release HPG's shared display.
+The shipped `hpgcc-window` example builds and links all six launcher variants;
+native execution remains pending. The installed/relocated SDK gate now passes
+for this client in C and C++23, all six launchers and three HP39 Aplet variants;
+453 complete-gate release artifacts match across two clean builds.
+The maintained `tests/e2e/hpgcc-window` client now passes all six Direct and all
+six Stock targets: four real 30 ms callbacks, synchronous consumed user events,
+four repaint cycles, independent final-frame pixels and settled native return.
+This native fixture uses HPG mono double buffering. Its Runtime CI manifest now
+runs the same client and pixel verifier; formal CI acceptance remains pending.
+Custom components now use `win_wcore_alloc` with installation, removal,
+destruction and preferred-size callbacks. Geometry, borrowed fonts, colors,
+transparency, focus notifications and base painting follow the historical
+interfaces. Base painting retains the preceding pattern/XOR mode for the
+background, then selects foreground/font, solid pattern and PAINT mode. Clip
+right/bottom endpoints remain exclusive. Host tests exercise production HPG
+pixels as well as lifecycle callback ordering and event-snapshot lifetime.
+
+Remove components before destroying them, and wait until event/timer dispatch
+returns before destruction. Destruction inside callbacks and reset with installed
+components return EBUSY. Membership changes inside lifecycle callbacks also
+return EBUSY. Cleanup/unregistration stays available after a latched error.
+Invalid geometry is rejected without changing the previous bounds; failed
+construction leaves application data ownership with the caller. This is local
+custom-component implementation, not acceptance of concrete historical controls,
+the complete `win.h` umbrella, or original multi-control applications. Native execution gates remain open. The optional
+`tests/compat/check-win-widgets.py` compiles 21 original functions from each
+caller-supplied HPGCC 1.1/2.0 archive. Both match 86,172 trace lines across 384
+scenarios, including focus callback order, safe current-node removal, component
+properties and painting calls. It excludes the original dangling-cursor UB;
+separate sanitizer tests cover the repaired removal. An intentionally wrong
+transparency conversion is rejected by the comparison. The expanded
+relocated SDK gate passes custom components in C/C++23, all six launchers and
+three HP39 Aplet variants, with 517 byte-identical release outputs across clean
+builds (process 14783, exit 0).
+
+
+An internal `win-key-state` engine now reproduces the original default key
+handler's Alpha/Shift latches, held-state metadata and character tables. Its
+injected synchronous post preserves one-shot clearing before typed callbacks,
+modifier snapshots after those callbacks, and nested modifier notification order.
+Failures of typed/modifier/repaint posts are latched after partial delivery;
+a callback returning -1 remains a completed dispatch result. The public window
+service now installs the original-priority (2000000000) press/release translators.
+`winkeys.h` provides the historical event/state constants and typed payload fields;
+callback payloads are borrowed synchronously, including independent nested payloads.
+Earlier physical handlers can consume events before translation. Invalid key codes
+and nested dispatch failures latch the window error; reset clears modifier state.
+Character mapping retains the historical `hpkeyb49.h` numeric namespace on every
+model, including HP39, rather than interpreting each model's printed key legends.
+Use the canonical text-input service for model-native text interpretation.
+Modifier notifications synchronously post repaint event 7, as in the original;
+these posts do not run the idle frame begin/present hooks. A default repaint
+handler at priority 2000000000 draws Alpha/Shift segments through HPG: white
+when off, black when on/held, and gray 9 for locked Alpha. HPG's PAINT/XOR and
+buffering rules apply, and earlier handlers may consume repaint. A checked
+internal indicator hook propagates acquisition/segment/publication failures to
+the window loop; the public void HPG function keeps its existing contract.
+`tests/compat/check-win-key-state.py <archive-directory>` compiles caller-supplied
+1.1/2.0 sources under ASan/UBSan and compares 94,253 trace lines, including held
+Alpha, crossed shifts and nested callbacks. Both references match; a deliberately
+wrong alpha mapping is rejected. Focused failure tests, host/ARM analysis and
+six-model launcher compilation pass. Public integration additionally passes
+ASan/UBSan checks for polled matrix transitions, one-shot Alpha, nested payload
+lifetimes, preempted physical events, callback -1 results and error propagation.
+The public adapter passes host analysis and six-model ARM compilation. Native
+physical input and native modifier-indicator acceptance remain required; the preceding native
+window evidence predates this integration. The installed window example now
+uses typed digits to move the rectangle and ON to exit. Its relocated C/C++23
+SDK builds, six-model launchers and three HP39 Aplet variants pass, with 453
+byte-identical outputs from two clean builds (`/work/oct24-win-keys-sdk.log`).
+This validates header delivery and application packaging, not physical input. The complete
+SDK gate was rerun after checked indicator integration and passes the same 453
+reproducible outputs, six-model launchers and three HP39 Aplet variants
+(`/work/oct24-win-indicator-sdk.log`, process 71681 exit 0).
+
+The maintained window fixture additionally passes all six Direct models with
+real GPIO input: 22 press/release transitions and five expected typed callbacks
+in each of single/double-buffer gray16 modes. An independent verifier checks all
+pixels in 44 LCD/status captures per model and actual page exchange. One-shot
+and locked Alpha, digits, left-shift lowercase and right-shift unmapped keys are
+covered; a corrupted locked-Alpha status pixel is rejected. The original timer,
+final-frame and settled-return checks still pass. Stock execution of this new
+fixture found an HP39g+ launch-boundary failure: the first poll also observed
+Stock's still-held Enter key. Saved RAM proves matrix bits 7/60 and two edges
+for the first requested Alpha. The test now announces payload entry, waits for
+launch-key release before installing observers, and retains the first failure
+code. The fixed HP48gII Direct and HP50g Stock runs pass all input, status-frame,
+page-exchange and return checks (59175 exit 0). Fixed HP39g+ Stock also passes
+(69002 exit 0), including all 44 independently checked status frames. Fixed
+All six corrected Stock models now pass the same checks (final process 68792
+exit 0); each model retains its JSON result and all 44 frame/register pairs.
+The original three-model HP39 failures remain preserved. Shipped-example native
+execution, CI acceptance and full widget compatibility remain open. The integrated
+136-test ASan/UBSan suite also passes (671.25 seconds), as do full formatting
+and lint checks; whole-repository host/ARM analysis is still running. This is emulator GPIO evidence, not a physical-calculator test.
+
+The actual installed window example now also passes all six Direct models
+(81150 exit 0). A separate witness compiles its unchanged source with only main
+renamed, captures the display before its real cleanup, and independently checks
+the default animation's final rectangle and settled return. Sources and captures
+remain under `/work/oct24-window-example-native` and
+`/work/oct24-window-example-direct-<model>-evidence`. An initial witness reported
+PASS after cleanup and correctly failed the return screen-transition gate; that
+negative evidence remains preserved. This is default-animation execution, not
+scripted digit/ON interaction or shipped-example Stock acceptance.
+
+The useful implementation path is an owned compatibility state/event layer
+above the accepted UI, beginning with dispatch and widget lifetimes, then
+text/checkbox and the more stateful controls. These remain retained adapter
+work, not approved omissions. The cross-version comparison establishes a common
+1.1/2.0 implementation baseline; it does not establish a binary ABI or cover
+HPGCC3's different GUI object model. Before acceptance, run original widget
+applications with documented edits. The retained 1.1 `examples/win/simple.c`
+is a concrete candidate: it combines a four-action soft menu, label, editable
+text, menu-bound checkbox and all four slider orientations. Its bottom slider
+starts at y=65, so 64-line models require an explicit layout/scrolling adaptation;
+dropping that control would not preserve the example. Required
+tests include priority/tie ordering, nested dispatch during removal, borrowed
+payload lifetime, timer catch-up versus delay, removal during callbacks,
+focus/menu transitions, exhausted storage and exit cleanup. Cross-model UI
+pixels and Stock return must follow; passing current clean-UI tests alone is
+insufficient evidence for historical semantics.
+
+The initial internal `runtime/core/win-events` foundation now implements
+synchronous snapshot dispatch with caller-provided registry/snapshot storage.
+It preserves higher-priority/newer-tie ordering, nonzero callback results and
+outer-snapshot stability while nested dispatch observes registry changes.
+Registration or snapshot exhaustion reports `ENOSPC` before partial delivery;
+reset during a callback reports `EBUSY`. Callback data is borrowed, so removal
+does not permit freeing data still captured by an outer dispatch. Duplicate
+removal follows the first matching callback/data in dispatch order, as the
+historical implementation does even across different priorities.
+
+The `win_events` host test passes ASan/UBSan, including callback-side mutations,
+self-removal, nested exhaustion, short-circuit cleanup, extreme priorities and
+borrowed stack arguments. Host and ARM analysis and C/C++ six-model launcher
+builds pass. This initial module establishes dispatch semantics; the later
+installed interfaces, event namespace, idle loop, timers and native validation
+are described above. Complete original-widget-application compatibility remains
+open.
+
+The optional POSIX-host differential gate also compiles the original
+`win_add_event_handler.c`, `win_remove_event_handler.c` and `win_post_event.c`
+from each caller-supplied 1.1/2.0 archive:
+
+```sh
+python tests/compat/check-win-events.py /path/to/original-archives
+```
+
+It runs the same callback driver against the historical and new dispatchers,
+under ASan/UBSan. The host glue preallocates event-table rows, replaces hardware
+initialization with an empty function and supplies the host standard library.
+The sole edit to the historical function sources replaces their
+`alloca(int)` declaration with the host `<alloca.h>` declaration. It does not
+alter dispatch, registration or removal logic. No historical source is bundled
+with hpclang, and this optional gate needs the external archives and a host C
+compiler with sanitizers.
+
+Both original versions match all 4,836 trace lines from priority/duplicate,
+nested mutation, self-removal and 32 deterministic 120-operation sequences.
+The trace SHA-256 is
+`2d552d8e4d5fce5a18f9e411c56ccb4582820c600543947073d21ec5db9f5664`.
+A negative-control candidate that reverses equal-priority insertion is rejected
+with a trace mismatch. This strengthens the event-order evidence; event-number
+registration, hardware initialization, timers, rendering and complete original
+widget applications remain outside this comparison.
+
+The same optional gate now also compiles seven original timer functions from
+each archive and supplies a controlled nanosecond clock. Eight sanitized host
+scenarios establish the timer contract before implementing its bridge:
+
+- With a 10 ms period, dispatch first reached at 35 ms and callbacks taking
+  6 ms, periodic callbacks run at 35, 41 and 47 ms until the callback stops them.
+  Delay-mode callbacks instead run at 35, 51 and 67 ms.
+- Equal deadlines execute the most recently inserted timer first. Duplicate
+  callback/data or event/data removal cancels the earliest queued match.
+- The currently executing timer is absent from the queue. Removing its own
+  callback/data does not prevent its rescheduling; returning nonzero does.
+- A nonzero event-handler return also cancels an event timer. Nested timer
+  processing can execute another due timer while the outer callback is active.
+
+Both versions produce timer trace SHA-256
+`4d5c9cdf912ba42e47307c7035fd009e1c50869512caa17b750b528d49504647`.
+The clock and table setup are host glue; timer algorithms are compiled unchanged.
+These scenarios use positive intervals and valid registered events. They do not
+establish invalid-input, allocation-failure or hardware clock behavior, nor do
+they claim that a new timer adapter exists. A bridge must retain distinct queued
+and executing timer lifetimes rather than silently changing self-cancellation
+or rejecting all nested timer processing.
 
 ## Design consequence
 
@@ -874,7 +1203,7 @@ wrong: its cycle count implies hundredths of a second, but its delay assumes
 600 kHz while the historical tick service uses 750 kHz. The adapter implements
 the nominal units, not that clock error, arithmetic overflow or raw pin writes.
 
-`kos_beep` remains a separate compatibility requirement. HPGCC's wrapper waits
+`kos_beep` has a separate mode contract. HPGCC's wrapper waits
 on `kos_CheckBeepEnd`, whose result is affected by the supplied mode flags.
 HP50g ROM inspection indicates that bit 1 selects completion waiting, while
 bit 0 permits a later request to replace the active tone. The admission check
@@ -884,25 +1213,76 @@ six models confirm the completion-query truth table and rejection of a new
 request while the active flags prohibit replacement. The low-level driver
 returns -1 in that case, but the public KOS entry discards it and returns zero.
 These probes restore the native state and return normally; they do not start
-tones or verify real asynchronous timing and permitted preemption. An adapter
-requires owned asynchronous playback and
-completion/preemption state; the current blocking `hpclang_sound_play` alone
-does not implement that contract.
+tones or verify real asynchronous timing and permitted preemption. The adapter
+must apply this completion/preemption policy to the owned asynchronous service
+described below; blocking `hpclang_sound_play` alone does not implement it.
 
-The internal PWM4 one-shot lease now provides a separate deadline timer without
-changing PWM2 audio output or the shared prescaler. It rejects an existing
-running, update, DMA or pending owner before modifying registers. Host sanitizer
-tests cover delay rounding, overflow and resource restoration; native Direct
-probes on all six model emulators pass expiry, rearm and stopped-state restoration.
-Those probes keep the interrupt masked and poll its pending bit. A separate
-supervisor helper now exchanges and restores the banked IRQ stack, link and
-status registers. Six-model Direct probes verify actual interrupt delivery
-while application code runs a busy loop and independently compare the restored
-bank. System Services E2E maintains this test, including the SWI vector, stack
-boundary and retained Stock source latches, and passes all six Direct targets
-locally. The production IRQ dispatcher,
-absolute-deadline handling and autonomous audio shutdown remain required before
-this becomes a public asynchronous sound adapter.
+Current asynchronous sound implementation (local, not yet CI accepted):
+`hpclang_sound_start`, `hpclang_sound_status` and `hpclang_sound_stop` now use
+PWM2 output plus an interrupt-only watchdog deadline. Stock can already own
+PWM3/PWM4, so the production service does not assume either channel is free.
+Admission checks that the watchdog is idle and mapped correctly, disables
+reset output, and borrows an isolated IRQ vector and stack. A real IRQ stops
+the tone while application code is busy; status queries do not drive expiry.
+The foreground collector restores the IRQ bank and vector after completion,
+which cannot safely happen while the handler is executing on that stack.
+Explicit cancellation and runtime exit also release the lease. Power-profile
+changes and blocking playback reject an outstanding asynchronous lease.
+
+The clock serializes monotonic state under interrupt masking, and the handler
+uses a masked clock-read path while preserving interrupted `errno`. Shared
+register tests cover deadline chunking, admission rollback, replacement,
+cancellation and restoration. The emulator watchdog overlay now converts PCLK
+cycles to microsecond scheduling and preserves fractional cycles; independent
+arithmetic and register-model tests pass under sanitizers. Earlier investigation
+and intermediate results are retained in the [roadmap](roadmap.md).
+
+Public async replacement, autonomous stop, cancellation and restoration pass
+all six Direct and all six Stock models locally. Normal exit and `_Exit` each
+pass all six Direct targets;
+both exit paths also pass HP50g Stock. The exit
+fixtures inspect real cleanup before power, launcher or host restoration can
+hide missing releases. A negative control that skips cleanup fails at that
+boundary. Runtime CI now schedules both exit variants across all six Stock
+models and all three Direct families, retaining the blocking-exit suite.
+These gates are configured locally, not yet submitted or accepted. Native
+emulator results do not establish audible output from physical hardware.
+
+`kos.h` now exposes a locally implemented sound subset, `kos_beep` and
+`kos_CheckBeepEnd`. `kos_beep` accepts Hz in 1..15000 and nonzero milliseconds;
+the identical validation instructions in all six ROMs establish these bounds
+and the historical invalid-argument return of -51. The adapter also sets
+`errno=EINVAL`. Bits above the low two do not affect waiting or replacement.
+
+| Mode low bits | Call waits | Later KOS request may replace this tone |
+| --- | --- | --- |
+| 0 | No | No |
+| 1 | No | Yes |
+| 2 | Yes | No |
+| 3 | Yes | Yes |
+
+If the old KOS request forbids replacement, the new request returns zero
+without playing and waits according to the **old** mode, matching the ROM
+wrapper. `kos_CheckBeepEnd` is false only while a KOS tone with its waiting bit
+set is active; true does not necessarily mean silence. Completion queries
+collect finished resources. Clock failures also terminate the Boolean query
+with true and set `errno`; callers needing a distinct error result should use
+`hpclang_sound_status` instead. `kos_beep` returns -1 with `errno` on runtime
+resource/clock failure, making these additional service errors observable.
+
+Cancellation uses `hpclang_sound_stop`. A canonical start replaces the client
+identity as well as the tone, so old KOS mode bits cannot leak into later
+playback. KOS will not implicitly replace a canonical tone: it returns -1 /
+`EBUSY`. The same foreground-only interrupt ownership constraints documented
+in `hpclang/sound.h` apply. This subset does not expose raw KOS syscalls.
+
+Host sanitizer checks cover all sixteen low-nibble states crossed with four
+incoming modes, overlapping waits, failure propagation, invalid inputs and
+client identity. All six Direct models pass native KOS waiting-duration,
+actual PWM replacement/rejection, busy-loop autonomous completion and restored
+hardware checks. All six Stock models also pass. Both KOS-entry normal exit
+and immediate exit pass all six Direct/Stock models locally, including hardware
+restoration before launcher return. CI acceptance remains pending.
 
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
@@ -1021,3 +1401,45 @@ presence and active-low GPD3 write protection. x50ng models the same pins.
 Pre-acquisition sampling and the owned removal latch are separate stages of
 the same media lifecycle. Emulator tests establish stale-handle rejection and
 remount behavior; the later physical card test remains a nonblocking follow-up.
+
+### Progress and slider adapter (local)
+
+`winprogress.h` implements four orientations, clamped values, configurable range,
+increment and repeat delays, value-change events, focus transfer at boundaries,
+and a blinking focus pattern. Setters retain HPGCC's separation from change
+events and preferred-size packing. Invalid nonfinite bounds, NaN values,
+nonpositive increments/delays and invalid orientations are rejected; reversed
+or equal finite bounds preserve the old range. Event -1 disables notifications.
+Removal cancels blink and repeat timers even from the value-change callback.
+Failed preferred-size computation preserves the previous component dimensions.
+
+Production event/timer/HPG sanitizer tests cover all four direction pixel maps,
+key increments/decrements, delayed and periodic repeats, release cancellation,
+focus transfer, published blink pixels, callback removal, invalid values/types
+and preferred-size overflow. The first blink assertion read the back page after
+presentation; the corrected check observes the front page. Failure evidence is
+retained. Native execution remains open;
+the installed SDK client exercises these symbols in C/C++. The complete gate
+passes six-model launchers, three HP39 Aplet variants, model-specific Notebook
+builds and 517 reproducible release outputs (64824 exit 0).
+
+The optional `tests/compat/check-win-progress.py` compiles eight unchanged
+original progress-control functions from each supplied HPGCC 1.1/2.0 archive.
+Both match 7,011 trace lines across 24 orientation/range/focus configurations,
+including preferred sizes, rendering calls, pattern bytes, key-driven events,
+repeat timing, release cancellation and focus transfer. Both sides use the same
+production window foundation; HPG device calls are recorded, not rendered by
+this comparison. Separate production HPG tests check pixels. A deliberately
+reversed horizontal increment mapping is rejected. Invalid-input extensions and
+safe removal during notification are covered separately, not claimed identical
+to the original implementation.
+
+The maintained native window fixture also passes the progress controls on all
+six Direct models. Each executes 16 GPIO edges and eight value-change callbacks
+across both buffering modes, checks focus and resulting values, removes and
+recreates controls, and captures four 60% orientations for independent complete
+pixel and LCD-mode checks. Existing keyboard/page-exchange and settled-return
+gates still pass. Repeat/blink timing remains covered by host tests, not this
+native tap phase. All six Stock models also pass the same independent input,
+pixel and settled-return gates (9966 exit 0). The full 140-test sanitizer
+regression passes (10200 exit 0); CI submission/acceptance remains pending.

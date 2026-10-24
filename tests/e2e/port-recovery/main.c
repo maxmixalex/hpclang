@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include "sst-flash.h"
 #include <hpclang/time.h>
+#include "clock-internal.h"
 __thread int errno;
 __thread unsigned tls_probe = 0x12345678;
 #ifdef HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT
@@ -94,7 +95,7 @@ static void bus_write(void *context, unsigned address, unsigned short value)
 static unsigned flash_time(void *context)
 {
     (void)context;
-    return (unsigned)hpclang_time_monotonic_us();
+    return (unsigned)hpclang_time_monotonic_us_masked();
 }
 static struct hpclang_sst_bus bus_for(void *context)
 {

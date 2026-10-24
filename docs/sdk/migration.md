@@ -17,8 +17,9 @@ Do not put historical include directories before the installed headers.
 | KOS filesystem handles or raw SD/controller calls | Move file operations to standard C streams and the services in `hpclang/storage.h`. Preserve operation failures and removable-media handling. |
 | Raw Saturn addresses, `sat_peek`-style traversal or retained pointers into native objects | Use independent snapshots from `hpclang/object.h` and logical handles from `hpclang/object-store.h`; use `hpclang/port.h` for native port objects. |
 | Direct LCD addresses, packed framebuffer writes, MMU changes or interrupt handlers | Express drawing through `hpclang/display.h` surfaces and fonts, and timing through `hpclang/time.h` / `timer.h`. A raw hardware algorithm requires a separate design review. |
-| `win*` widgets | Port the view and event logic to the [declarative UI](declarative-ui.md); a compatible historical widget family is not provided. |
-| `kos_beep` and completion polling | Asynchronous mode/preemption compatibility is unfinished. The blocking `hpsys.h` tones are usable only when blocking matches the application's behavior. |
+| `win*` widgets | Port the view and event logic to the [declarative UI](declarative-ui.md); compatibility adapters remain in development. Preserve synchronous event delivery, callback lifetimes and widget-owned state; the [source review](../development/hpgcc-compat.md#historical-window-adapter-feasibility) explains the required bridge. |
+| Window events and timers | `winevent.h` / `wintimer.h` provide the event/timer subset; start from `examples/hpgcc-window`. Intervals are positive milliseconds. Check `hpclang_win_error()` for latched errors, including fixed-pool exhaustion; reset only after callbacks unwind. This does not supply typed-key/modifier semantics or widgets. |
+| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags; modes and both KOS-entry exit paths pass locally on all six Direct/Stock models. CI acceptance remains pending. A true completion query can still mean a nonwaiting tone is playing. See the [mode contract](../development/hpgcc-compat.md). |
 
 Compile with the normal SDK target options and resolve diagnostics one family
 at a time. Do not suppress undeclared functions or cast away mismatched pointer
@@ -67,6 +68,21 @@ owners from `hpclang/object-store.hpp`. Move to transfer ownership; borrow with
 `owned_object::receive` for compatible C producer calls, so a failed operation
 does not discard the old value. These wrappers work in the SDK's no-exceptions,
 no-RTTI profile.
+
+For byte-stream files and directories, `hpclang/storage.hpp` provides C++17
+`owned_stream` and `owned_stream_directory`. Adopt an independently opened
+`FILE*` or `hpclang_stream_directory*`, use `get()` with the existing C I/O
+functions, and move or `release()` to transfer close responsibility. Do not
+adopt standard streams or a borrowed handle. The wrappers add no allocation
+and preserve the C backend's model, media and encoding restrictions.
+
+Call and check `close()` before reporting a write as saved: it returns the
+underlying close result and empties the owner even on failure. Empty `close()`
+is an idempotent success. Destruction, `reset()` and move assignment provide
+best-effort cleanup and preserve `errno`, so they deliberately cannot report a
+close error. Explicitly close a writable stream before replacing its owner.
+To keep an existing handle on open failure, first adopt the new result in a
+temporary owner and replace only after checking it.
 
 Returning normally destroys automatic C++ owners. Calling `exit()` does not
 unwind those scopes; release local resources explicitly before that path.

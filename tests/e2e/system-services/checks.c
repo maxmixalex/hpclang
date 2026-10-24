@@ -17,6 +17,8 @@
 unsigned hpclang_e2e_console_test(void);
 unsigned hpclang_e2e_power_test(void);
 unsigned hpclang_e2e_irq_test(void);
+unsigned hpclang_e2e_watchdog_test(void);
+unsigned hpclang_e2e_sound_async_test(void);
 
 /* Exercise Stock's transfer decoding independently of incidental machine-code
  * bytes. Both nibble alignments contain CRLF after HP39 Aplet packaging.
@@ -278,8 +280,17 @@ uint32_t hpclang_e2e_system_test(void)
             return 0x7a33;
 
     unsigned irq_failure = hpclang_e2e_irq_test();
+    if (!irq_failure) {
+        irq_failure = hpclang_e2e_watchdog_test();
+        /* Distinguish watchdog failures from the independent PWM IRQ probe. */
+        if (irq_failure)
+            irq_failure += 0x80u;
+    }
     if (irq_failure)
         return 0x7b00u + irq_failure;
+    unsigned async_failure = hpclang_e2e_sound_async_test();
+    if (async_failure)
+        return 0x7c00u + async_failure;
     int sound_result = sound_test();
     if (sound_result)
         return 0x7600u + (uint32_t)sound_result;

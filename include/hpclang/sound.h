@@ -22,6 +22,26 @@ extern "C"
     int hpclang_sound_play(uint32_t frequency_hz, uint32_t duration_ms,
                            hpclang_sound_cancel_fn cancel, void *context);
 
+    /* Foreground-only asynchronous tone. replace != 0 cancels our active tone
+     * before hardware admission of a new one. Preflight failures preserve the
+     * old request; admission failures after cancellation leave it stopped.
+     * Nonzero frequency/duration are required. Start temporarily enables owned
+     * IRQ delivery and masks FIQ: do not call inside a critical section or from
+     * interrupt context. Other IRQ sources stay masked. Audio stops without
+     * foreground SDK calls; the reserved IRQ stack/vector is collected by
+     * status, stop, a later start, or normal/_Exit cleanup. These restore the
+     * CPU interrupt mask saved by the first start. Call status/stop before
+     * changing interrupt policy. Starting amid foreign enabled IRQs fails
+     * EBUSY. Hardware contention also fails EBUSY; clock/mapping failures are
+     * EIO/ENOSYS. Zero duration is EINVAL, excessive deadlines EOVERFLOW.
+     */
+    int hpclang_sound_start(uint32_t frequency_hz, uint32_t duration_ms, int replace);
+    /* 1 running; 0 idle/completed (collects resources); -1 clock/timer failure
+     * (collects resources and sets errno). No clock polling drives completion. */
+    int hpclang_sound_status(void);
+    /* Cancel/collect idempotently. The shared runtime exit path also does this. */
+    void hpclang_sound_stop(void);
+
 #ifdef __cplusplus
 }
 #endif

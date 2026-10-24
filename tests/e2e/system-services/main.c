@@ -12,11 +12,15 @@ static const char fail_label[] = HPCLANG_UI_TEXT("SYSTEM FAIL");
 volatile uint32_t hpclang_e2e_result;
 uint32_t hpclang_e2e_system_test(void);
 
+#if !defined(HPCLANG_E2E_ASYNC_EXIT)
 static int exit_from_sound(void *context)
 {
     (void)context;
     exit(0);
 }
+#else
+void hpclang_e2e_sound_exit(void);
+#endif
 
 int main(void)
 {
@@ -41,7 +45,11 @@ int main(void)
     }
     /* Terminate inside a sound callback: runtime cleanup must stop PWM before
      * restoring the borrowed clock, even though play() never returns. */
+#if defined(HPCLANG_E2E_ASYNC_EXIT)
+    hpclang_e2e_sound_exit();
+#else
     (void)hpclang_sound_play(1000, 20, exit_from_sound, NULL);
+#endif
     hpclang_e2e_result = UINT32_C(0x4641750c);
     for (;;)
         __asm__ volatile("nop");

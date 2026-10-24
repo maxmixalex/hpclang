@@ -81,6 +81,14 @@ It measures a short delay, draws the duration and returns. Its README explains
 the units and the boundary between historical timer calls and hpclang rendering;
 it does not imply complete HPGCC compatibility.
 
+`examples/hpgcc-window` uses `winevent.h` and `wintimer.h` to repaint a moving
+rectangle through HPG, then quit after twenty 50 ms timer callbacks. Check
+`hpclang_win_error()` after the loop: historical void calls latch failures.
+Callbacks borrow their application data through synchronous dispatch. The
+installed-SDK gate also builds this source as C++23 and packages all three HP39
+Aplet variants. Typed-key/modifier events and historical widgets remain under
+development; this example is not a complete `win.h` compatibility claim.
+
 `examples/hpgcc-console` combines C `printf`/`puts`, C++ `std::printf` and HPG
 graphics, edits a name in a 16-byte buffer, reads a count and a value, prints
 their product, then waits for a key before returning.
@@ -214,6 +222,13 @@ API; owning a snapshot does not grant access to a native RPL stack on HP39.
 See `examples/object-cpp` for a complete C++17 application. Automatic local
 cleanup applies to normal returns; `exit()` does not unwind local C++ objects.
 
+For byte streams, `<hpclang/storage.hpp>` supplies move-only `owned_stream`
+and `owned_stream_directory` owners. The installed `examples/storage-cpp`
+is a standalone C++17 application that opens `README.TXT` on an HP49g+/HP50g
+FAT SD card and checks reading and both close results. Cleanup on an early
+return preserves `errno`; call `close()` explicitly when its result matters.
+The owners retain the C backend's model and media requirements.
+
 ### Own directory handles and iterators
 
 `<hpclang/object-store.hpp>` adds `owned_object_store` and
@@ -336,6 +351,16 @@ Transfer the Aplet and Reset program using Conn3x/HPGComm; install the library
 once. Build separate packages with `MODEL hp39gplus` or `MODEL hp40gs` for
 those calculators. Reset clears only the selected Aplet's custom data.
 
+The same directory contains a host-side `footprint.json` report. Its `files`
+map and `bundle_file_bytes` sum describe the five transfer files, including the
+library and directory listings. `aplet_file_bytes` counts `HPGCC000.000`;
+`embedded_launcher_bytes` counts the launcher inside it, without the eight-byte
+`HPHP49-C` transfer header. `aplet_non_launcher_bytes` is the remaining Aplet
+envelope and support data. The input launcher, embedded launcher and Aplet are
+nested representations: do not add them together. The report is not listed for
+transfer and is excluded from the bundle total. These file sizes do not measure
+calculator resident allocations, transport overhead or peak installation RAM.
+
 For HP48gII, install ARMToolbox48 library 275 and transfer its model's `.hp`
 object. HP49g+/HP50g use their corresponding ARMToolbox launcher support.
 The generated application does not include or replace the calculator OS.
@@ -346,7 +371,9 @@ The installed `examples/notebook` combines the declarative C UI, calculator
 clock and native object persistence. It uses Aplet-owned data on HP39 Stock
 and a dedicated HOME object on classic Stock, with explicit Save/Reload
 actions and rejection of foreign data. Its README describes the storage and
-encoding contract; device persistence acceptance is still pending.
+encoding contract. All six original-ROM Stock emulator persistence cases
+passed Runtime 39928737278; this is emulator evidence, not physical-device
+validation.
 
 Include `<hpclang/device.h>` and read `hpclang_device_info()` for model and
 visible display dimensions. Use `hpclang_device_capability()` to decide whether

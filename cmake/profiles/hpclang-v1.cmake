@@ -29,6 +29,17 @@ add_compile_options(
 set(HPCLANG_RUNTIME_START
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/start.S")
 set(HPCLANG_RUNTIME
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-events.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-timers.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-loop.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-keyboard.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-key-state.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-drivers.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-repaint.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-window.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-widget.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-progress.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-focus.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-layout.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-focus.c"
@@ -96,6 +107,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-system.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-sound.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-string.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-number.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-rtc.c"
@@ -119,6 +131,12 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/timer.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-engine.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-alarm.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/watchdog-alarm.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/irq-owner.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-session.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-async.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-async-entry.S"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-playback.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/time-math.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/time.c")

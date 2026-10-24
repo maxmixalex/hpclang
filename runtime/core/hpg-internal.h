@@ -34,6 +34,16 @@ struct hpg_graphics *hpclang_hpg_acquire_screen(void);
 /* Interactive console updates publish an owned HPG page. In double-buffer mode,
  * retain the displayed contents in the new back page for the next edit. */
 int hpclang_hpg_console_present(void);
+/* Checked window repaint hooks: borrow/acquire the existing HPG lease, clear
+ * the current drawing page, then publish/flip after event callbacks. Preserve
+ * an existing mode and buffering policy; cleanup remains hpg_cleanup's job.
+ * Context is unused. Drawing through legacy single-buffer HPG primitives may
+ * publish before the final hook; this is not an atomic-frame guarantee. */
+int hpclang_hpg_frame_begin(void *context);
+int hpclang_hpg_frame_present(void *context);
+/* Checked form of hpg_set_indicator, including single-page publication errors.
+ * Preserves the current PAINT/XOR and buffering semantics. */
+int hpclang_hpg_indicator_set(unsigned char indicator, unsigned char color);
 void hpclang_hpg_finish(struct hpg_graphics *g);
 void hpclang_hpg_builtin_glyph(struct hpclang_surface *surface, hpg_font_t *font,
                                unsigned char code, int x, int y);

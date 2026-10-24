@@ -9,6 +9,8 @@ struct hpclang_exit_hooks
     void (*power)(void);
     void (*stdio)(void);
     void (*rtc_tick)(void);
+    void (*sound_async)(void);
+    int (*sound_async_active)(void);
 };
 extern struct hpclang_exit_hooks hpclang_exit_hooks;
 void hpclang_rtc_tick_restore(void);

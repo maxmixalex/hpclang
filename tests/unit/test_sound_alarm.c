@@ -150,9 +150,54 @@ static void ownership(void)
     hpclang_sound_alarm_release(&bus, NULL);
     assert(h.writes == writes);
 }
+static void absolute_deadlines(void)
+{
+    struct hardware h = initial(), before = h;
+    struct hpclang_sound_alarm_bus bus = {&h, read_reg, write_reg};
+    struct hpclang_sound_alarm alarm = {0};
+    assert(hpclang_sound_alarm_acquire_until(&bus, &alarm, 50000000, 1, 10, 10) == -1);
+    assert(errno == EINVAL && !h.writes && !alarm.owned);
+    assert(hpclang_sound_alarm_acquire_until(&bus, &alarm, 50000000, 1, UINT64_MAX, 1) == -1);
+    assert(errno == EINVAL && !h.writes);
+    assert(hpclang_sound_alarm_advance(&bus, &alarm, 10, 10) == -1);
+    assert(errno == EINVAL && !h.writes);
+
+    /* The deadline is wider than the relative timer API. Intermediate expiry
+     * must rearm a full chunk without truncating the remaining timestamp. */
+    assert(!hpclang_sound_alarm_acquire_until(&bus, &alarm, 50000000, 1, 0, UINT64_MAX));
+    assert(h.regs[ALARM_COUNT] == 65535 && ((h.regs[ALARM_MUX] >> 16) & 15) == 3);
+    h.regs[ALARM_MASK] &= ~0x4000u;
+    h.regs[ALARM_SOURCE] |= 0x4000;
+    h.regs[ALARM_PENDING] |= 0x4000;
+    assert(!hpclang_sound_alarm_advance(&bus, &alarm, UINT32_MAX, UINT64_MAX));
+    assert(alarm.owned && h.regs[ALARM_COUNT] == 65535);
+    assert(!(h.regs[ALARM_MASK] & 0x4000));
+    assert(h.regs[ALARM_SOURCE] == before.regs[ALARM_SOURCE]);
+    assert(h.regs[ALARM_PENDING] == before.regs[ALARM_PENDING]);
+
+    /* One microsecond remains even beside UINT64_MAX. The hardware uses the
+     * smallest representable period; only the next timestamp can finish it. */
+    assert(!hpclang_sound_alarm_advance(&bus, &alarm, UINT64_MAX - 1, UINT64_MAX));
+    assert(alarm.owned && h.regs[ALARM_COUNT] == 0);
+    assert(hpclang_sound_alarm_advance(&bus, &alarm, UINT64_MAX, UINT64_MAX) == 1);
+    assert(!alarm.owned && !memcmp(h.regs, before.regs, sizeof h.regs));
+    unsigned writes = h.writes;
+    assert(hpclang_sound_alarm_advance(&bus, &alarm, UINT64_MAX, UINT64_MAX) == -1);
+    assert(errno == EINVAL && h.writes == writes);
+
+    assert(!hpclang_sound_alarm_acquire_until(&bus, &alarm, 50000000, 1, 1000, 2000));
+    writes = h.writes;
+    assert(hpclang_sound_alarm_advance(NULL, &alarm, 3000, 2000) == -1);
+    assert(errno == EINVAL && h.writes == writes && alarm.owned);
+    /* Delayed delivery never schedules an extra period. */
+    assert(hpclang_sound_alarm_advance(&bus, &alarm, 3000, 2000) == 1);
+    assert(!alarm.owned && !memcmp(h.regs, before.regs, sizeof h.regs));
+}
+
 int main(void)
 {
     timing();
     ownership();
+    absolute_deadlines();
     return 0;
 }

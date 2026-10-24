@@ -8,6 +8,7 @@
 #include "sst-flash.h"
 #include "expected-library.h"
 #include <hpclang/time.h>
+#include "clock-internal.h"
 #include <stddef.h>
 
 __thread int errno;
@@ -124,7 +125,7 @@ static void bus_write(void *c, unsigned a, unsigned short v)
 static unsigned flash_time(void *c)
 {
     (void)c;
-    return (unsigned)hpclang_time_monotonic_us();
+    return (unsigned)hpclang_time_monotonic_us_masked();
 }
 static int program_publication(void *c, uint32_t a, uint16_t value)
 {

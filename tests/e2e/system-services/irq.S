@@ -28,7 +28,9 @@ hpclang_e2e_irq_snapshot:
     movs pc, lr
 .size hpclang_e2e_irq_snapshot, .-hpclang_e2e_irq_snapshot
 
-/* No SDK polling or callback: only the actual exception can set the witness. */
+/* IRQ-to-Thumb dispatch with an 8-byte aligned owned stack. Foreground code
+ * cannot set the witness or advance the deadline. Preserve caller-saved ARM
+ * registers and the exception return address across the C handler. */
 .global hpclang_e2e_irq_handler
 .type hpclang_e2e_irq_handler,%function
 hpclang_e2e_irq_handler:
@@ -37,16 +39,14 @@ hpclang_e2e_irq_handler:
     ldr r1, [r0, #16]
     tst r1, #0x4000
     beq .Lmask
-    ldr r1, =hpclang_e2e_irq_hits
-    ldr r2, [r1]
-    add r2, r2, #1
-    str r2, [r1]
-    mov r1, #0x4000
-    str r1, [r0]
-    str r1, [r0, #16]
+    ldr ip, =hpclang_e2e_irq_dispatch
+    mov lr, pc
+    bx ip
+    b .Lreturn
 .Lmask:
     mvn r1, #0
     str r1, [r0, #8]
+.Lreturn:
     pop {r0-r3, ip, lr}
     subs pc, lr, #4
 .size hpclang_e2e_irq_handler, .-hpclang_e2e_irq_handler

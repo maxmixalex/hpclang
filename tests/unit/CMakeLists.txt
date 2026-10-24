@@ -16,11 +16,23 @@ endfunction()
 
 hpclang_unit(flash_busy test_flash_busy.c)
 target_include_directories(test_flash_busy PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+hpclang_unit(watchdog_clock test_watchdog_clock.c)
+target_include_directories(test_watchdog_clock PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+hpclang_unit(watchdog_model test_watchdog_model.c)
+target_include_directories(test_watchdog_model PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
 hpclang_unit(memory_checkpoint test_memory_checkpoint.c)
 target_include_directories(test_memory_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
 if(UNIX)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        hpclang_unit(time_state test_time_state.c
+            "${HPCLANG_ROOT}/runtime/core/time.c"
+            "${HPCLANG_ROOT}/runtime/core/time-math.c"
+            "${HPCLANG_ROOT}/runtime/core/datetime.c")
+        target_include_directories(test_time_state PRIVATE
+            "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+    endif()
     hpclang_unit(pool_checkpoint test_pool_checkpoint.c)
     target_include_directories(test_pool_checkpoint PRIVATE
         "${HPCLANG_ROOT}/tests/e2e/harness/x50ng" "${HPCLANG_ROOT}/platform/armtoolbox")
@@ -36,6 +48,73 @@ target_include_directories(test_sst_flash PRIVATE "${HPCLANG_ROOT}/runtime/core"
 
 hpclang_unit(rtc_tick test_rtc_tick.c "${HPCLANG_ROOT}/runtime/core/rtc-tick.c")
 target_include_directories(test_rtc_tick PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(win_key_state test_win_key_state.c
+    "${HPCLANG_ROOT}/runtime/core/win-key-state.c")
+target_include_directories(test_win_key_state PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+hpclang_unit(win_key_state_reference "${HPCLANG_ROOT}/tests/compat/win-key-state.c"
+    "${HPCLANG_ROOT}/runtime/core/win-key-state.c")
+target_include_directories(test_win_key_state_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+
+hpclang_unit(win_focus test_win_focus.c "${HPCLANG_ROOT}/runtime/core/win-focus.c")
+target_include_directories(test_win_focus PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(win_events test_win_events.c "${HPCLANG_ROOT}/runtime/core/win-events.c")
+target_include_directories(test_win_events PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(win_timers test_win_timers.c
+    "${HPCLANG_ROOT}/runtime/core/win-timers.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
+target_include_directories(test_win_timers PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(win_loop test_win_loop.c
+    "${HPCLANG_ROOT}/runtime/core/win-loop.c"
+    "${HPCLANG_ROOT}/runtime/core/win-timers.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
+target_include_directories(test_win_loop PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(win_repaint test_win_repaint.c
+    "${HPCLANG_ROOT}/runtime/core/win-repaint.c"
+    "${HPCLANG_ROOT}/runtime/core/win-loop.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
+target_include_directories(test_win_repaint PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(win_public test_win_public.c
+    "${HPCLANG_ROOT}/runtime/core/win-key-state.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-window.c"
+    "${HPCLANG_ROOT}/runtime/core/win-drivers.c"
+    "${HPCLANG_ROOT}/runtime/core/win-keyboard.c"
+    "${HPCLANG_ROOT}/runtime/core/win-repaint.c"
+    "${HPCLANG_ROOT}/runtime/core/win-timers.c"
+    "${HPCLANG_ROOT}/runtime/core/win-loop.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
+target_include_directories(test_win_public PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+get_target_property(win_adapter_sources test_win_public SOURCES)
+list(REMOVE_ITEM win_adapter_sources test_win_public.c)
+hpclang_unit(win_widget test_win_widget.c ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c")
+target_include_directories(test_win_widget PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+hpclang_unit(win_widget_reference "${HPCLANG_ROOT}/tests/compat/win-widgets.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c")
+target_include_directories(test_win_widget_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+hpclang_unit(win_progress_reference "${HPCLANG_ROOT}/tests/compat/win-progress.c"
+    ${win_adapter_sources} "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-progress.c")
+target_include_directories(test_win_progress_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+hpclang_unit(win_keyboard test_win_keyboard.c
+    "${HPCLANG_ROOT}/runtime/core/win-drivers.c"
+    "${HPCLANG_ROOT}/runtime/core/win-loop.c"
+    "${HPCLANG_ROOT}/runtime/core/win-timers.c"
+    "${HPCLANG_ROOT}/runtime/core/win-keyboard.c"
+    "${HPCLANG_ROOT}/runtime/core/win-events.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-keyboard.c"
+    "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
+target_include_directories(test_win_keyboard PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+hpclang_unit(win_timer_reference "${HPCLANG_ROOT}/tests/compat/win-timers.c"
+    "${HPCLANG_ROOT}/runtime/core/win-timers.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
+target_include_directories(test_win_timer_reference PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(rpl_flash_record test_rpl_flash_record.c
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
@@ -182,6 +261,17 @@ hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-progress.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-window.c"
+    "${HPCLANG_ROOT}/runtime/core/win-key-state.c"
+    "${HPCLANG_ROOT}/runtime/core/win-drivers.c"
+    "${HPCLANG_ROOT}/runtime/core/win-keyboard.c"
+    "${HPCLANG_ROOT}/runtime/core/win-timers.c"
+    "${HPCLANG_ROOT}/runtime/core/win-repaint.c"
+    "${HPCLANG_ROOT}/runtime/core/win-loop.c"
+    "${HPCLANG_ROOT}/runtime/core/win-events.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-console.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-line.c"
     "${HPCLANG_ROOT}/runtime/core/console.c"
@@ -338,6 +428,27 @@ hpclang_unit(sound test_sound.c "${HPCLANG_ROOT}/runtime/core/sound-engine.c")
 target_include_directories(test_sound PRIVATE "${HPCLANG_ROOT}/runtime/core")
 hpclang_unit(sound_alarm test_sound_alarm.c "${HPCLANG_ROOT}/runtime/core/sound-alarm.c")
 target_include_directories(test_sound_alarm PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(watchdog_alarm test_watchdog_alarm.c "${HPCLANG_ROOT}/runtime/core/watchdog-alarm.c")
+target_include_directories(test_watchdog_alarm PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(irq_owner test_irq_owner.c "${HPCLANG_ROOT}/runtime/core/irq-owner.c")
+target_include_directories(test_irq_owner PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(sound_session test_sound_session.c
+    "${HPCLANG_ROOT}/runtime/core/sound-session.c"
+    "${HPCLANG_ROOT}/runtime/core/sound-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/watchdog-alarm.c"
+    "${HPCLANG_ROOT}/runtime/core/irq-owner.c")
+target_include_directories(test_sound_session PRIVATE "${HPCLANG_ROOT}/runtime/core")
+  hpclang_unit(hpgcc_sound test_hpgcc_sound.c "${HPCLANG_ROOT}/runtime/core/hpgcc-sound.c")
+  target_include_directories(test_hpgcc_sound PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    hpclang_unit(sound_async test_sound_async.c "${HPCLANG_ROOT}/runtime/core/sound-async.c")
+    target_include_directories(test_sound_async PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+endif()
+hpclang_unit(sound_playback test_sound_playback.c
+    "${HPCLANG_ROOT}/runtime/core/sound-playback.c"
+    "${HPCLANG_ROOT}/runtime/core/sound-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/sound-alarm.c")
+target_include_directories(test_sound_playback PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(time test_time.c "${HPCLANG_ROOT}/runtime/core/time-math.c")
 target_include_directories(test_time PRIVATE "${HPCLANG_ROOT}/runtime/core")
@@ -623,12 +734,21 @@ target_include_directories(test_fatfs_config PRIVATE
 target_link_libraries(test_fatfs_config PRIVATE hpclang_fatfs_vendor)
 
 hpclang_unit(storage_metadata test_storage_metadata.c
+    test_storage_cpp.cpp
     "${HPCLANG_ROOT}/runtime/libc/storage-volumes.c"
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace.c"
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")
 target_include_directories(test_storage_metadata PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/libc")
 target_link_libraries(test_storage_metadata PRIVATE hpclang_fatfs_vendor)
+target_compile_features(test_storage_metadata PRIVATE cxx_std_17)
+target_compile_options(test_storage_metadata PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+if(UNIX)
+    hpclang_unit(stream_cpp test_stream_cpp.cpp)
+    target_include_directories(test_stream_cpp PRIVATE "${HPCLANG_ROOT}/include")
+    target_compile_features(test_stream_cpp PRIVATE cxx_std_17)
+    target_compile_options(test_stream_cpp PRIVATE -fno-exceptions -fno-rtti)
+endif()
 
 hpclang_unit(storage_media test_storage_media.c "${HPCLANG_ROOT}/runtime/libc/storage-media.c")
 target_include_directories(test_storage_media PRIVATE
