@@ -1360,6 +1360,15 @@ must cover the complete previously observed allocation, including metadata;
 coalescing is permitted. A residual old header is insufficient. Unreviewed
 allocator code is rejected instead of applying an assumed layout.
 
+The local Runtime workflow enables both observers for Stock UI jobs and requires
+`--pool --allocation --native-release`. Successful release verification writes
+`*-native-release.json` with model, pointer, released bytes, allocator/Flash/SRAM
+hashes and free-list roots. The job retains the post-return SRAM with allocation,
+pool, release and Stock-status reports for independent replay. Fresh Stock setup
+removes an old release report before executing another application. This workflow
+change has passed actionlint, shellcheck and exact-step replay on the three
+completed models; remote acceptance remains pending.
+
 The focused native sequence completes on HP39g+ and HP50g; HP39gs also passes, with independent
 UI, memory, pool, allocation and post-return free-list checks. Values are bytes:
 

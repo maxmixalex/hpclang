@@ -227,7 +227,7 @@ def free_list_covers(
     return any(start <= low and high <= stop for start, stop in spans)
 
 
-def verify_native_release(prefix: Path, model: int, state: Path) -> int:
+def verify_native_release(prefix: Path, model: int, state: Path, proof: Path | None = None) -> int:
     verify_allocation(prefix, model)
     status_path = state.parent / f"{state.name.removesuffix('-state')}-stock.json"
     status = json.loads(status_path.read_text())
@@ -239,6 +239,12 @@ def verify_native_release(prefix: Path, model: int, state: Path) -> int:
     report = json.loads(Path(f"{prefix}-allocation-2.json").read_text())
     pointer = report["pointer"]
     if not pointer:
+        if proof:
+            proof.write_text(
+                json.dumps({"version": 1, "model": model, "pointer": 0, "released_bytes": 0})
+                + "\n",
+                encoding="utf-8",
+            )
         print(f"PASS: {prefix}: no optional native block to release")
         return 0
     rom, ram = (state / "flash").read_bytes(), (state / "sram").read_bytes()
@@ -274,6 +280,25 @@ def verify_native_release(prefix: Path, model: int, state: Path) -> int:
     assert free_list_covers(
         read32, head, begin, end, heap, pointer - 16, pointer + released - 16
     ), f"{prefix}: native allocation not covered by the post-return free list"
+    if proof:
+        proof.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "model": model,
+                    "pointer": pointer,
+                    "released_bytes": released,
+                    "allocator_code_sha256": fingerprint,
+                    "flash_sha256": hashlib.sha256(rom).hexdigest(),
+                    "sram_sha256": hashlib.sha256(ram).hexdigest(),
+                    "free_list_roots": roots,
+                    "free_list_head": head,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     print(f"PASS: {prefix}: {released} native block bytes returned to validated free list")
     return released
 
@@ -311,6 +336,7 @@ def main() -> None:
                     Path(f"build/{target}-frame"),
                     models.index(target) + 1,
                     Path(f"build/{target}-state"),
+                    Path(f"build/{target}-native-release.json"),
                 )
             else:
                 check = verify_allocation if args.allocation else verify_pool
