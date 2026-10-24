@@ -430,10 +430,13 @@ local Stock observations, relevant host/sanitizer/Python checks, SDK packaging,
 Ruff and strict docs passed. On the subsequent check, Quality 40050688500,
 Storage 40050688494, Runtime 40050688507 and Objects 40050688481 pass. Runtime's
 three Direct UI families and all six Stock UI/pool jobs pass. Core 40050688514
-still has running/queued native Port jobs. All Font Gallery 40050688484 test
-jobs pass, but its queued evidence publisher was cancelled; only that terminal
-job (120751449957) was re-run and Gallery now passes. Core remains in progress
-on the 2026-10-24 follow-up check. The batch is not yet fully CI accepted or merged.
+now also passes, including every native Port lifecycle job. Font Gallery
+40050688484 passes after its cancelled publisher was re-run. All six workflows
+therefore pass at exactly `d409b01453cddc77fc60932ac20d52f06dee4052`.
+[PR #9](https://github.com/maxmixalex/hpclang/pull/9) merged this accepted batch
+into main as `23338a57`. The local work branch merged that ancestry without
+changing its tree; later audio and C++ storage-owner work remains local and
+separately unaccepted. Fresh PR/main CI runs were not polled.
 This does not complete M8.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
@@ -469,12 +472,12 @@ The design record contains the mapped-pool ledger for all six launches.
 The local Runtime workflow enables capture and requires `--pool` for Stock UI,
 uploading the linked memory report alongside runtime observations. YAML parsing,
 verifier shell syntax and all six retained UI report/pixel flows pass; this
-workflow change is submitted in `d409b014` and awaits CI acceptance.
+workflow change is CI accepted at `d409b014` and merged through PR #9.
 The earlier instrumented HP39g+ experiment exits
 successfully, but its final snapshot no longer contains the marker, so it
 provides no pool measurement. The new observer captures while the application
 is still mapped and is opt-in;
-six-model local observation is complete, while CI acceptance and native
+six-model local observation and CI acceptance are complete, while native
 allocator/installation/transfer totals remain open.
 
 Local native-pool observation (2026-10-23): an isolated test-only stage records
@@ -4645,11 +4648,11 @@ transfer-new, avoiding the analyzer's impossible alias path between independent
 live fopen results; updated sanitizer tests and ARM analysis pass.
 Final artifacts `/work/oct24-storage-cpp-v2-artifact` are built from
 `/work/oct24-storage-cpp-src`; full Direct and HP49g+/HP50g SD-transport Stock
-verification runs on session 45311 / PID 159829: all six Direct and HP49g+ Stock
-pass; HP50g Stock remains active. The expanded installed SDK C++ client and
+verification completed on session 45311 (exit 0): all six Direct context checks
+and both HP49g+/HP50g Stock storage paths pass. The expanded installed SDK C++ client and
 six-model package gate pass on session 59414 (exit 0). Logs use
 `oct24-storage-cpp-v2-{direct,stock}-*.log` and `oct24-storage-cpp-sdk-v2.log`.
-HP50g Stock and CI acceptance remain pending; this does not complete M8.5.
+This slice is locally verified; CI acceptance remains pending and M8.5 is not complete.
 
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications
