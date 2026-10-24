@@ -4,6 +4,7 @@
 #include <winimg.h>
 #include <winsoftmenu.h>
 #include <wincheckbox.h>
+#include <winchoose.h>
 #include <string.h>
 
 static int paint(void *event, void *data)
@@ -107,7 +108,21 @@ int main(void)
     int checked = win_checkbox_is_selected(check) && win_checkbox_get_label(check) == action;
     win_remove_widget(check);
     win_widget_destroy(check);
+    win_widget_t *choice = win_choose_new();
+    if (!choice)
+        return 7;
+    win_choose_add(choice, action);
+    win_choose_add_with_label(choice, initial, title);
+    win_choose_set_choice(choice, initial);
+    int chosen = win_choose_get_index(choice) == 1 && win_choose_get_choice(choice) == initial;
+    win_choose_set_index(choice, 0);
+    win_choose_remove(choice, initial);
+    win_choose_set_menu(choice, menu, 0);
+    win_add_widget(choice);
+    win_remove_widget(choice);
+    win_widget_destroy(choice);
     win_remove_widget(menu);
     win_widget_destroy(menu);
-    return !focused || !destroyed || !correct || !checked || value != 3.5 || hpclang_win_error();
+    return !focused || !destroyed || !correct || !checked || !chosen || value != 3.5 ||
+           hpclang_win_error();
 }

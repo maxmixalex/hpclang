@@ -18,14 +18,25 @@ The project target is stronger than "substantial calculator-facing functionality
 
 HPGCC 1.1-p1 with 39G support is the historical HP39-family application reference; HPGCC 2.0 SP2 is the principal HP48/49/50 parity reference. HPGCC3 remains an additional API/design reference, not a ROMLIB ABI or custom-ROM target.
 
-## Principles
+## Current M8 follow-up evidence
 
 Selection-control foundation on `m8-choose-controls` remains local and internal:
 paired borrowed option/label descriptors preserve numeric selection semantics;
 allocation failure leaves state intact, and removal shifts both fields together.
 Focused ASan/UBSan tests, ARMv4T compilation and static analysis pass
-(`/work/oct24-choose-tests.log`). Public chooser APIs, popup selection,
-confirmation/cancellation, SDK and native acceptance remain pending.
+(`/work/oct24-choose-tests.log`). The following local adapter now provides all
+nine public APIs and popup selection with confirmation/cancellation, empty lists,
+numeric selection, first-focus menu binding, removal and reset/reinstallation.
+The overlay leaves the application menu installed, consumes modal keys and
+closes on focus loss or successful programmatic mutation. Production HPG pixel
+checks pass 64/80-line displays, both buffers, 40-option scrolling and selected
+rows. All three focused sanitizer targets and ARM compile/analysis pass; logs
+`/work/oct24-choose-{adapter,pixels}-*.log`. Initial pixel expectation extended
+the border by one row; corrected with its failure log retained. SDK process
+38518 runs on `/work/oct24-choose-src`. Original-source comparison, native
+matrix and CI acceptance remain pending; this is not completed M8 acceptance.
+
+## Principles
 
 - one application ABI: HPC1 / hpclang v1;
 - one common ARMv4T runtime;

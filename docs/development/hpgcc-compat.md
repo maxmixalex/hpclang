@@ -1614,3 +1614,27 @@ both buffering modes. A wrong focus pixel is rejected. Previous menu/image/text/
 progress/key/settled-return gates still pass. Stock process 73812 runs separately
 in `/work/oct24-checkbox-src` using `/work/oct24-checkbox-native-arm`; Stock
 completion and CI acceptance remain open.
+
+### Selection control (independent local batch)
+
+`winchoose.h` provides all nine chooser functions. Options and labels are
+borrowed, paired descriptors; removal retains historical numeric selection
+while shifting both strings together. Allocation failure preserves state.
+Negative or out-of-range indices represent no choice; appending can make a
+past-end index valid. Setters do not imply packing or ordinary repaint.
+
+Plain W cycles choices; a focused CHOOS menu action opens a modal list. Up/down
+wrap, F5 cancels and F6 commits. The popup adapts to 64/80-line displays and
+scrolls long lists. It overlays the installed application menu and consumes
+keyboard events instead of removing/reinstalling widgets from lifecycle
+callbacks. Focus loss, successful list mutations, setters, rebinding and removal
+close it. Bound menus and strings must outlive their references. Each installation
+allocates a fresh event number; first-focus publication waits until installation.
+
+Three focused ASan/UBSan targets pass: paired state/allocation rollback,
+production event/focus/lifecycle interaction, and production HPG pixels for
+40-item lists on both display heights and buffering modes. ARM compile/analysis
+pass. Logs: `/work/oct24-choose-{adapter,pixels}-*.log`; initial pixel expectation
+failure is retained separately. Installed SDK process 38518 runs. Historical
+source comparison, negative oracle checks and native six-model acceptance
+remain open. No CI or M8 completion is claimed.

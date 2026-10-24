@@ -16,6 +16,7 @@
 #include <winimg.h>
 #include <winsoftmenu.h>
 #include <wincheckbox.h>
+#include <winchoose.h>
 #include <hpclang/device.h>
 #include <winkeys.h>
 #include "hpgcc-keyboard.h"
@@ -1181,6 +1182,95 @@ static void checkbox_widget_pixels(void)
     display_height = 6;
 }
 
+static void choose_widget_pixels(void)
+{
+    struct hpclang_surface *saved = display;
+    display_width = 131;
+    for (display_height = 64; display_height <= 80; display_height += 16) {
+        display = hpclang_surface_create_mono(132, display_height);
+        assert(display);
+        display->width = 131;
+        for (int buffered = 0; buffered < 2; ++buffered) {
+            assert(!hpclang_win_reset());
+            hpg_set_mode_gray16(buffered);
+            char glyphs[256 * 3] = {0};
+            glyphs['A' * 3] = 1;
+            glyphs['A' * 3 + 1] = 2;
+            glyphs['A' * 3 + 2] = 4;
+            glyphs['B' * 3] = 4;
+            glyphs['B' * 3 + 1] = 2;
+            glyphs['B' * 3 + 2] = 1;
+            hpg_font_t *font = hpg_alloc_font(glyphs, 256, 3, 3);
+            win_widget_t *menu = win_softmenu_new(), *chooser = win_choose_new();
+            assert(font && menu && chooser);
+            win_widget_set_font(chooser, font);
+            win_widget_set_location(chooser, 1, 1);
+            win_widget_set_size(chooser, 5, 5);
+            win_choose_set_menu(chooser, menu, 0);
+            for (int i = 0; i < 40; ++i)
+                win_choose_add_with_label(chooser, i % 2 ? "B" : "A", "A");
+            win_add_widget(menu);
+            win_add_widget(chooser);
+            for (int selected = 0; selected < 40; selected += 39) {
+                win_choose_set_index(chooser, selected);
+                win_keytyped_t key = {KB_A, 0, 0, 0, 0};
+                assert(win_post_event(WIN_KEY_TYPED, &key) == 1);
+                hpg_clip_reset(NULL);
+                hpg_clear();
+                assert(win_post_event(WIN_REPAINT_EVENT, NULL) == 1);
+                /* Fixed expected panel geometry: 13 rows at y=0 on 64 lines,
+                 * 17 rows at y=0 on 80 lines. Last selection scrolls to bottom. */
+                int rows = display_height == 64 ? 13 : 17;
+                int first = selected ? 40 - rows : 0;
+                int bottom = rows * 4 + 3;
+                for (int y = 0; y <= bottom + 1; ++y)
+                    for (int x = 15; x <= 115; ++x) {
+                        int expected = 0;
+                        if (x <= 114 && y <= bottom &&
+                            (y == 0 || y == bottom || x == 15 || x == 114))
+                            expected = 255;
+                        int row = (y - 2) / 4;
+                        int local_y = (y - 2) % 4;
+                        if (y >= 2 && row < rows && x >= 17 && x <= 112) {
+                            int chosen = first + row == selected;
+                            expected = chosen ? 255 : 0;
+                            int glyph_x = (first + row) % 2 ? 2 - (local_y - 1) : local_y - 1;
+                            if (local_y >= 1 && x == 18 + glyph_x)
+                                expected = chosen ? 0 : 255;
+                        }
+                        if (hpg_get_pixel(NULL, x, y) != expected)
+                            fprintf(
+                                stderr,
+                                "choose pixel %d,%d height=%u selected=%d actual=%d expected=%d\n",
+                                x, y, display_height, selected, hpg_get_pixel(NULL, x, y),
+                                expected);
+                        assert(hpg_get_pixel(NULL, x, y) == expected);
+                    }
+                /* Painting the modal must preserve the ordinary label outside it. */
+                assert(hpg_get_pixel(NULL, 2, 2) == 0);
+                assert(hpg_get_pixel(NULL, 3, 2) == 255);
+                assert(hpg_get_pixel(NULL, 0, display_height - 7) == 0);
+                assert(hpg_get_pixel(NULL, 88, display_height - 7) == 255);
+                assert(hpg_get_pixel(NULL, 110, display_height - 7) == 255);
+                key.keycode = KB_E;
+                assert(win_post_event(WIN_KEY_TYPED, &key) == 1);
+                assert(win_choose_get_index(chooser) == selected);
+            }
+            win_remove_widget(chooser);
+            win_remove_widget(menu);
+            win_widget_destroy(chooser);
+            win_widget_destroy(menu);
+            hpg_free_font(font);
+            assert(!hpclang_win_error() && !hpclang_win_reset());
+            hpg_cleanup();
+        }
+        hpclang_surface_destroy(display);
+    }
+    display = saved;
+    display_width = 8;
+    display_height = 6;
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -1283,6 +1373,7 @@ int main(void)
     image_widget_pixels();
     menu_widget_pixels();
     checkbox_widget_pixels();
+    choose_widget_pixels();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);
