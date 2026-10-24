@@ -207,6 +207,10 @@ endforeach()
                 restored = b"HPC1" + embedded[4:16] + zlib.decompress(embedded[16:], wbits=-15)
             if restored != hpc:
                 raise AssertionError(f"{name}: launcher image differs from public HPC1")
+            if memory["serialized"]["hpc1_file_bytes"] != len(hpc) or memory["serialized"][
+                "embedded_payload_bytes"
+            ] != len(embedded):
+                raise AssertionError(f"{name}: serialized application accounting mismatch")
             for model in (
                 "hp39gplus",
                 "hp39gs",
@@ -218,6 +222,13 @@ endforeach()
                 launcher = output / f"{name}-launchers" / model
                 binary = launcher.with_suffix(".bin").read_bytes()
                 wrapped = launcher.with_suffix(".hp").read_bytes()
+                sizes = memory["serialized"]["models"][model]
+                if sizes != {
+                    "launcher_bytes": len(binary),
+                    "transfer_file_bytes": len(wrapped),
+                    "native_object_nibbles": 2 * (len(wrapped) - 8),
+                }:
+                    raise AssertionError(f"{name}/{model}: serialized launcher accounting mismatch")
                 if embedded not in binary or binary not in wrapped or wrapped[:8] != b"HPHP49-C":
                     raise AssertionError(
                         f"{name}/{model}: application missing from native launcher"

@@ -43,8 +43,9 @@ The example requires and caps its application read/write arena at 36 KiB through
 8 KiB application stack. Launcher admission also accounts for application code
 and startup workspace before entering the application. Inspect the generated
 `declarative_ui-launchers/memory.json` for the linked image's pool requirements.
-Stored objects, native allocator overhead and separate LCD DMA pages are
-additional; these settings do not reduce the Stock launcher's reservation.
+Stored objects and native allocator overhead are additional. The current LCD
+DMA buffers use the application heap and are already inside its RW budget;
+these settings do not reduce the Stock launcher's reservation.
 
 ## Operate
 

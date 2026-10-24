@@ -21,6 +21,9 @@ hpclang_unit(memory_checkpoint test_memory_checkpoint.c)
 target_include_directories(test_memory_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
 if(UNIX)
+    hpclang_unit(pool_checkpoint test_pool_checkpoint.c)
+    target_include_directories(test_pool_checkpoint PRIVATE
+        "${HPCLANG_ROOT}/tests/e2e/harness/x50ng" "${HPCLANG_ROOT}/platform/armtoolbox")
     hpclang_unit(reset_checkpoint test_reset_checkpoint.c)
     target_include_directories(test_reset_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 endif()

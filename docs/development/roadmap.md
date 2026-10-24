@@ -419,6 +419,119 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+2026-10-24 acceptance: all six workflows pass at `64d223d9` (Quality
+39935566666, Core 39935566642, Runtime 39935566879, Objects 39935566875,
+Storage 39935566853 and Font Gallery 39935566811). Runtime includes every
+Direct family and all six Stock UI targets. PR #8 merged the timing, linked
+memory-report, minimum-RW admission and installed C example budget batch into
+main as `17444cb7`. Later pool-observer, serialized-report, sketch-review and
+migration-guide changes remain a separate batch; this does not complete M8.
+
+Local serialized-footprint follow-up (2026-10-23): memory.json now records
+actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
+bytes and native object nibbles, validating the native encoded extent. Raw-only
+builds report null wrapper sizes. The UI fixture is 56,296 B as standalone
+HPC1 and 39,478 B embedded; HP50g's transfer is 53,688 B containing a
+107,360-nibble native object. These nested representations must not be summed.
+All six raw and wrapped launchers remain byte-identical; raw-only reporting
+passes. The expanded relocated SDK size-accounting check and all three HP39
+C/C++ Aplet families pass, as do Ruff/format and strict docs.
+This records file/object geometry, not native overhead, HP39 Aplet containers
+or transfer/install peak memory; those resource requirements remain open.
+
+Local host-side pool observer (2026-10-23): optional Stock capture reads the
+existing boot/native state and original coarse table without changing guest
+code or storage. It checks descriptor/table agreement and distinct physical
+pages and emits immutable per-checkpoint reports. The UI `--pool` verifier
+requires both records and stable geometry across cleanup. Host ASan/UBSan
+rejection tests, Python report tests, formatting and Ruff pass. The unmodified
+HP50g launcher passes UI pixels/reports/return and both pool observations:
+94 pages (376 KiB), 9 RW pages, with 64 pages outside stage/code/workspace/stack
+and the capped RW mapping. HP39g+ now also passes: 34 stage-pool pages plus
+two native-workspace pages (144 KiB total), 9 RW pages and 4 supplied pages
+beyond the linked layout. Both reports agree and all 36 physical pages are
+distinct. HP39gs now passes UI/return and both pool observations: 33 stage pages
+plus two native-workspace pages (140 KiB), with three pages beyond the layout.
+HP40gs, HP48gII and HP49g+ now also pass the complete UI/pixel/report/return
+flow, with respectively 35, 37 and 94 distinct supplied pages. All six targets
+retain the 36 KiB application RW arena and identical pre-PASS/post-cleanup
+observations. The original queue finished; PID 84275 is no longer running.
+The design record contains the mapped-pool ledger for all six launches.
+The local Runtime workflow enables capture and requires `--pool` for Stock UI,
+uploading the linked memory report alongside runtime observations. YAML parsing,
+verifier shell syntax and all six retained UI report/pixel flows pass; this
+workflow change is not yet submitted.
+The earlier instrumented HP39g+ experiment exits
+successfully, but its final snapshot no longer contains the marker, so it
+provides no pool measurement. The new observer captures while the application
+is still mapped and is opt-in;
+six-model local observation is complete, while CI acceptance and native
+allocator/installation/transfer totals remain open.
+
+Local native-pool observation (2026-10-23): an isolated test-only stage records
+its incoming geometry before the UI runs. HP50g Stock passes the complete UI
+and normal return; its retained witness reports 94 stage-pool pages (376 KiB),
+6 stage pages, 14 code pages and 9 RW pages. One MMU workspace and one stage
+stack page leave 63 supplied pages outside the capped application RW mapping.
+The saved coarse table independently contains 94 valid, distinct physical
+pages. The witness adds 64 B of stage storage and crosses a page boundary:
+this instrumented stage needs one more page than production. This observation
+does not measure native allocator block size/overhead or installation/transfer
+peaks, and is not a production minimum claim. The separate HP39g+ experiment
+passes UI and return, but marker extraction finds no retained record in the
+final snapshot; no HP39g+ pool count is inferred. Evidence lives under
+`/work/oct23-native-pool-src/build`, with build/read scripts retained in
+`research/oct23-native-pool-witness.py` and `research/oct23-native-pool-read.py`.
+The first two setup attempts failed before application execution (missing PTY
+directory, then CRLF sequence input); the corrected HP50g v3 log passes.
+
+One-time submitted-UI CI check after independent review/accounting work:
+`64d223d9` Quality 39935566666 passes; Core 39935566642, Runtime 39935566879,
+Objects 39935566875, Storage 39935566853 and Gallery 39935566811 are queued.
+No repeated queue polling or merge; these results do not cover local follow-ups.
+
+Local native-allocation policy audit (2026-10-23): release-source inspection
+decodes the wrapper's `0x01c00000` as MMU packing, optional ARM OS RAM and one
+16-byte native stack-growth block. The low 20 bits in this mode reserve free
+TEMPOB growth; they do not request a fixed pool size. Native source versions
+probe available OS allocations with different margins, so copying the UI RW
+budget into this word would not bound the native reservation. The design
+record retains source member names and archive provenance and distinguishes
+this static policy evidence from required model-specific runtime accounting.
+The wrapper now spells out the same bit combination; all six existing launcher
+envelopes remain byte-identical. Native allocation/overhead and installation/
+transfer footprints remain open; no resource or milestone closure is claimed.
+
+Local resource-accounting correction (2026-10-23): LCD DMA backing is not an
+extra native allocation in the current backend. `display-hardware.c` allocates
+and releases it through application malloc/free, and translates the same RW
+pages. ARM object relocations independently confirm those calls. Therefore the
+36 KiB RW budget and normal E2E heap extent already include DMA buffers and
+their allocation slack; adding them again would double-count. Remove the wrong
+DMA exclusion from memory.json and SDK/example guidance. Document scan-geometry
+size, bounded retry slack and old/new-buffer overlap during replacement.
+Eight memory-report tests, DMA/display-session ASan/UBSan, Ruff/format and strict
+docs pass. Native launcher reservation/overhead, stored objects and transfer
+staging remain outside the report; whole-system admission remains open.
+
+Local C sketch review (2026-10-23): the installed device-manager represents all
+six retained declaration/application patterns. The design record maps each to
+public example code and independent tests, explains application-owned scan
+lifetime and borrowed canvas state, and retains provisional API names. The
+application fixture now verifies declaration purity, stale success/error events
+during a replacement scan, and exactly-once queued-task cleanup on exit across
+two palettes and 2/4/16 levels. ASan/UBSan, pinned formatting and strict docs
+pass. The public-sketch technical review is complete; resource acceptance and
+M8.2/M8.3 completion remain open. This follow-up is local, not yet submitted.
+
+Current UI submission: `64d223d9` is pushed on `m8-flash-write` after local
+acceptance of timing checkpoints, launcher memory reports, minimum-RW admission
+and the installed C example budget. Timing passes all six Direct/Stock models;
+minimum-RW admission passes all six Direct models at the exact required pool
+and focused HP39g+/HP50g Stock. Installed SDK relocation and all three HP39
+Aplet families pass. CI is submitted; the one-time result above is current. Whole-system
+resource accounting and the other M8.2/M8.3 acceptance criteria remain open.
+
 Execution discipline: read this roadmap and remote issue #1 before selecting work;
 reconcile implementation, branch and verification evidence, then update both when
 results or scope facts change. The 2026-10-23 sequencing decision below now governs current work. Port 2 recovery
@@ -489,10 +602,12 @@ CMake regenerates a deleted report. Seven host tests and the relocated installed
 SDK C/C++/font/six-model packaging checks pass, including missing-report rebuild.
 The first instrumented UI artifact requires 30 pool pages for its complete
 36 KiB RW ceiling, or 32 on HP39 Stock. Stored objects, transfer staging, native
-allocator policy/overhead and separate LCD DMA allocations remain excluded.
+allocator policy/overhead remain excluded. The earlier exclusion of LCD DMA
+backing was incorrect: the current display backend uses application malloc,
+so those buffers are already included in the RW arena and measured heap extent.
 The report-only change produces byte-identical six-model launchers. Whole-app
-admission and actual Stock reservation reduction remain open. No new CI submission
-or M8.2/M8.3 completion is claimed.
+admission and actual Stock reservation reduction remain open. This is included
+in the current UI submission above; M8.2/M8.3 completion is not claimed.
 Accepted repair (2026-10-23): `5959159a` on `m8-flash-write` includes safe
 admission folding, maintained copy-size preflight and the four preceding
 startup-evidence commits. Local dual-model recovery, the separate size-check
@@ -2168,11 +2283,11 @@ triggered CI workflows pass at `d94580b4`, without closing an entire M8 stage.
 | --- | --- | --- |
 | M8.0 | Native port reads and substantial mutation support exist. Port 2 backup create/replace/remove and library creation have native evidence. | Complete library registration/attachment and execution-reference safety; Port 1 replacement/removal; trusted Port 2 recovery installation and authority lifecycle, safe startup ordering, reclamation and retained per-port gates. |
 | M8.1 | Installed source SDK and six-model packaging accepted. | Preserve relocation/build/package regressions as later features are integrated. |
-| M8.2 | Declaration, layout, input, effects and canvas implemented; integrated UI CI accepted. | Public application/API review and remaining smallest-target resource/update-cost criteria. |
+| M8.2 | Declaration, layout, input, effects and canvas implemented; integrated UI CI accepted; public C sketch technically reviewed. | Remaining smallest-target resource/update-cost criteria and submitted follow-up CI; names remain provisional until acceptance. |
 | M8.3 | Components, themes and renderer implemented; all-six Direct/Stock local memory-report and low-memory checks pass. | Whole-application physical-memory admission and remaining resource/CI acceptance; touched-stack watermarks alone are insufficient. |
 | M8.4 | Multiple graphics, keyboard, console and system adapter groups exist. Fixed-array line-input aliases pass all-six Direct/Stock locally. | Complete the retained historical API/application ledger, asynchronous KOS sound and decimal-format policy, plus remaining adapter groups and CI acceptance. |
-| M8.5 | Initial C++ UI/object wrappers accepted; additional owners verified locally. | Broader ownership/migration guidance, examples and pending integration acceptance. |
-| M8.6 | Integrated examples and relocated packaging have substantial local evidence. | Complete downstream scenarios, resource/error/return and release acceptance; retain the independent-launcher evaluation without presuming retirement. |
+| M8.5 | C++ UI/object wrappers and directory/iterator owners accepted in CI. | Broader ownership/migration guidance, public conventions and remaining examples/release work. |
+| M8.6 | Notebook cross-family persistence, classic Port 0 backup and HP49/50 file export accepted in CI; relocated packaging verified. | Remaining resource/error/return and release acceptance; retain the independent-launcher evaluation without presuming retirement. |
 
 The retained M8.0 implementation track is native-port work: establish
 complete execution-reference coverage for safe movement/registration, then
@@ -3914,9 +4029,12 @@ Deliver and review this core in the following slices, using the retained
   patterns as one stateful example, with a deterministic asynchronous provider
   and real calculator keyboard/display evidence.
 
-- [ ] Review a small public application sketch before freezing API names:
+- [x] Review a small public application sketch before freezing API names:
   nested rows/columns, conditional children, a keyed changing list, controlled
   text input, a custom canvas and an asynchronous operation with cancellation.
+  The [C application sketch review](sdk-design.md#c-application-sketch-review)
+  maps these requirements to the installed example and independent fixtures.
+  This technical review does not freeze names before UI milestone acceptance.
 - [ ] Define bounded node storage, deterministic sizing/measurement/overflow,
   stable-key reconciliation and predictable allocation-failure behavior.
   Measure actual memory and update cost on the smallest supported target.
@@ -4188,6 +4306,18 @@ below are retained.
 
 #### M8.5 — Modern C++ and migration
 
+The installed SDK now includes `docs/migration.md`, linked from Getting started
+and the documentation navigation. It maps supported adapter headers and retired
+raw interfaces to concrete services, explains exact versus approximate number
+exchange, byte text versus UTF-8, borrowed buffers and C/C++ ownership, bounded
+line input and model/context checks. It explicitly retains unfinished asynchronous
+sound and Port 2 recovery/reclamation requirements. The migration/tooling and
+public-convention acceptance items below remain open. This documentation slice
+is local; strict documentation, exact installed-file/link checks, and the
+relocated SDK gate pass (C/C++, fonts, HPC1, six-model launchers and all six
+model-specific Notebook builds). HP39 Aplet packaging was not repeated for this
+documentation-only slice; its earlier acceptance remains recorded above.
+
 Local implementation adds allocation-free C++ declaration/scope guards and
 movable ownership for offscreen surfaces. A shipped C++ counter uses the same
 C UI core; its actual view is also exercised by the UI E2E before the complete
@@ -4219,7 +4349,10 @@ claim that `exit()` unwinds automatic C++ objects.
 All 95 host targets, focused ASan/UBSan and ARM C++ analysis pass. Object Basics
 passes HP39g+ Direct and HP48gII/HP50g Stock locally, including normal return.
 The relocated SDK gate passes C/C++, all six model builds/launchers and the
-three HP39 Aplet package variants. CI acceptance of these new owners is pending.
+three HP39 Aplet package variants. CI acceptance is complete in Runtime
+39928737278 at `5959159a`, merged by PR #7 as `2baebace`: Object Basics passes
+all six Stock models, including the real directory/iterator ownership fixture
+on classic models and the explicit unsupported-context behavior on HP39.
 
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications
@@ -4231,6 +4364,20 @@ three HP39 Aplet package variants. CI acceptance of these new owners is pending.
   deterministic resource generation as part of the installable SDK.
 
 #### M8.6 — Application and release acceptance
+
+Current scenario acceptance (reconciled 2026-10-23): Runtime
+[39928737278](https://github.com/maxmixalex/hpclang/actions/runs/39928737278)
+at `5959159a`, merged through PR #7 as `2baebace`, passes Notebook on all six
+Stock models, notebook-backup on HP48gII/HP49g+/HP50g, and notebook-export on
+HP49g+/HP50g. These fixtures link the installed example's actual app/store/export
+sources. The UI verifier checks text across three launches; backup exercises
+save/restore/replace/remove while preserving the primary save; export checks
+UTF-8 bytes and retained card content through independent host FAT tools.
+The application also reads civil time. These are original-ROM emulator results,
+not physical-device results. The relevant application/fixture sources are
+unchanged from that accepted commit. Earlier pending-Stock/CI descriptions
+below are implementation history, superseded by this acceptance. Resource
+limits, release documentation and independent-launcher evaluation remain open.
 
 The initial `examples/notebook` application connects the C UI and civil clock
 to native string persistence: HP39 Aplet-owned data or classic HOME. Saves are
@@ -4278,7 +4425,7 @@ The Runtime registry covers these separate Stock-only fixtures with per-model
 builds where needed. Local verification also passes all 91 host targets, SDK
 relocation and six-model builds, schema/negative-configuration checks, static
 analysis, shellcheck, actionlint, formatting and strict documentation. Formal CI
-acceptance for this integrated batch remains pending.
+acceptance for these integrated scenarios is recorded above.
 
 The public ARM bootstrap and synchronous KOS wrappers now return through `BX`
 after restoring LR, as required when ARMv4T callers use Thumb. The relocated SDK
@@ -4288,7 +4435,7 @@ three HP39 Aplet variants pass locally. Object Basics also passes HP39g+ and
 HP50g Stock startup and normal return with the corrected wrappers. These checks
 do not replace physical-device validation or close the remaining release goals.
 
-- [ ] Exercise non-trivial downstream applications combining UI, object data,
+- [x] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each
   hardware family and state exactly which scenarios were emulated or physical.
 - [ ] Validate release installation, reproducible assets, resource limits,

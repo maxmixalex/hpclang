@@ -1218,7 +1218,125 @@ provider can exercise effect transitions, alongside real calculator input and
 display verification. This fixture preserves the original application model
 while fitting each target's screen and input capabilities.
 
+### C application sketch review
+
+The 2026-10-23 technical review uses the installed
+`examples/declarative-ui/app.c` as the public sketch, together with its
+`app.h` model and `main.c` event loop. This is executable ordinary C, built
+from a relocated SDK, rather than a second illustrative API that could drift
+from the implementation. The review preserves the application contract above.
+Public names remain provisional until UI milestone acceptance.
+
+| Original requirement | Public sketch | Independent evidence |
+| --- | --- | --- |
+| Nested composition and conditional children | `status_card` scopes two component instances; `demo_view` composes rows, columns and a scrolling root, selecting controls with ordinary `if` statements. | `test_ui_demo.c` executes the actual view at each state; `test_ui.c` exercises scope interruption, duplicate keys and rejected frames. |
+| Keyed changing list | `device_row` uses persistent device IDs; insertion and reversal change model order without manually creating widgets. | The application test checks surviving control lifetimes after insertion/reversal and renderer replacement. |
+| Controlled text and values | `demo_view` reads the filter and enabled state; `demo_update` accepts edit proposals and toggle values. | The application test edits the filter through `hpclang_ui_edit`; core input tests cover UTF-8, selection, capacity and accepted/rejected proposals. |
+| Explicit asynchronous states | `demo_update` queues scan work; `demo_poll` drives its provider; loading/error/retry/cancel are model states. | The application test covers failure, retry, cancellation, stale success/error delivery during a replacement request, and exit with queued work. |
+| Revision-driven custom canvas | `wave` paints the model samples inside the renderer's drawing lease; `DEMO_WAVE` updates samples and revision. | Host renderer tests exercise clipping/damage; six-model LCD verification checks model-derived waveform coordinates independently. |
+| Bounded declarations and separate rendering | `demo_view` begins, lays out and commits a candidate; `main.c` renders and publishes afterward. Storage is configured before the loop. | Every application-test declaration checks that the entire application model and provider bookkeeping remain unchanged; allocation-fault and failed-frame tests cover the core/renderer boundaries. |
+
+The view borrows the model for canvas state. Keep the model alive through paint;
+change its revision whenever the canvas-visible samples change. The accepted
+tree owns copied text, but does not copy arbitrary canvas state. Model updates
+and accepted declarations therefore precede rendering in the example loop.
+
+The scan deliberately uses application ownership (`owner=0`). The Scan button
+disappears when Loading replaces it, so tying the operation to that button's
+node lifetime would cancel valid work. Cancel/disconnect explicitly cancels and
+drains the task before reusing its provider context. Completion tokens must
+match the active request; shutdown cleans up outstanding work exactly once.
+Node-owned effects remain available when removal really should cancel work.
+
+`HPCLANG_UI_WITH` uses the supported compiler's cleanup attribute to balance
+scopes across normal completion, `break`, `continue`, `return` and outward
+`goto`. It is not an ISO-C-only macro. Explicit begin/close functions are the
+alternative; jumping into a scope or using `longjmp` across it is unsupported.
+The caller retains responsibility for commit/abort and error propagation.
+
+This review finds the six application patterns represented in the public C
+surface. It does not freeze names, claim pointer hardware or faithful HP39
+native styling, or close physical-memory/performance acceptance. The simulated
+provider, renderer palette/font choices and keyboard-only interaction are the
+documented target adaptations, not removed application requirements.
+
 ### Startup resource admission
+
+The wrapper's native request word is `0x01c00000`, not a byte count. The
+Launcher V3 format in HPGCC 1.1's `ARMToolbox/LibFmt.txt` and HPGCC 2.0 SP2's
+`sources/ARMToolbox/masd_source/ARMTBX_3_SOURCES.DIR` assigns bit 22 to the MMU
+packer, bit 23 to optional ARM OS RAM, and bits 24–27 to native stack-growth
+reservation in 16-byte blocks. Our word sets both flags and one stack block.
+With the packer enabled, the low 20 bits describe space to leave for TEMPOB
+growth, not the application's pool size; this word leaves that field zero.
+Writing a 36 KiB application limit there would change native free-space policy,
+not enforce a 36 KiB allocation.
+
+The historical implementations assemble a pool from available native memory
+and optionally append an OS allocation. Their OS probing policy varies: the
+1.1 HP48 source leaves 4 KiB after its probe, while the other 1.1 source leaves
+16 KiB; the 2.0 final-launch path also probes before reserving its block.
+Those source facts explain why a single static native-reservation number would
+be misleading. They do not prove a specific six-model firmware allocation or
+allocator overhead. Runtime admission validates the supplied pool; whole-system
+acceptance still needs model-specific observation of the native allocation,
+stored objects and transfer staging. The linked minimum in `memory.json` is a
+requirement on that pool, not an observation of its actual size.
+
+Source audit provenance: the inspected `hpgcc-2.0-SP2-Linux.tar.bz2` has SHA-256
+`e4f9d632e65316101717f39c00523c2f43608a11156d4a4d4e8fae3195771029`;
+the member is `hpgcc_20/sources/ARMToolbox/masd_source/ARMTBX_3_SOURCES.DIR`.
+The 1.1 comparison uses `ARMToolbox/masd_source48/SYSMEM.ARM` and
+`ARMToolbox/masd_source/SYSMEM.ARM` in the retained 39G-support release archive.
+
+For runtime observations, set `HPCLANG_E2E_CAPTURE_STAGE_POOL=1` on a Stock
+harness invocation. At each existing memory checkpoint the host reads the
+boot page's native-state pointer, ARMSYS page count/table/block fields and the
+original coarse table through the stage mapping. It requires the table address
+to match the active stage descriptor and every observed page to have a valid,
+distinct physical mapping. HP39's two native workspace pages are recorded
+separately from the stage count. Inconsistent or repurposed native registers
+reject the observation; it does not guess a count from trailing table contents.
+
+Each checkpoint writes immutable `*-pool-ID.json` with version 1, checkpoint
+ID, model, RW bytes, stage/native-workspace page counts, native OS block pointer,
+table address and physical page addresses. The pointer is not an allocation
+size. The normal memory report and its acknowledgement remain unchanged.
+Stock run setup removes previous pool reports. No guest bytes, fields, symbols
+or allocations are added by this observer.
+
+Run `tests/e2e/ui/verify.py stock FAMILY --pool` to require both pool reports,
+correct target identity, 36 KiB RW, valid unique physical pages and identical
+pool observations before PASS and after runtime cleanup. The ordinary UI
+pixel/memory/return checks still apply. Initial HP50g execution with the
+unmodified launcher records 94 distinct pages (376 KiB) and a 36 KiB RW arena.
+HP39g+ also passes the complete UI and return flow: 34 stage pages plus two
+native-workspace pages, with identical records before PASS and after cleanup.
+HP39gs passes the same flow with 33 stage pages plus two native-workspace pages.
+The linked layout and observed distinct pages give this pool ledger for the
+maintained UI acceptance artifact (all values in KiB):
+
+| Pool use | HP39g+ | HP39gs | HP40gs | HP48gII | HP49g+ | HP50g |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Stage extent, alignment and original-table prefix | 20 | 20 | 20 | 20 | 20 | 20 |
+| Stage stack | 4 | 4 | 4 | 4 | 4 | 4 |
+| Application MMU workspace | 4 | 4 | 4 | 4 | 4 | 4 |
+| Application code | 56 | 56 | 56 | 56 | 56 | 56 |
+| Application RW, including heap-backed LCD buffers | 36 | 36 | 36 | 36 | 36 | 36 |
+| Native-call workspace | 8 | 8 | 8 | 0 | 0 | 0 |
+| Supplied pages beyond this layout | 16 | 12 | 12 | 28 | 256 | 256 |
+| Total distinct supplied pages | 144 | 140 | 140 | 148 | 376 | 376 |
+
+The application RW row includes its boot page, static data, heap and reserved
+8 KiB stack; these must not be added again. This is the acceptance fixture's
+linked image and observed calculator state, not every UI application's budget.
+It measures the supplied mapped pool, not native allocator metadata,
+installation storage or transfer-time peak usage. All six Stock models pass
+the complete UI/return flow and both pool checks locally. The local Runtime
+workflow now opts Stock UI jobs into capture and
+requires `--pool` verification, uploading the linked `launchers/memory.json`
+alongside observed reports. Other suites and Direct runs retain their existing
+behavior. This workflow change is not yet submitted or CI accepted.
 
 Stock startup has an earlier admission boundary than the application's RW
 budget. Stage0 must fit the linked stage1 memory extent (including its prefix,

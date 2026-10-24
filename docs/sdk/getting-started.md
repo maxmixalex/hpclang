@@ -153,11 +153,25 @@ which is included in the per-model minimum pool totals; `minimum_rw_pages`
 still describes the ABI-only layout. Deleting the report causes CMake to
 regenerate it.
 
+The report's `serialized` section records actual output sizes: the standalone
+HPC1 file, the embedded payload (possibly compressed), and each model's raw
+launcher, wrapped transfer file and native object in nibbles. The object extent
+is checked against the wrapper's encoded size field; its eight-byte transfer
+header is excluded. Wrapper-dependent values are null for `--raw-only` builds.
+These are nested representations, not additive allocations: the wrapped file
+already contains the launcher and embedded payload, and launching it does not
+also require storing the standalone HPC1 file. HP39 Aplet envelopes, directory
+metadata, native allocation overhead and transfer/install temporary copies are
+not included in these serialized sizes.
+
 These totals describe required pool geometry, not measured free memory or a
 change to Stock's allocation policy. The minimum RW layout does not promise
 application heap capacity. Native allocator overhead, stored launcher/payload
-objects, transfer staging and separately owned LCD DMA pages are excluded and
-listed in the report. A successful build does not prove that a particular
+objects and transfer staging are excluded and listed in the report. The current
+display backend allocates LCD DMA buffers from the application heap: their
+backing storage and alignment slack consume the same RW arena, not an additional
+native allocation. An ABI-only RW minimum does not budget those heap requests;
+choose an application minimum that includes them. A successful build does not prove that a particular
 calculator state has enough memory to launch.
 
 ## Own calculator objects in C++
@@ -231,10 +245,13 @@ result, check it, then `swap()` it into the old owner. Calling `reset()` with a
 failed null result would close the old handle. Local scopes clean up on normal
 return; explicitly reset owners before `exit()` or `_Exit()` if they must close
 before termination.
-Release such resources before calling it. Global-object destruction follows
-the runtime's ordinary exit handling.
+Global-object destruction follows the runtime's ordinary exit handling.
 
 ## Migrate HPGCC source
+
+See the [migration guide](migration.md) for per-interface decisions, precision,
+ownership, text encodings and an application acceptance checklist. This guide
+is also installed beside this page in the SDK.
 
 Compatibility is provided by installed headers **and runtime implementations**.
 For supported calls, keep the historical include spelling and function calls;

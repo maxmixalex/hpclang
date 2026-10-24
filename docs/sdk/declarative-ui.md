@@ -360,7 +360,9 @@ boundary without changing the SDK
 allocator. `used` includes allocator bookkeeping and retained free blocks;
 it is not the sum of live application allocations. `capacity` is the space
 between the end of static data and the reserved stack boundary. Neither value
-measures stack high-water usage or separately allocated LCD DMA pages. Local
+measures stack high-water usage. LCD DMA backing is allocated through `malloc`
+by `runtime/core/display-hardware.c`, so it is included in the heap observation,
+including alignment padding and allocator bookkeeping. Local
 runs of the instrumented fixture submitted at `19143951` report:
 
 | Target | Launcher RW arena | Peak heap extent | Heap capacity |
@@ -468,6 +470,20 @@ These are requested heap bytes, excluding allocator bookkeeping and alignment
 overhead. Add the declaration pool, application state, stack and any owned LCD
 DMA pages to obtain an application budget. LCD pages use the hardware scan
 width and row count, which need not equal this renderer's logical viewport.
+Both renderer buffers and LCD DMA buffers come from the application heap.
+When starting from the measured `HEAP` extent instead of these component sizes,
+do not add them again. DMA translation validates physical contiguity of the
+existing RW backing; it does not allocate a second set of physical pages.
+For a hardware scan of `rows` by `scan_width`, each LCD buffer needs
+`rows * ceil(scan_width * bits_per_pixel / 8)` data bytes. Acquisition first
+requests those bytes plus three bytes of alignment slack. Fragmented physical
+backing can trigger retries with up to 4,095 bytes of slack; failed candidates
+are released before retry. A two-page session owns two such allocations.
+Replacing a session temporarily retains the old buffers while acquiring the
+new ones, so both sets contribute to the transient heap requirement. Allocator
+metadata and retained free blocks remain part of the measured heap extent;
+adding requested byte counts alone does not bound that extent or guarantee a
+physically contiguous span.
 Host allocation tests check the two-buffer cost at every size/level combination
 above, independently of host descriptor sizes, and retain allocation-failure
 and allocation-free frame checks. Peak whole-application memory and complete

@@ -20,6 +20,7 @@
 #include "s3c2410/s3c2410_io_port.h"
 #include "frame-checkpoint.h"
 #include "memory-checkpoint.h"
+#include "pool-checkpoint.h"
 #include "input-checkpoint.h"
 #include "media-checkpoint.h"
 
@@ -736,6 +737,10 @@ static void monitor(void *arg)
     }
 
     if (readable) {
+        if (pool_checkpoint(s->hdw, value) < 0) {
+            fail(s, "pool-checkpoint");
+            return;
+        }
         int memory = memory_checkpoint(s->hdw, s->result_addr, value);
         if (memory < 0) {
             fail(s, "memory-checkpoint");

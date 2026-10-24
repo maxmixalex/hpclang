@@ -112,17 +112,64 @@ def verify(prefix: Path, height: int, stock: bool = False) -> None:
     )
 
 
+def verify_pool(prefix: Path, model: int) -> int:
+    reports = []
+    fields = {
+        "version",
+        "id",
+        "model",
+        "rw_bytes",
+        "stage_pool_pages",
+        "native_workspace_pages",
+        "native_os_block",
+        "pool_l2_physical",
+        "physical_pages",
+    }
+    for checkpoint in (1, 2):
+        report = json.loads(Path(f"{prefix}-pool-{checkpoint}.json").read_text())
+        assert set(report) == fields, f"{prefix}: pool report schema"
+        assert all(
+            type(report[key]) is int and 0 <= report[key] <= 0xFFFFFFFF
+            for key in fields - {"physical_pages"}
+        )
+        assert report["version"] == 1 and report.pop("id") == checkpoint
+        assert report["model"] == model and report["rw_bytes"] == 36864
+        workspace = 2 if model <= 3 else 0
+        assert report["native_workspace_pages"] == workspace
+        count = report["stage_pool_pages"] + workspace
+        assert 0 < report["stage_pool_pages"] and count <= 256
+        pages = report["physical_pages"]
+        assert isinstance(pages, list) and len(pages) == count
+        assert all(
+            type(page) is int and 0 < page <= 0xFFFFF000 and page % 4096 == 0 for page in pages
+        )
+        assert len(set(pages)) == count, f"{prefix}: aliased pool pages"
+        assert report["pool_l2_physical"] in pages, f"{prefix}: table outside pool"
+        reports.append(report)
+    assert reports[0] == reports[1], f"{prefix}: pool changed across cleanup"
+    print(f"PASS: {prefix}: observed native pool {count} pages ({count * 4096} bytes)")
+    return count
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
     parser.add_argument("family", choices=("hp39", "hp48", "hp4950"))
+    parser.add_argument(
+        "--pool", action="store_true", help="require Stock native-pool observations"
+    )
     args = parser.parse_args()
+    if args.pool and args.mode != "stock":
+        parser.error("--pool requires Stock mode")
     for target in Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines():
         verify(
             Path(f"build/{target}-frame"),
             80 if args.family == "hp4950" else 64,
             args.mode == "stock",
         )
+        if args.pool:
+            models = ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g")
+            verify_pool(Path(f"build/{target}-frame"), models.index(target) + 1)
 
 
 if __name__ == "__main__":

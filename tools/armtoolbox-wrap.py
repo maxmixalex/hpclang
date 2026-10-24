@@ -11,7 +11,11 @@ import argparse
 import struct
 from pathlib import Path
 
-MEMORY_REQUEST = 0x01C00000
+# Launcher V3: M enables the MMU packer, R permits ARM OS memory, and
+# D reserves 16-byte blocks for native stack growth. With M set, the low
+# 20 bits reserve free TEMPOB growth space; they are NOT a requested pool size.
+# MIN/MAX_RW_BYTES belong to stage admission/mapping, not this native policy.
+MEMORY_REQUEST = (1 << 22) | (1 << 23) | (1 << 24)
 LINK_MARKER = 0x3176B34C
 
 

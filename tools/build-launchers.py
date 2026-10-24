@@ -114,7 +114,6 @@ def memory_report(
         "excludes": [
             "native launcher allocation policy and allocator overhead",
             "stored launcher/application objects and transfer staging",
-            "separately owned display DMA pages",
         ],
     }
 
@@ -262,6 +261,11 @@ __hpc1_blob_end:
         encoding="utf-8",
     )
     bundle_object = compile_source(bundle, "bundle")
+    report["serialized"] = {
+        "hpc1_file_bytes": len(original),
+        "embedded_payload_bytes": (scratch / "application.bin").stat().st_size,
+        "models": {},
+    }
     for model in models:
         definitions = [f"-DHPCLANG_STAGE0_MODEL={MODELS[model]}"]
         if hp39_armsys_probe and MODELS[model] <= 3:
@@ -271,9 +275,22 @@ __hpc1_blob_end:
         run(ld, "-m", "armelf", "-T", platform / "stage0.ld", entry, bundle_object, "-o", elf)
         binary = output / (model + ".bin")
         run(tools / "llvm-objcopy", "-O", "binary", elf, binary)
+        sizes = {
+            "launcher_bytes": binary.stat().st_size,
+            "transfer_file_bytes": None,
+            "native_object_nibbles": None,
+        }
         if wrap:
             # Use the same native object envelope as repository execution tests.
             run(sys.executable, root / "tools/armtoolbox-wrap.py", binary, output / (model + ".hp"))
+            wrapped = (output / (model + ".hp")).read_bytes()
+            # The transfer header is not part of the native string object.
+            # Its five-nibble prologue precedes the self-inclusive size field.
+            object_nibbles = 5 + (int.from_bytes(wrapped[10:13], "little") >> 4)
+            if wrapped[:10] != b"HPHP49-C\x2c\x2a" or object_nibbles != 2 * (len(wrapped) - 8):
+                raise ValueError("native launcher object extent does not match its envelope")
+            sizes.update(transfer_file_bytes=len(wrapped), native_object_nibbles=object_nibbles)
+        report["serialized"]["models"][model] = sizes
     (output / "memory.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
 

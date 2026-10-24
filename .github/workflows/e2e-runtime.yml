@@ -335,6 +335,7 @@ jobs:
       SUITE: ${{ matrix.suite.mode }}
       APPLICATION: ${{ matrix.suite.artifact }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: ${{ matrix.suite.keyboard && '1' || '0' }}
+      HPCLANG_E2E_CAPTURE_STAGE_POOL: ${{ matrix.suite.mode == 'ui' && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -379,7 +380,12 @@ jobs:
         if: matrix.suite.verifier != ''
         env:
           VERIFIER: ${{ matrix.suite.verifier }}
-        run: python3 "$VERIFIER" stock "$FAMILY"
+        run: |
+          args=(stock "$FAMILY")
+          if [[ "$SUITE" == ui ]]; then
+            args+=(--pool)
+          fi
+          python3 "$VERIFIER" "${args[@]}"
 
       - name: Generate suite LCD evidence
         if: always()
@@ -421,6 +427,7 @@ jobs:
             build/*-code-relocation/**
             build/e2e/${{ matrix.suite.artifact }}/e2e.hpc
             build/e2e/${{ matrix.suite.artifact }}/e2e.stock-*.json
+            build/e2e/${{ matrix.suite.artifact }}/launchers/memory.json
           if-no-files-found: warn
 
   publish-evidence:

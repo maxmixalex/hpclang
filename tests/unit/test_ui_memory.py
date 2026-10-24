@@ -26,6 +26,43 @@ class UiMemoryTests(unittest.TestCase):
         self.path.write_text(json.dumps(report))
         return VERIFY.verify_memory(self.prefix)
 
+    def test_pool_observation_requires_distinct_stable_native_pages(self):
+        with self.assertRaises(FileNotFoundError):
+            VERIFY.verify_pool(self.prefix, 6)
+        report = dict(
+            version=1,
+            model=6,
+            rw_bytes=36864,
+            stage_pool_pages=30,
+            native_workspace_pages=0,
+            native_os_block=0,
+            pool_l2_physical=0x08000000,
+            physical_pages=[0x08000000 + i * 4096 for i in range(30)],
+        )
+
+        def save(value, checkpoint):
+            Path(f"{self.prefix}-pool-{checkpoint}.json").write_text(
+                json.dumps(dict(value, id=checkpoint))
+            )
+
+        for checkpoint in (1, 2):
+            save(report, checkpoint)
+        self.assertEqual(VERIFY.verify_pool(self.prefix, 6), 30)
+        for invalid in (
+            dict(report, version=True),
+            dict(report, model=5),
+            dict(report, stage_pool_pages=31),
+            dict(report, native_workspace_pages=2),
+            dict(report, rw_bytes=32768),
+            dict(report, pool_l2_physical=0x09000000),
+            dict(report, physical_pages=[0x08000000] * 30),
+            dict(report, physical_pages=[True] + report["physical_pages"][1:]),
+            dict(report, native_os_block=42),
+        ):
+            save(invalid, 1)
+            with self.subTest(report=invalid), self.assertRaises(AssertionError):
+                VERIFY.verify_pool(self.prefix, 6)
+
     def test_final_cleanup_watermark_and_heap_are_required(self):
         self.assertEqual(self.check(self.report), (2416, 8192, 18892, 22920))
         for index, value in (
