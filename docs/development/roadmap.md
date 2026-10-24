@@ -4308,9 +4308,11 @@ below are retained.
   independent pixels and normal return. The first Stock queue (session 10232)
   terminated before application execution because copied CRLF sequence files
   were rejected. After normalizing the container sequences, the Stock-only
-  retry runs on session 66673 / PID 104588 using `/work/oct24-clock-system`,
-  with `oct24-clock-stock-*-v2.log` preserving separate evidence. Stock
-  acceptance remains pending.
+  retry completed on session 66673 (exit 0) using `/work/oct24-clock-system`,
+  with `oct24-clock-stock-*-v2.log` preserving separate evidence. All six Stock
+  models pass full System Services, independent pixels/input and normal return.
+  Together with the prior six-model Direct results, this clock-state slice is
+  locally verified; it has not yet been submitted to CI.
   The maintained IRQ fixture now dispatches from its ARM exception entry into
   Thumb C, preserves interrupted errno, samples through the already-masked clock
   path, rearms an early timer expiry and releases at the absolute deadline.
@@ -4378,9 +4380,22 @@ below are retained.
   UINT64_MAX deadlines, zero-write rejection, reset exclusion on every control
   write, cancellation/late completion and restoration. ARMv4T Thumb compile
   with warnings as errors and repository-policy static analysis pass. This
-  local engine is included in the SDK source list, but no guest MMIO adapter,
-  watchdog IRQ fixture or public sound path is enabled yet. Native admission,
-  actual interrupt timing, playback integration and exit cleanup remain open.
+  local engine is included in the SDK source list. A subsequent maintained
+  watchdog IRQ fixture validates the inherited L1 section for 0x07800000 before
+  MMIO access (HP50g saved Stock table independently maps it to 0x53000000).
+  It requires actual IRQ9 delivery on every model: busy/no-pending admission
+  rejection cannot count as a timing pass. An initial 1 ms expiry rearms toward
+  an absolute 100 ms deadline while foreground executes only a busy loop;
+  dispatch samples the masked clock, preserves errno and stops PWM2 audio.
+  Before foreground cleanup it checks watchdog/audio registers, banked IRQ
+  state, stack canary, SWI/vector and unrelated source/mask restoration.
+  HP50g Direct passes full System Services, independent pixels/input and return
+  on `/work/oct24-watchdog-irq-artifact` (session 59581 exit 0). ARM build and
+  policy static analysis pass. Full six-model Direct then Stock queue runs on
+  session 68284 / PID 110928 in `/work/oct24-watchdog-irq-src`, using the repaired
+  emulator; logs are `/work/oct24-watchdog-irq-{direct,stock}-*.log`. Wider native
+  acceptance remains pending. Public asynchronous sound, production IRQ
+  lifetime, preemption and exit cleanup are not yet implemented.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
