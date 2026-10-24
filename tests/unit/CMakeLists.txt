@@ -14,6 +14,10 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(win_choices test_win_choices.c "${HPCLANG_ROOT}/runtime/core/win-choices.c")
+target_include_directories(test_win_choices PRIVATE "${HPCLANG_ROOT}/runtime/core")
+target_compile_definitions(test_win_choices PRIVATE realloc=hpclang_test_realloc)
+
 hpclang_unit(flash_busy test_flash_busy.c)
 target_include_directories(test_flash_busy PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 hpclang_unit(watchdog_clock test_watchdog_clock.c)

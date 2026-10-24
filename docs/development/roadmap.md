@@ -20,6 +20,13 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Principles
 
+Selection-control foundation on `m8-choose-controls` remains local and internal:
+paired borrowed option/label descriptors preserve numeric selection semantics;
+allocation failure leaves state intact, and removal shifts both fields together.
+Focused ASan/UBSan tests, ARMv4T compilation and static analysis pass
+(`/work/oct24-choose-tests.log`). Public chooser APIs, popup selection,
+confirmation/cancellation, SDK and native acceptance remain pending.
+
 - one application ABI: HPC1 / hpclang v1;
 - one common ARMv4T runtime;
 - thin platform implementations: `hp39`, `hp48`, and `hp4950`;
