@@ -419,6 +419,14 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+2026-10-24 acceptance: all six workflows pass at `64d223d9` (Quality
+39935566666, Core 39935566642, Runtime 39935566879, Objects 39935566875,
+Storage 39935566853 and Font Gallery 39935566811). Runtime includes every
+Direct family and all six Stock UI targets. PR #8 merged the timing, linked
+memory-report, minimum-RW admission and installed C example budget batch into
+main as `17444cb7`. Later pool-observer, serialized-report, sketch-review and
+migration-guide changes remain a separate batch; this does not complete M8.
+
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
 actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
 bytes and native object nibbles, validating the native encoded extent. Raw-only
@@ -444,17 +452,21 @@ two native-workspace pages (144 KiB total), 9 RW pages and 4 supplied pages
 beyond the linked layout. Both reports agree and all 36 physical pages are
 distinct. HP39gs now passes UI/return and both pool observations: 33 stage pages
 plus two native-workspace pages (140 KiB), with three pages beyond the layout.
-The design record contains the mapped-pool ledger for these three launches.
+HP40gs, HP48gII and HP49g+ now also pass the complete UI/pixel/report/return
+flow, with respectively 35, 37 and 94 distinct supplied pages. All six targets
+retain the 36 KiB application RW arena and identical pre-PASS/post-cleanup
+observations. The original queue finished; PID 84275 is no longer running.
+The design record contains the mapped-pool ledger for all six launches.
 The local Runtime workflow enables capture and requires `--pool` for Stock UI,
 uploading the linked memory report alongside runtime observations. YAML parsing,
-verifier shell syntax and all three retained UI report/pixel flows pass; this
-workflow change is not yet submitted. The remaining three Stock models run in
-sequence on exec session 49539 (PID 84275), currently HP40gs.
+verifier shell syntax and all six retained UI report/pixel flows pass; this
+workflow change is not yet submitted.
 The earlier instrumented HP39g+ experiment exits
 successfully, but its final snapshot no longer contains the marker, so it
 provides no pool measurement. The new observer captures while the application
 is still mapped and is opt-in;
-six-model acceptance and native allocator/installation/transfer totals remain open.
+six-model local observation is complete, while CI acceptance and native
+allocator/installation/transfer totals remain open.
 
 Local native-pool observation (2026-10-23): an isolated test-only stage records
 its incoming geometry before the UI runs. HP50g Stock passes the complete UI

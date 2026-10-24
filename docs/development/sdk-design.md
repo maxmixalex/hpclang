@@ -1316,27 +1316,27 @@ HP39gs passes the same flow with 33 stage pages plus two native-workspace pages.
 The linked layout and observed distinct pages give this pool ledger for the
 maintained UI acceptance artifact (all values in KiB):
 
-| Pool use | HP39g+ Stock | HP39gs Stock | HP50g Stock |
-| --- | ---: | ---: | ---: |
-| Stage extent, alignment and original-table prefix | 20 | 20 | 20 |
-| Stage stack | 4 | 4 | 4 |
-| Application MMU workspace | 4 | 4 | 4 |
-| Application code | 56 | 56 | 56 |
-| Application RW, including heap-backed LCD buffers | 36 | 36 | 36 |
-| Native-call workspace | 8 | 8 | 0 |
-| Supplied pages beyond this layout | 16 | 12 | 256 |
-| Total distinct supplied pages | 144 | 140 | 376 |
+| Pool use | HP39g+ | HP39gs | HP40gs | HP48gII | HP49g+ | HP50g |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Stage extent, alignment and original-table prefix | 20 | 20 | 20 | 20 | 20 | 20 |
+| Stage stack | 4 | 4 | 4 | 4 | 4 | 4 |
+| Application MMU workspace | 4 | 4 | 4 | 4 | 4 | 4 |
+| Application code | 56 | 56 | 56 | 56 | 56 | 56 |
+| Application RW, including heap-backed LCD buffers | 36 | 36 | 36 | 36 | 36 | 36 |
+| Native-call workspace | 8 | 8 | 8 | 0 | 0 | 0 |
+| Supplied pages beyond this layout | 16 | 12 | 12 | 28 | 256 | 256 |
+| Total distinct supplied pages | 144 | 140 | 140 | 148 | 376 | 376 |
 
 The application RW row includes its boot page, static data, heap and reserved
 8 KiB stack; these must not be added again. This is the acceptance fixture's
 linked image and observed calculator state, not every UI application's budget.
 It measures the supplied mapped pool, not native allocator metadata,
-installation storage or transfer-time peak usage. Other models remain under
-validation. The local Runtime workflow now opts Stock UI jobs into capture and
+installation storage or transfer-time peak usage. All six Stock models pass
+the complete UI/return flow and both pool checks locally. The local Runtime
+workflow now opts Stock UI jobs into capture and
 requires `--pool` verification, uploading the linked `launchers/memory.json`
 alongside observed reports. Other suites and Direct runs retain their existing
-behavior. This workflow change is not yet submitted or CI accepted; complete
-six-model local observation remains pending.
+behavior. This workflow change is not yet submitted or CI accepted.
 
 Stock startup has an earlier admission boundary than the application's RW
 budget. Stage0 must fit the linked stage1 memory extent (including its prefix,
