@@ -53,6 +53,22 @@ def main():
             check=True,
         )
         actual = subprocess.check_output([str(executable)])
+        timer_candidate = work / "timer-candidate"
+        subprocess.run(
+            [
+                args.compiler,
+                *flags,
+                "-I",
+                str(root / "runtime/core"),
+                str(root / "tests/compat/win-timers.c"),
+                str(root / "runtime/core/win-timers.c"),
+                str(candidate),
+                "-o",
+                str(timer_candidate),
+            ],
+            check=True,
+        )
+        actual_timers = subprocess.check_output([str(timer_candidate)])
         for name, prefix in RELEASES:
             reference = work / name
             reference.mkdir()
@@ -111,6 +127,7 @@ def main():
                 [
                     args.compiler,
                     *flags,
+                    "-DREFERENCE",
                     "-I",
                     str(reference),
                     str(root / "tests/compat/win-timers.c"),
@@ -121,6 +138,8 @@ def main():
                 check=True,
             )
             timer_trace = subprocess.check_output([str(timer_executable)])
+            if actual_timers != timer_trace:
+                raise AssertionError(f"{name}: timer trace differs from candidate")
             print(
                 f"PASS {name}: eight original timer scenarios, "
                 f"sha256={hashlib.sha256(timer_trace).hexdigest()}"

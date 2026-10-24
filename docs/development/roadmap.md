@@ -442,9 +442,9 @@ This does not complete M8.
 
 Batch submission (2026-10-24): canonical and KOS mode matrices
 pass all six Direct/Stock targets. The KOS-entry normal-exit matrix now also
-passes all six Direct/Stock targets; the same queue (21588) has advanced to
-immediate exit. Earlier canonical-API immediate-exit evidence remains recorded
-below and does not substitute for the pending complete KOS-entry matrix.
+passes all six Direct/Stock targets. KOS-entry immediate exit now also passes
+all six Direct/Stock targets; the final HP39 Stock log records all three
+model checks and normal return. The original queue has terminated.
 The current tracked tree is copied into `/work/oct24-prepush-src`. Final whole
 lint/format and all 173 Python tests pass. Whole-project analysis completed
 on session 71555 across 326 sources and 1,339 configurations from 4,047
@@ -454,13 +454,13 @@ checked `fseek()`. Its exact host analysis configuration and ASan/UBSan test
 both pass after correction; no runtime code changed. Logs are
 `/work/oct24-prepush-{lint,format,python,analysis}.log` and
 `/work/oct24-prepush-stream-{analysis,build,test}.log`.
-KOS immediate exit now passes all six Direct models and HP49g+/HP50g/HP48gII
-Stock; HP39 Stock continues on the same queue. C++ owners retain their
+KOS exit results are retained in `/work/oct24-kos-{exit,immediate}-{direct,stock}-results`,
+with family logs under `/work/oct24-kos-*`. C++ owners retain their
 separate native Storage and focused sanitizer evidence; the final SDK gate
 includes 389 reproducible release outputs and HP39 footprint regeneration.
 This reviewed batch is submitted on `m8-flash-write`; fresh CI is not polled.
-The complete KOS immediate-exit Stock matrix and formal CI acceptance remain
-open. All original M8 milestone requirements remain retained.
+Formal CI acceptance remains open. All original M8 milestone requirements
+remain retained.
 
 Subsequent single CI inspection at exact head `99168c1be049b815ffc318a1db9ecd2dc9ea247e`:
 Quality 40061641240 passes. Core 40061641258 and Font Gallery 40061641275 are
@@ -4673,8 +4673,16 @@ below are retained.
   duplicate removal, queued versus executing cancellation, event-return stop
   and nested processing. `/work/oct24-win-timer-reference.log` records both
   matching timer traces and the unchanged 4,836-line dispatcher comparisons.
-  This establishes the source runtime contract for the next timer bridge;
-  it is not a claim that that adapter or hardware timing is implemented.
+  The internal foreground timer bridge now implements this contract with a
+  caller-owned fixed pool and injectable monotonic clock. Both original
+  versions match its eight scenario traces exactly. Bounded pumping retains
+  due work; executing slots cannot be reused; event preflight failures retain
+  undelivered work. Clock and deadline failures are explicit and do not replay
+  delivered callbacks. Three focused ASan/UBSan targets, host/ARM analysis and
+  C/C++ six-model launcher builds pass locally. Evidence is retained in
+  `/work/oct24-win-timers-{build,differential,analysis,arm}.log`.
+  Public window interfaces, the device clock/idle loop and widget integration
+  remain open; this internal implementation has not been submitted to CI.
 
 #### M8.5 — Modern C++ and migration
 

@@ -1,11 +1,8 @@
-#include "winpriv.h"
 #include <assert.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-struct win_eventqueue _win_sysqueue;
-static struct win_eventhandler *rows[EQ_LEV1SIZE][EQ_LEV2SIZE];
 static uint64_t now, times[16];
 static int ids[16], used;
 struct task
@@ -14,6 +11,10 @@ struct task
     uint64_t cost;
 };
 
+#ifdef REFERENCE
+#include "winpriv.h"
+struct win_eventqueue _win_sysqueue;
+static struct win_eventhandler *rows[EQ_LEV1SIZE][EQ_LEV2SIZE];
 void win_init(void)
 {
     for (unsigned i = 0; i < EQ_LEV1SIZE; ++i)
@@ -23,6 +24,83 @@ void sys_updateTimer(sys_timer_t *timer)
 {
     timer->current = now;
 }
+static int pending(void)
+{
+    return _win_timer_list != NULL;
+}
+static uint64_t next_deadline(void)
+{
+    assert(_win_timer_list);
+    return _win_timer_list->next_time;
+}
+static void reset_backend(void)
+{
+}
+#else
+#include "win-timers.h"
+static struct hpclang_win_timers timers;
+static struct hpclang_win_timer slots[8];
+static struct hpclang_win_events events;
+static struct hpclang_win_handler handlers[8];
+static struct hpclang_win_call snapshots[16];
+static int clock_read(void *context, uint64_t *value)
+{
+    (void)context;
+    *value = now;
+    return 0;
+}
+static int pending(void)
+{
+    return timers.head != NULL;
+}
+static uint64_t next_deadline(void)
+{
+    assert(timers.head);
+    return timers.head->deadline;
+}
+static void reset_backend(void)
+{
+    static int initialized;
+    if (!initialized) {
+        assert(!hpclang_win_events_init(&events, handlers, 8, snapshots, 16));
+        initialized = 1;
+    }
+    assert(!hpclang_win_timers_init(&timers, slots, 8, clock_read, NULL, &events));
+}
+static void win_add_timer(hpclang_win_timer_fn function, void *data, int milliseconds, int periodic)
+{
+    assert(!hpclang_win_timers_add(&timers, function, data, (uint64_t)milliseconds * 1000000,
+                                   periodic));
+}
+static void win_remove_timer(hpclang_win_timer_fn function, void *data)
+{
+    assert(!hpclang_win_timers_remove(&timers, function, data));
+}
+static int _win_timer_generator(void *unused, void *context)
+{
+    (void)unused;
+    (void)context;
+    return hpclang_win_timers_pump(&timers, SIZE_MAX);
+}
+static void win_add_timer_event(int event, void *data, int milliseconds, int periodic)
+{
+    assert(!hpclang_win_timers_add_event(&timers, event, data, (uint64_t)milliseconds * 1000000,
+                                         periodic));
+}
+static void win_remove_timer_event(int event, void *data)
+{
+    assert(!hpclang_win_timers_remove_event(&timers, event, data));
+}
+static void win_add_event_handler(int event, int priority, hpclang_win_event_fn function,
+                                  void *data)
+{
+    assert(!hpclang_win_events_add(&events, event, priority, function, data));
+}
+static void win_remove_event_handler(int event, hpclang_win_event_fn function, void *data)
+{
+    assert(!hpclang_win_events_remove(&events, event, function, data));
+}
+#endif
 static void mark(int id)
 {
     assert(used < 16);
@@ -42,9 +120,10 @@ static int run(void *context)
 }
 static void clear(void)
 {
-    assert(!_win_timer_list);
+    assert(!pending());
     now = 0;
     used = 0;
+    reset_backend();
 }
 static void pump(uint64_t milliseconds)
 {
@@ -84,11 +163,11 @@ int main(void)
     struct task delay = {2, 0, 3, 0, 6000000};
     win_add_timer(run, &delay, 10, 0);
     pump(35);
-    assert(used == 1 && _win_timer_list->next_time == UINT64_C(51000000));
+    assert(used == 1 && next_deadline() == UINT64_C(51000000));
     pump(50);
     assert(used == 1);
     pump(51);
-    assert(used == 2 && _win_timer_list->next_time == UINT64_C(67000000));
+    assert(used == 2 && next_deadline() == UINT64_C(67000000));
     pump(67);
     assert(used == 3);
     expect(0, 2, 35);
@@ -119,7 +198,7 @@ int main(void)
     struct task self = {6, 0, 2, 1, 0};
     win_add_timer(run, &self, 10, 1);
     pump(10);
-    assert(used == 1 && _win_timer_list);
+    assert(used == 1 && pending());
     pump(20);
     assert(used == 2);
     expect(0, 6, 10);

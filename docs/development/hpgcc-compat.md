@@ -654,6 +654,17 @@ common/_win_timer_generator.c
 04033bf94a0c72d7df31d10ee0c39da56cd7c313c01cbe933a5436d77488c0cf
 ```
 
+The internal `win-timers` scheduler now preserves the original queue ordering,
+periodic catch-up, post-callback delay, cancellation and nested processing.
+It uses caller-owned slots and an injected monotonic clock; no hardware IRQ or
+allocation is involved. A callback budget retains outstanding due work. Event
+preflight failures retain the undelivered timer; clock/rescheduling failures
+after delivery release that timer without replaying its callback. Both 1.1
+and 2.0 original implementations match eight scenario traces under ASan/UBSan.
+Additional focused tests cover capacity, budget, clock and overflow failures;
+host/ARM analysis and six-model C/C++ launcher builds pass. Public window
+interfaces, a device-clock idle loop and widget integration remain unfinished.
+
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter
@@ -1098,8 +1109,9 @@ Host sanitizer checks cover all sixteen low-nibble states crossed with four
 incoming modes, overlapping waits, failure propagation, invalid inputs and
 client identity. All six Direct models pass native KOS waiting-duration,
 actual PWM replacement/rejection, busy-loop autonomous completion and restored
-hardware checks. HP49g+/HP50g/HP48gII Stock also pass. HP39 Stock validation,
-the extended KOS-entry exit matrix and CI acceptance remain pending.
+hardware checks. All six Stock models also pass. Both KOS-entry normal exit
+and immediate exit pass all six Direct/Stock models locally, including hardware
+restoration before launcher return. CI acceptance remains pending.
 
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
