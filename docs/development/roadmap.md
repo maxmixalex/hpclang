@@ -4670,6 +4670,16 @@ CI submission. Keep host semantic tests separate from calculator integration
 and pixel witnesses, select affected E2E suites, and preserve normal PASS and
 return gates. A pushed CI run is not a reason to stop independent work or poll.
 
+## Deferred research — HP39gs / HP40gs ROM storage
+
+User idea recorded on 2026-10-24; **not scheduled for implementation or added as an M8 acceptance gate**.
+
+- Investigate an optional hpclang ROM/Flash write service for HP39gs and HP40gs, making usable ROM space available for fonts and other persistent application resources. Per the user's hardware constraint, HP39g+ is excluded from this proposal.
+- Reference: [HP39GS-Explorer](https://github.com/Yanye0xFF/HP39GS-Explorer). Its README describes an HP39gs 2.22 custom firmware image containing a GB2312 font and installation through the bootloader. This is evidence for image-based font storage, not proof of a safe in-application write API or HP40gs compatibility.
+- Research input: the user's complete real-machine ROM dumps are stored locally at `D:\Works\Calc\HP 39gs 相关文档\ROM`. The directory exists; its dumps have not been analyzed for this proposal or added to the repository.
+- Future feasibility work should establish per-model Flash commands and erase geometry, genuinely available regions, protection of firmware/bootloader and existing data, execution during writes, and recovery after interrupted writes. ROM corruption and loss of bootability are acknowledged risks; the idea does not authorize hardware flashing now.
+- Preserve the normal SDK's no-required-ROM-replacement principle. This remains an optional research direction, separate from the retained M8 native Port 0/1/2 work and current audio acceptance.
+
 ## Additional M7–M8 acceptance requirements
 
 The following requirements supplement the existing milestones and preserve the
