@@ -4995,6 +4995,17 @@ below are retained.
   `/work/oct24-checkbox-{build,tests}.log`; comparison/pixels/SDK/native remain
   open. Separate `/work/oct24-checkbox-src` preserves running batch sources.
 
+  Checkbox follow-up `da323b44` passes real HPG selected/focused/glyph pixels
+  in both buffers and six unchanged 1.1/2.0 function comparisons: 7,218 lines,
+  SHA256 `c13bbed5c0d2925615957b2ad755cd5a9f21b5193980f625fbc82f8feaa4843e`.
+  Wrong checkmark-pattern negative is rejected; three sanitizer targets pass.
+  Full SDK passes (60235 exit 0): C/C++, six launchers, three Aplet variants,
+  notebooks and 517 reproducible outputs (`/work/oct24-checkbox-sdk.log`).
+  Native checkbox acceptance remains open. Menu Stock 86659 passes HP39g+
+  and continues HP39gs. Full text/image ASan/UBSan regression now passes all
+  143 tests (63047 exit 0, 1553.33 seconds), log
+  `/work/oct24-controls-full-tests.log`; no menu/checkbox full-suite claim.
+
   Component batch pushed as `cb7c7bae` to `m8-flash-write`, draft PR #10.
   Includes custom widgets/focus and progress sliders; text/image/menu branches
   remain local follow-ups. Previous head 0a7c2d8d passed every push/PR workflow
