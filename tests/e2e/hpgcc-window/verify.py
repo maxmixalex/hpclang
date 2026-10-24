@@ -22,9 +22,14 @@ def verify(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("frames", nargs="+", type=Path)
-    for frame in parser.parse_args().frames:
-        verify(frame)
+    parser.add_argument("mode", choices=("direct", "stock"))
+    parser.add_argument("family", choices=("hp39", "hp48", "hp4950"))
+    args = parser.parse_args()
+    targets = Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines()
+    if not targets:
+        raise AssertionError("No executed targets to verify")
+    for target in targets:
+        verify(Path(f"build/{target}-pass.pgm"))
 
 
 if __name__ == "__main__":

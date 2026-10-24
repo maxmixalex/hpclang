@@ -479,14 +479,17 @@ registers on the current watchdog emulator (`/work/oct24-ci-recovery-repro`,
 session 2634 exit 1). The older-emulator comparison also exits 1 with identical
 registers (9666; `/work/oct24-ci-recovery-old-emulator.log`). The clock's newly
 added SWI guard is called inside Flash query/busy modes, where ROM exception
-instructions cannot be fetched. A local candidate uses an IRQ-masked clock
-helper for production Flash and all recovery witness timeout callbacks.
+instructions cannot be fetched. Local repair `4c87835f` uses an IRQ-masked clock helper for production Flash
+and all recovery witness timeout callbacks; the SST bus contract explicitly
+excludes ROM SWI entry from callbacks during query/busy modes.
 The focused ASan/UBSan clock test passes, including no supervisor entry and
 last-value/errno preservation on clock failure. All four recovery build variants
 compile. Both native recovery runs pass the first two busy-operation power cuts
 that previously crashed; full suites continue (94903/44621). Stock object-mutation
 (19519) and publication validation (38155, HP49g+ then HP50g) also run. Both
-recovery runs have additionally passed interrupted-recovery validation.
+recovery runs additionally pass interrupted recovery and journal retirement
+with unchanged catalogs after reset. HP49g+ also passes automatic STARTUP
+replay/retirement and the second warmstart; full guarded suites continue.
 Both Stock object-mutation suites pass complete primary execution, return and
 all lifecycle invocations (19519 exit 0). Evidence is preserved separately in
 `/work/oct24-flash-clock-object-evidence` before other native runs reuse captures.
@@ -4808,8 +4811,12 @@ below are retained.
   Stock validation is now running on 94697, sequential hp4950/hp48/hp39 families,
   with dedicated `/work/oct24-window-stock-assets` and logs
   `/work/oct24-window-stock-*.log`. This independent M8.4 work proceeds during
-  native CI-repair validation waits; pixel verification and all Stock returns
-  remain pending.
+  native CI-repair validation waits. HP49g+/HP50g Stock execution, settled return
+  and independent full-frame pixel checks pass; HP48/HP39 continue. The suite is
+  now wired into the Runtime manifest with the standard context/family verifier
+  interface: three Direct family jobs and six Stock model jobs. The generated
+  matrix and seven planner tests pass, as do verifier Ruff/format checks.
+  This is local CI wiring, not submitted/accepted CI.
 
 #### M8.5 — Modern C++ and migration
 
