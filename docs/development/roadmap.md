@@ -33,7 +33,8 @@ checks pass 64/80-line displays, both buffers, 40-option scrolling and selected
 rows. All three focused sanitizer targets and ARM compile/analysis pass; logs
 `/work/oct24-choose-{adapter,pixels}-*.log`. Initial pixel expectation extended
 the border by one row; corrected with its failure log retained. SDK process
-38518 runs on `/work/oct24-choose-src`. Original-source comparison, native
+38518 exits 0: 517 reproducible outputs, C/C++, six launchers, three Aplet
+variants and notebooks pass (`/work/oct24-choose-sdk.log`). Original-source comparison, native
 matrix and CI acceptance remain pending; this is not completed M8 acceptance.
 
 ## Principles

@@ -1635,6 +1635,7 @@ Three focused ASan/UBSan targets pass: paired state/allocation rollback,
 production event/focus/lifecycle interaction, and production HPG pixels for
 40-item lists on both display heights and buffering modes. ARM compile/analysis
 pass. Logs: `/work/oct24-choose-{adapter,pixels}-*.log`; initial pixel expectation
-failure is retained separately. Installed SDK process 38518 runs. Historical
+failure is retained separately. Installed SDK 38518 exits 0: 517 reproducible outputs, C/C++, six launchers,
+three Aplet variants and notebooks pass (`/work/oct24-choose-sdk.log`). Historical
 source comparison, negative oracle checks and native six-model acceptance
 remain open. No CI or M8 completion is claimed.
