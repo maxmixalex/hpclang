@@ -20,6 +20,20 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Development volume cleanup (user requested): removed generated font trees from
+96 obsolete isolated source copies, reclaiming 24.74 GiB; /work drops from
+about 71 to 46 GiB. Source archives, source files, logs, ROM/SRAM evidence and
+current worktrees are retained. Old cleaned mirrors need font regeneration
+before rebuilding; their paths/source archives are recorded in
+`research/oct24-generated-font-cleanup.json`. No host-mounted directory was
+deleted. Filesystem trim completed; the VHD file need not shrink immediately.
+After the disk-full incident, the current Port C++ source mirror was repaired
+from a D: archive and all 4,619 tracked files verified against SHA-256 manifests
+(3,856 mismatches/missing files repaired). Do not trust pre-crash mirror content
+without verification. SDK verification restarted as session 33637; pending.
+Future isolated experiments must avoid copying the entire generated font tree
+and retain evidence separately from rebuildable scratch files.
+
 M8.5 Port iterator owner (local worktree `m8-port-cpp`): new allocation-free
 `hpclang::owned_port_iterator` preserves errno on cleanup and follows unique_ptr
 move/adopt/release semantics. The real C Port fixture plus C++17 ASan/UBSan
