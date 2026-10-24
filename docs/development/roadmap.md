@@ -4862,6 +4862,21 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Stock key-fixture failure and local correction (after 8db74b41): original
+  process 32221 reports HP39g+ runtime failure 0x46417806 and continues HP39gs;
+  completion of one target was not a pass. Saved SRAM resolves the historical
+  matrix to bits 7/60 (launch Enter plus requested Alpha), with two physical
+  edges and one typed callback on the first request, before any status frame.
+  Evidence is preserved in `/work/oct24-win-physical-stock-hp39gplus-failure`.
+  The fixture now announces entry through an LCD checkpoint and waits, bounded,
+  for actual launch-key release before installing observers/injecting test keys.
+  All subsequent extra edges still fail. It also preserves the first keyboard
+  failure instead of replacing it with the final timer-summary error. Six-model
+  compilation and ARM analysis pass; fixed native reruns are not yet accepted.
+  Process 59175 checks fixed HP48gII Direct and HP50g Stock, in different target
+  state directories from the still-live original HP39 run. Candidate build is
+  `/work/oct24-win-physical-settled-arm`; logs use `/work/oct24-win-settled-*`.
+
   Post-indicator SDK acceptance (local 342d54c6): the complete relocated-SDK
   gate passes C/C++23 applications, all six launchers, all three HP39 Aplet
   variants, per-model Notebook builds and 453 byte-identical release outputs

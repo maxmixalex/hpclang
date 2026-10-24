@@ -784,8 +784,12 @@ pixels in 44 LCD/status captures per model and actual page exchange. One-shot
 and locked Alpha, digits, left-shift lowercase and right-shift unmapped keys are
 covered; a corrupted locked-Alpha status pixel is rejected. The original timer,
 final-frame and settled-return checks still pass. Stock execution of this new
-fixture is running; neither it nor shipped-example native execution is claimed
-complete. This is emulator GPIO evidence, not a physical-calculator test.
+fixture found an HP39g+ launch-boundary failure: the first poll also observed
+Stock's still-held Enter key. Saved RAM proves matrix bits 7/60 and two edges
+for the first requested Alpha. The test now announces payload entry, waits for
+launch-key release before installing observers, and retains the first failure
+code. Fixed native reruns remain pending; neither Stock matrix acceptance nor
+shipped-example native execution is claimed complete. This is emulator GPIO evidence, not a physical-calculator test.
 
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then

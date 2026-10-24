@@ -83,6 +83,15 @@ static int typed(void *event, void *context)
         failure = 9;
     return 17;
 }
+static int checkpoint(unsigned id)
+{
+    uint64_t begun = hpclang_time_monotonic_us();
+    hpclang_e2e_result = UINT32_C(0x46520000) | id;
+    while (hpclang_e2e_result != (UINT32_C(0x464b0000) | id))
+        if (hpclang_time_monotonic_us() - begun > 2000000)
+            return -1;
+    return 0;
+}
 static int physical_tap(unsigned key)
 {
     /* Inverse of the historical byte-column matrix layout. The test mailbox
@@ -109,12 +118,8 @@ static int physical_tap(unsigned key)
         if (win_post_event(7, NULL) || hpclang_win_error())
             return -1;
         hpg_flip();
-        unsigned id = frame_base + physical_edges;
-        hpclang_e2e_result = UINT32_C(0x46520000) | id;
-        begun = hpclang_time_monotonic_us();
-        while (hpclang_e2e_result != (UINT32_C(0x464b0000) | id))
-            if (hpclang_time_monotonic_us() - begun > 2000000)
-                return -1;
+        if (checkpoint(frame_base + physical_edges))
+            return -1;
     }
     return 0;
 }
@@ -123,6 +128,15 @@ static int keyboard_check(int buffered)
     physical_edges = typed_count = 0;
     frame_base = buffered ? 200 : 100;
     hpg_set_mode_gray16(buffered);
+    /* Stock may enter the payload before its launch-key release. Announce
+     * payload entry to disable launch retries, then wait for that real release
+     * before installing observers or injecting the first test transition. */
+    if (checkpoint(frame_base))
+        return -1;
+    uint64_t begun = hpclang_time_monotonic_us();
+    while (keyb_isAnyKeyPressed())
+        if (hpclang_time_monotonic_us() - begun > 2000000)
+            return -1;
     win_add_event_handler(WIN_KEY_PRESSED, INT_MAX, physical, (void *)(uintptr_t)1);
     win_add_event_handler(WIN_KEY_RELEASED, INT_MAX, physical, NULL);
     win_add_event_handler(WIN_KEY_TYPED, 0, typed, NULL);
@@ -143,7 +157,7 @@ int main(void)
         failure = failure ? failure : 5;
     hpg_set_mode_mono(1);
     if (errno || hpclang_time_read_us(&start))
-        failure = 5;
+        failure = failure ? failure : 5;
     event_id = win_register_event();
     win_add_event_handler(event_id, 0, receive, &deliveries);
     win_add_event_handler(7, 0, paint, NULL);
@@ -153,8 +167,9 @@ int main(void)
     if (!failure)
         win_event_loop();
     uint64_t end;
-    if (hpclang_win_error() || hpclang_time_read_us(&end) || ticks != 4 || paints != 4 ||
-        deliveries != 4 || end - start < 120000 || end - start > 2000000)
+    if (!failure &&
+        (hpclang_win_error() || hpclang_time_read_us(&end) || ticks != 4 || paints != 4 ||
+         deliveries != 4 || end - start < 120000 || end - start > 2000000))
         failure = 6;
     hpclang_e2e_result = failure ? UINT32_C(0x46417800) | failure : UINT32_C(0x50415353);
     if (failure)
