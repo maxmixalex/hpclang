@@ -120,6 +120,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-engine.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-alarm.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/watchdog-alarm.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/irq-owner.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-playback.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/time-math.c"

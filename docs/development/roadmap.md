@@ -4394,8 +4394,31 @@ below are retained.
   policy static analysis pass. Full six-model Direct then Stock queue runs on
   session 68284 / PID 110928 in `/work/oct24-watchdog-irq-src`, using the repaired
   emulator; logs are `/work/oct24-watchdog-irq-{direct,stock}-*.log`. Wider native
-  acceptance remains pending. Public asynchronous sound, production IRQ
-  lifetime, preemption and exit cleanup are not yet implemented.
+  acceptance remains pending: all six Direct models and HP49g+/HP50g/HP48gII
+  Stock now pass; the same queue is executing the three HP39 Stock models.
+  A local follow-up extracts controller/vector/banked-stack lifetime into
+  `irq-owner`: callers hold IRQ/FIQ masked, supply one source plus aligned ARM
+  entry/stack, and serialize exclusive ownership. It masks all sources before
+  switching, retains source latches while releasing the old selection, routes
+  all sources to IRQ for the exclusive lease, enables
+  only its owned IRQ source, and restores the original controller/vector/bank
+  from foreground after peripheral shutdown. Invalid or repeated admission
+  performs no writes; release is idempotent. ASan/UBSan checks switching order,
+  alignment/source rejection, busy rejection and complete bank/mask/vector
+  restoration. The watchdog fixture now uses this runtime engine while its
+  independent bank oracle and pre-cleanup peripheral checks remain in place.
+  ARM build and policy analysis pass. The first native extraction retained
+  unrelated Stock FIQ routing and timed out in IRQ entry (session 95426 exit 1).
+  Inspection of the pinned controller model shows FIQ requests are processed
+  before IRQ arbitration, independently of INTMSK. The original passing fixture
+  cleared INTMOD; restoring that exclusive routing policy fixes HP50g Direct.
+  Failed results remain in `/work/oct24-irq-owner-failed-direct` and the first
+  artifact/logs. Corrected artifact `/work/oct24-irq-owner-v2-artifact` passes
+  HP50g Direct System Services/pixels/input/return; its Stock validation runs
+  on session 89836 / PID 114110 in `/work/oct24-irq-owner-src`, with logs named
+  `oct24-irq-owner-v2-*-hp50g.log`. Host sanitizers and ARM analysis pass again.
+  This does not alter the ongoing earlier matrix. Public asynchronous sound,
+  production dispatch/preemption and exit cleanup remain unimplemented.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;

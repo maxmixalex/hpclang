@@ -2,6 +2,7 @@
 #include <errno.h>
 #include "clock-internal.h"
 #include "irq.h"
+#include "irq-owner.h"
 #include "watchdog-alarm.h"
 #include "sound-engine.h"
 
@@ -46,6 +47,24 @@ static void audio_write(void *context, enum hpclang_sound_reg reg, uint32_t valu
     REG(audio_addresses[reg]) = value;
 }
 static const struct hpclang_sound_bus audio = {audio_read, audio_write, 0};
+
+static const uintptr_t irq_addresses[] = {0x07100008, 0x07100004, 0x07100010, 0x08000018};
+static uint32_t owner_read(void *context, enum hpclang_irq_owner_reg reg)
+{
+    (void)context;
+    return REG(irq_addresses[reg]);
+}
+static void owner_write(void *context, enum hpclang_irq_owner_reg reg, uint32_t value)
+{
+    (void)context;
+    REG(irq_addresses[reg]) = value;
+}
+static void owner_exchange(void *context, struct hpclang_irq_bank *bank)
+{
+    (void)context;
+    hpclang_irq_bank_exchange(bank);
+}
+static const struct hpclang_irq_owner_bus owner_bus = {0, owner_read, owner_write, owner_exchange};
 
 static void stop(void)
 {
@@ -121,18 +140,21 @@ unsigned hpclang_e2e_watchdog_test(void)
     }
     if ((REG(0x07600008) & 0xf000) != 0x9000 || (REG(0x07a00010) & 0x30) != 0x20)
         failure = 9;
-    REG(0x07100008) = UINT32_MAX;
-    REG(0x07100004) = 0;
-    /* Preserve all Stock source latches while releasing their selection. */
-    REG(0x07100010) = REG(0x07100010);
     struct hpclang_irq_bank before, after;
     hpclang_e2e_irq_snapshot(&before);
-    struct hpclang_irq_bank bank = {(uintptr_t)(irq_stack + 256), 0, 0};
-    hpclang_irq_bank_exchange(&bank);
-    if (bank.stack != before.stack || bank.link != before.link || bank.status != before.status)
+    struct hpclang_irq_owner owner = {0};
+    /* CPU IRQ/FIQ remain masked. Snapshot the original controller mask, not
+     * the temporary IRQ9 mask installed by peripheral admission. */
+    REG(0x07100008) = mask;
+    if (hpclang_irq_owner_acquire(&owner_bus, &owner, 0x200, (uintptr_t)(irq_stack + 256),
+                                  (uintptr_t)hpclang_e2e_watchdog_handler)) {
+        stop();
+        hpclang_irq_restore(cpsr);
+        return 15;
+    }
+    if (owner.bank.stack != before.stack || owner.bank.link != before.link ||
+        owner.bank.status != before.status)
         failure = 2;
-    REG(0x08000018) = (uintptr_t)hpclang_e2e_watchdog_handler;
-    REG(0x07100008) = ~UINT32_C(0x200);
     errno = EDOM;
     hpclang_irq_restore((cpsr | 0x40u) & ~0x80u);
     /* A bounded busy loop: delivery cannot depend on SDK service calls. */
@@ -142,14 +164,6 @@ unsigned hpclang_e2e_watchdog_test(void)
     if (hpclang_e2e_watchdog_hits < 2 || !irq_finished || irq_error ||
         irq_last_time < irq_deadline || alarm.owned || tone.owned || errno != EDOM)
         failure = 3;
-    REG(0x07100008) = UINT32_MAX;
-    REG(0x08000018) = vector;
-    hpclang_irq_bank_exchange(&bank);
-    hpclang_e2e_irq_snapshot(&after);
-    if (before.stack != after.stack || before.link != after.link || before.status != after.status)
-        failure = 4;
-    if (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi)
-        failure = 5;
     for (unsigned i = 0; i < 3; ++i)
         if (REG(addresses[i]) != watchdog_before[i])
             failure = 14;
@@ -158,8 +172,13 @@ unsigned hpclang_e2e_watchdog_test(void)
         if (REG(audio_addresses[i]) != audio_before[i])
             failure = 10;
     stop();
-    REG(0x07100004) = mode;
-    REG(0x07100008) = mask;
+    /* Release runs only on the foreground stack, after stopping the source. */
+    hpclang_irq_owner_release(&owner_bus, &owner);
+    hpclang_e2e_irq_snapshot(&after);
+    if (before.stack != after.stack || before.link != after.link || before.status != after.status)
+        failure = 4;
+    if (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi)
+        failure = 5;
     if ((REG(0x07100000) & source) != source || REG(0x07100004) != mode ||
         REG(0x07100008) != mask || REG(0x08000018) != vector)
         failure = 6;

@@ -352,6 +352,8 @@ hpclang_unit(sound_alarm test_sound_alarm.c "${HPCLANG_ROOT}/runtime/core/sound-
 target_include_directories(test_sound_alarm PRIVATE "${HPCLANG_ROOT}/runtime/core")
 hpclang_unit(watchdog_alarm test_watchdog_alarm.c "${HPCLANG_ROOT}/runtime/core/watchdog-alarm.c")
 target_include_directories(test_watchdog_alarm PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(irq_owner test_irq_owner.c "${HPCLANG_ROOT}/runtime/core/irq-owner.c")
+target_include_directories(test_irq_owner PRIVATE "${HPCLANG_ROOT}/runtime/core")
 hpclang_unit(sound_playback test_sound_playback.c
     "${HPCLANG_ROOT}/runtime/core/sound-playback.c"
     "${HPCLANG_ROOT}/runtime/core/sound-engine.c"
