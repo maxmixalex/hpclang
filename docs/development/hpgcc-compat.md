@@ -1513,3 +1513,24 @@ so the existing text-only Stock run keeps its original binary and evidence.
 All six Direct models pass (1287 exit 0). Image Stock process 82374 runs in
 that separate directory. Full 143-test control regression (63047) and host/ARM
 analysis (54292) also run separately; Stock completion and CI remain open.
+
+### Soft menu adapter (independent menu batch)
+
+`winsoftmenu.h` implements 30 copied five-byte labels, six visible items,
+forward/back paging, enabled states, active/disabled colors, insertion, deletion
+with bounded packing and synchronous events carrying borrowed extra data and
+shift states. Alpha and right-shift NXT fall through. Full add returns -1;
+invalid indices and null labels use the window error latch. Construction reads
+model geometry without acquiring a display; rendering anchors at the active
+64- or 80-line screen bottom.
+
+This intentionally repairs original defects: unsigned backward-page underflow,
+the duplicate ordinary-color symbol in the disabled-color source, and deletion
+packing that retained a destination occupancy bit when moving an empty slot.
+The normal 80-line layout retains six 22-pixel cells and five-byte labels.
+Host ASan/UBSan tests cover every entry, five pages, wraparound, modifiers,
+disabling, copied/truncated labels, gaps, insert/delete shifts, full capacity,
+removal and 64/80-line placement calls. ARMv4T compile/analysis pass. Logs:
+`/work/oct24-menu-sanitizer-{build,tests}.log`. This is isolated on
+`m8-menu-controls` using `/work/oct24-menu-src`; original-source comparison,
+production pixels, installed SDK and native acceptance remain open.
