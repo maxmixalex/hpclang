@@ -4862,6 +4862,22 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Latest fixed Stock results: HP39gs and HP48gII pass in the ongoing 68792
+  process; it has advanced to HP49g+. HP40gs passes and 96971 exits 0. Together
+  with retained HP39g+/HP50g results, five of six corrected Stock targets pass
+  input, all 44 independent status frames, page exchange and settled return.
+  HP49g+ and full host regression 68707 remain pending. Each native result is
+  copied to `/work/oct24-win-settled-stock-<model>-evidence`.
+
+  Build-input audit at d2375cdc: 4,556 tracked files were compared with the
+  writable container mirror after CRLF normalization. Runtime and test sources
+  matched; only five documents and one build-help line were stale. After syncing
+  those six files, all 4,556 match. A fresh CMake install verifies getting-started,
+  migration and the window README byte-for-byte against current sources
+  (`/work/oct24-window-documentation-install.log`). This supplements earlier SDK
+  runtime/build evidence without claiming the old installed documentation was
+  current. Development roadmap/compatibility documents are not SDK install paths.
+
   Full regression started at 5f1cd1c6: all host targets rebuild successfully
   with ASan/UBSan enabled for C/C++. The 136-test CTest suite runs in process
   68707 (`/work/oct24-window-full-unit-{build,tests}.log`); no full-suite pass
