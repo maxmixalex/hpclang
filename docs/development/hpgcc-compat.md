@@ -715,6 +715,29 @@ with a trace mismatch. This strengthens the event-order evidence; event-number
 registration, hardware initialization, timers, rendering and complete original
 widget applications remain outside this comparison.
 
+The same optional gate now also compiles seven original timer functions from
+each archive and supplies a controlled nanosecond clock. Eight sanitized host
+scenarios establish the timer contract before implementing its bridge:
+
+- With a 10 ms period, dispatch first reached at 35 ms and callbacks taking
+  6 ms, periodic callbacks run at 35, 41 and 47 ms until the callback stops them.
+  Delay-mode callbacks instead run at 35, 51 and 67 ms.
+- Equal deadlines execute the most recently inserted timer first. Duplicate
+  callback/data or event/data removal cancels the earliest queued match.
+- The currently executing timer is absent from the queue. Removing its own
+  callback/data does not prevent its rescheduling; returning nonzero does.
+- A nonzero event-handler return also cancels an event timer. Nested timer
+  processing can execute another due timer while the outer callback is active.
+
+Both versions produce timer trace SHA-256
+`4d5c9cdf912ba42e47307c7035fd009e1c50869512caa17b750b528d49504647`.
+The clock and table setup are host glue; timer algorithms are compiled unchanged.
+These scenarios use positive intervals and valid registered events. They do not
+establish invalid-input, allocation-failure or hardware clock behavior, nor do
+they claim that a new timer adapter exists. A bridge must retain distinct queued
+and executing timer lifetimes rather than silently changing self-cancellation
+or rejecting all nested timer processing.
+
 ## Design consequence
 
 Historical source compatibility remains important, but it must sit on the clean dependency stack already established:

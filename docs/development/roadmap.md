@@ -462,6 +462,12 @@ This reviewed batch is submitted on `m8-flash-write`; fresh CI is not polled.
 The complete KOS immediate-exit Stock matrix and formal CI acceptance remain
 open. All original M8 milestone requirements remain retained.
 
+Subsequent single CI inspection at exact head `99168c1be049b815ffc318a1db9ecd2dc9ea247e`:
+Quality 40061641240 passes. Core 40061641258 and Font Gallery 40061641275 are
+running; Runtime 40061641253, Objects 40061641226 and Storage 40061641296 are
+queued. This does not establish batch acceptance, and those live runs are not
+being polled. Later local window-audit/dispatch changes are outside that head.
+
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
 actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
 bytes and native object nibbles, validating the native encoded extent. Raw-only
@@ -4661,6 +4667,14 @@ below are retained.
   Logs are `/work/oct24-win-events-{reference,negative}.log`; this is local
   host semantic evidence, not calculator UI/loop acceptance or a bundled-source
   CI test. Formatting/Ruff and strict docs pass.
+  The reference gate additionally compiles seven original timer functions and
+  supplies a controlled clock. Eight ASan/UBSan scenarios pass on both versions:
+  periodic catch-up versus post-callback delay, equal-deadline order, earliest
+  duplicate removal, queued versus executing cancellation, event-return stop
+  and nested processing. `/work/oct24-win-timer-reference.log` records both
+  matching timer traces and the unchanged 4,836-line dispatcher comparisons.
+  This establishes the source runtime contract for the next timer bridge;
+  it is not a claim that that adapter or hardware timing is implemented.
 
 #### M8.5 — Modern C++ and migration
 
