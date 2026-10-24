@@ -4895,11 +4895,17 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Submission update: the complete local window-key/indicator batch and Kermit
+  diagnostics are pushed as `0a7c2d8d` in draft PR #10. All 136 sanitizer tests,
+  full host/ARM analysis, formatting/lint and strict docs pass locally.
+  Preceding-head CI was inspected immediately before this push; new-head CI
+  has not been polled. CI acceptance and merge remain pending.
+
   Latest preceding-head CI inspection (95348ce8): push Core 40068703216 now
   passes, as do both Quality/Storage/Gallery runs and push Objects. PR Core
   40068713317 also passes; both Runtime runs queue. PR Objects 40068713236's
   pre-execution HP39g+ transfer stall remains unresolved with evidence below.
-  No new push or merge was made.
+  This inspection preceded the 0a7c2d8d push; no merge was made.
 
   Build-input audit at d2375cdc: 4,556 tracked files were compared with the
   writable container mirror after CRLF normalization. Runtime and test sources
