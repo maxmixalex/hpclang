@@ -20,6 +20,21 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Second container cleanup (user requested): removed 1,008 obsolete CMakeFiles
+folders, 18 commit-free temporary Git stores, 10 obsolete SDK installations and
+small Python/Ruff caches (7.30 GiB). Preserved 1,008 build diagnostic files in
+`/work/oct24-cleanup-build-diagnostics.tar.gz`, verified readable. Compressed
+2,558 old logs, verifying each decompressed SHA-256 before deleting its original
+(8.24 GiB reclaimed). `/work` now uses 30.1 GiB; both cleanup rounds recover
+about 40.3 GiB. ROM/Flash/SRAM evidence, current sources and toolchains remain.
+Manifests are copied to `research/oct24-{build,log}-cleanup.json`; use
+`research/restore-container-log.py` inside the container to restore a listed
+.log.gz when a verifier requires the original filename. Cleaned build/SDK paths
+must be rebuilt, not treated as available artifacts. Filesystem trim completed.
+Port C++ SDK verification 33637 now exits 0 after verified source repair;
+installed C/C++ example, relocation and six-model packaging pass. Native owner
+execution and remote acceptance remain open. No push or CI polling.
+
 Development volume cleanup (user requested): removed generated font trees from
 96 obsolete isolated source copies, reclaiming 24.74 GiB; /work drops from
 about 71 to 46 GiB. Source archives, source files, logs, ROM/SRAM evidence and
