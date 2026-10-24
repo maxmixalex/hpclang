@@ -145,10 +145,11 @@ unsigned hpclang_e2e_irq_test(void)
         failure = 4;
     if (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi)
         failure = 5;
-    /* Check audio restoration before foreground cleanup could repair it. */
+    /* Preserve an earlier delivery/ownership failure; otherwise identify the
+     * exact audio register before foreground cleanup could repair it. */
     for (unsigned i = 0; i < 7; ++i)
-        if (REG(audio_addresses[i]) != audio_before[i])
-            failure = 10;
+        if (!failure && REG(audio_addresses[i]) != audio_before[i])
+            failure = 0x20u + i;
     hpclang_sound_playback_stop(&audio, &bus, &playback);
     REG(0x07100004) = mode;
     REG(0x07100008) = mask;

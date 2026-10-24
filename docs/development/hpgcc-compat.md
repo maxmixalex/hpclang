@@ -713,7 +713,7 @@ foreign clean display lease returns `EBUSY`. HPG cleanup retains ownership of
 release. Pixel tests use actual HPG/surface code across 2/4/16 levels and both
 buffering modes, checking successive frames, stale-pixel clearing, failed-flip
 front preservation and ownership conflicts. Their display session is a host
-fixture, so native window display/return acceptance remains outstanding. Legacy
+fixture; the separate native event/timer/repaint acceptance is described below. Legacy
 single-buffer draw calls can publish before the final hook; no atomic-frame
 guarantee is introduced. Declarative widget bridging remains separate work.
 
@@ -727,7 +727,13 @@ Reset is rejected during callbacks and does not release HPG's shared display.
 The shipped `hpgcc-window` example builds and links all six launcher variants;
 native execution remains pending. The installed/relocated SDK gate now passes
 for this client in C and C++23, all six launchers and three HP39 Aplet variants;
-453 complete-gate release artifacts match across two clean builds. Typed-key/modifier
+453 complete-gate release artifacts match across two clean builds.
+The maintained `tests/e2e/hpgcc-window` client now passes all six Direct and all
+six Stock targets: four real 30 ms callbacks, synchronous consumed user events,
+four repaint cycles, independent final-frame pixels and settled native return.
+This native fixture uses HPG mono double buffering. Its Runtime CI manifest now
+runs the same client and pixel verifier; these changes have not been pushed.
+Typed-key/modifier
 events 3..6, historical widgets and the complete `win.h` umbrella remain work
 in progress, not supported names with empty implementations.
 

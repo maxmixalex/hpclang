@@ -468,9 +468,28 @@ remain retained.
 
 Subsequent single CI inspection at exact head `99168c1be049b815ffc318a1db9ecd2dc9ea247e`:
 Quality 40061641240, Storage 40061641296 and Gallery 40061641275 pass. Core
-40061641258 fails 14 native Port lifecycle jobs; Runtime 40061641253 is running
-and Objects 40061641226 fails both Stock object-mutation jobs at the latest
-pre-push failure-review checkpoint. Main Core
+40061641258 fails 14 native Port lifecycle jobs; Objects 40061641226 fails both
+Stock object-mutation jobs. Runtime 40061641253 has now finished with thirteen
+failed jobs: ten Port jobs have the same PC 0x00000008 crash; HP40gs Stock
+system-services fails before execution after 90 s without transfer progress;
+Direct system-services-immediate/hp39 (HP40gs only) and Stock immediate/HP40gs
+report 0x46417b0a, an audio-register restoration check. The exact CI immediate
+build passes its first local HP40gs Direct replay (9526 exit 0). An isolated
+diagnostic copy preserves the first error and distinguishes PWM/watchdog
+mismatches; original assertions and production code remain unchanged. Further
+reproduction runs under `/work/oct24-audio-diag-{src,results}`. Eight isolated
+old-emulator diagnostic runs pass (46900 exit 0). Exact CI binary + CI emulator
+repetition passes eight iterations (65205 exit 0) under
+`/work/oct24-audio-ci-pair-results`. Six additional diagnostic runs sharing one
+CPU with two busy workers also pass (47545 exit 0), with separate register
+snapshots under `/work/oct24-audio-contention-results`. The maintained test now
+preserves an earlier failure instead of overwriting it with an audio mismatch;
+PWM register mismatches report 0x7b20+i, watchdog mismatches 0x7bb0+i, for the
+seven existing checked registers. Passing requirements are unchanged. All three
+HP39 Direct targets, their independent system verifier and ARM analysis pass
+for this diagnostic change (73004 exit 0). Logs use
+`/work/oct24-audio-diagnostics-maintained-*`. The original audio failure remains
+unresolved; these are diagnostic improvements, not a claimed runtime repair. Main Core
 40059453759 separately fails HP49g+ recovery after retirement resume with a
 blank Stock display. Neither failure is accepted or dismissed as transient.
 Downloaded branch recovery/publication logs show execution at unmapped
@@ -479,26 +498,40 @@ registers on the current watchdog emulator (`/work/oct24-ci-recovery-repro`,
 session 2634 exit 1). The older-emulator comparison also exits 1 with identical
 registers (9666; `/work/oct24-ci-recovery-old-emulator.log`). The clock's newly
 added SWI guard is called inside Flash query/busy modes, where ROM exception
-instructions cannot be fetched. Local repair `4c87835f` uses an IRQ-masked clock helper for production Flash
-and all recovery witness timeout callbacks; the SST bus contract explicitly
+instructions cannot be fetched. Local repair `4c87835f` uses an IRQ-masked
+clock helper for production Flash and all recovery witness timeout callbacks; the SST bus contract explicitly
 excludes ROM SWI entry from callbacks during query/busy modes.
 The focused ASan/UBSan clock test passes, including no supervisor entry and
 last-value/errno preservation on clock failure. All four recovery build variants
 compile. Both native recovery runs pass the first two busy-operation power cuts
-that previously crashed; full suites continue (94903/44621). Stock object-mutation
-(19519) and publication validation (38155, HP49g+ then HP50g) also run. Both
+that previously crashed. Both runs ultimately exit 1 (94903/44621): guarded
+reservation verification requires before-reset.json, which the stale local
+watchdog emulator never emitted. Its executable lacks the reset-checkpoint
+feature. Earlier phase evidence is retained; no complete-suite pass is claimed.
+The exact CI Runtime emulator is unpacked at `/work/oct24-ci-current-x50ng`
+and does include that feature. Guarded reservation supplements run on 56280
+and 8541 in `/work/oct24-flash-clock-ci-reservation-{hp49gplus,hp50g}`, using
+saved clean states and unchanged maintained verification. HP49g+ now passes
+guarded low-memory recovery and repeated restart with the required snapshot;
+rejection cases remain running. Publication validation
+passes HP49g+; the HP50g half continues on 38155. Both
 recovery runs additionally pass interrupted recovery and journal retirement
-with unchanged catalogs after reset. HP49g+ also passes automatic STARTUP
-replay/retirement and the second warmstart; full guarded suites continue.
+with unchanged catalogs after reset. Both models also pass automatic STARTUP
+replay/retirement and the second warmstart, plus bank-header/body fault and
+low-memory configuration recovery before the missing-checkpoint failure.
 Both Stock object-mutation suites pass complete primary execution, return and
 all lifecycle invocations (19519 exit 0). Evidence is preserved separately in
 `/work/oct24-flash-clock-object-evidence` before other native runs reuse captures.
 Main's original retirement-cut state resets successfully on both current and
 old emulators (36805/29165 exit 0), with the original restart verifier accepting
-61 catalog entries and Flash preservation. Evidence is in
-`/work/oct24-main-retirement-resume-{repro,old-emulator}`. The blank display
+61 catalog entries and Flash preservation. The exact CI emulator also passes
+the same saved-state verifier (81178 exit 0; 61 entries). Evidence is in
+`/work/oct24-main-retirement-resume-{repro,old-emulator,ci-emulator}`. The blank display
 failure remains unreproduced, not claimed fixed. Whole host
-ASan/UBSan build and CTest run on 1072 (`/work/oct24-flash-clock-unit-test.log`). Objects failure logs confirm the
+ASan/UBSan build and all 134 CTest targets pass (1072 exit 0; 729.62 s), including
+the complete Flash exhaustive tests (`/work/oct24-flash-clock-unit-test.log`).
+Whole tracked-source format and lint checks pass; logs are
+`/work/oct24-window-final-{format,lint}.log`. Objects failure logs confirm the
 same PC 0x00000008 crash on both models. Focused host/ARM static analysis and
 strict docs pass. Full regression and CI acceptance remain pending.
 Later local window-audit/dispatch changes are outside that head.
@@ -4806,17 +4839,17 @@ below are retained.
   on every capture; a corrupted-frame negative control is rejected. The ARM
   payload analysis, formatter and verifier Ruff checks pass. Artifact:
   `/work/oct24-window-e2e-artifact`; logs: `/work/oct24-window-direct-*.log`;
-  captures/results: `/work/oct24-prepush-src/build`. Stock execution, original
-  window-client/widget acceptance and CI remain open. No new push occurred.
-  Stock validation is now running on 94697, sequential hp4950/hp48/hp39 families,
-  with dedicated `/work/oct24-window-stock-assets` and logs
-  `/work/oct24-window-stock-*.log`. This independent M8.4 work proceeds during
-  native CI-repair validation waits. HP49g+/HP50g Stock execution, settled return
-  and independent full-frame pixel checks pass; HP48/HP39 continue. The suite is
-  now wired into the Runtime manifest with the standard context/family verifier
-  interface: three Direct family jobs and six Stock model jobs. The generated
-  matrix and seven planner tests pass, as do verifier Ruff/format checks.
-  This is local CI wiring, not submitted/accepted CI.
+  captures/results: `/work/oct24-prepush-src/build`. Original window-client/widget
+  acceptance and CI remain open. No new push occurred.
+  All six Stock targets now pass (94697 exit 0), including independent full-frame
+  pixel verification and settled return. Assets and logs are
+  `/work/oct24-window-stock-assets` and `/work/oct24-window-stock-*.log`;
+  complete model captures/state are preserved in `/work/oct24-window-stock-evidence`.
+  This closes local six-model Direct/Stock acceptance of the maintained public
+  event/timer/mono-double-buffer repaint fixture, not original widget clients.
+  Runtime CI wiring (`762705eb`) adds three Direct family jobs and six Stock
+  model jobs using the standard context/family verifier. Generated matrix,
+  seven planner tests and verifier Ruff/format checks pass. Not pushed or CI accepted.
 
 #### M8.5 — Modern C++ and migration
 

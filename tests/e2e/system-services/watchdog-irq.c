@@ -144,10 +144,11 @@ unsigned hpclang_e2e_watchdog_test(void)
     for (unsigned i = 0; i < 3; ++i)
         if (REG(addresses[i]) != watchdog_before[i])
             failure = 14;
-    /* Check audio restoration before foreground cleanup could repair it. */
+    /* Preserve an earlier delivery/ownership failure; otherwise identify the
+     * exact audio register before foreground cleanup could repair it. */
     for (unsigned i = 0; i < 7; ++i)
-        if (REG(audio_addresses[i]) != audio_before[i])
-            failure = 10;
+        if (!failure && REG(audio_addresses[i]) != audio_before[i])
+            failure = 0x30u + i;
     stop();
     /* Release runs only on the foreground stack, after stopping the source. */
     hpclang_e2e_irq_snapshot(&after);
