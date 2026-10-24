@@ -4315,8 +4315,9 @@ below are retained.
   Foreground code only runs a bounded busy loop. The fixture requires multiple
   deliveries, deadline completion, released ownership and the existing exact
   IRQ bank/vector/mask/stack-guard restoration checks. Its fresh ARM build and
-  static analysis pass; six-model Direct execution runs separately on session
-  50299 / PID 104530, artifact `/work/oct24-irq-deadline-artifact`.
+  static analysis pass; all six Direct models pass the complete fixture,
+  independent input pixels and normal return. Session 50299 exits successfully;
+  the tested artifact is `/work/oct24-irq-deadline-artifact`.
   This is native integration evidence, not yet the production sound dispatcher
   or autonomous audio-stop implementation.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
