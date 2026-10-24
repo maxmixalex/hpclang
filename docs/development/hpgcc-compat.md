@@ -1605,3 +1605,12 @@ Installed SDK gate passes (60235 exit 0), including all six checkbox symbols in
 C/C++, six-model launchers, three HP39 Aplet variants, notebooks and 517
 byte-identical outputs (`/work/oct24-checkbox-sdk.log`). Native checkbox
 acceptance remains open.
+
+Native checkbox checks pass all six Direct models (25391 exit 0), with 32 GPIO
+edges per model across both buffers: W toggle, arrows, CHK selection, removal
+preserving successor bindings, focused rebinding and unbinding. Independent
+whole-frame captures check selected/unselected patterns, focus and labels in
+both buffering modes. A wrong focus pixel is rejected. Previous menu/image/text/
+progress/key/settled-return gates still pass. Stock process 73812 runs separately
+in `/work/oct24-checkbox-src` using `/work/oct24-checkbox-native-arm`; Stock
+completion and CI acceptance remain open.

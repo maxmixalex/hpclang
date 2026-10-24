@@ -5,6 +5,7 @@
 #include <wintext.h>
 #include <winimg.h>
 #include <winsoftmenu.h>
+#include <wincheckbox.h>
 #include <string.h>
 #include <hpkeyb49.h>
 #include <limits.h>
@@ -411,6 +412,76 @@ static int menu_check(int buffered)
     hpg_free_font(font);
     return hpclang_win_error() ? -1 : hpclang_win_reset();
 }
+static int checkbox_check(int buffered)
+{
+    hpg_set_mode_gray16(buffered);
+    physical_edges = 0;
+    win_widget_t *menu = win_softmenu_new();
+    win_widget_t *a = win_checkbox_new("A"), *b = win_checkbox_new("B");
+    if (!menu || !a || !b)
+        return -1;
+    win_checkbox_set_menu(a, menu, 0);
+    win_checkbox_set_menu(b, menu, 0);
+    win_add_widget(menu);
+    win_add_widget(a);
+    win_add_widget(b);
+    win_add_event_handler(WIN_KEY_PRESSED, INT_MAX, physical, (void *)(uintptr_t)1);
+    win_add_event_handler(WIN_KEY_RELEASED, INT_MAX, physical, NULL);
+    if (!win_widget_has_focus(a) || text_tap(KB_W) || !win_checkbox_is_selected(a) ||
+        text_tap(KB_DN) || !win_widget_has_focus(b) || text_tap(KB_A) ||
+        !win_checkbox_is_selected(b) || text_tap(KB_UP) || !win_widget_has_focus(a) ||
+        text_tap(KB_A) || win_checkbox_is_selected(a))
+        return -1;
+    win_remove_widget(a);
+    win_widget_destroy(a);
+    if (!win_widget_has_focus(b) || text_tap(KB_A) || win_checkbox_is_selected(b))
+        return -1;
+    win_checkbox_set_menu(b, menu, 1);
+    if (text_tap(KB_B) || !win_checkbox_is_selected(b))
+        return -1;
+    win_checkbox_set_menu(b, NULL, 0);
+    if (text_tap(KB_B) || !win_checkbox_is_selected(b) || physical_edges != 16)
+        return -1;
+    win_remove_widget(b);
+    win_widget_destroy(b);
+    win_remove_widget(menu);
+    win_widget_destroy(menu);
+    if (hpclang_win_reset())
+        return -1;
+    char glyphs[256 * 3] = {0};
+    glyphs['A' * 3] = 1;
+    glyphs['A' * 3 + 1] = 2;
+    glyphs['A' * 3 + 2] = 4;
+    hpg_font_t *font = hpg_alloc_font(glyphs, 256, 3, 3);
+    win_widget_t *boxes[] = {win_checkbox_new("A"), win_checkbox_new("")};
+    if (!font || !boxes[0] || !boxes[1])
+        return -1;
+    for (unsigned i = 0; i < 2; ++i) {
+        win_widget_set_font(boxes[i], font);
+        win_widget_set_location(boxes[i], 5 + (int)i * 20, 15);
+        win_widget_set_size(boxes[i], 12, 9);
+        win_add_widget(boxes[i]);
+    }
+    win_checkbox_set_selected(boxes[0], 1);
+    for (unsigned focus = 0; focus < 2; ++focus) {
+        if (!win_widget_has_focus(boxes[focus]))
+            return -1;
+        hpg_clip_reset(NULL);
+        hpg_clear();
+        if (win_post_event(WIN_REPAINT_EVENT, NULL) || hpclang_win_error())
+            return -1;
+        hpg_flip();
+        if (checkpoint((buffered ? 1200 : 1100) + focus))
+            return -1;
+        win_focus_next();
+    }
+    for (unsigned i = 2; i; --i) {
+        win_remove_widget(boxes[i - 1]);
+        win_widget_destroy(boxes[i - 1]);
+    }
+    hpg_free_font(font);
+    return hpclang_win_error() ? -1 : hpclang_win_reset();
+}
 int main(void)
 {
     errno = 0;
@@ -425,6 +496,8 @@ int main(void)
         failure = failure ? failure : 13;
     if (!failure && (menu_check(0) || menu_check(1)))
         failure = failure ? failure : 14;
+    if (!failure && (checkbox_check(0) || checkbox_check(1)))
+        failure = failure ? failure : 16;
     hpg_set_mode_mono(1);
     hpg_clip_reset(NULL);
     if (errno || hpclang_time_read_us(&start))

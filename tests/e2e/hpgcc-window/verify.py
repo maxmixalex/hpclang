@@ -173,6 +173,33 @@ def verify_menu(prefix):
     print(f"PASS {prefix}: menu pages, disabled colors and labels in both buffer modes")
 
 
+def verify_checkbox(prefix):
+    checked = (0, 0x20, 0x30, 0x1A, 0x0E, 4, 0x3E, 0)
+    empty = (0, 0, 0, 0, 0, 0, 0x3E, 0)
+    for base in (1100, 1200):
+        for focus in (0, 1):
+            path = Path(f"{prefix}-{base + focus}.pgm")
+            width, height, pixels = read_pgm(path)
+            if width != 132 or height not in (64, 80):
+                raise AssertionError(f"{path}: unsupported checkbox geometry")
+            for y in range(height):
+                for x in range(width):
+                    ink = 0
+                    for index, pattern in enumerate((checked, empty)):
+                        local, row = x - (5 + index * 20), y - 15
+                        if not (0 <= local < 12 and 0 <= row < 9):
+                            continue
+                        if focus == index and local <= 6:
+                            ink = 255
+                        if local <= 8 and pattern[row % 8] & (1 << (local % 8)):
+                            ink = 0 if focus == index else 255
+                        if index == 0 and 1 <= row <= 3 and local == 7 + row:
+                            ink = 255
+                    if pixels[y * width + x] != 255 - ink:
+                        raise AssertionError(f"{path}: unexpected checkbox pixel at {x},{y}")
+    print(f"PASS {prefix}: selected/unselected checkbox focus and labels in both buffer modes")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -188,6 +215,7 @@ def main():
         verify_text(Path(f"build/{target}-frame"))
         verify_image(Path(f"build/{target}-frame"))
         verify_menu(Path(f"build/{target}-frame"))
+        verify_checkbox(Path(f"build/{target}-frame"))
 
 
 if __name__ == "__main__":
