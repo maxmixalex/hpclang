@@ -58,6 +58,9 @@ hpclang_unit(win_key_state_reference "${HPCLANG_ROOT}/tests/compat/win-key-state
 target_include_directories(test_win_key_state_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
     "${HPCLANG_ROOT}/include")
 
+hpclang_unit(win_focus test_win_focus.c "${HPCLANG_ROOT}/runtime/core/win-focus.c")
+target_include_directories(test_win_focus PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(win_events test_win_events.c "${HPCLANG_ROOT}/runtime/core/win-events.c")
 target_include_directories(test_win_events PRIVATE "${HPCLANG_ROOT}/runtime/core")
 

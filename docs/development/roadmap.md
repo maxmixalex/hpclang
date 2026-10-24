@@ -4895,6 +4895,23 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Local widget foundation after 0a7c2d8d: `win-focus` implements caller-owned
+  component membership, insertion before the current cursor, forward/backward
+  focus traversal, installation/removal callbacks and repaint ordering. It
+  retains historical lost/gained notifications when traversal stays on the
+  same node, and historical cursor-based has-focus for passive components.
+  Removing the final focusable component now leaves a valid surviving cursor
+  instead of the historical dangling node. Duplicate membership is rejected;
+  lifecycle callback reentry into mutation/traversal returns EBUSY. Queries
+  remain usable during callbacks. Event snapshot lifetime is a separate public
+  adapter responsibility; this module does not yet expose winwidget/wincore.
+  Focused ASan/UBSan tests pass, including explicit callback traces and 9,216
+  combinations of four-component focusability, insertion and removal order.
+  ARMv4T compilation and focused Clang analysis pass; log
+  `/work/oct24-win-focus-tests.log`. Original-source differential execution,
+  public integration, concrete controls and native widget acceptance remain
+  open. This is local work only, not part of the submitted CI batch.
+
   Submission update: the complete local window-key/indicator batch and Kermit
   diagnostics are pushed as `0a7c2d8d` in draft PR #10. All 136 sanitizer tests,
   full host/ARM analysis, formatting/lint and strict docs pass locally.
