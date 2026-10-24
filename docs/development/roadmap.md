@@ -4862,6 +4862,12 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Full regression started at 5f1cd1c6: all host targets rebuild successfully
+  with ASan/UBSan enabled for C/C++. The 136-test CTest suite runs in process
+  68707 (`/work/oct24-window-full-unit-{build,tests}.log`); no full-suite pass
+  is claimed yet. Native Stock processes 68792 and 96971 remain live with
+  separate target directories. These are existing runs, not restarted attempts.
+
   Latest local window/transport checkpoint: fixed HP39g+ Stock now passes
   (69002 exit 0), including independent final pixels, 44 status frames, page
   exchange and settled return. Evidence is preserved separately in
