@@ -3,6 +3,7 @@
 #include <wintext.h>
 #include <winimg.h>
 #include <winsoftmenu.h>
+#include <wincheckbox.h>
 #include <string.h>
 
 static int paint(void *event, void *data)
@@ -96,7 +97,17 @@ int main(void)
     win_softmenu_set_enabled(menu, 0, 0);
     win_softmenu_delete_item(menu, 0, 29);
     win_add_widget(menu);
+    win_widget_t *check = win_checkbox_new(action);
+    if (!check)
+        return 6;
+    win_checkbox_set_label(check, action);
+    win_checkbox_set_selected(check, 1);
+    win_checkbox_set_menu(check, menu, 0);
+    win_add_widget(check);
+    int checked = win_checkbox_is_selected(check) && win_checkbox_get_label(check) == action;
+    win_remove_widget(check);
+    win_widget_destroy(check);
     win_remove_widget(menu);
     win_widget_destroy(menu);
-    return !focused || !destroyed || !correct || value != 3.5 || hpclang_win_error();
+    return !focused || !destroyed || !correct || !checked || value != 3.5 || hpclang_win_error();
 }

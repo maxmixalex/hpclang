@@ -15,6 +15,7 @@
 #include <wintext.h>
 #include <winimg.h>
 #include <winsoftmenu.h>
+#include <wincheckbox.h>
 #include <hpclang/device.h>
 #include <winkeys.h>
 #include "hpgcc-keyboard.h"
@@ -1113,6 +1114,73 @@ static void menu_widget_pixels(void)
     display_height = 6;
 }
 
+static void checkbox_widget_pixels(void)
+{
+    struct hpclang_surface *saved = display;
+    display_width = 32;
+    display_height = 16;
+    display = hpclang_surface_create_mono(33, 16);
+    assert(display);
+    display->width = 32;
+    const unsigned char checked[] = {0, 0x20, 0x30, 0x1a, 0x0e, 4, 0x3e, 0};
+    const unsigned char empty[] = {0, 0, 0, 0, 0, 0, 0x3e, 0};
+    for (int buffered = 0; buffered < 2; ++buffered) {
+        assert(!hpclang_win_reset());
+        hpg_set_mode_gray16(buffered);
+        char glyphs[256 * 3] = {0};
+        glyphs['A' * 3] = 1;
+        glyphs['A' * 3 + 1] = 2;
+        glyphs['A' * 3 + 2] = 4;
+        hpg_font_t *font = hpg_alloc_font(glyphs, 256, 3, 3);
+        win_widget_t *boxes[] = {win_checkbox_new("A"), win_checkbox_new("")};
+        assert(font && boxes[0] && boxes[1]);
+        for (unsigned i = 0; i < 2; ++i) {
+            win_widget_set_font(boxes[i], font);
+            win_widget_set_location(boxes[i], i ? 20 : 3, 2);
+            win_widget_set_size(boxes[i], 12, 9);
+            win_add_widget(boxes[i]);
+        }
+        for (int focus = 0; focus < 2; ++focus) {
+            assert(win_widget_has_focus(boxes[focus]));
+            for (int selected = 0; selected < 2; ++selected) {
+                win_checkbox_set_selected(boxes[0], selected);
+                hpg_clip_reset(NULL);
+                hpg_clear();
+                assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+                for (int y = 0; y < 16; ++y)
+                    for (int x = 0; x < 32; ++x) {
+                        int expected = 0;
+                        for (int i = 0; i < 2; ++i) {
+                            int local_x = x - (i ? 20 : 3), row = y - 2;
+                            if (local_x < 0 || local_x >= 12 || row < 0 || row >= 9)
+                                continue;
+                            if (focus == i && local_x <= 6)
+                                expected = 255;
+                            const unsigned char *pattern = !i && selected ? checked : empty;
+                            if (local_x <= 8 && (pattern[row % 8] & (1u << (local_x % 8))))
+                                expected = focus == i ? 0 : 255;
+                            if (!i && row >= 1 && row <= 3 && local_x == 8 + row - 1)
+                                expected = 255;
+                        }
+                        assert(hpg_get_pixel(NULL, x, y) == expected);
+                    }
+            }
+            win_focus_next();
+        }
+        for (unsigned i = 2; i; --i) {
+            win_remove_widget(boxes[i - 1]);
+            win_widget_destroy(boxes[i - 1]);
+        }
+        hpg_free_font(font);
+        assert(!hpclang_win_error() && !hpclang_win_reset());
+        hpg_cleanup();
+    }
+    hpclang_surface_destroy(display);
+    display = saved;
+    display_width = 8;
+    display_height = 6;
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -1214,6 +1282,7 @@ int main(void)
     text_widget_pixels();
     image_widget_pixels();
     menu_widget_pixels();
+    checkbox_widget_pixels();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

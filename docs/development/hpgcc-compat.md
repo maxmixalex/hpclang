@@ -1587,3 +1587,21 @@ cleanup and invalid inputs. ARMv4T compilation and analysis pass. Logs use
 `/work/oct24-checkbox-{build,tests}.log`. Work is isolated on
 `m8-checkbox-controls` with `/work/oct24-checkbox-src`; original-source
 comparison, production pixels, SDK and native acceptance remain open.
+
+Checkbox follow-up tests pass production HPG pixels for selected/unselected and
+focused/unfocused states, label glyphs, clipping and both buffer modes. The
+original-source comparison compiles all six unchanged 1.1/2.0 checkbox functions
+over the shared widget/event/soft-menu foundation, adding only the historical
+ULONGLONG type alias to host libc shims. Both match 7,218 trace lines (SHA256
+`c13bbed5c0d2925615957b2ad755cd5a9f21b5193980f625fbc82f8feaa4843e`).
+Six multiline/empty label cases, preferred sizes, boolean setters, keyboard
+modifiers, focus and established menu bindings are covered. Lifecycle repairs
+remain separately tested, not claimed identical to original bugs. The wrong
+checkmark-pattern negative is rejected. Three sanitizer targets pass; logs are
+`/work/oct24-checkbox-{reference,negative}.log` and
+`/work/oct24-checkbox-reference-tests.log`.
+
+Installed SDK gate passes (60235 exit 0), including all six checkbox symbols in
+C/C++, six-model launchers, three HP39 Aplet variants, notebooks and 517
+byte-identical outputs (`/work/oct24-checkbox-sdk.log`). Native checkbox
+acceptance remains open.

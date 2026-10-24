@@ -278,6 +278,7 @@ hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-checkbox.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-image.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-text.c"
@@ -883,4 +884,10 @@ hpclang_unit(win_checkbox test_win_checkbox.c ${win_adapter_sources}
     "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-checkbox.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
 target_include_directories(test_win_checkbox PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+hpclang_unit(win_checkbox_reference "${HPCLANG_ROOT}/tests/compat/win-checkbox.c"
+    ${win_adapter_sources} "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-checkbox.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_checkbox_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
     "${HPCLANG_ROOT}/include")
