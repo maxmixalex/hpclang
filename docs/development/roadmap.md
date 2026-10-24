@@ -20,6 +20,7 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Principles
 
+- before each subsequent remote push, inspect the previous push's CI and failed-job logs; record unresolved causes explicitly and do not treat cancelled or pending runs as passes; do not poll newly pushed CI;
 - one application ABI: HPC1 / hpclang v1;
 - one common ARMv4T runtime;
 - thin platform implementations: `hp39`, `hp48`, and `hp4950`;
@@ -4916,17 +4917,21 @@ below are retained.
   `/work/oct24-text-{reference,negative}.log`. Three sanitizer targets pass,
   including production HPG custom-font pixels for glyphs/cursor/deletion
   (`/work/oct24-text-pixels-tests.log`). Strict docs pass. SDK clients expanded
-  in `a0e285df`; full relocated SDK process 14789 runs with log
-  `/work/oct24-text-sdk.log`. Text native/SDK acceptance remains pending.
+  in `a0e285df`; full relocated SDK process 14789 exits 0: C/C++, six-model
+  launchers, three HP39 Aplet variants, notebooks and 517 byte-identical outputs
+  pass (`/work/oct24-text-sdk.log`). Text native/CI acceptance remains pending.
   Integrate these following-batch commits only after the frozen batch.
+  Subsequent Stock progress results: HP40gs, HP48gII and HP49g+ also pass
+  independent keyboard/control pixels and return; process 9966 continues HP50g.
+  Full 140-test sanitizer process 10200 remains running; no full-pass claim.
 
   Pre-next-push CI inspection of 0a7c2d8d: both Quality (40073587007 /
   40073583118), Storage (40073587032 / 40073583077) and Objects (40073587006 /
-  40073583192) runs pass. PR Gallery 40073586972 passes; push Gallery
-  40073583076 queues. PR Core 40073586985 runs; push Core 40073583179 queues.
+  40073583192) runs pass. Both Gallery runs 40073586972 /
+  40073583076 pass. PR Core 40073586985 runs; push Core 40073583179 queues.
   Runtime's aggregate queued label does not mean no work: 40073586999 has
-  45 successful / six running / 66 queued jobs; 40073583151 has 45 successful /
-  five running / 67 queued. Neither reports a failed job at this inspection.
+  69 successful / 48 unfinished jobs; 40073583151 has 72 successful /
+  45 unfinished jobs. Neither reports a failed job at this inspection.
   Preceding 95348ce8 Runtime runs were cancelled by workflow concurrency after
   101 and 90 successful jobs respectively, not accepted as whole-suite passes.
   The older transport/audio failures remain unresolved; a passing Objects run
