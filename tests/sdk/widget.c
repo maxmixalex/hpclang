@@ -1,4 +1,5 @@
 #include <wincore.h>
+#include <winprogress.h>
 
 static int paint(void *event, void *data)
 {
@@ -41,5 +42,19 @@ int main(void)
     int focused = win_widget_has_focus(widget);
     win_remove_widget(widget);
     win_widget_destroy(widget);
-    return !focused || !destroyed || hpclang_win_error();
+    win_widget_t *slider = win_progress_new(1);
+    if (!slider)
+        return 2;
+    win_progress_set_range(slider, -10, 10);
+    win_progress_set_inc(slider, 0.5);
+    win_progress_set_value(slider, 3.5);
+    win_progress_set_orient(slider, WIN_PROGRESS_VERT_TOP);
+    win_progress_set_delay(slider, 400, 80);
+    win_progress_set_event(slider, -1);
+    win_widget_pack(slider);
+    win_add_widget(slider);
+    double value = win_progress_get_value(slider);
+    win_remove_widget(slider);
+    win_widget_destroy(slider);
+    return !focused || !destroyed || value != 3.5 || hpclang_win_error();
 }

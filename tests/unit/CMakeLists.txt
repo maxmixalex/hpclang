@@ -256,6 +256,7 @@ hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-progress.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
     "${HPCLANG_ROOT}/runtime/core/win-focus.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-window.c"

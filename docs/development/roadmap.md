@@ -4895,6 +4895,23 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Local concrete progress/slider adapter: `winprogress.h` now implements all
+  eight historical entry points, four orientations, range/value/increment,
+  key-driven changes and boundary focus transfer, delayed/periodic repeat,
+  release cancellation, blink pattern and change events. Removal during a value
+  notification cannot rearm repeat timers. Internal component-type checking
+  rejects accidental cross-control casts. Invalid nonfinite configuration and
+  unsafe integer conversions are checked; failed packing keeps prior dimensions.
+  Three focused sanitizer targets pass, including production HPG pixel maps,
+  repeat timing, focus transitions, callback removal, published blink pixels,
+  NaN and preferred-size overflow. ARMv4T compile/analysis pass. Logs:
+  `/work/oct24-progress-tests.log`; original mistaken back-page blink assertion
+  retained in `/work/oct24-progress-back-page-test-failure.log`. The SDK C/C++
+  client now exercises the progress API; full gate runs in process 64824,
+  log `/work/oct24-progress-sdk.log`. Formatting and strict docs pass.
+  Original-progress-source differential and native control execution remain
+  open. Local work only; no new push or CI acceptance.
+
   Custom-component original-source differential now passes: the optional
   `tests/compat/check-win-widgets.py` compiles 21 unchanged original functions
   from each caller-supplied HPGCC 1.1/2.0 archive with host-only structural glue.

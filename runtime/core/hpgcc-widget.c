@@ -23,6 +23,20 @@ static int valid(win_widget_t *widget)
     hpclang_win_fail(EINVAL);
     return 0;
 }
+int hpclang_win_widget_installed(win_widget_t *widget)
+{
+    return widget && widget->node.owner;
+}
+void *hpclang_win_widget_data(win_widget_t *widget, void (*destroy)(win_widget_t *))
+{
+    if (!valid(widget))
+        return NULL;
+    if (widget->destroy != destroy) {
+        hpclang_win_fail(EINVAL);
+        return NULL;
+    }
+    return widget->data;
+}
 static void call(win_widget_t *widget, void (*function)(win_widget_t *))
 {
     if (function) {
@@ -185,6 +199,8 @@ void win_widget_pack(win_widget_t *widget)
         return;
     int width = 0, height = 0;
     win_wcore_pref_size(widget, &width, &height);
+    if (hpclang_win_error())
+        return;
     if (geometry(widget->x, widget->y, width, height)) {
         widget->width = width;
         widget->height = height;

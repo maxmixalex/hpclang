@@ -3,12 +3,16 @@
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <float.h>
+#include <math.h>
 #include <stddef.h>
 #include <hpclang/font-package.h>
 #include "display-surface.h"
 #include "hpg-internal.h"
 #include "win-repaint.h"
 #include <wincore.h>
+#include <winprogress.h>
+#include <winkeys.h>
 #include "hpgcc-keyboard.h"
 #define HPCLANG_HPCONIO_NO_AUTOINIT
 #include <hpconio.h>
@@ -16,9 +20,10 @@
 #include <hpclang/stdio.h>
 #include "stdio-routing.h"
 
+static uint64_t window_time;
 int hpclang_time_read_us(uint64_t *value)
 {
-    *value = 0;
+    *value = window_time;
     return 0;
 }
 int hpclang_hpgcc_keymatrix_read(keymatrix *matrix)
@@ -799,6 +804,128 @@ static void widget_pixels(void)
     hpg_cleanup();
 }
 
+static int progress_changes, remove_on_change;
+static int progress_changed(void *event, void *data)
+{
+    assert(event == data);
+    ++progress_changes;
+    if (remove_on_change)
+        win_remove_widget(event);
+    return 0;
+}
+static void progress_widgets(void)
+{
+    assert(!hpclang_win_reset());
+    hpg_set_mode_gray16(1);
+    int changed = win_register_event();
+    win_widget_t *bar = win_progress_new(1);
+    assert(bar && win_progress_get_value(bar) == 0);
+    win_progress_set_event(bar, changed);
+    win_add_event_handler(changed, 0, progress_changed, bar);
+    win_widget_set_location(bar, 1, 1);
+    win_widget_set_size(bar, 6, 4);
+    win_progress_set_value(bar, 50);
+    win_add_widget(bar);
+    for (int direction = 0; direction < 4; ++direction) {
+        win_progress_set_orient(bar, direction);
+        hpg_clip_reset(NULL);
+        hpg_set_color(NULL, 0);
+        hpg_fill_rect(0, 0, 7, 5);
+        assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+        for (int y = 0; y < 6; ++y)
+            for (int x = 0; x < 8; ++x) {
+                int inside = x >= 1 && x <= 6 && y >= 1 && y <= 4;
+                int border = x == 1 || x == 6 || y == 1 || y == 4;
+                int filled = direction == 0   ? x <= 3
+                             : direction == 1 ? y >= 3
+                             : direction == 2 ? x >= 4
+                                              : y <= 2;
+                assert(hpg_get_pixel(NULL, x, y) == (inside && (border || filled) ? 255 : 0));
+            }
+    }
+    const int increment[] = {KB_RT, KB_UP, KB_LF, KB_DN};
+    const int decrement[] = {KB_LF, KB_DN, KB_RT, KB_UP};
+    for (int direction = 0; direction < 4; ++direction) {
+        win_progress_set_orient(bar, direction);
+        win_progress_set_value(bar, 50);
+        assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)increment[direction]) == 1);
+        assert(win_progress_get_value(bar) == 60);
+        assert(!win_post_event(WIN_KEY_RELEASED, (void *)(uintptr_t)increment[direction]));
+        assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)decrement[direction]) == 1);
+        assert(win_progress_get_value(bar) == 50);
+        assert(!win_post_event(WIN_KEY_RELEASED, (void *)(uintptr_t)decrement[direction]));
+    }
+    assert(progress_changes == 8);
+    win_progress_set_orient(bar, 0);
+    win_progress_set_value(bar, 0);
+    win_progress_set_delay(bar, 10, 5);
+    assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_RT) == 1);
+    window_time = 10000;
+    assert(hpclang_win_step(1) == 1 && win_progress_get_value(bar) == 20);
+    window_time = 15000;
+    assert(hpclang_win_step(1) == 1 && win_progress_get_value(bar) == 30);
+    assert(!win_post_event(WIN_KEY_RELEASED, (void *)(uintptr_t)KB_RT));
+    window_time = 30000;
+    assert(hpclang_win_step(1) == 1 && win_progress_get_value(bar) == 30);
+    window_time = 500000;
+    assert(hpclang_win_step(2) == 1);
+    assert(hpclang_surface_get_pixel(pages[back ^ 1], 4, 2) == 255 &&
+           hpclang_surface_get_pixel(pages[back ^ 1], 5, 2) == 0);
+    win_widget_t *other = win_progress_new(1);
+    assert(other);
+    win_progress_set_event(other, -1);
+    win_add_widget(other);
+    win_progress_set_value(bar, 100);
+    assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_RT) == 1);
+    assert(win_widget_has_focus(other));
+    win_remove_widget(other);
+    win_widget_destroy(other);
+    win_progress_set_range(bar, -20, 20);
+    assert(win_progress_get_value(bar) == 20);
+    win_progress_set_range(bar, 5, 5);
+    win_progress_set_value(bar, -100);
+    assert(win_progress_get_value(bar) == -20);
+    win_progress_set_value(bar, 0);
+    remove_on_change = 1;
+    int before = progress_changes;
+    assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_RT) == 1);
+    win_widget_destroy(bar);
+    win_remove_event_handler(changed, progress_changed, bar);
+    window_time = 1000000;
+    assert(hpclang_win_step(1) == 1 && progress_changes == before + 1);
+    assert(!hpclang_win_error() && !hpclang_win_reset());
+    bar = win_progress_new(0);
+    assert(bar);
+    win_progress_set_inc(bar, 0);
+    assert(hpclang_win_error() == EINVAL);
+    win_widget_destroy(bar);
+    assert(!hpclang_win_reset());
+    bar = win_progress_new(0);
+    assert(bar);
+    int old_width, old_height, new_width, new_height;
+    win_widget_get_size(bar, &old_width, &old_height);
+    win_progress_set_inc(bar, DBL_MIN);
+    win_widget_pack(bar);
+    assert(hpclang_win_error() == EOVERFLOW);
+    win_widget_get_size(bar, &new_width, &new_height);
+    assert(new_width == old_width && new_height == old_height);
+    win_widget_destroy(bar);
+    assert(!hpclang_win_reset());
+    bar = win_progress_new(0);
+    assert(bar);
+    win_progress_set_value(bar, NAN);
+    assert(hpclang_win_error() == EINVAL && win_progress_get_value(bar) == 0);
+    win_widget_destroy(bar);
+    assert(!hpclang_win_reset());
+    bar = win_wcore_alloc(widget_noop, widget_noop, widget_noop, widget_size, 0, NULL);
+    assert(bar);
+    win_progress_set_value(bar, 50);
+    assert(hpclang_win_error() == EINVAL);
+    win_widget_destroy(bar);
+    assert(!hpclang_win_reset());
+    hpg_cleanup();
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -896,6 +1023,7 @@ int main(void)
     historical_console();
     window_frames();
     widget_pixels();
+    progress_widgets();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

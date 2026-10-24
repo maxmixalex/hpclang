@@ -590,6 +590,7 @@ The HPGCC 1.1/2.0 widget family remains a retained **M8.4 adapter requirement**.
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `winevent.h`, `wintimer.h`, `winkeys.h` | Bounded foreground event/timer/key service over native input, time and HPG | Adapter implemented locally; see exact validation below | M8.4, CI pending |
 | `winwidget.h`, `wincore.h` | Custom component lifecycle, focus, geometry and base painting | Local sanitizer/pixel and relocated SDK checks pass; native acceptance pending | M8.4 |
+| `winprogress.h` | Four-orientation progress/slider, focus, repeat and blinking cursor | Local sanitizer/pixel checks pass; SDK/native/reference pending | M8.4 |
 | Concrete `win*` controls and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
 
@@ -1400,3 +1401,22 @@ presence and active-low GPD3 write protection. x50ng models the same pins.
 Pre-acquisition sampling and the owned removal latch are separate stages of
 the same media lifecycle. Emulator tests establish stale-handle rejection and
 remount behavior; the later physical card test remains a nonblocking follow-up.
+
+### Progress and slider adapter (local)
+
+`winprogress.h` implements four orientations, clamped values, configurable range,
+increment and repeat delays, value-change events, focus transfer at boundaries,
+and a blinking focus pattern. Setters retain HPGCC's separation from change
+events and preferred-size packing. Invalid nonfinite bounds, NaN values,
+nonpositive increments/delays and invalid orientations are rejected; reversed
+or equal finite bounds preserve the old range. Event -1 disables notifications.
+Removal cancels blink and repeat timers even from the value-change callback.
+Failed preferred-size computation preserves the previous component dimensions.
+
+Production event/timer/HPG sanitizer tests cover all four direction pixel maps,
+key increments/decrements, delayed and periodic repeats, release cancellation,
+focus transfer, published blink pixels, callback removal, invalid values/types
+and preferred-size overflow. The first blink assertion read the back page after
+presentation; the corrected check observes the front page. Failure evidence is
+retained. Native execution and original-progress-source differential remain open;
+the installed SDK client has been extended to exercise these symbols.
