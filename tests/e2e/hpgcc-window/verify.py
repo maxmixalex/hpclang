@@ -134,6 +134,24 @@ def verify_text(prefix):
     print(f"PASS {prefix}: multiline label and entry in both buffer modes")
 
 
+def verify_image(prefix):
+    for phase in (700, 800):
+        path = Path(f"{prefix}-{phase}.pgm")
+        width, height, pixels = read_pgm(path)
+        if width != 132 or height not in (64, 80):
+            raise AssertionError(f"{path}: unsupported image frame geometry")
+        for y in range(height):
+            for x in range(width):
+                expected = 255
+                if 5 <= x < 14 and 15 <= y < 21:
+                    expected = 0 if (x - 5 + y - 15) % 2 == 0 else 255
+                if 5 <= x < 7 and 15 <= y < 17:
+                    expected = 136 if (x, y) == (5, 15) else 0 if (x, y) == (6, 16) else 255
+                if pixels[y * width + x] != expected:
+                    raise AssertionError(f"{path}: unexpected image/pattern pixel at {x},{y}")
+    print(f"PASS {prefix}: image/pattern composition in both buffer modes")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -147,6 +165,7 @@ def main():
         verify_keys(Path(f"build/{target}-frame"))
         verify_controls(Path(f"build/{target}-frame"))
         verify_text(Path(f"build/{target}-frame"))
+        verify_image(Path(f"build/{target}-frame"))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 #include <winkeys.h>
 #include <winprogress.h>
 #include <wintext.h>
+#include <winimg.h>
 #include <string.h>
 #include <hpkeyb49.h>
 #include <limits.h>
@@ -307,6 +308,43 @@ static int text_check(int buffered)
     hpg_free_font(font);
     return hpclang_win_error() ? -1 : hpclang_win_reset();
 }
+static int image_check(int buffered)
+{
+    hpg_set_mode_gray16(buffered);
+    hpg_t *image = hpg_alloc_gray16_image(2, 2);
+    char bits[] = {0x55, (char)0xaa};
+    hpg_pattern_t *pattern = hpg_alloc_pattern(bits, 2, 0);
+    if (!image || !pattern)
+        return -1;
+    hpg_set_color(image, 119);
+    hpg_draw_pixel_on(image, 0, 0);
+    hpg_set_color(image, 255);
+    hpg_draw_pixel_on(image, 1, 1);
+    win_widget_t *widget = win_img_new(pattern, image);
+    if (!widget)
+        return -1;
+    int width, height;
+    win_widget_get_size(widget, &width, &height);
+    if (width != 2 || height != 2)
+        return -1;
+    win_widget_set_location(widget, 5, 15);
+    win_widget_set_size(widget, 9, 6);
+    win_add_widget(widget);
+    hpg_clip_reset(NULL);
+    hpg_clear();
+    if (win_post_event(WIN_REPAINT_EVENT, NULL) || hpclang_win_error())
+        return -1;
+    hpg_flip();
+    if (checkpoint(buffered ? 800 : 700))
+        return -1;
+    win_remove_widget(widget);
+    win_widget_destroy(widget);
+    if (hpg_get_pixel(image, 0, 0) != 119)
+        return -1;
+    hpg_free_image(image);
+    hpg_free_pattern(pattern);
+    return hpclang_win_error() ? -1 : hpclang_win_reset();
+}
 int main(void)
 {
     errno = 0;
@@ -317,6 +355,8 @@ int main(void)
         failure = failure ? failure : 10;
     if (!failure && (text_check(0) || text_check(1)))
         failure = failure ? failure : 12;
+    if (!failure && (image_check(0) || image_check(1)))
+        failure = failure ? failure : 13;
     hpg_set_mode_mono(1);
     hpg_clip_reset(NULL);
     if (errno || hpclang_time_read_us(&start))

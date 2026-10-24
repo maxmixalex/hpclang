@@ -1496,3 +1496,19 @@ include image construction; the complete gate passes (55970 exit 0): C/C++,
 six launchers, three Aplet variants, notebooks and 517 byte-identical release
 outputs (`/work/oct24-image-sdk.log`).
 Original-source differential and native image-control acceptance remain open.
+
+The image source comparison compiles unchanged `img/win_img_new.c` from both
+HPGCC 1.1 and 2.0 over the same production widget/event foundation. All 32
+resource/transparency/geometry combinations match 577 trace lines (SHA256
+`4bf8c7cd9944ed93bc85a1c3b58f1a0b0182518dc87c964538f2ed0c14295bde`).
+The missing-pattern negative is rejected; image reference and real HPG pixel
+CTest targets pass under sanitizers. Logs: `/work/oct24-image-{reference,negative}.log`
+and `/work/oct24-image-reference-tests.log`. Zero-sized drawing and allocation
+failures are extension boundaries, not claimed identical call traces.
+
+The native fixture now captures image-over-pattern pixels and borrowed-image
+retention at checkpoints 700/800. Six-model Direct process 1287 uses separate
+source `/work/oct24-image-native-src` and artifact `/work/oct24-image-native-arm`,
+so the existing text-only Stock run keeps its original binary and evidence.
+HP39g+ and HP39gs Direct pass; remaining native results are pending. Full
+isolated control regression (63047) and host/ARM analysis also run separately.
