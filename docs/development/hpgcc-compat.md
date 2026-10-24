@@ -1555,9 +1555,11 @@ across both buffering modes, checks focus and resulting values, removes and
 recreates controls, and captures four 60% orientations for independent complete
 pixel and LCD-mode checks. Existing keyboard/page-exchange and settled-return
 gates still pass. Repeat/blink timing remains covered by host tests, not this
-native tap phase. Stock execution is running; CI acceptance remains pending.
+native tap phase. All six Stock models also pass the same independent input,
+pixel and settled-return gates (9966 exit 0). The full 140-test sanitizer
+regression passes (10200 exit 0); submitted in cb7c7bae, CI acceptance remains pending.
 
-### Text label and entry adapter (isolated following batch)
+### Text label and entry adapter (local integrated batch)
 
 `wintext.h` supplies labels and editable byte strings with historical arrow-key
 focus/cursor behavior, backspace, left-shift delete-at-cursor, right-shift clear,
@@ -1580,9 +1582,8 @@ wrong shifted-backspace precedence is rejected. These checks exclude original
 undefined allocation/alias/mutable-cursor cases, tested separately as repairs.
 The installed SDK gate passes C/C++ text clients, six-model launchers, all three
 HP39 Aplet variants, model-specific notebooks and 517 byte-identical release
-outputs (14789 exit 0; `/work/oct24-text-sdk.log`). Native and CI acceptance
-remain open; this work is isolated on `m8-widget-controls`, outside the frozen
-progress/component batch.
+outputs (14789 exit 0; `/work/oct24-text-sdk.log`). All six Stock text models pass (18243 exit 0). This work is now integrated
+locally into `m8-flash-write`; its CI submission/acceptance remains open.
 
 The maintained native window fixture passes text controls on all six Direct
 models (68819 exit 0). Per model it exercises 52 GPIO edges across both
@@ -1590,9 +1591,9 @@ buffering modes: insertion limits, cursor movement, backspace, shifted deletion,
 clear and focus transfer. Independent complete-frame checks verify multiline
 labels and adjacent entry glyphs with a known custom font. Existing keyboard,
 progress, final-frame and settled-return checks still pass. Cursor timing
-remains a host gate; Stock execution and CI acceptance remain open.
+remains a host gate; all six Stock models also pass. CI acceptance remains open.
 
-### Image adapter (isolated following batch)
+### Image adapter (local integrated batch)
 
 `win_img_new` borrows an optional HPG pattern and image. Preferred size follows
 the image, or is zero without one. Painting applies the widget background and
@@ -1626,8 +1627,11 @@ retention at checkpoints 700/800. Six-model Direct process 1287 uses separate
 source `/work/oct24-image-native-src` and artifact `/work/oct24-image-native-arm`,
 so the existing text-only Stock run keeps its original binary and evidence.
 All six Direct models pass (1287 exit 0). Image Stock process 82374 runs in
-that separate directory. Full 143-test control regression (63047) and host/ARM
-analysis (54292) also run separately; Stock completion and CI remain open.
+that separate directory. Full 143-test control regression passes (63047 exit 0,
+1553.33 seconds), as does whole host/ARM analysis (89153 exit 0, 357 sources).
+All six Stock models also pass; text/image are submitted in PR #11, with CI
+acceptance pending. The earlier analysis setup failure is
+preserved; no source analyzer ran until the missing Git metadata was corrected.
 
 ### Soft menu adapter (independent menu batch)
 

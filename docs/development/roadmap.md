@@ -20,89 +20,150 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
-Box acceptance follow-up compares unchanged original 1.1/2.0 box sources:
-144 dense positive-weight grid/alignment/padding cases and repeated available
-sizes match 48,816 lines (SHA256
-`5b9a06f2d72d31a27c0cee044026699e31d69bc76b57c0213289fac6d19f57f7`).
-Wrong padding is rejected; original zero-weight/placeholder/lifecycle defects
-remain separately tested repairs. Eleven related sanitizer targets pass,
-including actual HPG nested pattern/text geometry and removal in both buffers.
-Six-model Direct passes 40 additional GPIO edges/model for grouped controls,
-dynamic membership/focus/menu bindings and descendant modal removal, with
-independent full-frame layout/removal pixels and settled return. Missing label
-pixel is rejected. Combined process 74185 now runs Stock on the fixed box
-artifact; full 153-test regression 37870 and whole analysis 18338 run separately.
-Logs `/work/oct24-box-*`; no Stock/full-regression/CI acceptance is claimed.
+Text/image batch submitted as `9683fd6a` in draft PR #11:
+https://github.com/maxmixalex/hpclang/pull/11 . Source audit matches 4,581 tracked
+files against the verified text/image mirror except the two documented tracking
+files; pinned format, lint and strict docs pass. Existing 143-test/357-source,
+SDK 517-output and all-six Direct/Stock gates apply to the unchanged sources.
+Previous cb7c7bae CI was inspected and accepted before this push; no fresh
+PR #11 CI or merge-main CI was polled. Recheck 9683fd6a before the next push.
+The following local status update is intentionally not a second immediate push.
 
-Chooser full regression 29287 completes all 150 tests in 1359.26 seconds.
-Together with 368-source analysis it covers the pre-box implementation. Fixed
-return-check Direct passes all six models; process 69407 continues Stock.
+PR #10 is accepted and merged as `ed5f470d` at submitted head `cb7c7bae`.
+Previous-push review confirms all eleven listed push/PR runs pass across
+Quality, Core, Runtime, Storage, Objects and Gallery. Core has 18 successful
+jobs in each run; Runtime push 40078980241 has 118 successes, PR 40078983291
+has 117 successes plus one conditional skip. Remote main's merge tree equals
+the accepted head. Local ancestry merge `1a6b7893` changes no files; new main CI
+was not polled. The next text/image batch is prepared separately, retaining
+143-test, 357-source, SDK and all-six Direct/Stock evidence. Only the two
+tracking/compatibility documents differ from verified text/image `fb77d9e8`.
 
-Box public follow-up implements all seven APIs, explicit weighted grid layout,
-NULL placeholders and nested borrowed children. The widget foundation walks
-groups outside callbacks, rolls back failed installation, rejects cycles and
-destruction of bound children, and detaches bindings when a box is destroyed.
-Dynamic membership installs/removes the affected subtree. Layout measures and
-validates all rectangles before publishing any changes. Ten related ASan/UBSan
-targets pass, including dynamic failure rollback, overflow and retained controls;
-ARM compile/analysis pass. SDK 69480 exits 0: 517 reproducible outputs, C/C++,
-six launchers, three Aplet variants and notebooks pass. Logs `/work/oct24-box-*`.
-Historical box source comparison and native group/pixel acceptance remain open.
-Two initial test-build errors (unused helper, missing limits header) are retained.
+Original application follow-up `1044543d` passes both original and responsive
+layouts through host ASan/UBSan at 64/80 lines and relocated SDK builds. The
+responsive variant removes the old umbrella and changes exactly three geometry
+calls, preserving the 80-line layout. All six Direct models pass 30 GPIO changes
+(29 delivered before EXIT), 15 captured application frames, slider/checkbox
+pixels and settled return. Original fixed geometry is independently rejected
+at (21,43) on 64 lines. Two ARM translation-unit analyses pass; HP39g+/HP50g
+screenshots were inspected. Stock 2266 now passes HP39g+ and continues. Logs,
+source hashes, migration diff and native artifact: `/work/oct24-simple-*`.
+Documentation follow-up `5ffeda4e` reconciles implemented window APIs and removes
+unshipped-development-document links from the installed migration guide.
+Strict docs and fresh installed guide equality/local-link checks pass.
 
-Chooser Stock 51380 terminated with HP39g+ runtime failure 0x46417805 after
-all chooser frames. Saved SRAM has errno=ENOMEM while both final display pages
-are already monochrome, proving the final mode switch succeeded. Fixture fix
-`fc6d7d01` clears errno immediately before that checked operation. Original
-RAM/state/ELF/HPC remain in `/work/oct24-choose-stock-hp39gplus-failure-state`.
-Process 69407 runs fresh six-model Direct followed by Stock on a separate
-return-check artifact; no replay acceptance yet. Chooser whole analysis 29830
-passes 368 sources; regression 29287 remains live. Checkbox Stock 73812 passes
-all six models. These results do not cover the new box implementation.
+Split window Stock 51945/76541 both pass HP39g+ and HP39gs, continuing with
+HP40gs and the classic models. No all-six Stock acceptance is claimed yet.
 
-Independent `m8-box-controls` work adds a checked internal grid-axis allocator
-and alignment helper. It preserves padding-first deficits and historical signed
-rounding, handles fixed zero-weight cells without division by zero, and computes
-remaining weights without subtractive cancellation. Invalid weights, allocation
-failure and coordinate overflow leave caller output unchanged. ASan/UBSan,
-ARMv4T compilation and static analysis pass (`/work/oct24-box-{build,tests}.log`).
-Source review also finds the original NULL-placeholder loop fails to advance;
-the future container adapter must fix that path. No public box API, grouped
-installation/removal, source-equivalence, SDK or native acceptance is claimed.
-Chooser regression/analysis/Stock runs remain on their original fixed sources.
+Window follow-up `cfa7c751` keeps all native checks while splitting the
+universal payload into foundation (63,648 bytes) and dialogs (65,488 bytes),
+16 code pages each instead of the 72,048-byte monolith. Every requested mode
+now checks actual surface levels and back-page exchange. Runtime CI includes
+both suites on all six models in both contexts; eight plan tests pass. Six
+Direct models pass for each group, and maintained HPC/raw launchers match the
+running artifacts byte-for-byte. Both ARM fixture analyses, verifier dispatch
+and missing-frame negative checks pass. Stock 51945/76541 continue in isolated
+`/work/oct24-window-split{1,2}-src`; logs `/work/oct24-window-split*`. No push.
 
-Selection-control foundation on `m8-choose-controls` remains local and internal:
-paired borrowed option/label descriptors preserve numeric selection semantics;
-allocation failure leaves state intact, and removal shifts both fields together.
-Focused ASan/UBSan tests, ARMv4T compilation and static analysis pass
-(`/work/oct24-choose-tests.log`). The following local adapter now provides all
-nine public APIs and popup selection with confirmation/cancellation, empty lists,
-numeric selection, first-focus menu binding, removal and reset/reinstallation.
-The overlay leaves the application menu installed, consumes modal keys and
-closes on focus loss or successful programmatic mutation. Production HPG pixel
-checks pass 64/80-line displays, both buffers, 40-option scrolling and selected
-rows. All three focused sanitizer targets and ARM compile/analysis pass; logs
-`/work/oct24-choose-{adapter,pixels}-*.log`. Initial pixel expectation extended
-the border by one row; corrected with its failure log retained. SDK process
-38518 exits 0: 517 reproducible outputs, C/C++, six launchers, three Aplet
-variants and notebooks pass (`/work/oct24-choose-sdk.log`).
+Diagnosis is now concrete: `/work/oct24-mode-diag-*` records ENOMEM (12),
+mailbox 0x4641782c and 36 KiB boot RW on HP39g+ Stock. Single-buffer frames
+100..122 exist; the double-buffer request fails before frame 200. Preserved
+SRAM/state/ELF/HPC are in `/work/oct24-mode-diag-failure-state`. The final
+snapshot has already switched back to mono, so it is not a gray-mode snapshot.
+The first diagnostic launch failed because its temporary PTY directory was
+missing; a fresh launch after creating it produced this runtime-fail evidence.
+The memory finding is separate from the earlier final errno fixture fix.
 
-Chooser follow-up compares all nine unchanged original functions from HPGCC
-1.1/2.0: 1,337 matching state/keyboard trace lines, SHA256
-`f419ec0019d7557102368b019f38802113552eef0d63215cd0b26ab73cf86580`.
-Original label-removal and lifecycle defects are excluded from equivalence and
-covered separately. Wrong returned index and selected-row pixel are rejected.
-Four focused sanitizer targets pass (`/work/oct24-choose-reference-tests.log`).
-All six Direct models pass 104 physical GPIO edges/model, popup confirm/cancel,
-empty lists, wrapping, menu/focus/removal/rebind, deterministic content pixels
-and settled return (67716 exit 0). Native font footer text is not a pixel claim;
-footer edges and content/status pixels are checked. Stock 51380 runs on the
-fixed `/work/oct24-choose-native-arm` artifact. Full 150-test regression 29287
-and whole host/ARM analysis 29830 run separately. Logs `/work/oct24-choose-*`.
-Stock, full regression/analysis and CI acceptance remain open; no M8 completion.
+Box guard `b57503fd` passes three sanitizer targets, both 48,816-line original
+comparisons and complete 373-source analysis (95021 exit 0). Original box
+regression 37870 also completes all 153 ASan/UBSan tests in 1408.86 seconds.
+Logs `/work/oct24-box-fix-*` and `/work/oct24-box-full-tests.log` are retained.
+The later native split changes are checked separately as described above.
+
+Original application follow-up `6f0d0a32` (isolated `m8-window-apps`) adds
+`win.h` and an archive-extracted 1.1 simple.c gate. Only the unused hpgcc49.h
+include is removed. ASan/UBSan production-loop interaction and relocated SDK
+ARM/six-launcher packaging pass; source hashes and migration diff are retained
+in `/work/oct24-simple-gate-final`. Host renderer is stubbed; original y=65
+slider still needs 64-line layout migration and native application acceptance.
+Initial harness failures were nested default-IDLE progress notifications;
+the scripted driver now guards reentry. No runtime behavior was changed.
+
+Latest local failures: chooser 69407 and box 74185 exit 1 on HP39g+ Stock
+page-exchange verification for mode 200. Both payload/Stock harnesses report
+successful final rendering and settled return, but independent LCD register
+checks fail. Chooser frames 200..222 retain address 0x04013208. This is not a
+Stock acceptance; remaining five models were not run by either script.
+Preserve `/work/oct24-choose-return-stock-*` and `/work/oct24-box-stock-*`.
+The previous errno failure did not recur; mode allocation/display exchange
+requires investigation. Whole box analysis 18338 also exits 1: zero-sized
+allocation diagnostics in hpgcc-box.c:180/182 on two configurations, despite
+373 sources processed. These original failures are superseded by the guard
+and regression results above; the monolithic Stock failure remains recorded.
+
+Earlier cb7c7bae inspection found unfinished Core/Runtime runs; the completed
+acceptance and merge above supersede that pending state.
+
+Box follow-up `d5cbc83f` supplies all seven public APIs, transactional grid
+layout and borrowed nested groups. Group installation runs outside callbacks
+and rolls back failures; dynamic add/remove, cycle rejection and bound-child
+lifetime checks pass ten related sanitizer targets. ARM compile/analysis and
+full SDK 69480 pass (517 outputs, C/C++, six launchers, three Aplet variants).
+Follow-up `cf8c97cc` passes 48,816-line original 1.1/2.0 grid comparisons,
+wrong-padding and missing-pixel negatives, eleven sanitizer targets and all six
+Direct models (40 additional GPIO edges/model, full-frame nested layout/removal
+and settled return). Stock 74185 and analysis 18338 subsequently fail as
+detailed above; full 153-test regression 37870 subsequently passes. Logs `/work/oct24-box-*`; CI acceptance remains open.
+
+Historical foundation note (superseded by `d5cbc83f`): `2c4b6502` passes focused
+ASan/UBSan, ARM compile and analysis. Checked axis allocation/alignment handles
+zero weights, padding deficits, allocation rollback and coordinate overflow,
+retaining historical signed rounding. Original NULL-placeholder looping and
+zero-weight division were identified for repair. Public APIs and native
+acceptance were pending at that earlier stage. Logs `/work/oct24-box-*`.
+
+Latest follow-up inspection (2026-10-24): `cb7c7bae` Quality, Storage and
+Objects push/PR runs pass; Gallery 40078983286 now also passes. Core and Runtime
+remain unfinished with no failed jobs at inspection: Core PR/push have 8/7
+successful and 10/11 unfinished jobs; Runtime PR/push have 93/91 successful
+and 24/26 unfinished jobs. No new push was made.
+No subsequent push or CI acceptance is claimed. Re-read failed Objects run
+40068713236: HP39g+ fails with `host-gate-failed` during Stock payload transfer,
+before test execution; the transport cause remains open. Inspect again before
+the next push, including any remaining or newly failed jobs.
+
+Image Stock process 82374 has completed all six models successfully, joining
+its six-model Direct, SDK, reference/pixel tests and text/image full regression.
+Menu Stock 86659 also completes all six models successfully; checkbox Stock
+73812 completes all six models successfully (exit 0).
+Independent chooser foundation `896948b4` passes focused ASan/UBSan, ARMv4T
+compile and analysis: paired option/label removal and allocation rollback.
+Follow-up `eaa91dc4` adds all nine public chooser APIs, scrolling modal selection,
+confirm/cancel, empty lists and lifecycle-safe menu overlays. Three focused
+ASan/UBSan targets pass including real HPG pixels on 64/80-line displays in both
+buffer modes, plus ARM compile/analysis. Logs `/work/oct24-choose-*-tests.log`.
+SDK process 38518 exits 0: 517 reproducible outputs, six-model C/C++ launchers,
+three Aplet variants and notebooks pass (`/work/oct24-choose-sdk.log`).
+Follow-up `991afcd4` compares all nine unchanged 1.1/2.0 functions: 1,337 matching
+state/keyboard trace lines. Wrong index and selected-row pixel are rejected;
+four focused sanitizer targets pass. All six Direct models pass 104 GPIO
+edges/model, modal confirm/cancel/scrolling, content/status pixels, footer edges
+and settled return (67716 exit 0). Built-in footer glyphs are outside the pixel
+claim. Stock 51380 fails on HP39g+ after all chooser frames (0x46417805).
+Saved SRAM has errno=ENOMEM but two successfully installed monochrome pages:
+the final check attributed stale errno to a successful switch. Fixture fix
+`fc6d7d01` clears errno immediately before the mode-switch check; original
+RAM/state/ELF/HPC are preserved in
+`/work/oct24-choose-stock-hp39gplus-failure-state`. Process 69407 validates
+fresh Direct then Stock using `/work/oct24-choose-return-arm`: all six Direct
+models pass, Stock pending. Whole analysis 29830 passes 368 sources; full
+150-test regression 29287 passes in 1359.26 seconds. Neither covers box changes.
+Logs `/work/oct24-choose-*`. Stock and CI acceptance remain open. All chooser work remains local on
+`m8-choose-controls`; no subsequent push or M8 completion is claimed.
 
 ## Principles
 
+- before each subsequent remote push, inspect the previous push's CI and failed-job logs; record unresolved causes explicitly and do not treat cancelled or pending runs as passes; do not poll newly pushed CI;
 - one application ABI: HPC1 / hpclang v1;
 - one common ARMv4T runtime;
 - thin platform implementations: `hp39`, `hp48`, and `hp4950`;
@@ -4978,13 +5039,153 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Independent following control batch: branch `m8-widget-controls` in
+  `research/m8-widget-controls`, commit `da17a3f9`, adds `wintext.h` labels and
+  editable fields. It uses `/work/oct24-controls-src` and separate sanitizer
+  build `/work/oct24-text-tests`; the current progress-batch source/artifact and
+  running processes are unchanged. Text storage capacity is separate from the
+  historical keyboard insertion limit; programmatic replacement may exceed the
+  limit without changing it. Tests pass insertion bounds, cursor movement,
+  three deletion modes, focus, cursor rendering-call positions, mutable-buffer
+  shortening, aliased replacement, and allocation-failure preservation/cleanup.
+  ARMv4T compile/analysis pass; logs `/work/oct24-text-{build,tests}.log`.
+  This is not yet integrated into m8-flash-write, its SDK, native matrix or CI.
+  Text follow-up `9cf24d5f` compares all three original source files/four public
+  APIs from both HPGCC 1.1/2.0 versions over the same window foundation. Both
+  match 13,837 lines (SHA256
+  `5053bfb5a00912b263eb38c7acfd6beb75966317959c7c8e9df2a9246b9c0534`),
+  including six label layouts, four entry limits, high bytes, programmatic
+  over-limit replacement and 512 editing actions. Both use unsigned char like
+  ARM. Wrong shifted-backspace precedence is rejected. Logs:
+  `/work/oct24-text-{reference,negative}.log`. Three sanitizer targets pass,
+  including production HPG custom-font pixels for glyphs/cursor/deletion
+  (`/work/oct24-text-pixels-tests.log`). Strict docs pass. SDK clients expanded
+  in `a0e285df`; full relocated SDK process 14789 exits 0: C/C++, six-model
+  launchers, three HP39 Aplet variants, notebooks and 517 byte-identical outputs
+  pass (`/work/oct24-text-sdk.log`). Text native/CI acceptance remains pending.
+  Text native follow-up `308da748` passes all six Direct models (68819 exit 0):
+  52 physical GPIO edges per model cover insertion limits, cursor movement,
+  three deletion behaviors and focus; complete-frame checks verify multiline
+  labels and entry glyphs in both buffer modes. All saved return records pass;
+  a missing label pixel is rejected. Stock process 18243 now runs. Initial
+  isolated setup failures (emulator symlink and CRLF sequence) occurred before
+  payload execution and are retained in `/work/oct24-text-direct-setup-failure.log`
+  and `/work/oct24-text-stock-sequence-failure.log`. SDK follow-up `d699fe5e`
+  records completed acceptance. Integrate this batch after the frozen batch.
+  Independent image follow-up `0716c8d8` adds `winimg.h`: borrowed optional
+  image/pattern, preferred image size, clipped pattern-before-image painting,
+  allocation cleanup and detached repaint on removal. Real HPG ASan/UBSan
+  composition/clipping/removal/resource-reuse tests and ARM compile/analysis
+  pass. Corrected test expectations use the relative pattern origin and fit
+  the host display; initial failure log is retained. SDK process 55970 exits 0: C/C++, six launchers, three Aplet variants,
+  notebooks and 517 byte-identical outputs pass (`/work/oct24-image-sdk.log`).
+  Image follow-up `9b07487e` passes unchanged 1.1/2.0 source comparisons:
+  32 resource/transparency/geometry cases, 577 matching lines, missing-pattern
+  negative rejected. Reference and HPG pixel sanitizer targets pass. All six
+  Direct models pass image-over-pattern frames and settled return (1287 exit 0),
+  using separate `/work/oct24-image-native-src` and `/work/oct24-image-native-arm`.
+  Image Stock 82374, full 143-test regression 63047 and whole analysis 54292 run.
+  Text-only Stock 18243 passes HP39g+ and continues HP39gs on its original
+  artifact. Logs use `/work/oct24-image-*` and `/work/oct24-controls-*`.
+  Stock completion and CI acceptance remain open.
+  Following menu batch `556ea3ee` on `m8-menu-controls` implements all eight
+  soft-menu APIs: 30 copied labels, five pages, modifiers/event payloads,
+  enabled/colors and insert/delete packing. It repairs unsigned backward-page
+  underflow, the duplicate disabled-color symbol and stale occupancy on gap
+  packing. Construction uses model facts without display acquisition; drawing
+  adapts to 64/80 lines. Focused ASan/UBSan and ARM compile/analysis pass, logs
+  `/work/oct24-menu-sanitizer-{build,tests}.log`. Original-source comparison,
+  real pixels, SDK and native acceptance remain open. Uses separate source
+  `/work/oct24-menu-src`; running text/image batches remain unchanged.
+  Menu follow-up `dfe576d6` passes real HPG full-frame cells/labels/disabled
+  colors/page-two checks for 64/80-line displays and both buffering modes.
+  Original 1.1/2.0 comparisons cover all eight APIs and match 6,840 lines;
+  wrong four-byte label negative rejected. Reference shims only rename the
+  duplicate disabled-color symbol and replace the external alloca declaration
+  with the host intrinsic header; first link failure retained. Three sanitizer
+  targets pass. SDK 74007 exits 0 (C/C++, six launchers, three Aplet variants,
+  notebooks, 517 reproducible outputs), log `/work/oct24-menu-sdk.log`. Native
+  menu acceptance remains open. Text Stock 18243 now passes HP39g+/HP39gs and
+  continues HP40gs; image Stock 82374 passes HP39g+ and continues HP39gs.
+  Whole text/image analysis 54292 exited before source enumeration because
+  its isolated mirror lacked Git metadata. Setup failure log retained at
+  `/work/oct24-controls-analysis-setup-failure.log`; corrected process 89153
+  runs the original full scope. Regression 63047 and Stock 18243/82374 remain live.
+  Native menu follow-up `a7a5068a` passes all six Direct models (32162 exit 0):
+  56 GPIO edges/ten selection callbacks per model, page wrap, disabled-item
+  suppression, complete two-page glyph/color captures in both buffer modes
+  and settled return. Wrong disabled-color pixel negative is rejected. Menu
+  Stock process 86659 runs from `/work/oct24-menu-src` with its fixed artifact.
+  Full text/image host/ARM analysis passes (89153 exit 0, 357 sources), log
+  `/work/oct24-controls-analysis.log`; full 143-test regression remains live.
+  Final frozen-batch verification: all six Stock models pass independent
+  keyboard/control pixels and settled return (9966 exit 0). Full ASan/UBSan
+  regression passes all 140 tests in 1351.00 seconds (10200 exit 0), log
+  `/work/oct24-progress-full-tests.log`. Together with six-model Direct, SDK,
+  format/lint and 352-source analysis, local batch gates pass. CI submission
+  and acceptance remain open; earlier running entries below are historical.
+
+  Text-only Stock matrix completes (18243 exit 0): all six models pass
+  independent text/input/frame checks and settled return. Image Stock 82374
+  passes HP39g+/HP39gs and continues HP40gs; menu Stock 86659 remains live.
+  Full 143-test regression 63047 continues; 357-source analysis already passes.
+  Independent checkbox follow-up `c0a65c94` on `m8-checkbox-controls` implements
+  six APIs, borrowed labels, selected state, plain-W toggle, arrow focus and
+  soft-menu CHK bindings. Per-install event IDs survive reset/reinstall, first
+  focus binds only after installation, and removal retains the next checkbox
+  binding while clearing a singleton. Focused rebinding/unbinding is explicit.
+  ASan/UBSan lifecycle/input tests and ARM compile/analysis pass, logs
+  `/work/oct24-checkbox-{build,tests}.log`; comparison/pixels/SDK/native remain
+  open. Separate `/work/oct24-checkbox-src` preserves running batch sources.
+
+  Checkbox follow-up `da323b44` passes real HPG selected/focused/glyph pixels
+  in both buffers and six unchanged 1.1/2.0 function comparisons: 7,218 lines,
+  SHA256 `c13bbed5c0d2925615957b2ad755cd5a9f21b5193980f625fbc82f8feaa4843e`.
+  Wrong checkmark-pattern negative is rejected; three sanitizer targets pass.
+  Full SDK passes (60235 exit 0): C/C++, six launchers, three Aplet variants,
+  notebooks and 517 reproducible outputs (`/work/oct24-checkbox-sdk.log`).
+  Native checkbox acceptance remains open. Menu Stock 86659 passes HP39g+
+  and continues HP39gs. Full text/image ASan/UBSan regression now passes all
+  143 tests (63047 exit 0, 1553.33 seconds), log
+  `/work/oct24-controls-full-tests.log`; no menu/checkbox full-suite claim.
+
+  Text/image branch integrated locally into m8-flash-write after component
+  submission. The only merge conflict was compatibility-document status; all
+  4,581 tracked files match the verified control mirror after newline
+  normalization. Full formatting/lint and strict docs pass with pinned ATFE
+  clang-format and the quality venv. Initial local checks used system
+  clang-format 18 and CRLF Python copies; corrected environment/line endings
+  without behavioral source changes. Logs `/work/oct24-integrated-*`. Existing
+  143 sanitizers/357-source analysis/SDK/native results retain exact source
+  coverage. Image Stock remains pending; no new push or fresh CI query.
+
+  Checkbox native follow-up `2927ab3b` passes all six Direct models (25391
+  exit 0): 32 GPIO edges per model, focus/CHK/rebind/unbind/removal checks and
+  independent complete selected/focus/label frames in both buffering modes.
+  Wrong focus pixel is rejected. Stock 73812 runs from its fixed checkbox
+  artifact; acceptance remains open. Local text/image merge is `161374d2`.
+
+  Component batch pushed as `cb7c7bae` to `m8-flash-write`, draft PR #10.
+  Includes custom widgets/focus and progress sliders; text/image/menu branches
+  remain local follow-ups. Previous head 0a7c2d8d passed every push/PR workflow
+  before this push. New CI is submitted, not polled or accepted; no merge.
+
+  Final pre-push inspection: every workflow on 0a7c2d8d passes on both push
+  and PR runs. Core 40073586985/40073583179 and Runtime
+  40073586999/40073583151 are now terminal success, joining Quality, Storage,
+  Objects and Gallery. No unfinished or failed jobs remain on that head.
+  This does not establish fixes for older intermittent transport/audio causes.
+  Component source audit matches all 4,572 tracked files to the verified mirror;
+  strict docs pass (`/work/oct24-component-final-docs.log`). The ready component
+  batch retains all 140 sanitizer, SDK and six-model Direct/Stock evidence.
+
   Pre-next-push CI inspection of 0a7c2d8d: both Quality (40073587007 /
   40073583118), Storage (40073587032 / 40073583077) and Objects (40073587006 /
-  40073583192) runs pass. PR Gallery 40073586972 passes; push Gallery
-  40073583076 queues. PR Core 40073586985 runs; push Core 40073583179 queues.
+  40073583192) runs pass. Both Gallery runs 40073586972 /
+  40073583076 pass. PR Core 40073586985 passes; push Core 40073583179 runs.
   Runtime's aggregate queued label does not mean no work: 40073586999 has
-  45 successful / six running / 66 queued jobs; 40073583151 has 45 successful /
-  five running / 67 queued. Neither reports a failed job at this inspection.
+  102 successful / 15 unfinished jobs; 40073583151 has 115 successful /
+  two unfinished jobs. Neither reports a failed job at this inspection.
   Preceding 95348ce8 Runtime runs were cancelled by workflow concurrency after
   101 and 90 successful jobs respectively, not accepted as whole-suite passes.
   The older transport/audio failures remain unresolved; a passing Objects run
@@ -4996,8 +5197,8 @@ below are retained.
   The mirror Git index includes all current files. Full format/lint pass, logs
   `/work/oct24-progress-{format,lint}.log`. Full 140-target ASan/UBSan regression
   runs in process 10200, logs `/work/oct24-progress-full-{build,tests}.log`.
-  Whole host/ARM analysis runs in process 37052, log
-  `/work/oct24-progress-analysis.log`. Neither full result is claimed yet.
+  Whole host/ARM analysis passes (37052 exit 0, 352 sources), log
+  `/work/oct24-progress-analysis.log`. Full sanitizer result remains pending.
   Stock process 9966 remains active; HP39g+ directory transfer completed and
   payload packet sends are progressing. Keep the same processes until terminal.
 
@@ -5017,9 +5218,9 @@ below are retained.
   lacked RUNNER_TEMP and exited before emulation; log retained at
   `/work/oct24-progress-stock-setup-failure.log`. Corrected six-model Stock
   process 9966 is live, with `/work/oct24-progress-stock-<model>.log` and matching
-  evidence directories. HP39g+ Stock now passes input, all 46 captured frames,
+  evidence directories. HP39g+/HP39gs Stock now pass input, all 46 captured frames,
   page exchange, final animation and settled return; the same process continues
-  with HP39gs. Remaining Stock models and CI acceptance are pending; local only.
+  with HP40gs. Remaining Stock models and CI acceptance are pending; local only.
 
   Progress-control source differential now passes both HPGCC 1.1/2.0:
   `tests/compat/check-win-progress.py` compiles all eight unchanged original
