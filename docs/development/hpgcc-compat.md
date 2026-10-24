@@ -1440,4 +1440,6 @@ across both buffering modes, checks focus and resulting values, removes and
 recreates controls, and captures four 60% orientations for independent complete
 pixel and LCD-mode checks. Existing keyboard/page-exchange and settled-return
 gates still pass. Repeat/blink timing remains covered by host tests, not this
-native tap phase. Stock execution is running; CI acceptance remains pending.
+native tap phase. All six Stock models also pass the same independent input,
+pixel and settled-return gates (9966 exit 0). The full 140-test sanitizer
+regression passes (10200 exit 0); CI submission/acceptance remains pending.

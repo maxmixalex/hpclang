@@ -4921,9 +4921,12 @@ below are retained.
   launchers, three HP39 Aplet variants, notebooks and 517 byte-identical outputs
   pass (`/work/oct24-text-sdk.log`). Text native/CI acceptance remains pending.
   Integrate these following-batch commits only after the frozen batch.
-  Subsequent Stock progress results: HP40gs, HP48gII and HP49g+ also pass
-  independent keyboard/control pixels and return; process 9966 continues HP50g.
-  Full 140-test sanitizer process 10200 remains running; no full-pass claim.
+  Final frozen-batch verification: all six Stock models pass independent
+  keyboard/control pixels and settled return (9966 exit 0). Full ASan/UBSan
+  regression passes all 140 tests in 1351.00 seconds (10200 exit 0), log
+  `/work/oct24-progress-full-tests.log`. Together with six-model Direct, SDK,
+  format/lint and 352-source analysis, local batch gates pass. CI submission
+  and acceptance remain open; earlier running entries below are historical.
 
   Pre-next-push CI inspection of 0a7c2d8d: both Quality (40073587007 /
   40073583118), Storage (40073587032 / 40073583077) and Objects (40073587006 /
