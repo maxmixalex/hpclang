@@ -1344,6 +1344,14 @@ The existing pool report schema remains unchanged. This is one block's
 accounting; other native allocations and installation/transfer peaks remain
 outside its scope. Native acceptance of this additional observer is pending.
 
+Use `tests/e2e/ui/verify.py stock FAMILY --pool --allocation` to require both
+checkpoint reports, cross-check their block pointer and model against the pool,
+recompute mapped-page intersections and require identical observations across
+cleanup. Any page intersecting only allocator metadata is also rejected. The
+reported pool/block union is pool bytes plus unmapped usable bytes plus block
+metadata; it avoids counting shared pages twice. It remains a partial resource
+ledger, not total native allocation or a sufficient installation budget.
+
 The preceding raw HP39g+ capture passes UI pixels, memory/pool checks and Stock
 return. Both checkpoints show pointer `0x080053ac`, extent 6,144 bytes and
 allocated flags `0x2102`, with no mapped pool page inside that extent. Its

@@ -151,6 +151,59 @@ def verify_pool(prefix: Path, model: int) -> int:
     return count
 
 
+def verify_allocation(prefix: Path, model: int) -> int:
+    """Cross-check the block and pool; return their union, not total native RAM."""
+    pool_pages = verify_pool(prefix, model)
+    reports = []
+    fields = {
+        "version",
+        "id",
+        "model",
+        "pointer",
+        "usable_bytes",
+        "flags",
+        "next",
+        "previous",
+        "metadata_bytes",
+        "mapped_pages",
+        "unmapped_usable_bytes",
+    }
+    begin, end = 0x08000000, 0x08040000 if model == 4 else 0x08080000
+    for checkpoint in (1, 2):
+        report = json.loads(Path(f"{prefix}-allocation-{checkpoint}.json").read_text())
+        pool = json.loads(Path(f"{prefix}-pool-{checkpoint}.json").read_text())
+        assert set(report) == fields, f"{prefix}: allocation report schema"
+        assert all(type(value) is int and 0 <= value <= 0xFFFFFFFF for value in report.values())
+        assert report["version"] == 1 and report.pop("id") == checkpoint
+        assert report["model"] == model
+        pointer, usable = report["pointer"], report["usable_bytes"]
+        assert pointer == pool["native_os_block"], f"{prefix}: allocation/pool pointer mismatch"
+        assert all(begin <= page <= end - 4096 for page in pool["physical_pages"])
+        if not pointer:
+            assert not any(report[key] for key in fields - {"version", "id", "model"})
+        else:
+            assert pointer % 4 == usable % 4 == 0
+            assert begin + 16 <= pointer <= end - 4 and usable <= end - pointer - 4
+            assert report["metadata_bytes"] == 20 and report["flags"] & 0xF000 in (0x1000, 0x2000)
+            for key in ("next", "previous"):
+                link = report[key]
+                assert not link or (
+                    link % 4 == 0 and begin <= link <= end - 16 and link != pointer - 16
+                )
+            mapped = 0
+            for page in pool["physical_pages"]:
+                if page < pointer + usable + 4 and page + 4096 > pointer - 16:
+                    assert pointer <= page and page + 4096 <= pointer + usable
+                    mapped += 1
+            assert report["mapped_pages"] == mapped
+            assert report["unmapped_usable_bytes"] == usable - mapped * 4096
+        reports.append(report)
+    assert reports[0] == reports[1], f"{prefix}: allocation changed across cleanup"
+    total = pool_pages * 4096 + reports[0]["unmapped_usable_bytes"] + reports[0]["metadata_bytes"]
+    print(f"PASS: {prefix}: pool/block union {total} bytes (other native allocations excluded)")
+    return total
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -158,9 +211,14 @@ def main() -> None:
     parser.add_argument(
         "--pool", action="store_true", help="require Stock native-pool observations"
     )
+    parser.add_argument(
+        "--allocation", action="store_true", help="also require validated native-block observations"
+    )
     args = parser.parse_args()
     if args.pool and args.mode != "stock":
         parser.error("--pool requires Stock mode")
+    if args.allocation and not args.pool:
+        parser.error("--allocation requires --pool")
     for target in Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines():
         verify(
             Path(f"build/{target}-frame"),
@@ -169,7 +227,8 @@ def main() -> None:
         )
         if args.pool:
             models = ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g")
-            verify_pool(Path(f"build/{target}-frame"), models.index(target) + 1)
+            check = verify_allocation if args.allocation else verify_pool
+            check(Path(f"build/{target}-frame"), models.index(target) + 1)
 
 
 if __name__ == "__main__":

@@ -84,6 +84,73 @@ class UiMemoryTests(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     self.check(invalid)
 
+    def test_native_allocation_cross_checks_pool_without_double_counting(self):
+        pool = dict(
+            version=1,
+            model=6,
+            rw_bytes=36864,
+            stage_pool_pages=32,
+            native_workspace_pages=0,
+            native_os_block=0x08001010,
+            pool_l2_physical=0x08008000,
+            physical_pages=[0x08002000, 0x08003000] + [0x08008000 + i * 4096 for i in range(30)],
+        )
+        allocation = dict(
+            version=1,
+            model=6,
+            pointer=0x08001010,
+            usable_bytes=0x2FF0,
+            flags=0x2102,
+            next=0,
+            previous=0,
+            metadata_bytes=20,
+            mapped_pages=2,
+            unmapped_usable_bytes=0xFF0,
+        )
+
+        def save(block, pages=pool):
+            for checkpoint in (1, 2):
+                for kind, value in (("allocation", block), ("pool", pages)):
+                    Path(f"{self.prefix}-{kind}-{checkpoint}.json").write_text(
+                        json.dumps(dict(value, id=checkpoint))
+                    )
+
+        save(allocation)
+        self.assertEqual(VERIFY.verify_allocation(self.prefix, 6), 32 * 4096 + 0xFF0 + 20)
+        for invalid in (
+            dict(allocation, version=True),
+            dict(allocation, model=1),
+            dict(allocation, usable_bytes=0xFFFFFFFF),
+            dict(allocation, flags=0x102),
+            dict(allocation, mapped_pages=3),
+            dict(allocation, unmapped_usable_bytes=0x2FF0),
+            dict(allocation, metadata_bytes=0),
+            dict(allocation, pointer=0),
+            dict(allocation, next=0x08001000),
+            dict(allocation, previous=0x08080000),
+            dict(allocation, extra=1),
+        ):
+            save(invalid)
+            with self.subTest(report=invalid), self.assertRaises(AssertionError):
+                VERIFY.verify_allocation(self.prefix, 6)
+        invalid_pool = dict(pool, physical_pages=[0x08004000] + pool["physical_pages"][1:])
+        save(allocation, invalid_pool)  # a mapped page overlaps only the footer
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_allocation(self.prefix, 6)
+        save(allocation)
+        path = Path(f"{self.prefix}-allocation-2.json")
+        changed = dict(allocation, flags=0x2103, id=2)
+        path.write_text(json.dumps(changed))
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_allocation(self.prefix, 6)
+        path.unlink()
+        with self.assertRaises(FileNotFoundError):
+            VERIFY.verify_allocation(self.prefix, 6)
+        empty = dict.fromkeys(allocation, 0)
+        empty.update(version=1, model=6)
+        save(empty, dict(pool, native_os_block=0))
+        self.assertEqual(VERIFY.verify_allocation(self.prefix, 6), 32 * 4096)
+
     def test_schema_and_missing_artifact_are_not_accepted(self):
         with self.assertRaises(FileNotFoundError):
             VERIFY.verify_memory(self.prefix)

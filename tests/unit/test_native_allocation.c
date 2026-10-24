@@ -48,6 +48,8 @@ int main(void)
     assert(native_allocation_read(read32, memory, pointer, BASE, end, pages, 2, &result) == -1);
     pages[0] = pages[1]; /* duplicate page must not double-count */
     assert(native_allocation_read(read32, memory, pointer, BASE, end, pages, 2, &result) == -1);
+    pages[0] = BASE + 0x4000u; /* page contains only the allocation footer */
+    assert(native_allocation_read(read32, memory, pointer, BASE, end, pages, 2, &result) == -1);
     pages[0] = end;
     assert(native_allocation_read(read32, memory, pointer, BASE, end, pages, 2, &result) == -1);
     pages[0] = BASE + 0x8000u;

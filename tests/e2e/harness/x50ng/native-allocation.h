@@ -49,7 +49,7 @@ static int native_allocation_read(native_read32_t read32, void *context, uint32_
         for (uint32_t j = 0; j < i; ++j)
             if (pages[i] == pages[j])
                 return -1;
-        if (pages[i] < pointer + value.usable_bytes && pages[i] + 4096u > pointer) {
+        if (pages[i] < pointer + value.usable_bytes + 4u && pages[i] + 4096u > header) {
             if (pages[i] < pointer || pages[i] + 4096u > pointer + value.usable_bytes)
                 return -1;
             ++value.mapped_pages;
