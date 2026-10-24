@@ -4,6 +4,29 @@ This page records the M7 source-compatibility inventory. Historical names are in
 
 ## Sources and method
 
+### Original window application gate
+
+`win.h` supplies the historical control umbrella. Run
+`ATFE=/path/to/atfe python3 tests/compat/check-win-simple.py /path/to/archives --work /new/output/path`
+to extract HPGCC 1.1's `examples/win/simple.c`, remove its unused `hpgcc49.h`
+include, and retain a migration diff and SHA256 report. No application logic is
+rewritten. The original member SHA256 is
+`db0b138ac6bc76abfea0d6b0eeac8cf5e141d3b32fdd3a1d8c6e6fcdfe260b23`.
+
+The ASan/UBSan host harness runs the production event loop through A/B/CLEAR,
+checkbox menu selection, all four slider orientations and EXIT. Its renderer
+is stubbed and its external cleanup handles the original process-exit-only
+ownership. Nested IDLE change notifications are ignored by the scripted input
+driver, matching the progress control's documented default event. The gate also
+installs and relocates the SDK, compiles the application for ARM and checks all
+six launcher envelopes. `/work/oct24-simple-gate-final/report.json` records a
+passing run; earlier harness reentrancy failures remain in adjacent logs.
+
+This is not native application acceptance: the original fourth slider at y=65
+remains outside 64-line screens. Layout migration and native input/rendering
+acceptance remain required. This application is from 1.1 only; it is absent
+from the supplied 2.0 archive.
+
 Box acceptance follow-up compares all seven public APIs and the original
 preferred-size helper from both unchanged 1.1/2.0 releases: 144 dense,
 positive-weight grid/alignment/padding cases across surplus/deficit sizes match
