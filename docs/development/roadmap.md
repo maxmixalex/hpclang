@@ -20,6 +20,13 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Box follow-up `d5cbc83f` supplies all seven public APIs, transactional grid
+layout and borrowed nested groups. Group installation runs outside callbacks
+and rolls back failures; dynamic add/remove, cycle rejection and bound-child
+lifetime checks pass ten related sanitizer targets. ARM compile/analysis and
+full SDK 69480 pass (517 outputs, C/C++, six launchers, three Aplet variants).
+Box source comparison and native acceptance remain open; logs `/work/oct24-box-*`.
+
 Independent box foundation `2c4b6502` on `m8-box-controls` passes focused
 ASan/UBSan, ARM compile and analysis. Checked axis allocation/alignment handles
 zero weights, padding deficits, allocation rollback and coordinate overflow,
@@ -37,7 +44,7 @@ the next push, including any remaining or newly failed jobs.
 Image Stock process 82374 has completed all six models successfully, joining
 its six-model Direct, SDK, reference/pixel tests and text/image full regression.
 Menu Stock 86659 also completes all six models successfully; checkbox Stock
-73812 passes HP39g+/HP39gs and continues HP40gs on its unchanged artifact.
+73812 completes all six models successfully (exit 0).
 Independent chooser foundation `896948b4` passes focused ASan/UBSan, ARMv4T
 compile and analysis: paired option/label removal and allocation rollback.
 Follow-up `eaa91dc4` adds all nine public chooser APIs, scrolling modal selection,
@@ -51,9 +58,15 @@ state/keyboard trace lines. Wrong index and selected-row pixel are rejected;
 four focused sanitizer targets pass. All six Direct models pass 104 GPIO
 edges/model, modal confirm/cancel/scrolling, content/status pixels, footer edges
 and settled return (67716 exit 0). Built-in footer glyphs are outside the pixel
-claim. Stock 51380 runs on the fixed chooser artifact. Full 150-test regression
-29287 and whole analysis 29830 run. Logs `/work/oct24-choose-*`. Stock, full
-regression/analysis and CI acceptance remain open. All chooser work remains local on
+claim. Stock 51380 fails on HP39g+ after all chooser frames (0x46417805).
+Saved SRAM has errno=ENOMEM but two successfully installed monochrome pages:
+the final check attributed stale errno to a successful switch. Fixture fix
+`fc6d7d01` clears errno immediately before the mode-switch check; original
+RAM/state/ELF/HPC are preserved in
+`/work/oct24-choose-stock-hp39gplus-failure-state`. Process 69407 validates
+fresh Direct then Stock using `/work/oct24-choose-return-arm`; replay pending.
+Whole analysis 29830 passes 368 sources; full 150-test regression 29287 runs.
+Logs `/work/oct24-choose-*`. Stock, full regression and CI acceptance remain open. All chooser work remains local on
 `m8-choose-controls`; no subsequent push or M8 completion is claimed.
 
 ## Principles
