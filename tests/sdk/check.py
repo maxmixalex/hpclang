@@ -258,6 +258,7 @@ endforeach()
                             "LIB275L.000",
                             "HP39DIR.000",
                             "HP39DIR.CUR",
+                            "footprint.json",
                         )
                     )
                     aplet = (bundle / "HPGCC000.000").read_bytes()
@@ -271,6 +272,28 @@ endforeach()
                     ):
                         if not (bundle / asset).stat().st_size:
                             raise AssertionError(f"missing Aplet companion: {asset}")
+                    footprint = json.loads((bundle / "footprint.json").read_text())
+                    files = {
+                        filename: (bundle / filename).stat().st_size
+                        for filename in (
+                            "HPGCC000.000",
+                            "HPCRESET.000",
+                            "LIB275L.000",
+                            "HP39DIR.000",
+                            "HP39DIR.CUR",
+                        )
+                    }
+                    if (
+                        footprint["version"] != 1
+                        or footprint["input_launcher_file_bytes"] != len(wrapped)
+                        or footprint["embedded_launcher_bytes"] != len(wrapped) - 8
+                        or footprint["aplet_file_bytes"] != len(aplet)
+                        or footprint["aplet_non_launcher_bytes"] != len(aplet) - len(wrapped) + 8
+                        or footprint["files"] != files
+                        or footprint["bundle_file_bytes"] != sum(files.values())
+                        or not footprint["excludes"]
+                    ):
+                        raise AssertionError(f"{name}/{model}: Aplet footprint accounting mismatch")
         # Clean builds in distinct source/output directories must publish the
         # same resources. CMake caches, debug/ELF metadata and dependency files
         # are not portable release artifacts and are deliberately excluded.
@@ -303,6 +326,7 @@ endforeach()
         missing = [build / "hello_c-launchers/hp50g.hp", build / "hello_cpp-launchers/memory.json"]
         if args.aplet_tool:
             missing.append(build / "hello_cpp-aplet/hp39gs/HPCRESET.000")
+            missing.append(build / "hello_c-aplet/hp40gs/footprint.json")
         for path in missing:
             path.unlink()
         run("cmake", "--build", str(build), "--parallel", "2", env=env)

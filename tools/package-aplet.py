@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
@@ -73,8 +74,26 @@ def package(payload: Path, output: Path, tool: Path, assets: Path, name: str, au
         )
         (work / "HP39DIR.000").write_bytes(listing.encode("ascii"))
         (work / "HP39DIR.CUR").write_bytes(b"HP39AscA A 11 HP39DIR.0004 Root")
+        sizes = {filename: (work / filename).stat().st_size for filename in OUTPUTS}
+        report = {
+            "version": 1,
+            "input_launcher_file_bytes": len(image),
+            "embedded_launcher_bytes": len(image) - 8,
+            "aplet_file_bytes": len(aplet),
+            "aplet_non_launcher_bytes": len(aplet) - (len(image) - 8),
+            "files": sizes,
+            "bundle_file_bytes": sum(sizes.values()),
+            "excludes": [
+                "this host-side report",
+                "transport protocol overhead",
+                "calculator resident object and allocation overhead",
+                "transfer and installation peak memory",
+                "application runtime memory",
+            ],
+        }
+        (work / "footprint.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         output.mkdir(parents=True, exist_ok=True)
-        for filename in OUTPUTS:
+        for filename in (*OUTPUTS, "footprint.json"):
             shutil.copyfile(work / filename, output / filename)
 
 

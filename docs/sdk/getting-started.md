@@ -343,6 +343,16 @@ Transfer the Aplet and Reset program using Conn3x/HPGComm; install the library
 once. Build separate packages with `MODEL hp39gplus` or `MODEL hp40gs` for
 those calculators. Reset clears only the selected Aplet's custom data.
 
+The same directory contains a host-side `footprint.json` report. Its `files`
+map and `bundle_file_bytes` sum describe the five transfer files, including the
+library and directory listings. `aplet_file_bytes` counts `HPGCC000.000`;
+`embedded_launcher_bytes` counts the launcher inside it, without the eight-byte
+`HPHP49-C` transfer header. `aplet_non_launcher_bytes` is the remaining Aplet
+envelope and support data. The input launcher, embedded launcher and Aplet are
+nested representations: do not add them together. The report is not listed for
+transfer and is excluded from the bundle total. These file sizes do not measure
+calculator resident allocations, transport overhead or peak installation RAM.
+
 For HP48gII, install ARMToolbox48 library 275 and transfer its model's `.hp`
 object. HP49g+/HP50g use their corresponding ARMToolbox launcher support.
 The generated application does not include or replace the calculator OS.

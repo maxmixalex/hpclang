@@ -451,6 +451,23 @@ C/C++ Aplet families pass, as do Ruff/format and strict docs.
 This records file/object geometry, not native overhead, HP39 Aplet containers
 or transfer/install peak memory; those resource requirements remain open.
 
+Local HP39 Aplet footprint follow-up (2026-10-24): `package-aplet.py` now emits
+`footprint.json` alongside its five transfer files. It reports actual per-file
+and bundle bytes, the wrapped input launcher, its embedded extent and the
+remaining Aplet envelope/support bytes, explicitly excluding protocol,
+calculator allocation and installation/runtime peaks. CMake declares the report
+as an output; the SDK gate checks its arithmetic, regeneration and reproducibility.
+The existing Storage launcher produces a 67,486-byte Aplet with a 66,504-byte
+embedded launcher and 982 other bytes; its complete five-file bundle is
+69,188 bytes on each HP39 model. All fifteen transfer files are byte-identical
+before/after this reporting change (`/work/oct24-aplet-size-parity`). Existing
+packager rejection tests, Ruff and strict docs pass. The expanded SDK gate
+passes on session 57150 (exit 0), including all 389 release-output byte
+comparisons, six-model builds, all three HP39 Aplet variants and deleted-report
+regeneration (`/work/oct24-aplet-footprint-sdk.log`). This is local work,
+not CI accepted.
+Native resident overhead and transfer/installation peaks remain open.
+
 Local host-side pool observer (2026-10-23): optional Stock capture reads the
 existing boot/native state and original coarse table without changing guest
 code or storage. It checks descriptor/table agreement and distinct physical

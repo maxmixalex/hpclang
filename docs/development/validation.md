@@ -7,7 +7,9 @@ C/C++ clients in two distinct source and build directories. With identical
 toolchain and configuration, it requires byte-identical generated font C/header
 resources, HPC1 images, six-model raw/wrapped launchers and memory reports.
 When the Aplet tool/assets are supplied, it also compares the three HP39 Aplet
-envelopes and their companion files. A missing output or any byte difference
+envelopes, companion files and host-side footprint reports. The SDK gate checks
+each Aplet report against the actual file sizes and regenerates a deleted report
+through the normal CMake build. A missing output or any byte difference
 fails the gate. Both builds use the installed package, not checkout headers.
 
 This checks the maintained SDK examples under `MinSizeRel`. It does not claim
