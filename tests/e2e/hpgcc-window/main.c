@@ -6,6 +6,7 @@
 #include <winimg.h>
 #include <winsoftmenu.h>
 #include <wincheckbox.h>
+#include <winchoose.h>
 #include <string.h>
 #include <hpkeyb49.h>
 #include <limits.h>
@@ -482,6 +483,95 @@ static int checkbox_check(int buffered)
     hpg_free_font(font);
     return hpclang_win_error() ? -1 : hpclang_win_reset();
 }
+
+static int choose_check(int buffered)
+{
+    hpg_set_mode_gray16(buffered);
+    physical_edges = 0;
+    win_widget_t *menu = win_softmenu_new(), *a = win_choose_new(), *b = win_choose_new();
+    if (!menu || !a || !b)
+        return -1;
+    win_choose_add(a, "one");
+    win_choose_add(a, "two");
+    win_choose_add(a, "three");
+    win_choose_set_menu(a, menu, 0);
+    win_choose_set_menu(b, menu, 0);
+    win_add_widget(menu);
+    win_add_widget(a);
+    win_add_widget(b);
+    win_add_event_handler(WIN_KEY_PRESSED, INT_MAX, physical, (void *)(uintptr_t)1);
+    win_add_event_handler(WIN_KEY_RELEASED, INT_MAX, physical, NULL);
+    if (text_tap(KB_W) || win_choose_get_index(a) != 1 || text_tap(KB_A) || text_tap(KB_DN) ||
+        text_tap(KB_E) || win_choose_get_index(a) != 1 || text_tap(KB_A) || text_tap(KB_UP) ||
+        text_tap(KB_F) || win_choose_get_index(a) != 0 || text_tap(KB_A) || text_tap(KB_UP) ||
+        text_tap(KB_F) || win_choose_get_index(a) != 2 || text_tap(KB_DN) ||
+        !win_widget_has_focus(b) || text_tap(KB_A) || text_tap(KB_UP) || text_tap(KB_F) ||
+        win_choose_get_index(b) != -1 || text_tap(KB_A))
+        return -1;
+    win_remove_widget(b);
+    win_widget_destroy(b);
+    if (!win_widget_has_focus(a) || text_tap(KB_A) || text_tap(KB_E))
+        return -1;
+    win_choose_set_menu(a, menu, 1);
+    if (text_tap(KB_B) || text_tap(KB_E))
+        return -1;
+    win_choose_set_menu(a, NULL, 0);
+    if (text_tap(KB_B) || physical_edges != 40)
+        return -1;
+    win_remove_widget(a);
+    win_widget_destroy(a);
+    win_remove_widget(menu);
+    win_widget_destroy(menu);
+    if (hpclang_win_reset())
+        return -1;
+    physical_edges = 0;
+    char glyphs[256 * 3] = {0};
+    const unsigned char forward[] = {1, 2, 4}, backward[] = {4, 2, 1};
+    for (unsigned row = 0; row < 3; ++row) {
+        glyphs['A' * 3 + row] = (char)forward[row];
+        glyphs['B' * 3 + row] = (char)backward[row];
+    }
+    hpg_font_t *font = hpg_alloc_font(glyphs, 256, 3, 3);
+    menu = win_softmenu_new();
+    a = win_choose_new();
+    if (!font || !menu || !a)
+        return -1;
+    win_widget_set_font(a, font);
+    win_widget_set_location(a, 1, 1);
+    win_widget_set_size(a, 5, 5);
+    for (unsigned i = 0; i < 40; ++i)
+        win_choose_add_with_label(a, i % 2 ? "B" : "A", "A");
+    win_choose_set_menu(a, menu, 0);
+    win_add_widget(menu);
+    win_add_widget(a);
+    win_add_event_handler(WIN_KEY_PRESSED, INT_MAX, physical, (void *)(uintptr_t)1);
+    win_add_event_handler(WIN_KEY_RELEASED, INT_MAX, physical, NULL);
+    for (unsigned frame = 0; frame < 4; ++frame) {
+        if (frame == 1 && text_tap(KB_A))
+            return -1;
+        if (frame == 2 && text_tap(KB_UP))
+            return -1;
+        if (frame == 3 && (text_tap(KB_E) || win_choose_get_index(a) != 0 || text_tap(KB_A) ||
+                           text_tap(KB_UP) || text_tap(KB_F) || win_choose_get_index(a) != 39))
+            return -1;
+        hpg_clip_reset(NULL);
+        hpg_clear();
+        int result = win_post_event(WIN_REPAINT_EVENT, NULL);
+        if (result != (frame == 1 || frame == 2) || hpclang_win_error())
+            return -1;
+        hpg_flip();
+        if (checkpoint((buffered ? 1400 : 1300) + frame))
+            return -1;
+    }
+    if (physical_edges != 12)
+        return -1;
+    win_remove_widget(a);
+    win_widget_destroy(a);
+    win_remove_widget(menu);
+    win_widget_destroy(menu);
+    hpg_free_font(font);
+    return hpclang_win_error() ? -1 : hpclang_win_reset();
+}
 int main(void)
 {
     errno = 0;
@@ -498,6 +588,8 @@ int main(void)
         failure = failure ? failure : 14;
     if (!failure && (checkbox_check(0) || checkbox_check(1)))
         failure = failure ? failure : 16;
+    if (!failure && (choose_check(0) || choose_check(1)))
+        failure = failure ? failure : 17;
     hpg_set_mode_mono(1);
     hpg_clip_reset(NULL);
     if (errno || hpclang_time_read_us(&start))

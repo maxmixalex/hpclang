@@ -34,8 +34,21 @@ rows. All three focused sanitizer targets and ARM compile/analysis pass; logs
 `/work/oct24-choose-{adapter,pixels}-*.log`. Initial pixel expectation extended
 the border by one row; corrected with its failure log retained. SDK process
 38518 exits 0: 517 reproducible outputs, C/C++, six launchers, three Aplet
-variants and notebooks pass (`/work/oct24-choose-sdk.log`). Original-source comparison, native
-matrix and CI acceptance remain pending; this is not completed M8 acceptance.
+variants and notebooks pass (`/work/oct24-choose-sdk.log`).
+
+Chooser follow-up compares all nine unchanged original functions from HPGCC
+1.1/2.0: 1,337 matching state/keyboard trace lines, SHA256
+`f419ec0019d7557102368b019f38802113552eef0d63215cd0b26ab73cf86580`.
+Original label-removal and lifecycle defects are excluded from equivalence and
+covered separately. Wrong returned index and selected-row pixel are rejected.
+Four focused sanitizer targets pass (`/work/oct24-choose-reference-tests.log`).
+All six Direct models pass 104 physical GPIO edges/model, popup confirm/cancel,
+empty lists, wrapping, menu/focus/removal/rebind, deterministic content pixels
+and settled return (67716 exit 0). Native font footer text is not a pixel claim;
+footer edges and content/status pixels are checked. Stock 51380 runs on the
+fixed `/work/oct24-choose-native-arm` artifact. Full 150-test regression 29287
+and whole host/ARM analysis 29830 run separately. Logs `/work/oct24-choose-*`.
+Stock, full regression/analysis and CI acceptance remain open; no M8 completion.
 
 ## Principles
 

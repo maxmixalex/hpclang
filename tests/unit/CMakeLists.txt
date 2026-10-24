@@ -905,3 +905,10 @@ hpclang_unit(win_choose test_win_choose.c ${win_adapter_sources}
     "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
 target_include_directories(test_win_choose PRIVATE "${HPCLANG_ROOT}/runtime/core"
     "${HPCLANG_ROOT}/include")
+
+hpclang_unit(win_choose_reference "${HPCLANG_ROOT}/tests/compat/win-choose.c" ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-choose.c" "${HPCLANG_ROOT}/runtime/core/win-choices.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_choose_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")

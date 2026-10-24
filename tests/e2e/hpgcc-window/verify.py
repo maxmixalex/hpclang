@@ -200,6 +200,44 @@ def verify_checkbox(prefix):
     print(f"PASS {prefix}: selected/unselected checkbox focus and labels in both buffer modes")
 
 
+def verify_choose(prefix):
+    for base in (1300, 1400):
+        for frame in range(4):
+            path = Path(f"{prefix}-{base + frame}.pgm")
+            width, height, pixels = read_pgm(path)
+            if width != 132 or height not in (64, 80):
+                raise AssertionError(f"{path}: unsupported chooser geometry")
+            rows = 13 if height == 64 else 17
+            first = 40 - rows if frame == 2 else 0
+            selected = 39 if frame == 2 else 0
+            bottom = rows * 4 + 3
+            # The model's built-in menu font is tested separately. Check every
+            # content pixel, including the status column, and footer cell edges.
+            for y in range(height - 7):
+                for x in range(width):
+                    ink = 255 if 1 <= x < 6 and 1 <= y < 6 else 0
+                    if 2 <= y <= 4 and x == y:
+                        ink = 0
+                    if frame in (1, 2) and 15 <= x <= 115 and y <= bottom + 1:
+                        ink = 0
+                        if x <= 114 and y <= bottom and (y in (0, bottom) or x in (15, 114)):
+                            ink = 255
+                        row, local_y = divmod(y - 2, 4)
+                        if 0 <= row < rows and 17 <= x <= 112:
+                            chosen = first + row == selected
+                            ink = 255 if chosen else 0
+                            glyph_x = 3 - local_y if (first + row) % 2 else local_y - 1
+                            if local_y >= 1 and x == 18 + glyph_x:
+                                ink = 0 if chosen else 255
+                    if pixels[y * width + x] != 255 - ink:
+                        raise AssertionError(f"{path}: unexpected chooser pixel at {x},{y}")
+            if frame in (1, 2):
+                for x, expected in ((0, 255), (88, 0), (110, 0), (131, 255)):
+                    if pixels[(height - 7) * width + x] != expected:
+                        raise AssertionError(f"{path}: unexpected modal footer at {x}")
+    print(f"PASS {prefix}: chooser labels, modal scroll/selection and footer edges in both buffers")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -216,6 +254,7 @@ def main():
         verify_image(Path(f"build/{target}-frame"))
         verify_menu(Path(f"build/{target}-frame"))
         verify_checkbox(Path(f"build/{target}-frame"))
+        verify_choose(Path(f"build/{target}-frame"))
 
 
 if __name__ == "__main__":
