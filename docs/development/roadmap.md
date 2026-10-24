@@ -4968,6 +4968,13 @@ below are retained.
   its isolated mirror lacked Git metadata. Setup failure log retained at
   `/work/oct24-controls-analysis-setup-failure.log`; corrected process 89153
   runs the original full scope. Regression 63047 and Stock 18243/82374 remain live.
+  Native menu follow-up `a7a5068a` passes all six Direct models (32162 exit 0):
+  56 GPIO edges/ten selection callbacks per model, page wrap, disabled-item
+  suppression, complete two-page glyph/color captures in both buffer modes
+  and settled return. Wrong disabled-color pixel negative is rejected. Menu
+  Stock process 86659 runs from `/work/oct24-menu-src` with its fixed artifact.
+  Full text/image host/ARM analysis passes (89153 exit 0, 357 sources), log
+  `/work/oct24-controls-analysis.log`; full 143-test regression remains live.
   Final frozen-batch verification: all six Stock models pass independent
   keyboard/control pixels and settled return (9966 exit 0). Full ASan/UBSan
   regression passes all 140 tests in 1351.00 seconds (10200 exit 0), log
@@ -4980,8 +4987,8 @@ below are retained.
   40073583192) runs pass. Both Gallery runs 40073586972 /
   40073583076 pass. PR Core 40073586985 passes; push Core 40073583179 runs.
   Runtime's aggregate queued label does not mean no work: 40073586999 has
-  80 successful / 37 unfinished jobs; 40073583151 has 86 successful /
-  31 unfinished jobs. Neither reports a failed job at this inspection.
+  102 successful / 15 unfinished jobs; 40073583151 has 115 successful /
+  two unfinished jobs. Neither reports a failed job at this inspection.
   Preceding 95348ce8 Runtime runs were cancelled by workflow concurrency after
   101 and 90 successful jobs respectively, not accepted as whole-suite passes.
   The older transport/audio failures remain unresolved; a passing Objects run
