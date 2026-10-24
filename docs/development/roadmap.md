@@ -4414,11 +4414,30 @@ below are retained.
   cleared INTMOD; restoring that exclusive routing policy fixes HP50g Direct.
   Failed results remain in `/work/oct24-irq-owner-failed-direct` and the first
   artifact/logs. Corrected artifact `/work/oct24-irq-owner-v2-artifact` passes
-  HP50g Direct System Services/pixels/input/return; its Stock validation runs
-  on session 89836 / PID 114110 in `/work/oct24-irq-owner-src`, with logs named
+  HP50g Direct and Stock System Services/pixels/input/return; session 89836
+  completed with exit 0 in `/work/oct24-irq-owner-src`, with logs named
   `oct24-irq-owner-v2-*-hp50g.log`. Host sanitizers and ARM analysis pass again.
   This does not alter the ongoing earlier matrix. Public asynchronous sound,
   production dispatch/preemption and exit cleanup remain unimplemented.
+  The next local `sound-session` engine combines PWM2, watchdog and IRQ leases
+  into one lifetime. Start installs controller ownership before peripherals;
+  any admission failure unwinds in reverse lifetime order. Non-replacing
+  overlaps reject unchanged; replacement stops our old session before admitting
+  the new tone, with explicit stopped-on-new-admission-failure semantics.
+  IRQ advance preserves errno, rejects backward/failed clocks, stops peripherals
+  autonomously and masks controller sources. It retains its executing IRQ bank
+  until foreground close/next start; close is idempotent and restores that bank,
+  vector and original routing/masks last. No user callbacks or allocation occur.
+  Shared-register ASan/UBSan integration tests execute all four real engines,
+  covering completion, rearm, overlap, replacement, cancellation, clock errors,
+  admission rollback and restoration. They forbid bank exchange from ISR.
+  The maintained native fixture now dispatches through this session; HP50g
+  Direct passes with independent pixels/input/return and pre-cleanup peripheral
+  restoration. ARM build/analysis pass. HP50g Stock is running on session 97813
+  in `/work/oct24-sound-session-src`, artifact `/work/oct24-sound-session-artifact`,
+  logs `/work/oct24-sound-session-{direct,stock}-hp50g.log`. Public API/HPGCC
+  flags, CPU interrupt-state lifetime and normal/immediate-exit wiring remain
+  open; host session close tests alone do not establish exit-path acceptance.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
