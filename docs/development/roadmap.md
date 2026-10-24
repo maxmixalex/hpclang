@@ -4862,6 +4862,16 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Post-indicator SDK acceptance (local 342d54c6): the complete relocated-SDK
+  gate passes C/C++23 applications, all six launchers, all three HP39 Aplet
+  variants, per-model Notebook builds and 453 byte-identical release outputs
+  (`/work/oct24-win-indicator-sdk.log`, process 71681 exit 0). This includes
+  8403e215's checked indicator implementation. Stock keyboard validation remains
+  live in process 32221; no result or restart is inferred from transfer latency.
+  The compatibility guide's stale "no installed win headers" and conditional
+  widget-scope wording is corrected: three public headers are implemented;
+  full widgets and win.h remain required M8.4 work.
+
   Local native window-key fixture (after 8403e215, not pushed): the maintained
   `hpgcc-window` client now requests real emulator GPIO transitions through the
   shared KI/KJ mailbox. Each of single/double-buffer gray16 modes checks 22 edges

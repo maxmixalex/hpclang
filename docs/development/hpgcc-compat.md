@@ -573,7 +573,7 @@ Raw KOS entry numbers and calling conventions remain **Migration/Internal**. Por
 
 ## win widget/event library
 
-The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if real ports justify it**. Recreating historical widgets before stable display/input/time/object services would invert the dependency order.
+The HPGCC 1.1/2.0 widget family remains a retained **M8.4 adapter requirement**. The display/input/time/object foundations and bounded event/timer/key adapters support that work; widget ownership, focus, layout and original-application acceptance remain unfinished.
 
 ## Compatibility matrix
 
@@ -588,7 +588,8 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 | HPGCC2/3 `FS*` | bounded source adapter above owned FatFs storage | Adapter | M7.2d implemented; Storage #53 green |
 | Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e bounded application subset complete; Runtime #338 green; M7.3f public mutation implemented and accepted |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
-| `win*` widgets | Declarative UI; compatibility state/event bridge still required | Source review below; adapters remain open | later |
+| `winevent.h`, `wintimer.h`, `winkeys.h` | Bounded foreground event/timer/key service over native input, time and HPG | Adapter implemented locally; see exact validation below | M8.4, CI pending |
+| `win*` widgets and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
 
 ## Historical window adapter feasibility
@@ -596,7 +597,9 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 The 2026-10-24 review reads the retained HPGCC 1.1/39g distribution's
 `sources/win` headers and implementations (`/work/hpgcc39-review` locally),
 then compares all four original release archives. This is static source
-evidence, not runtime compatibility. No `win*` compatibility header is installed yet.
+evidence, separate from the subsequent implementation and runtime checks below.
+The installed `winevent.h`, `wintimer.h` and `winkeys.h` now expose working
+event/timer/key adapters; the full `win.h` umbrella and widgets remain open.
 
 | Release | Source/header files scanned | Window-family evidence |
 | --- | ---: | --- |
@@ -662,8 +665,8 @@ preflight failures retain the undelivered timer; clock/rescheduling failures
 after delivery release that timer without replaying its callback. Both 1.1
 and 2.0 original implementations match eight scenario traces under ASan/UBSan.
 Additional focused tests cover capacity, budget, clock and overflow failures;
-host/ARM analysis and six-model C/C++ launcher builds pass. Public window
-interfaces, a device-clock idle loop and widget integration remain unfinished.
+host/ARM analysis and six-model C/C++ launcher builds pass. The public interface
+and device-clock integration are described below; widget integration remains open.
 
 The internal `win-loop` now dispatches idle through this event bus. It retains
 the original entry-time quit reset and shared quit flag for nested runs. A
@@ -671,8 +674,8 @@ handler consuming idle does not terminate the loop; requesting quit allows the
 current snapshot to finish. Bounded runs leave pending timers and registrations
 intact. Host integration checks the keyboard/repaint/timer priority sequence,
 timed quit, consumption, nesting and failed-dispatch retry. Those generators
-are controlled test callbacks; device input, rendering and public window
-adapters still require integration and calculator acceptance.
+are controlled test callbacks. Subsequent device-input/rendering/public adapter
+integration and its native evidence are described below.
 
 The internal `win-keyboard` generator now uses the existing model-aware
 historical matrix reader, with an explicit checked read result. As in the
@@ -692,8 +695,8 @@ callbacks. This is separate from historical handler consumption; an ordinary
 nonzero callback still does not quit or fail the loop. Driver failures consume
 idle and propagate to the caller; the owner must unwind before reinitializing.
 Host integration covers timed quit, keyboard/clock failures and insufficient
-snapshot capacity during nested key dispatch. Native interaction, repaint,
-public APIs and widget acceptance remain open.
+snapshot capacity during nested key dispatch. Subsequent native interaction,
+repaint and public API validation are described below; widgets remain open.
 
 The internal repaint coordinator preserves the original request lifecycle:
 requests coalesce, pending clears before target preparation, repaint dispatch
@@ -769,7 +772,10 @@ window evidence predates this integration. The installed window example now
 uses typed digits to move the rectangle and ON to exit. Its relocated C/C++23
 SDK builds, six-model launchers and three HP39 Aplet variants pass, with 453
 byte-identical outputs from two clean builds (`/work/oct24-win-keys-sdk.log`).
-This validates header delivery and application packaging, not physical input.
+This validates header delivery and application packaging, not physical input. The complete
+SDK gate was rerun after checked indicator integration and passes the same 453
+reproducible outputs, six-model launchers and three HP39 Aplet variants
+(`/work/oct24-win-indicator-sdk.log`, process 71681 exit 0).
 
 The maintained window fixture additionally passes all six Direct models with
 real GPIO input: 22 press/release transitions and five expected typed callbacks
@@ -811,10 +817,10 @@ historical implementation does even across different priorities.
 The `win_events` host test passes ASan/UBSan, including callback-side mutations,
 self-removal, nested exhaustion, short-circuit cleanup, extreme priorities and
 borrowed stack arguments. Host and ARM analysis and C/C++ six-model launcher
-builds pass. This module has no installed historical API, event registration
-namespace, idle loop, timers or widget binding yet; it establishes the dispatch
-semantics without claiming complete original-application compatibility or
-native execution evidence.
+builds pass. This initial module establishes dispatch semantics; the later
+installed interfaces, event namespace, idle loop, timers and native validation
+are described above. Complete original-widget-application compatibility remains
+open.
 
 The optional POSIX-host differential gate also compiles the original
 `win_add_event_handler.c`, `win_remove_event_handler.c` and `win_post_event.c`
