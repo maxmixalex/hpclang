@@ -4895,6 +4895,18 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Pre-next-push CI inspection of 0a7c2d8d: both Quality (40073587007 /
+  40073583118), Storage (40073587032 / 40073583077) and Objects (40073587006 /
+  40073583192) runs pass. PR Gallery 40073586972 passes; push Gallery
+  40073583076 queues. PR Core 40073586985 runs; push Core 40073583179 queues.
+  Runtime's aggregate queued label does not mean no work: 40073586999 has
+  45 successful / six running / 66 queued jobs; 40073583151 has 45 successful /
+  five running / 67 queued. Neither reports a failed job at this inspection.
+  Preceding 95348ce8 Runtime runs were cancelled by workflow concurrency after
+  101 and 90 successful jobs respectively, not accepted as whole-suite passes.
+  The older transport/audio failures remain unresolved; a passing Objects run
+  does not establish a transport repair. Recheck before the actual next push.
+
   Pre-push component-batch validation at 2e7cfcc5: a CRLF-normalized audit
   of all 4,572 tracked files confirms runtime/tests match the writable container
   mirror. Only roadmap/compatibility status text differed; both were synced.
@@ -4922,7 +4934,9 @@ below are retained.
   lacked RUNNER_TEMP and exited before emulation; log retained at
   `/work/oct24-progress-stock-setup-failure.log`. Corrected six-model Stock
   process 9966 is live, with `/work/oct24-progress-stock-<model>.log` and matching
-  evidence directories. Stock and CI acceptance remain pending; local only.
+  evidence directories. HP39g+ Stock now passes input, all 46 captured frames,
+  page exchange, final animation and settled return; the same process continues
+  with HP39gs. Remaining Stock models and CI acceptance are pending; local only.
 
   Progress-control source differential now passes both HPGCC 1.1/2.0:
   `tests/compat/check-win-progress.py` compiles all eight unchanged original
