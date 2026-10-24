@@ -4862,12 +4862,23 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
-  Latest fixed Stock results: HP39gs and HP48gII pass in the ongoing 68792
-  process; it has advanced to HP49g+. HP40gs passes and 96971 exits 0. Together
-  with retained HP39g+/HP50g results, five of six corrected Stock targets pass
-  input, all 44 independent status frames, page exchange and settled return.
-  HP49g+ and full host regression 68707 remain pending. Each native result is
-  copied to `/work/oct24-win-settled-stock-<model>-evidence`.
+  Current local window acceptance: all six corrected Stock models pass real
+  GPIO input, 44 independent status frames per model, page exchange, final
+  rectangle/background pixels and settled return. Final process 68792 exits 0;
+  HP40gs 96971, HP39g+ 69002 and HP50g 59175 also exit 0. All six preserved JSON
+  records report pass/returned/return_settled, with every frame/register pair in
+  `/work/oct24-win-settled-stock-<model>-evidence`. Earlier six-model Direct
+  validation and post-indicator SDK gates pass; the corrected fixture also
+  passes HP48gII Direct. Full 136-test host regression 68707 remains running.
+  CI submission/acceptance, shipped-example execution and widget APIs remain
+  open. Below are retained earlier checkpoints; their pending labels describe
+  those checkpoints, not the current native matrix.
+
+  Latest preceding-head CI inspection (95348ce8): push Core 40068703216 now
+  passes, as do both Quality/Storage/Gallery runs and push Objects. PR Core
+  40068713317 is running; both Runtime runs queue. PR Objects 40068713236's
+  pre-execution HP39g+ transfer stall remains unresolved with evidence below.
+  No new push or merge was made.
 
   Build-input audit at d2375cdc: 4,556 tracked files were compared with the
   writable container mirror after CRLF normalization. Runtime and test sources

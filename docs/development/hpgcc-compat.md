@@ -791,10 +791,10 @@ launch-key release before installing observers, and retains the first failure
 code. The fixed HP48gII Direct and HP50g Stock runs pass all input, status-frame,
 page-exchange and return checks (59175 exit 0). Fixed HP39g+ Stock also passes
 (69002 exit 0), including all 44 independently checked status frames. Fixed
-HP39gs, HP48gII and HP40gs now also pass; corrected HP49g+ remains running.
-The original three-model HP39 failures remain preserved.
-Neither the complete Stock matrix acceptance nor
-shipped-example native execution is claimed complete. This is emulator GPIO evidence, not a physical-calculator test.
+All six corrected Stock models now pass the same checks (final process 68792
+exit 0); each model retains its JSON result and all 44 frame/register pairs.
+The original three-model HP39 failures remain preserved. Shipped-example native
+execution, CI acceptance and full widget compatibility remain open. This is emulator GPIO evidence, not a physical-calculator test.
 
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
