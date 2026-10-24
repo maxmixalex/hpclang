@@ -4945,6 +4945,19 @@ below are retained.
   Text-only Stock 18243 passes HP39g+ and continues HP39gs on its original
   artifact. Logs use `/work/oct24-image-*` and `/work/oct24-controls-*`.
   Stock completion and CI acceptance remain open.
+  Following menu batch `556ea3ee` on `m8-menu-controls` implements all eight
+  soft-menu APIs: 30 copied labels, five pages, modifiers/event payloads,
+  enabled/colors and insert/delete packing. It repairs unsigned backward-page
+  underflow, the duplicate disabled-color symbol and stale occupancy on gap
+  packing. Construction uses model facts without display acquisition; drawing
+  adapts to 64/80 lines. Focused ASan/UBSan and ARM compile/analysis pass, logs
+  `/work/oct24-menu-sanitizer-{build,tests}.log`. Original-source comparison,
+  real pixels, SDK and native acceptance remain open. Uses separate source
+  `/work/oct24-menu-src`; running text/image batches remain unchanged.
+  Whole text/image analysis 54292 exited before source enumeration because
+  its isolated mirror lacked Git metadata. Setup failure log retained at
+  `/work/oct24-controls-analysis-setup-failure.log`; corrected process 89153
+  runs the original full scope. Regression 63047 and Stock 18243/82374 remain live.
   Final frozen-batch verification: all six Stock models pass independent
   keyboard/control pixels and settled return (9966 exit 0). Full ASan/UBSan
   regression passes all 140 tests in 1351.00 seconds (10200 exit 0), log
