@@ -427,8 +427,10 @@ memory-report, minimum-RW admission and installed C example budget batch into
 main as `17444cb7`. Later pool-observer, serialized-report, sketch-review and
 migration-guide changes were pushed separately as `d409b014` after all six
 local Stock observations, relevant host/sanitizer/Python checks, SDK packaging,
-Ruff and strict docs passed. That batch is submitted, not CI accepted; its new
-CI has not been polled. This does not complete M8.
+Ruff and strict docs passed. On the subsequent check, Quality 40050688500 and
+Storage 40050688494 pass; Core 40050688514, Runtime 40050688507 and Objects
+40050688481 are queued, and Font Gallery 40050688484 is running. The batch is
+not yet CI accepted or merged. This does not complete M8.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
 actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
@@ -4361,11 +4363,24 @@ below are retained.
   fixtures pass ASan/UBSan, including one million fine-grained observations,
   delayed processing, rate changes, stopped counters, reset-only and IRQ-only
   modes. The Python tool suite, Ruff/format and patched emulator build pass.
-  Six-model Direct System Services plus HP50g Stock regression is running on
-  session 65553 / PID 107813 using `/work/oct24-watchdog-x50ng`; all six Direct
-  models now pass, and HP50g Stock is running. These existing payloads test startup/return and
+  Six-model Direct System Services plus HP50g Stock regression completed on
+  session 65553 (exit 0) using `/work/oct24-watchdog-x50ng`; all six Direct
+  models and HP50g Stock pass. These existing payloads test startup/return and
   interference, not a new application watchdog backend. Guest watchdog lease,
   active IRQ timing and Stock availability tests remain required.
+  A subsequent internal `watchdog-alarm` lease now borrows only disabled
+  watchdogs without pending IRQ9, leaving busy owners untouched. Its running
+  configuration always disables reset and uses PCLK/128, upward-rounded final
+  periods and bounded 65535-count chunks for absolute 64-bit deadlines.
+  Acquire leaves IRQ9 masked; rearm preserves its current mask; release restores
+  the original stopped control/reload/count/mask and retains unrelated sources.
+  Host ASan/UBSan tests check arithmetic with independent 128-bit expectations,
+  UINT64_MAX deadlines, zero-write rejection, reset exclusion on every control
+  write, cancellation/late completion and restoration. ARMv4T Thumb compile
+  with warnings as errors and repository-policy static analysis pass. This
+  local engine is included in the SDK source list, but no guest MMIO adapter,
+  watchdog IRQ fixture or public sound path is enabled yet. Native admission,
+  actual interrupt timing, playback integration and exit cleanup remain open.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
