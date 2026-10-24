@@ -4719,6 +4719,17 @@ below are retained.
   `/work/oct24-win-drivers-{build,analysis,arm}.log`. Host tests control the
   physical and clock sources; native interaction acceptance, actual repaint,
   public window APIs and widgets remain open. This batch remains local.
+  The internal repaint coordinator now follows `win_repaint.c` and
+  `_win_repaint_generator.c`: coalesce requests, clear pending before preparing
+  the target, dispatch repaint synchronously and present afterward. A request
+  made while painting survives; ordinary quit/consumption still presents the
+  current frame. Checked begin/present hooks and nested dispatch failures latch
+  the loop error and skip remaining stages without replay. Seven sanitizer
+  targets, host/ARM analysis and six-model C/C++ builds pass, including nested
+  repaint, request coalescing, next-frame requests and failures at every stage.
+  Logs: `/work/oct24-win-repaint-{build,analysis,arm}.log`. Hooks are controlled
+  in these tests; actual surface/UI rendering, original window clients and
+  native pixel/return acceptance remain open. Not pushed.
 
 #### M8.5 — Modern C++ and migration
 

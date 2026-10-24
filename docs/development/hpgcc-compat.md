@@ -695,6 +695,17 @@ Host integration covers timed quit, keyboard/clock failures and insufficient
 snapshot capacity during nested key dispatch. Native interaction, repaint,
 public APIs and widget acceptance remain open.
 
+The internal repaint coordinator preserves the original request lifecycle:
+requests coalesce, pending clears before target preparation, repaint dispatch
+is synchronous, and presentation follows even when a handler consumes the
+event or requests ordinary quit. Requests raised during painting remain pending
+for another frame; explicit nested repaint retains that sequencing. Checked
+prepare/present hooks allow the future rendering owner to propagate failures
+through the loop latch, skipping later stages without replaying drawing.
+Host tests cover coalescing, re-request, nesting, consumption/quit and each
+failure stage. Their hooks record calls rather than draw pixels; surface/UI
+integration and calculator rendering acceptance remain unfinished.
+
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter
