@@ -20,6 +20,19 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Native-allocation accounting experiment (M8.2/M8.3/M8.6, local): the existing
+six-model mapped-pool reports do not establish native allocator sizes. A separate
+read-only emulator probe captures 256 bytes around the recorded native OS block
+at each UI memory checkpoint, preserving the unchanged application/launcher and
+existing UI/pool/return gates. HP39g+ process 82387 is running; no capture result
+or allocator interpretation is accepted yet. Script:
+`research/oct24-native-allocation-observe.py`; isolated source/emulator/logs:
+`/work/oct24-native-allocation-*`. Setup-only failures (missing observer header,
+headless asset-copy links and RUNNER_TEMP) were corrected before guest execution.
+The frontend was explicitly rebuilt after modifying its optional observer header.
+Raw neighborhood values must be checked against live allocator behavior and
+model firmware before deriving block sizes, overhead or alignment losses.
+
 Window export inventory follow-up (local): audit report v2 records 75 distinct
 original implementation names and the header/source discrepancies in both 1.1
 and 2.0. `check-win-exports.py` derives all 76 original/repaired names and forces
