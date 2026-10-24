@@ -7,6 +7,7 @@
 #include <hpclang/sound.h>
 #include "sound-session.h"
 #include "exit-hooks.h"
+#include "sound-client.h"
 
 struct hpclang_exit_hooks hpclang_exit_hooks;
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
@@ -176,6 +177,15 @@ int main(void)
     assert(errno == EDOM);
     cpu &= ~0x80u;
     assert(hpclang_sound_status() == -1 && errno == EIO && cpu == 0xd0);
+    static const int client;
+    assert(!hpclang_sound_start_client(440, 10, 0, &client));
+    assert(hpclang_sound_is_client(&client) && !hpclang_sound_is_client(0));
+    assert(hpclang_sound_start(0, 10, 1) == -1 && hpclang_sound_is_client(&client));
+    assert(!hpclang_sound_start(880, 10, 1) && !hpclang_sound_is_client(&client));
+    hpclang_sound_stop();
+    assert(!hpclang_sound_start_client(440, 10, 0, &client));
+    hpclang_sound_stop();
+    assert(!hpclang_sound_is_client(&client));
     now = UINT64_MAX;
     assert(hpclang_sound_start(440, 10, 0) == -1 && errno == EOVERFLOW && cpu == 0xd0);
     assert(!munmap(page, 4096));

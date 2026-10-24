@@ -18,7 +18,7 @@ Do not put historical include directories before the installed headers.
 | Raw Saturn addresses, `sat_peek`-style traversal or retained pointers into native objects | Use independent snapshots from `hpclang/object.h` and logical handles from `hpclang/object-store.h`; use `hpclang/port.h` for native port objects. |
 | Direct LCD addresses, packed framebuffer writes, MMU changes or interrupt handlers | Express drawing through `hpclang/display.h` surfaces and fonts, and timing through `hpclang/time.h` / `timer.h`. A raw hardware algorithm requires a separate design review. |
 | `win*` widgets | Port the view and event logic to the [declarative UI](declarative-ui.md); a compatible historical widget family is not provided. |
-| `kos_beep` and completion polling | Asynchronous mode/preemption compatibility is unfinished. The blocking `hpsys.h` tones are usable only when blocking matches the application's behavior. |
+| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags; locally verified on all six Direct models, Stock/CI acceptance pending. A true completion query can still mean a nonwaiting tone is playing. See the [mode contract](../development/hpgcc-compat.md). |
 
 Compile with the normal SDK target options and resolve diagnostics one family
 at a time. Do not suppress undeclared functions or cast away mismatched pointer

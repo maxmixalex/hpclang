@@ -4,6 +4,7 @@
 
 #define REG(address) (*(volatile uint32_t *)(uintptr_t)(address))
 void hpclang_e2e_irq_snapshot(struct hpclang_irq_bank *);
+unsigned hpclang_e2e_kos_sound_test(void);
 unsigned hpclang_e2e_sound_async_test(void)
 {
     const uintptr_t addresses[] = {0x07600000, 0x07600004, 0x07600008, 0x07600024, 0x07600028,
@@ -74,6 +75,11 @@ unsigned hpclang_e2e_sound_async_test(void)
         failure = 13;
 finish:
     hpclang_sound_stop();
+    if (!failure) {
+        unsigned kos_failure = hpclang_e2e_kos_sound_test();
+        if (kos_failure)
+            failure = 0x40 + kos_failure;
+    }
     hpclang_irq_save_disable();
     for (unsigned i = 0; i < 14; ++i)
         if (REG(addresses[i]) != before[i])

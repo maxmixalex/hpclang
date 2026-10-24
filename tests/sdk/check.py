@@ -101,6 +101,8 @@ def main():
         shutil.copytree(package / "examples/hpgcc-console", application / "console")
         shutil.copytree(package / "examples/notebook", application / "notebook")
         shutil.copyfile(root / "tests/sdk/numeric-input.cpp", application / "numeric-input.cpp")
+        for suffix in ("c", "cpp"):
+            shutil.copyfile(root / "tests/sdk/sound.c", application / f"sound.{suffix}")
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
@@ -108,11 +110,15 @@ def main():
                 "hpclang_add_application(numeric_input numeric-input.cpp)\n"
                 "target_compile_features(numeric_input PRIVATE cxx_std_17)\n"
                 "hpclang_target_launchers(numeric_input)\n"
+                "hpclang_add_application(sound_c sound.c)\n"
+                "hpclang_add_application(sound_cpp sound.cpp)\n"
+                "hpclang_target_launchers(sound_c)\n"
+                "hpclang_target_launchers(sound_cpp)\n"
             )
         if args.aplet_tool:
             with (application / "CMakeLists.txt").open("a") as source:
                 source.write("""
-foreach(application IN ITEMS hello_c hello_cpp numeric_input)
+foreach(application IN ITEMS hello_c hello_cpp numeric_input sound_c sound_cpp)
     foreach(model IN ITEMS hp39gplus hp39gs hp40gs)
         hpclang_target_aplet(${application} MODEL ${model} NAME "SDK example"
             AUTHOR hpclang TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")
@@ -173,6 +179,8 @@ endforeach()
             ("hello_c", build),
             ("hello_cpp", build),
             ("numeric_input", build),
+            ("sound_c", build),
+            ("sound_cpp", build),
             ("declarative_ui", build / "devices"),
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),

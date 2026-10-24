@@ -4,6 +4,7 @@
 #include "clock-internal.h"
 #include "exit-hooks.h"
 #include "sound-session.h"
+#include "sound-client.h"
 
 #define REG(address) (*(volatile uint32_t *)(uintptr_t)(address))
 static const uintptr_t audio_regs[] = {0x07600000, 0x07600004, 0x07600008, 0x07600024, 0x07600028,
@@ -52,6 +53,7 @@ static const struct hpclang_sound_session_bus bus = {{audio_read, audio_write, 0
 static struct hpclang_sound_session session;
 static uint32_t stack[256] __attribute__((aligned(8)));
 static uint32_t original_masks;
+static const void *request_client;
 void hpclang_sound_irq_entry(void);
 
 static int active(void)
@@ -66,6 +68,7 @@ static uint32_t collect(uint32_t current)
     }
     hpclang_exit_hooks.sound_async = 0;
     hpclang_exit_hooks.sound_async_active = 0;
+    request_client = 0;
     return current;
 }
 void hpclang_sound_stop(void)
@@ -88,6 +91,15 @@ int hpclang_sound_status(void)
     return state == SOUND_SESSION_RUNNING;
 }
 int hpclang_sound_start(uint32_t frequency, uint32_t duration_ms, int replace)
+{
+    return hpclang_sound_start_client(frequency, duration_ms, replace, 0);
+}
+int hpclang_sound_is_client(const void *client)
+{
+    return client && session.irq.owned && request_client == client;
+}
+int hpclang_sound_start_client(uint32_t frequency, uint32_t duration_ms, int replace,
+                               const void *client)
 {
     if (!frequency || !duration_ms) {
         errno = EINVAL;
@@ -128,10 +140,12 @@ int hpclang_sound_start(uint32_t frequency, uint32_t duration_ms, int replace)
             current = (current & ~0xc0u) | baseline;
             hpclang_exit_hooks.sound_async = 0;
             hpclang_exit_hooks.sound_async_active = 0;
+            request_client = 0;
         }
         goto fail;
     }
     original_masks = baseline;
+    request_client = client;
     hpclang_exit_hooks.sound_async = hpclang_sound_stop;
     hpclang_exit_hooks.sound_async_active = active;
     /* Start the requested interval after configuring PWM. */

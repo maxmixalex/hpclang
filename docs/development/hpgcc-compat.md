@@ -874,7 +874,7 @@ wrong: its cycle count implies hundredths of a second, but its delay assumes
 600 kHz while the historical tick service uses 750 kHz. The adapter implements
 the nominal units, not that clock error, arithmetic overflow or raw pin writes.
 
-`kos_beep` remains a separate compatibility requirement. HPGCC's wrapper waits
+`kos_beep` has a separate mode contract. HPGCC's wrapper waits
 on `kos_CheckBeepEnd`, whose result is affected by the supplied mode flags.
 HP50g ROM inspection indicates that bit 1 selects completion waiting, while
 bit 0 permits a later request to replace the active tone. The admission check
@@ -911,7 +911,7 @@ and intermediate results are retained in the [roadmap](roadmap.md).
 Public async replacement, autonomous stop, cancellation and restoration pass
 all six Direct models and HP49g+/HP50g/HP48gII/HP39g+ Stock locally. HP39gs/HP40gs
 Stock runs remain pending. Normal exit and `_Exit` each pass all six Direct targets;
-normal exit also passes HP50g Stock, while its `_Exit` run is pending. The exit
+both exit paths also pass HP50g Stock. The exit
 fixtures inspect real cleanup before power, launcher or host restoration can
 hide missing releases. A negative control that skips cleanup fails at that
 boundary. Runtime CI now schedules both exit variants across all six Stock
@@ -919,9 +919,39 @@ models and all three Direct families, retaining the blocking-exit suite.
 These gates are configured locally, not yet submitted or accepted. Native
 emulator results do not establish audible output from physical hardware.
 
-The historical KOS entry points and active-request mode policy remain open.
-The canonical async API is their implementation foundation, not an assertion
-that the KOS compatibility contract has already been delivered.
+`kos.h` now exposes a locally implemented sound subset, `kos_beep` and
+`kos_CheckBeepEnd`. `kos_beep` accepts Hz in 1..15000 and nonzero milliseconds;
+the identical validation instructions in all six ROMs establish these bounds
+and the historical invalid-argument return of -51. The adapter also sets
+`errno=EINVAL`. Bits above the low two do not affect waiting or replacement.
+
+| Mode low bits | Call waits | Later KOS request may replace this tone |
+| --- | --- | --- |
+| 0 | No | No |
+| 1 | No | Yes |
+| 2 | Yes | No |
+| 3 | Yes | Yes |
+
+If the old KOS request forbids replacement, the new request returns zero
+without playing and waits according to the **old** mode, matching the ROM
+wrapper. `kos_CheckBeepEnd` is false only while a KOS tone with its waiting bit
+set is active; true does not necessarily mean silence. Completion queries
+collect finished resources. Clock failures also terminate the Boolean query
+with true and set `errno`; callers needing a distinct error result should use
+`hpclang_sound_status` instead. `kos_beep` returns -1 with `errno` on runtime
+resource/clock failure, making these additional service errors observable.
+
+Cancellation uses `hpclang_sound_stop`. A canonical start replaces the client
+identity as well as the tone, so old KOS mode bits cannot leak into later
+playback. KOS will not implicitly replace a canonical tone: it returns -1 /
+`EBUSY`. The same foreground-only interrupt ownership constraints documented
+in `hpclang/sound.h` apply. This subset does not expose raw KOS syscalls.
+
+Host sanitizer checks cover all sixteen low-nibble states crossed with four
+incoming modes, overlapping waits, failure propagation, invalid inputs and
+client identity. All six Direct models pass native KOS waiting-duration,
+actual PWM replacement/rejection, busy-loop autonomous completion and restored
+hardware checks. Full Stock validation and CI acceptance remain pending.
 
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 

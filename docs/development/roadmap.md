@@ -4493,9 +4493,9 @@ below are retained.
   cleanup before power/launcher/host restoration, checking fourteen peripheral,
   controller and vector registers, the independent IRQ-bank snapshot, CPU masks
   and cleared optional hooks without calling stop/status. All six Direct models
-  pass both normal exit and `_Exit`; HP50g Stock normal exit also passes locally.
-  Both ARM variants build; the remaining HP50g Stock immediate-exit
-  queues run on session 74777 from `/work/oct24-sound-exit-src`, with artifacts
+  pass both normal exit and `_Exit`; both also pass HP50g Stock locally.
+  Both ARM variants build; session 74777 completed with exit 0 from
+  `/work/oct24-sound-exit-src`, with artifacts
   `/work/oct24-sound-{exit,immediate}-artifact` and matching logs. A separate
   negative control omits the real release in the test wrapper only, under
   `/work/oct24-sound-exit-negative-src` (session 92952, terminal exit 1) fails
@@ -4513,6 +4513,27 @@ below are retained.
   The compatibility guide now describes the implemented watchdog/IRQ/public
   lifetime and its current evidence instead of presenting superseded primitive
   experiments as current blockers. Historical KOS flags remain unfinished.
+  Local KOS adapter follow-up: `kos.h` now exposes `kos_beep` and
+  `kos_CheckBeepEnd` through owned async playback. An internal per-request client
+  identity prevents stale KOS policy after canonical replacement/cancellation.
+  Old-request bit 0 controls admission; bit 1 controls waiting/query behavior.
+  Rejected overlap returns zero and waits on the old request, matching the ROM
+  wrapper. All six ROM entry validations are instruction-identical: 1..15000 Hz,
+  nonzero duration, invalid result -51 (the adapter additionally sets EINVAL).
+  Runtime ownership/clock errors return -1/errno; canonical tones are not
+  implicitly replaced. Other mode bits do not change the two policies.
+  ASan/UBSan tests cross sixteen old states with four incoming modes, including
+  nested waiting/replacement, invalid calls, failed replacement, asynchronous
+  failure and canonical-client isolation. ARM policy analysis and six launchers
+  pass. All six Direct models pass measured waiting, actual PWM replacement and
+  rejection, no-SDK autonomous stop, mixed-client isolation and exact restoration
+  plus independent pixels/input. Source `/work/oct24-kos-sound-src`, artifact
+  `/work/oct24-kos-sound-artifact`, logs `oct24-kos-sound-{direct,stock}-*.log`;
+  session 98967 / PID 130857 continues the Stock matrix. Installed-SDK C/C++
+  sound clients pass the relocation/package gate with all six launchers
+  (session 31182, exit 0), alongside existing SDK clients and model-specific
+  Notebook builds. Ruff/format and ARM analysis pass. Full Stock and CI
+  acceptance are not yet claimed.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
