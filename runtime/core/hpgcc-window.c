@@ -5,6 +5,7 @@
 #include "win-drivers.h"
 #include "win-repaint.h"
 #include "hpg-internal.h"
+#include "win-internal.h"
 #include <errno.h>
 #include <limits.h>
 
@@ -19,6 +20,18 @@ static struct hpclang_win_timers timers;
 static struct hpclang_win_repaint repaint;
 static struct hpclang_win_drivers drivers;
 static int initialized, next_event;
+struct hpclang_win_focus hpclang_win_widgets;
+unsigned hpclang_win_widget_callbacks;
+
+int hpclang_win_fail(int error)
+{
+    win_init();
+    return hpclang_win_loop_fail(&loop, error);
+}
+int hpclang_win_dispatch_active(void)
+{
+    return events.depth || timers.depth || hpclang_win_widget_callbacks || hpclang_win_widgets.busy;
+}
 
 static int fail(int error)
 {
@@ -136,7 +149,8 @@ void win_add_event_handler(int event, int priority, win_eventhandler handler, vo
 }
 void win_remove_event_handler(int event, win_eventhandler handler, void *data)
 {
-    if (ready() && event_valid(event) && hpclang_win_events_remove(&events, event, handler, data))
+    win_init();
+    if (event_valid(event) && hpclang_win_events_remove(&events, event, handler, data))
         fail(errno);
 }
 int hpclang_win_error(void)
@@ -162,7 +176,7 @@ void win_event_quit(void)
 }
 int hpclang_win_reset(void)
 {
-    if (initialized && (events.depth || timers.depth)) {
+    if (hpclang_win_dispatch_active() || hpclang_win_widgets.current) {
         errno = EBUSY;
         return -1;
     }
@@ -199,11 +213,13 @@ void win_add_timer_event(int event, void *data, int ms, int periodic)
 }
 void win_remove_timer(win_timerfunc_t function, void *data)
 {
-    if (ready() && hpclang_win_timers_remove(&timers, function, data))
+    win_init();
+    if (hpclang_win_timers_remove(&timers, function, data))
         fail(errno);
 }
 void win_remove_timer_event(int event, void *data)
 {
-    if (ready() && event_valid(event) && hpclang_win_timers_remove_event(&timers, event, data))
+    win_init();
+    if (event_valid(event) && hpclang_win_timers_remove_event(&timers, event, data))
         fail(errno);
 }

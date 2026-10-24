@@ -14,7 +14,8 @@ extern "C"
      * and 32 timers. Exhaustion reports ENOSPC, never silently drops a registration.
      * System IDs 0..7 are reserved; user event registration starts at 8. Physical
      * key events 1/2, typed/modifier events 3..6 (winkeys.h), and repaint 7
-     * are generated. Widget adapters and complete win.h remain unfinished.
+     * are generated. Custom components use winwidget.h/wincore.h; concrete
+     * controls and the complete win.h umbrella remain unfinished.
      */
     void win_init(void);
     int win_register_event(void);
@@ -29,8 +30,8 @@ extern "C"
      * callback's nonzero result alone does not latch an error. Inspect error after
      * win_post_event to distinguish a callback's -1 from failed dispatch.
      * Step: 0 quit, 1 budget exhausted, -1/errno. Reset rejects active callbacks
-     * with EBUSY; otherwise drops registrations/timers and clears the error. It
-     * neither releases a shared HPG display nor destroys borrowed callback data.
+     * and installed widgets with EBUSY; otherwise drops registrations/timers and clears the error.
+     * It neither releases a shared HPG display nor destroys borrowed callback data.
      */
     int hpclang_win_error(void);
     int hpclang_win_step(size_t idle_budget);

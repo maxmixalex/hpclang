@@ -589,7 +589,8 @@ The HPGCC 1.1/2.0 widget family remains a retained **M8.4 adapter requirement**.
 | Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e bounded application subset complete; Runtime #338 green; M7.3f public mutation implemented and accepted |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `winevent.h`, `wintimer.h`, `winkeys.h` | Bounded foreground event/timer/key service over native input, time and HPG | Adapter implemented locally; see exact validation below | M8.4, CI pending |
-| `win*` widgets and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
+| `winwidget.h`, `wincore.h` | Custom component lifecycle, focus, geometry and base painting | Local sanitizer/pixel checks pass; native/SDK acceptance pending | M8.4 |
+| Concrete `win*` controls and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
 
 ## Historical window adapter feasibility
@@ -599,7 +600,8 @@ The 2026-10-24 review reads the retained HPGCC 1.1/39g distribution's
 then compares all four original release archives. This is static source
 evidence, separate from the subsequent implementation and runtime checks below.
 The installed `winevent.h`, `wintimer.h` and `winkeys.h` now expose working
-event/timer/key adapters; the full `win.h` umbrella and widgets remain open.
+event/timer/key adapters. `winwidget.h`/`wincore.h` now add custom components;
+concrete controls and the full `win.h` umbrella remain open.
 
 | Release | Source/header files scanned | Window-family evidence |
 | --- | ---: | --- |
@@ -736,7 +738,24 @@ six Stock targets: four real 30 ms callbacks, synchronous consumed user events,
 four repaint cycles, independent final-frame pixels and settled native return.
 This native fixture uses HPG mono double buffering. Its Runtime CI manifest now
 runs the same client and pixel verifier; formal CI acceptance remains pending.
-Historical widgets and the complete `win.h` umbrella remain work in progress.
+Custom components now use `win_wcore_alloc` with installation, removal,
+destruction and preferred-size callbacks. Geometry, borrowed fonts, colors,
+transparency, focus notifications and base painting follow the historical
+interfaces. Base painting retains the preceding pattern/XOR mode for the
+background, then selects foreground/font, solid pattern and PAINT mode. Clip
+right/bottom endpoints remain exclusive. Host tests exercise production HPG
+pixels as well as lifecycle callback ordering and event-snapshot lifetime.
+
+Remove components before destroying them, and wait until event/timer dispatch
+returns before destruction. Destruction inside callbacks and reset with installed
+components return EBUSY. Membership changes inside lifecycle callbacks also
+return EBUSY. Cleanup/unregistration stays available after a latched error.
+Invalid geometry is rejected without changing the previous bounds; failed
+construction leaves application data ownership with the caller. This is local
+custom-component implementation, not acceptance of concrete historical controls,
+the complete `win.h` umbrella, or original multi-control applications. Original
+source differential, relocated SDK and native execution gates remain open.
+
 
 An internal `win-key-state` engine now reproduces the original default key
 handler's Alpha/Shift latches, held-state metadata and character tables. Its

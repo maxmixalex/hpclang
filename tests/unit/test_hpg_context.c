@@ -8,11 +8,24 @@
 #include "display-surface.h"
 #include "hpg-internal.h"
 #include "win-repaint.h"
+#include <wincore.h>
+#include "hpgcc-keyboard.h"
 #define HPCLANG_HPCONIO_NO_AUTOINIT
 #include <hpconio.h>
 #include <hpclang/sound.h>
 #include <hpclang/stdio.h>
 #include "stdio-routing.h"
+
+int hpclang_time_read_us(uint64_t *value)
+{
+    *value = 0;
+    return 0;
+}
+int hpclang_hpgcc_keymatrix_read(keymatrix *matrix)
+{
+    matrix->full = 0;
+    return 0;
+}
 
 uint32_t hpclang_font_advance(const struct hpclang_font *font)
 {
@@ -737,6 +750,55 @@ static void window_frames(void)
     assert(hpclang_hpg_frame_present(NULL) == -1 && errno == EPERM);
 }
 
+static void widget_noop(win_widget_t *widget)
+{
+    (void)widget;
+}
+static void widget_size(win_widget_t *widget, int *width, int *height)
+{
+    (void)widget;
+    *width = 4;
+    *height = 3;
+}
+static void widget_pixels(void)
+{
+    assert(!hpclang_win_reset());
+    hpg_cleanup();
+    hpg_set_mode_gray16(1);
+    hpg_clip_reset(NULL);
+    hpg_set_color(NULL, 51);
+    hpg_fill_rect(0, 0, 7, 5);
+    win_widget_t *widget =
+        win_wcore_alloc(widget_noop, widget_noop, widget_noop, widget_size, 0, NULL);
+    assert(widget);
+    win_widget_set_location(widget, 2, 1);
+    win_widget_set_colors(widget, 255, 170);
+    char bits[] = {0x55};
+    hpg_pattern_t *pattern = hpg_alloc_pattern(bits, 1, 1);
+    assert(pattern);
+    hpg_set_pattern(NULL, pattern);
+    hpg_set_mode(NULL, HPG_MODE_XOR);
+    win_wcore_paint_base(widget);
+    assert(!hpclang_win_error());
+    for (int y = 0; y < 6; ++y)
+        for (int x = 0; x < 8; ++x)
+            assert(hpg_get_pixel(NULL, x, y) ==
+                   (x >= 2 && x < 6 && y >= 1 && y < 4 && !(x & 1) ? 153 : 51));
+    assert(hpg_get_color(NULL) == 255 && hpg_get_mode(NULL) == HPG_MODE_PAINT);
+    assert(!hpg_get_pattern(NULL) && hpg_get_font(NULL) == hpg_get_minifont());
+    win_widget_set_transparent(widget, 1);
+    win_wcore_paint_base(widget);
+    assert(hpg_get_pixel(NULL, 2, 1) == 153);
+    hpg_fill_rect(0, 0, 7, 5);
+    for (int y = 0; y < 6; ++y)
+        for (int x = 0; x < 8; ++x)
+            assert(hpg_get_pixel(NULL, x, y) == (x >= 2 && x < 6 && y >= 1 && y < 4 ? 255 : 51));
+    win_widget_destroy(widget);
+    hpg_free_pattern(pattern);
+    assert(!hpclang_win_reset());
+    hpg_cleanup();
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -833,6 +895,7 @@ int main(void)
     shared_screen();
     historical_console();
     window_frames();
+    widget_pixels();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

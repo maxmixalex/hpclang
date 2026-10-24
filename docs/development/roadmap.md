@@ -4895,6 +4895,23 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Local public custom-component follow-up: `winwidget.h`/`wincore.h` now
+  expose allocation, lifecycle, focus, geometry, borrowed fonts/colors and base
+  painting. Runtime profile includes the adapters. Reset rejects installed
+  widgets; destruction rejects active callbacks/snapshots. Event/timer removal
+  remains usable after a latched error, permitting component cleanup. Failed
+  construction retains caller data ownership, and invalid/overflowing geometry
+  preserves prior bounds. Lifecycle reentrant membership mutation is EBUSY.
+  Four focused ASan/UBSan targets pass: focus, public events, custom widgets and
+  real HPG context. Pixel assertions cover exclusive clipping, inherited
+  patterned XOR background, solid foreground and transparency. ARMv4T compile
+  and focused Clang analysis pass; log `/work/oct24-win-widget-tests.log`.
+  The relocated SDK gate now includes C/C++23 custom-component clients, six
+  launchers and three HP39 Aplet variants; process 14783 is running, log
+  `/work/oct24-win-widget-sdk.log`. Strict docs pass. Native
+  custom-component execution, original-source differential, concrete controls
+  and the complete historical win.h remain open. These are local changes only.
+
   Local widget foundation after 0a7c2d8d: `win-focus` implements caller-owned
   component membership, insertion before the current cursor, forward/backward
   focus traversal, installation/removal callbacks and repaint ordering. It

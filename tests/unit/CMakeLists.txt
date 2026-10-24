@@ -85,6 +85,13 @@ hpclang_unit(win_public test_win_public.c
     "${HPCLANG_ROOT}/runtime/core/win-loop.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
 target_include_directories(test_win_public PRIVATE "${HPCLANG_ROOT}/runtime/core"
     "${HPCLANG_ROOT}/include")
+get_target_property(win_adapter_sources test_win_public SOURCES)
+list(REMOVE_ITEM win_adapter_sources test_win_public.c)
+hpclang_unit(win_widget test_win_widget.c ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c")
+target_include_directories(test_win_widget PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
 hpclang_unit(win_keyboard test_win_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/win-drivers.c"
     "${HPCLANG_ROOT}/runtime/core/win-loop.c"
@@ -244,6 +251,13 @@ hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-window.c"
+    "${HPCLANG_ROOT}/runtime/core/win-key-state.c"
+    "${HPCLANG_ROOT}/runtime/core/win-drivers.c"
+    "${HPCLANG_ROOT}/runtime/core/win-keyboard.c"
+    "${HPCLANG_ROOT}/runtime/core/win-timers.c"
     "${HPCLANG_ROOT}/runtime/core/win-repaint.c"
     "${HPCLANG_ROOT}/runtime/core/win-loop.c"
     "${HPCLANG_ROOT}/runtime/core/win-events.c"
