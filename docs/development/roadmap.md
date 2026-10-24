@@ -20,6 +20,31 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Original application follow-up `6f0d0a32` (isolated `m8-window-apps`) adds
+`win.h` and an archive-extracted 1.1 simple.c gate. Only the unused hpgcc49.h
+include is removed. ASan/UBSan production-loop interaction and relocated SDK
+ARM/six-launcher packaging pass; source hashes and migration diff are retained
+in `/work/oct24-simple-gate-final`. Host renderer is stubbed; original y=65
+slider still needs 64-line layout migration and native application acceptance.
+Initial harness failures were nested default-IDLE progress notifications;
+the scripted driver now guards reentry. No runtime behavior was changed.
+
+Latest local failures: chooser 69407 and box 74185 exit 1 on HP39g+ Stock
+page-exchange verification for mode 200. Both payload/Stock harnesses report
+successful final rendering and settled return, but independent LCD register
+checks fail. Chooser frames 200..222 retain address 0x04013208. This is not a
+Stock acceptance; remaining five models were not run by either script.
+Preserve `/work/oct24-choose-return-stock-*` and `/work/oct24-box-stock-*`.
+The previous errno failure did not recur; mode allocation/display exchange
+requires investigation. Whole box analysis 18338 also exits 1: zero-sized
+allocation diagnostics in hpgcc-box.c:180/182 on two configurations, despite
+373 sources processed. Full regression 37870 remains running. Earlier focused
+analysis passes do not supersede this wider failure.
+
+Latest previous-push CI inspection: cb7c7bae still has passing Quality,
+Storage, Objects and Gallery. Both Core and Runtime runs remain unfinished;
+all completed jobs inspected pass, with no failed jobs. No push was made.
+
 Box follow-up `d5cbc83f` supplies all seven public APIs, transactional grid
 layout and borrowed nested groups. Group installation runs outside callbacks
 and rolls back failures; dynamic add/remove, cycle rejection and bound-child
@@ -28,8 +53,8 @@ full SDK 69480 pass (517 outputs, C/C++, six launchers, three Aplet variants).
 Follow-up `cf8c97cc` passes 48,816-line original 1.1/2.0 grid comparisons,
 wrong-padding and missing-pixel negatives, eleven sanitizer targets and all six
 Direct models (40 additional GPIO edges/model, full-frame nested layout/removal
-and settled return). Stock 74185, full 153-test regression 37870 and whole
-analysis 18338 run. Logs `/work/oct24-box-*`; CI acceptance remains open.
+and settled return). Stock 74185 and analysis 18338 subsequently fail as
+detailed above; full 153-test regression 37870 remains running. Logs `/work/oct24-box-*`; CI acceptance remains open.
 
 Historical foundation note (superseded by `d5cbc83f`): `2c4b6502` passes focused
 ASan/UBSan, ARM compile and analysis. Checked axis allocation/alignment handles
