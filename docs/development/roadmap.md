@@ -4652,6 +4652,15 @@ below are retained.
   Evidence uses `/work/oct24-win-events-{tests,arm}` and corresponding
   build/analysis logs. This is local implementation, not submitted or CI accepted;
   no public `win*` API, idle/timer loop or widget integration is claimed.
+  The optional `tests/compat/check-win-events.py` differential gate then compiles
+  the actual three historical event functions from both 1.1/2.0 archives with
+  documented host-only initialization/stdlib glue and an `alloca` declaration
+  adjustment. Both sanitized references match the candidate's complete 4,836-line
+  trace across deterministic sequences, duplicates, nested mutation and
+  self-removal. Reversed tie ordering is rejected by a negative control.
+  Logs are `/work/oct24-win-events-{reference,negative}.log`; this is local
+  host semantic evidence, not calculator UI/loop acceptance or a bundled-source
+  CI test. Formatting/Ruff and strict docs pass.
 
 #### M8.5 — Modern C++ and migration
 

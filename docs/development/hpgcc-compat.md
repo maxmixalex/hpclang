@@ -689,6 +689,32 @@ namespace, idle loop, timers or widget binding yet; it establishes the dispatch
 semantics without claiming complete original-application compatibility or
 native execution evidence.
 
+The optional POSIX-host differential gate also compiles the original
+`win_add_event_handler.c`, `win_remove_event_handler.c` and `win_post_event.c`
+from each caller-supplied 1.1/2.0 archive:
+
+```sh
+python tests/compat/check-win-events.py /path/to/original-archives
+```
+
+It runs the same callback driver against the historical and new dispatchers,
+under ASan/UBSan. The host glue preallocates event-table rows, replaces hardware
+initialization with an empty function and supplies the host standard library.
+The sole edit to the historical function sources replaces their
+`alloca(int)` declaration with the host `<alloca.h>` declaration. It does not
+alter dispatch, registration or removal logic. No historical source is bundled
+with hpclang, and this optional gate needs the external archives and a host C
+compiler with sanitizers.
+
+Both original versions match all 4,836 trace lines from priority/duplicate,
+nested mutation, self-removal and 32 deterministic 120-operation sequences.
+The trace SHA-256 is
+`2d552d8e4d5fce5a18f9e411c56ccb4582820c600543947073d21ec5db9f5664`.
+A negative-control candidate that reverses equal-priority insertion is rejected
+with a trace mismatch. This strengthens the event-order evidence; event-number
+registration, hardware initialization, timers, rendering and complete original
+widget applications remain outside this comparison.
+
 ## Design consequence
 
 Historical source compatibility remains important, but it must sit on the clean dependency stack already established:
