@@ -738,6 +738,26 @@ python tools/audit-hpgcc-windows.py /path/to/original-archives > window-audit.js
 The tool reads caller-supplied archives without extracting their paths or
 redistributing source. Its report contains archive SHA-256 identities, the
 scanned file counts, reference filenames and exact normalized comparisons.
+Version 2 also lists lexical function declarations/definitions with their source
+paths. Both 1.1 and 2.0 have 75 distinct implementation names and 75 declaration
+names, with the same discrepancies: two checkbox getters exist only under their
+correct names in source; the header declares nonexistent `win_text_is_selected`;
+and the disabled-color source mistakenly defines `win_softmenu_set_colors`
+again instead of declared `win_softmenu_set_disable_colors`. hpclang provides
+the real checkbox names and the intended disabled-color setter.
+
+The installed SDK export gate derives 76 names from that source inventory plus
+the repaired disabled-color declaration, then forces every function reference
+into C and C++ ARM links and checks the resulting ELF symbols:
+
+```sh
+ATFE=/path/to/atfe python3 tests/compat/check-win-exports.py /path/to/original-archives \
+  --sdk /path/to/installed-sdk --work /new/output/path
+```
+
+This checks availability and linkage, not behavior or historical binary ABI.
+The gate passes against the relocated SDK in `/work/oct24-window-exports`.
+Behavioral comparisons and native acceptance are recorded separately above.
 The reviewed archives are:
 
 ```text
@@ -760,7 +780,7 @@ a984795493f2e4cf79001e0f95824b9c76f20df6d38a071eb8f9deb7a650165d
 | `text/win_text_new.c` maintains editable byte text, cursor state and a blink timer; `win_text_set_text.c` copies replacement text. `checkbox` owns selection and updates menu bindings. | Labels, controlled `hpclang_ui_text_input` and `hpclang_ui_toggle` provide rendering/input foundations. A bridge must accept proposals into its own state before redeclaration, translate legacy byte text explicitly and preserve getter lifetimes. Direct aliases would change who owns the model. |
 | `choose/win_choose_set_choice.c` uses a past-end selection for NULL or an unmatched choice; `win_choose_get_choice.c` then returns NULL. `winsoftmenu.h` provides up to 30 entries with enabled states and associated events. | Compose selection/menu views from existing controls while retaining no-selection, dynamic option identity, menu paging and model-specific function-key routing. A fixed six-button view is insufficient. |
 | `progress/win_progress_set_value.c` clamps a double to its range. `win_progress_new.c` implements four orientations, slider key-repeat, focus changes at limits and change events. | The canvas callback can render a progress view, but the compatibility layer must retain numeric state, orientation, repeat timing and focus behavior. A painted rectangle alone is not a slider adapter. |
-| `winbox.h` exposes positioned/spanning children and alignment; `winimg.h` combines an HPG pattern and image. | Compare legacy layout results with row/column/scroll composition, and preserve borrowed image lifetimes and clipping through the canvas/surface backend. Do not silently discard positioning or spans. |
+| `winbox.h` exposes row/column placement, weights, preferred sizes and alignment; `winimg.h` combines an HPG pattern and image. | Compare legacy layout results with row/column/scroll composition, and preserve borrowed image lifetimes and clipping through the canvas/surface backend. Preserve those grid parameters; the original API has no row/column span parameter. |
 
 Header/source discrepancies also need explicit treatment: this distribution's
 `wincheckbox.h` names `win_text_get_text` and `win_text_is_selected` in its

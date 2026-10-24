@@ -20,6 +20,16 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Window export inventory follow-up (local): audit report v2 records 75 distinct
+original implementation names and the header/source discrepancies in both 1.1
+and 2.0. `check-win-exports.py` derives all 76 original/repaired names and forces
+their references through an installed relocated SDK in C and C++ ARM links,
+then checks defined ELF symbols. `/work/oct24-window-exports/report.json` passes;
+a missing wrapped `win_box_new` implementation is rejected at link, and the
+restored build passes. This is name/linkage evidence, not behavioral or ABI
+proof. Corrected the erroneous 74-name count and nonexistent box-span claim.
+Ruff format/lint and strict docs pass. Remote CI acceptance remains open.
+
 Previous-push CI review of exact head `9683fd6a` finds both Quality runs
 (40086239513/40086235523) and Storage push 40086235524 successful; the other
 seven listed runs are queued. This is not CI acceptance. Before another push,
