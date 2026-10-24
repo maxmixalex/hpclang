@@ -2,6 +2,7 @@
 #include "rpl-recovery-installation.h"
 #include "sst-flash.h"
 #include <hpclang/time.h>
+#include "clock-internal.h"
 
 __thread int errno;
 volatile uint32_t retirement_close_result[4];
@@ -22,7 +23,7 @@ static void write_bus(void *context, uint32_t address, uint16_t value)
 static uint32_t clock_us(void *context)
 {
     (void)context;
-    return (uint32_t)hpclang_time_monotonic_us();
+    return (uint32_t)hpclang_time_monotonic_us_masked();
 }
 
 static int program_phase(void *context, uint32_t address, uint16_t value)

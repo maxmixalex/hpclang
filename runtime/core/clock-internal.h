@@ -6,6 +6,9 @@ void hpclang_clock_pclk(uint64_t *numerator, uint64_t *denominator);
  * not enter the supervisor bridge. Foreground clock reads, initialization and
  * civil-time writes serialize against this operation. No user callbacks. */
 int hpclang_time_read_us_masked(uint64_t *microseconds);
+/* Flash command/query modes cannot fetch the ROM SWI vector. The Flash owner
+ * already masks IRQ/FIQ; retain the monotonic fallback without entering SWI. */
+uint64_t hpclang_time_monotonic_us_masked(void);
 struct hpclang_clock_epoch
 {
     uint64_t microseconds;

@@ -4,6 +4,7 @@
 #include "sst-flash.h"
 #include "expected-library.h"
 #include <hpclang/time.h>
+#include "clock-internal.h"
 __thread int errno;
 volatile unsigned cancellation_result[3];
 static volatile unsigned expected_bytes = sizeof expected_library;
@@ -20,7 +21,7 @@ static void bus_write(void *c, unsigned a, unsigned short v)
 static unsigned flash_time(void *c)
 {
     (void)c;
-    return (unsigned)hpclang_time_monotonic_us();
+    return (unsigned)hpclang_time_monotonic_us_masked();
 }
 static int program(void *c, unsigned a, unsigned short value)
 {

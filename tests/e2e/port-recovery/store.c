@@ -5,6 +5,7 @@
 #include "rpl-flash-write.h"
 #include "sst-flash.h"
 #include <hpclang/time.h>
+#include "clock-internal.h"
 
 __thread int errno;
 volatile uint32_t storage_result[2];
@@ -100,7 +101,7 @@ static void bus_write(void *context, uint32_t address, uint16_t value)
 static uint32_t flash_time(void *context)
 {
     (void)context;
-    return (uint32_t)hpclang_time_monotonic_us();
+    return (uint32_t)hpclang_time_monotonic_us_masked();
 }
 
 static int program_owned(void *context, uint32_t address, uint16_t value)

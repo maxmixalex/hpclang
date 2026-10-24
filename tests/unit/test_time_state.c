@@ -75,6 +75,13 @@ int main(void)
     REG32(0x07600014) = 59998;
     assert(!hpclang_time_read_us_masked(&first) && first > next);
     assert(bridges == count && (flags & 0xc0) == 0xc0);
+    REG32(0x07600014) = 59997;
+    first = hpclang_time_monotonic_us_masked();
+    assert(first > next && bridges == count && (flags & 0xc0) == 0xc0);
+    read_failure = 1;
+    errno = EBUSY;
+    assert(hpclang_time_monotonic_us_masked() == first);
+    assert(bridges == count && errno == EBUSY && (flags & 0xc0) == 0xc0);
     hpclang_irq_restore(old);
 
     read_failure = 1;

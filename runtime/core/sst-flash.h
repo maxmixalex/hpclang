@@ -6,6 +6,8 @@
 /* Internal SST x16 command engine. Addresses are byte offsets into the chip.
  * The caller identifies the compatible chip, owns an uncached mapping, runs
  * all code/callbacks from RAM and excludes interrupt/other Flash accesses.
+ * This includes the time callback: it must not enter a ROM SWI trampoline
+ * while the chip is in query or busy mode, even if its own code lives in RAM.
  * Entry requires ordinary array-read mode with no operation in progress.
  * Bounds constrain data programming/erasure; unlock commands use chip offsets.
  * A BUSY result does NOT authorize restoring Stock execution or interrupts:

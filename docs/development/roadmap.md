@@ -468,15 +468,36 @@ remain retained.
 
 Subsequent single CI inspection at exact head `99168c1be049b815ffc318a1db9ecd2dc9ea247e`:
 Quality 40061641240, Storage 40061641296 and Gallery 40061641275 pass. Core
-40061641258 fails 14 native Port lifecycle jobs; Runtime 40061641253 is queued
-and Objects 40061641226 is running at the failure-review checkpoint. Main Core
+40061641258 fails 14 native Port lifecycle jobs; Runtime 40061641253 is running
+and Objects 40061641226 fails both Stock object-mutation jobs at the latest
+pre-push failure-review checkpoint. Main Core
 40059453759 separately fails HP49g+ recovery after retirement resume with a
 blank Stock display. Neither failure is accepted or dismissed as transient.
 Downloaded branch recovery/publication logs show execution at unmapped
 `0x00000008`. The exact CI recovery build reproduces locally with matching
 registers on the current watchdog emulator (`/work/oct24-ci-recovery-repro`,
-session 2634 exit 1). An older-emulator comparison is running on session 9666,
-with output `/work/oct24-ci-recovery-old-emulator.log`; root cause remains open.
+session 2634 exit 1). The older-emulator comparison also exits 1 with identical
+registers (9666; `/work/oct24-ci-recovery-old-emulator.log`). The clock's newly
+added SWI guard is called inside Flash query/busy modes, where ROM exception
+instructions cannot be fetched. A local candidate uses an IRQ-masked clock
+helper for production Flash and all recovery witness timeout callbacks.
+The focused ASan/UBSan clock test passes, including no supervisor entry and
+last-value/errno preservation on clock failure. All four recovery build variants
+compile. Both native recovery runs pass the first two busy-operation power cuts
+that previously crashed; full suites continue (94903/44621). Stock object-mutation
+(19519) and publication validation (38155, HP49g+ then HP50g) also run. Both
+recovery runs have additionally passed interrupted-recovery validation.
+Both Stock object-mutation suites pass complete primary execution, return and
+all lifecycle invocations (19519 exit 0). Evidence is preserved separately in
+`/work/oct24-flash-clock-object-evidence` before other native runs reuse captures.
+Main's original retirement-cut state resets successfully on both current and
+old emulators (36805/29165 exit 0), with the original restart verifier accepting
+61 catalog entries and Flash preservation. Evidence is in
+`/work/oct24-main-retirement-resume-{repro,old-emulator}`. The blank display
+failure remains unreproduced, not claimed fixed. Whole host
+ASan/UBSan build and CTest run on 1072 (`/work/oct24-flash-clock-unit-test.log`). Objects failure logs confirm the
+same PC 0x00000008 crash on both models. Focused host/ARM static analysis and
+strict docs pass. Full regression and CI acceptance remain pending.
 Later local window-audit/dispatch changes are outside that head.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
@@ -4784,6 +4805,11 @@ below are retained.
   `/work/oct24-window-e2e-artifact`; logs: `/work/oct24-window-direct-*.log`;
   captures/results: `/work/oct24-prepush-src/build`. Stock execution, original
   window-client/widget acceptance and CI remain open. No new push occurred.
+  Stock validation is now running on 94697, sequential hp4950/hp48/hp39 families,
+  with dedicated `/work/oct24-window-stock-assets` and logs
+  `/work/oct24-window-stock-*.log`. This independent M8.4 work proceeds during
+  native CI-repair validation waits; pixel verification and all Stock returns
+  remain pending.
 
 #### M8.5 — Modern C++ and migration
 

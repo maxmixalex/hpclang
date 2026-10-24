@@ -363,3 +363,9 @@ int hpclang_time_read_us_masked(uint64_t *microseconds)
     }
     return 0;
 }
+
+uint64_t hpclang_time_monotonic_us_masked(void)
+{
+    uint64_t value;
+    return monotonic_now_unlocked(&value) ? value : state.last_us;
+}
