@@ -4,6 +4,7 @@
 #include <winprogress.h>
 #include <wintext.h>
 #include <winimg.h>
+#include <winsoftmenu.h>
 #include <string.h>
 #include <hpkeyb49.h>
 #include <limits.h>
@@ -345,6 +346,71 @@ static int image_check(int buffered)
     hpg_free_pattern(pattern);
     return hpclang_win_error() ? -1 : hpclang_win_reset();
 }
+static unsigned menu_deliveries;
+static int menu_selected(void *event, void *context)
+{
+    const unsigned expected[] = {1, 6, 7, 1, 25};
+    const win_softmenu_event_t *selected = event;
+    if (context || menu_deliveries >= 5 ||
+        (uintptr_t)selected->extra_data != expected[menu_deliveries] || selected->lshift ||
+        selected->rshift)
+        failure = 15;
+    ++menu_deliveries;
+    return 17;
+}
+static int menu_check(int buffered)
+{
+    hpg_set_mode_gray16(buffered);
+    menu_deliveries = physical_edges = 0;
+    int event = win_register_event();
+    win_add_event_handler(event, 0, menu_selected, NULL);
+    win_add_event_handler(WIN_KEY_PRESSED, INT_MAX, physical, (void *)(uintptr_t)1);
+    win_add_event_handler(WIN_KEY_RELEASED, INT_MAX, physical, NULL);
+    win_widget_t *menu = win_softmenu_new();
+    if (!menu)
+        return -1;
+    for (unsigned i = 0; i < 30; ++i)
+        if (win_softmenu_add_item(menu, "A", event, (void *)(uintptr_t)(i + 1)) != (int)i)
+            return -1;
+    win_add_widget(menu);
+    const unsigned keys[] = {KB_A, KB_F,      KB_L, KB_A, KB_LSHIFT, KB_L,
+                             KB_A, KB_LSHIFT, KB_L, KB_A, KB_L};
+    for (unsigned i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
+        if (text_tap(keys[i]))
+            return -1;
+    win_softmenu_set_enabled(menu, 5, 0);
+    if (text_tap(KB_F) || menu_deliveries != 5 || physical_edges != 24)
+        return -1;
+    win_remove_widget(menu);
+    win_widget_destroy(menu);
+    char glyphs[256 * 6] = {0};
+    for (unsigned row = 0; row < 4; ++row)
+        glyphs['A' * 6 + row] = (char)(1u << row);
+    hpg_font_t *font = hpg_alloc_font(glyphs, 256, 6, 4);
+    menu = win_softmenu_new();
+    if (!font || !menu)
+        return -1;
+    win_widget_set_font(menu, font);
+    for (int i = 0; i < 7; ++i)
+        win_softmenu_set_item(menu, i, "A", event, NULL);
+    win_softmenu_set_disable_colors(menu, 1, 51, 102);
+    win_softmenu_set_enabled(menu, 1, 0);
+    win_softmenu_set_colors(menu, 6, 17, 238);
+    win_add_widget(menu);
+    for (unsigned page = 0; page < 2; ++page) {
+        hpg_clip_reset(NULL);
+        hpg_clear();
+        if (win_post_event(WIN_REPAINT_EVENT, NULL) || hpclang_win_error())
+            return -1;
+        hpg_flip();
+        if (checkpoint((buffered ? 1000 : 900) + page) || text_tap(KB_L))
+            return -1;
+    }
+    win_remove_widget(menu);
+    win_widget_destroy(menu);
+    hpg_free_font(font);
+    return hpclang_win_error() ? -1 : hpclang_win_reset();
+}
 int main(void)
 {
     errno = 0;
@@ -357,6 +423,8 @@ int main(void)
         failure = failure ? failure : 12;
     if (!failure && (image_check(0) || image_check(1)))
         failure = failure ? failure : 13;
+    if (!failure && (menu_check(0) || menu_check(1)))
+        failure = failure ? failure : 14;
     hpg_set_mode_mono(1);
     hpg_clip_reset(NULL);
     if (errno || hpclang_time_read_us(&start))

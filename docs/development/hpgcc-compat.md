@@ -1552,3 +1552,13 @@ is rejected. Logs: `/work/oct24-menu-{reference,negative}.log` and
 Installed SDK acceptance passes (74007 exit 0): C/C++ menu clients, six model
 launchers, three HP39 Aplet variants, notebooks and 517 byte-identical outputs,
 log `/work/oct24-menu-sdk.log`. Native menu acceptance remains open.
+
+The native menu phase uses 56 physical GPIO edges and ten selection callbacks
+per model across both buffering modes, checking first/last visible options,
+forward/back paging including the repaired wrap, disabled-item suppression and
+payload shift states. Recreated menus use a known font for independent complete
+page/disabled-color/glyph checks at checkpoints 900/901/1000/1001. The retained
+text, image, progress, keyboard and settled-return gates still run. HP39g+,
+HP39gs and HP40gs Direct pass; the six-model runner (32162) continues in
+`/work/oct24-menu-src`, artifact `/work/oct24-menu-native-arm`. Stock assets are
+prepared; native matrix completion and CI acceptance remain open.

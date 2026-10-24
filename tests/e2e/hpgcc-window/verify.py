@@ -152,6 +152,27 @@ def verify_image(prefix):
     print(f"PASS {prefix}: image/pattern composition in both buffer modes")
 
 
+def verify_menu(prefix):
+    for base in (900, 1000):
+        for page in (0, 1):
+            path = Path(f"{prefix}-{base + page}.pgm")
+            width, height, pixels = read_pgm(path)
+            if width != 132 or height not in (64, 80):
+                raise AssertionError(f"{path}: unsupported menu frame geometry")
+            for y in range(height):
+                for x in range(width):
+                    cell, local = divmod(x, 22)
+                    row = y - (height - 6)
+                    ink = 0
+                    if x < 131 and y >= height - 7 and local <= 20 and (page == 0 or cell == 0):
+                        ink = 238 if page else 102 if cell == 1 else 255
+                        if 0 <= row < 4 and local == 9 + row:
+                            ink = 17 if page else 51 if cell == 1 else 0
+                    if pixels[y * width + x] != 255 - ink:
+                        raise AssertionError(f"{path}: unexpected menu pixel at {x},{y}")
+    print(f"PASS {prefix}: menu pages, disabled colors and labels in both buffer modes")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -166,6 +187,7 @@ def main():
         verify_controls(Path(f"build/{target}-frame"))
         verify_text(Path(f"build/{target}-frame"))
         verify_image(Path(f"build/{target}-frame"))
+        verify_menu(Path(f"build/{target}-frame"))
 
 
 if __name__ == "__main__":
