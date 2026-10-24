@@ -427,10 +427,13 @@ memory-report, minimum-RW admission and installed C example budget batch into
 main as `17444cb7`. Later pool-observer, serialized-report, sketch-review and
 migration-guide changes were pushed separately as `d409b014` after all six
 local Stock observations, relevant host/sanitizer/Python checks, SDK packaging,
-Ruff and strict docs passed. On the subsequent check, Quality 40050688500 and
-Storage 40050688494 pass; Core 40050688514, Runtime 40050688507 and Objects
-40050688481 are queued, and Font Gallery 40050688484 is running. The batch is
-not yet CI accepted or merged. This does not complete M8.
+Ruff and strict docs passed. On the subsequent check, Quality 40050688500,
+Storage 40050688494, Runtime 40050688507 and Objects 40050688481 pass. Runtime's
+three Direct UI families and all six Stock UI/pool jobs pass. Core 40050688514
+still has running/queued native Port jobs. All Font Gallery 40050688484 test
+jobs pass, but its queued evidence publisher was cancelled; only that terminal
+job (120751449957) was re-run. The batch is not yet fully CI accepted or merged.
+This does not complete M8.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
 actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
@@ -4394,8 +4397,9 @@ below are retained.
   policy static analysis pass. Full six-model Direct then Stock queue runs on
   session 68284 / PID 110928 in `/work/oct24-watchdog-irq-src`, using the repaired
   emulator; logs are `/work/oct24-watchdog-irq-{direct,stock}-*.log`. Wider native
-  acceptance remains pending: all six Direct models and HP49g+/HP50g/HP48gII
-  Stock now pass; the same queue is executing the three HP39 Stock models.
+  acceptance of this primitive is now local: all six Direct and all six Stock
+  models pass; session 68284 completed with exit 0. Public API integration has
+  separate validation below and is not covered by this earlier matrix.
   A local follow-up extracts controller/vector/banked-stack lifetime into
   `irq-owner`: callers hold IRQ/FIQ masked, supply one source plus aligned ARM
   entry/stack, and serialize exclusive ownership. It masks all sources before
@@ -4459,6 +4463,26 @@ below are retained.
   Its source currently lives in `/work/oct24-sound-api-src`; the repository
   retains the strict replacement test. No API Stock run or CI submission is
   claimed; repair replacement restoration before advancing public acceptance.
+  Correction after direct register/IRQ-entry tracing: the runtime restoration
+  was not defective. The fixed two-million-iteration test loop could finish
+  before the requested 10 ms on the emulator; status correctly returned running
+  and retained the IRQ lease. Later checks overwrote that earlier failure with
+  a vector mismatch. Traces show the original vector (0x0003f9b4 on HP50g) is
+  saved across replacement and restored by collection. An IRQ-entry witness
+  remained untouched in the failing run, confirming the expiry had not fired.
+  The maintained test now busy-polls the PWM running bit with a twenty-million
+  iteration failure bound, without SDK calls or foreground clock advancement.
+  It checks restored peripheral registers before collecting the IRQ lease and
+  stops subsequent restoration comparisons if status still reports running.
+  The strict replacement/cancellation assertions remain; no runtime restoration
+  workaround was added. Diagnostic source/script and reports remain under
+  `/work/oct24-sound-vector-src` and `research/oct24-trace-sound-vector.py`.
+  The corrected public API artifact `/work/oct24-sound-api-fixed-artifact`
+  passes HP49g+, HP50g and HP48gII Direct; the remaining Direct and full Stock
+  matrix runs on session 70552 / PID 123285 in `/work/oct24-sound-api-fixed-src`,
+  logs `oct24-sound-api-fixed-{direct,stock}-*.log`. ARM build and policy analysis
+  pass. Native normal/immediate-exit proof and HPGCC mode compatibility remain
+  open; public integration is not yet fully accepted or pushed.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
