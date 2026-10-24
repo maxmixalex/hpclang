@@ -153,6 +153,10 @@ static int measure(struct box *box, struct grid *grid)
     }
     if (!box->count)
         return 0;
+    /* A nonempty entry list must have at least one row and column. Keep the
+     * allocation bound explicit before indexing the measured grid. */
+    if (!grid->nrows || !grid->ncols)
+        return fail(EINVAL);
     if (grid->nrows > SIZE_MAX / sizeof(*grid->rows) ||
         grid->ncols > SIZE_MAX / sizeof(*grid->cols) ||
         box->count > SIZE_MAX / sizeof(*grid->items))

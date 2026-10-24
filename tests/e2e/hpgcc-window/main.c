@@ -13,11 +13,28 @@
 #include <limits.h>
 #include <hpgraphics.h>
 #include <hpclang/time.h>
+#include <hpclang/display.h>
 #include <errno.h>
 #include <stdint.h>
 
 volatile uint32_t hpclang_e2e_result;
 static unsigned ticks, paints, failure, deliveries;
+static int screen_mode(unsigned levels, int buffered)
+{
+    if (levels == 16)
+        hpg_set_mode_gray16(buffered);
+    else
+        hpg_set_mode_mono(buffered);
+    /* A failed void HPG mode request preserves the previous display. Verify
+     * the actual surface and exchange, not merely successfully drawn pixels.
+     * Successful allocator retries may leave errno from an earlier attempt. */
+    struct hpclang_surface *before = hpclang_display_surface();
+    if (!before || hpclang_surface_levels(before) != levels)
+        return -1;
+    errno = 0;
+    hpg_flip();
+    return errno || ((hpclang_display_surface() != before) != !!buffered) ? -1 : 0;
+}
 static uint64_t start;
 static int event_id;
 static int receive(void *event, void *context)
@@ -135,7 +152,8 @@ static int keyboard_check(int buffered)
 {
     physical_edges = typed_count = 0;
     frame_base = buffered ? 200 : 100;
-    hpg_set_mode_gray16(buffered);
+    if (screen_mode(16, buffered))
+        return -1;
     /* Stock may enter the payload before its launch-key release. Announce
      * payload entry to disable launch retries, then wait for that real release
      * before installing observers or injecting the first test transition. */
@@ -216,7 +234,8 @@ static int remove_controls(void)
 }
 static int controls_check(int buffered)
 {
-    hpg_set_mode_gray16(buffered);
+    if (screen_mode(16, buffered))
+        return -1;
     physical_edges = control_changes = 0;
     int changed = win_register_event();
     win_add_event_handler(changed, 0, control_changed, NULL);
@@ -253,7 +272,8 @@ static int text_tap(unsigned key)
 }
 static int text_check(int buffered)
 {
-    hpg_set_mode_gray16(buffered);
+    if (screen_mode(16, buffered))
+        return -1;
     physical_edges = 0;
     win_widget_t *entry = win_text_new_entry(2);
     win_widget_t *other = win_text_new_entry(2);
@@ -314,7 +334,8 @@ static int text_check(int buffered)
 }
 static int image_check(int buffered)
 {
-    hpg_set_mode_gray16(buffered);
+    if (screen_mode(16, buffered))
+        return -1;
     hpg_t *image = hpg_alloc_gray16_image(2, 2);
     char bits[] = {0x55, (char)0xaa};
     hpg_pattern_t *pattern = hpg_alloc_pattern(bits, 2, 0);
@@ -363,7 +384,8 @@ static int menu_selected(void *event, void *context)
 }
 static int menu_check(int buffered)
 {
-    hpg_set_mode_gray16(buffered);
+    if (screen_mode(16, buffered))
+        return -1;
     menu_deliveries = physical_edges = 0;
     int event = win_register_event();
     win_add_event_handler(event, 0, menu_selected, NULL);
@@ -416,7 +438,8 @@ static int menu_check(int buffered)
 }
 static int checkbox_check(int buffered)
 {
-    hpg_set_mode_gray16(buffered);
+    if (screen_mode(16, buffered))
+        return -1;
     physical_edges = 0;
     win_widget_t *menu = win_softmenu_new();
     win_widget_t *a = win_checkbox_new("A"), *b = win_checkbox_new("B");
@@ -487,7 +510,8 @@ static int checkbox_check(int buffered)
 
 static int choose_check(int buffered)
 {
-    hpg_set_mode_gray16(buffered);
+    if (screen_mode(16, buffered))
+        return -1;
     physical_edges = 0;
     win_widget_t *menu = win_softmenu_new(), *a = win_choose_new(), *b = win_choose_new();
     if (!menu || !a || !b)
@@ -576,7 +600,8 @@ static int choose_check(int buffered)
 
 static int box_check(int buffered)
 {
-    hpg_set_mode_gray16(buffered);
+    if (screen_mode(16, buffered))
+        return -1;
     physical_edges = 0;
     win_widget_t *root = win_box_new(), *inner = win_box_new(), *menu = win_softmenu_new();
     win_widget_t *a = win_checkbox_new("A"), *b = win_choose_new();
@@ -659,11 +684,21 @@ static int box_check(int buffered)
     hpg_free_font(font);
     return hpclang_win_error() ? -1 : hpclang_win_reset();
 }
+#ifndef HPCLANG_WINDOW_GROUP
+#define HPCLANG_WINDOW_GROUP 0
+#endif
 int main(void)
 {
-    errno = 0;
-    hpg_set_mode_mono(1);
-    if (errno || keyboard_check(0) || keyboard_check(1))
+    if (checkpoint(50))
+        failure = 5;
+    uint64_t entered = hpclang_time_monotonic_us();
+    while (keyb_isAnyKeyPressed())
+        if (hpclang_time_monotonic_us() - entered > 2000000) {
+            failure = 5;
+            break;
+        }
+#if HPCLANG_WINDOW_GROUP != 2
+    if (screen_mode(2, 1) || keyboard_check(0) || keyboard_check(1))
         failure = failure ? failure : 5;
     if (!failure && (controls_check(0) || controls_check(1)))
         failure = failure ? failure : 10;
@@ -675,17 +710,16 @@ int main(void)
         failure = failure ? failure : 14;
     if (!failure && (checkbox_check(0) || checkbox_check(1)))
         failure = failure ? failure : 16;
+#endif
+#if HPCLANG_WINDOW_GROUP != 1
     if (!failure && (choose_check(0) || choose_check(1)))
         failure = failure ? failure : 17;
     if (!failure && (box_check(0) || box_check(1)))
         failure = failure ? failure : 18;
-    /* Successful allocations may retain errno from an internal failed growth
-     * attempt. Attribute errors to this mode switch, not prior successful work. */
-    errno = 0;
-    hpg_set_mode_mono(1);
-    hpg_clip_reset(NULL);
-    if (errno || hpclang_time_read_us(&start))
+#endif
+    if (screen_mode(2, 1) || hpclang_time_read_us(&start))
         failure = failure ? failure : 5;
+    hpg_clip_reset(NULL);
     event_id = win_register_event();
     win_add_event_handler(event_id, 0, receive, &deliveries);
     win_add_event_handler(7, 0, paint, NULL);
