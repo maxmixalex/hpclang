@@ -4982,6 +4982,15 @@ below are retained.
   format/lint and 352-source analysis, local batch gates pass. CI submission
   and acceptance remain open; earlier running entries below are historical.
 
+  Final pre-push inspection: every workflow on 0a7c2d8d passes on both push
+  and PR runs. Core 40073586985/40073583179 and Runtime
+  40073586999/40073583151 are now terminal success, joining Quality, Storage,
+  Objects and Gallery. No unfinished or failed jobs remain on that head.
+  This does not establish fixes for older intermittent transport/audio causes.
+  Component source audit matches all 4,572 tracked files to the verified mirror;
+  strict docs pass (`/work/oct24-component-final-docs.log`). The ready component
+  batch retains all 140 sanitizer, SDK and six-model Direct/Stock evidence.
+
   Pre-next-push CI inspection of 0a7c2d8d: both Quality (40073587007 /
   40073583118), Storage (40073587032 / 40073583077) and Objects (40073587006 /
   40073583192) runs pass. Both Gallery runs 40073586972 /
