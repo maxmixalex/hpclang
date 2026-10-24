@@ -4895,6 +4895,17 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Pre-push component-batch validation at 2e7cfcc5: a CRLF-normalized audit
+  of all 4,572 tracked files confirms runtime/tests match the writable container
+  mirror. Only roadmap/compatibility status text differed; both were synced.
+  The mirror Git index includes all current files. Full format/lint pass, logs
+  `/work/oct24-progress-{format,lint}.log`. Full 140-target ASan/UBSan regression
+  runs in process 10200, logs `/work/oct24-progress-full-{build,tests}.log`.
+  Whole host/ARM analysis runs in process 37052, log
+  `/work/oct24-progress-analysis.log`. Neither full result is claimed yet.
+  Stock process 9966 remains active; HP39g+ directory transfer completed and
+  payload packet sends are progressing. Keep the same processes until terminal.
+
   Native progress/component Direct acceptance now passes all six models:
   the maintained hpgcc-window fixture adds four real slider instances, 16 GPIO
   edges and eight value-change events per model across single/double buffering.
