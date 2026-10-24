@@ -2,6 +2,8 @@
 #include <wintimer.h>
 #include <winkeys.h>
 #include <winprogress.h>
+#include <wintext.h>
+#include <string.h>
 #include <hpkeyb49.h>
 #include <limits.h>
 #include <hpgraphics.h>
@@ -240,6 +242,71 @@ static int controls_check(int buffered)
         return -1;
     return remove_controls();
 }
+static int text_tap(unsigned key)
+{
+    return control_edge(key, 1) || control_edge(key, 0);
+}
+static int text_check(int buffered)
+{
+    hpg_set_mode_gray16(buffered);
+    physical_edges = 0;
+    win_widget_t *entry = win_text_new_entry(2);
+    win_widget_t *other = win_text_new_entry(2);
+    if (!entry || !other)
+        return -1;
+    win_add_widget(entry);
+    win_add_widget(other);
+    win_add_event_handler(WIN_KEY_PRESSED, INT_MAX, physical, (void *)(uintptr_t)1);
+    win_add_event_handler(WIN_KEY_RELEASED, INT_MAX, physical, NULL);
+    if (!win_widget_has_focus(entry) || text_tap(KB_1) || text_tap(KB_2) || text_tap(KB_3) ||
+        strcmp(win_text_get_text(entry), "12") || text_tap(KB_LF) || text_tap(KB_BKS) ||
+        strcmp(win_text_get_text(entry), "2") || text_tap(KB_LSHIFT) || text_tap(KB_BKS) ||
+        strcmp(win_text_get_text(entry), "") || text_tap(KB_1) || text_tap(KB_RSHIFT) ||
+        text_tap(KB_BKS) || strcmp(win_text_get_text(entry), "") || text_tap(KB_DN) ||
+        !win_widget_has_focus(other) || text_tap(KB_2) || strcmp(win_text_get_text(other), "2") ||
+        text_tap(KB_UP) || !win_widget_has_focus(entry) || physical_edges != 26)
+        return -1;
+    win_remove_widget(other);
+    win_widget_destroy(other);
+    win_remove_widget(entry);
+    win_widget_destroy(entry);
+    if (hpclang_win_reset())
+        return -1;
+    /* Fresh controls have no elapsed blink callbacks. Capture deterministic
+     * text after the real input phase; cursor timing has a separate host gate. */
+    char bits[256 * 3] = {0};
+    const unsigned char a[] = {1, 2, 4}, b[] = {7, 5, 7};
+    for (unsigned row = 0; row < 3; ++row) {
+        bits['A' * 3 + row] = (char)a[row];
+        bits['B' * 3 + row] = (char)b[row];
+    }
+    hpg_font_t *font = hpg_alloc_font(bits, 256, 3, 3);
+    win_widget_t *label = win_text_new_label("A\nB");
+    entry = win_text_new_entry(2);
+    if (!font || !label || !entry)
+        return -1;
+    win_widget_t *text[] = {label, entry};
+    for (unsigned i = 0; i < 2; ++i) {
+        win_widget_set_font(text[i], font);
+        win_widget_set_location(text[i], 5 + (int)i * 20, 15);
+        win_widget_set_size(text[i], 10, 10);
+        win_add_widget(text[i]);
+    }
+    win_text_set_text(entry, "AB");
+    hpg_clip_reset(NULL);
+    hpg_clear();
+    if (win_post_event(WIN_REPAINT_EVENT, NULL) || hpclang_win_error())
+        return -1;
+    hpg_flip();
+    if (checkpoint(buffered ? 600 : 500))
+        return -1;
+    win_remove_widget(entry);
+    win_widget_destroy(entry);
+    win_remove_widget(label);
+    win_widget_destroy(label);
+    hpg_free_font(font);
+    return hpclang_win_error() ? -1 : hpclang_win_reset();
+}
 int main(void)
 {
     errno = 0;
@@ -248,6 +315,8 @@ int main(void)
         failure = failure ? failure : 5;
     if (!failure && (controls_check(0) || controls_check(1)))
         failure = failure ? failure : 10;
+    if (!failure && (text_check(0) || text_check(1)))
+        failure = failure ? failure : 12;
     hpg_set_mode_mono(1);
     hpg_clip_reset(NULL);
     if (errno || hpclang_time_read_us(&start))

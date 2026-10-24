@@ -1468,3 +1468,11 @@ HP39 Aplet variants, model-specific notebooks and 517 byte-identical release
 outputs (14789 exit 0; `/work/oct24-text-sdk.log`). Native and CI acceptance
 remain open; this work is isolated on `m8-widget-controls`, outside the frozen
 progress/component batch.
+
+The maintained native window fixture passes text controls on all six Direct
+models (68819 exit 0). Per model it exercises 52 GPIO edges across both
+buffering modes: insertion limits, cursor movement, backspace, shifted deletion,
+clear and focus transfer. Independent complete-frame checks verify multiline
+labels and adjacent entry glyphs with a known custom font. Existing keyboard,
+progress, final-frame and settled-return checks still pass. Cursor timing
+remains a host gate; Stock execution and CI acceptance remain open.
