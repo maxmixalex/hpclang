@@ -214,6 +214,7 @@ static int display_height(uint32_t model)
 
 #ifdef HPCLANG_E2E_STORAGE
 unsigned hpclang_historical_files(void);
+unsigned hpclang_e2e_storage_cpp(void);
 
 static int media_swap(unsigned phase)
 {
@@ -602,6 +603,10 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (got != sizeof(input_expected) - 1u || input_close != 0 ||
         memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0)
         return 0x34u;
+
+    unsigned cpp_storage = hpclang_e2e_storage_cpp();
+    if (cpp_storage)
+        return 0x300u + cpp_storage;
 
     FILE *output = fopen("HPCLANG.OUT", "w+b");
     if (output == NULL)

@@ -12,6 +12,49 @@
 #include <hpclang/font.h>
 #include <hpclang/object.hpp>
 #include <hpclang/time.hpp>
+#ifdef HPCLANG_E2E_STORAGE
+#include <hpclang/storage.hpp>
+#include <cstring>
+
+extern "C" unsigned hpclang_e2e_storage_cpp()
+{
+    hpclang::owned_stream input{std::fopen("HPCLANG.TST", "rb")};
+    hpclang::owned_stream_directory directory{hpclang_stream_directory_open("/")};
+    if (!input || !directory)
+        return 1;
+    auto *original = input.get();
+    hpclang::owned_stream moved{std::move(input)};
+    input.reset(std::fopen("HPCLANG.TST", "rb"));
+    if (!input)
+        return 2;
+    errno = EDOM;
+    input = std::move(moved);
+    if (moved || input.get() != original || errno != EDOM)
+        return 3;
+    const char expected[] = "HPCLANG-STORAGE\n";
+    char bytes[sizeof expected]{};
+    if (std::fread(bytes, 1, sizeof expected - 1, input.get()) != sizeof expected - 1 ||
+        std::memcmp(bytes, expected, sizeof expected - 1))
+        return 4;
+    if (input.close() || input || input.close())
+        return 5;
+    auto *released = directory.release();
+    hpclang::owned_stream_directory entries{released};
+    if (directory || !entries)
+        return 6;
+    bool found = false;
+    for (;;) {
+        hpclang_stream_directory_entry entry{};
+        int status = hpclang_stream_directory_read(entries.get(), &entry);
+        if (status < 0)
+            return 7;
+        if (!status)
+            break;
+        found |= std::strcmp(entry.name, "HPCLANG.TST") == 0;
+    }
+    return entries.close() || !found ? 8 : 0;
+}
+#endif
 
 extern "C" const struct hpclang_font hpclang_e2e_ui_font;
 

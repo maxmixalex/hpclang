@@ -909,8 +909,8 @@ arithmetic and register-model tests pass under sanitizers. Earlier investigation
 and intermediate results are retained in the [roadmap](roadmap.md).
 
 Public async replacement, autonomous stop, cancellation and restoration pass
-all six Direct models and HP49g+/HP50g/HP48gII/HP39g+/HP39gs Stock locally. HP40gs
-Stock remains pending. Normal exit and `_Exit` each pass all six Direct targets;
+all six Direct and all six Stock models locally. Normal exit and `_Exit` each
+pass all six Direct targets;
 both exit paths also pass HP50g Stock. The exit
 fixtures inspect real cleanup before power, launcher or host restoration can
 hide missing releases. A negative control that skips cleanup fails at that

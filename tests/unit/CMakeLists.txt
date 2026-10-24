@@ -656,12 +656,21 @@ target_include_directories(test_fatfs_config PRIVATE
 target_link_libraries(test_fatfs_config PRIVATE hpclang_fatfs_vendor)
 
 hpclang_unit(storage_metadata test_storage_metadata.c
+    test_storage_cpp.cpp
     "${HPCLANG_ROOT}/runtime/libc/storage-volumes.c"
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace.c"
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")
 target_include_directories(test_storage_metadata PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/libc")
 target_link_libraries(test_storage_metadata PRIVATE hpclang_fatfs_vendor)
+target_compile_features(test_storage_metadata PRIVATE cxx_std_17)
+target_compile_options(test_storage_metadata PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+if(UNIX)
+    hpclang_unit(stream_cpp test_stream_cpp.cpp)
+    target_include_directories(test_stream_cpp PRIVATE "${HPCLANG_ROOT}/include")
+    target_compile_features(test_stream_cpp PRIVATE cxx_std_17)
+    target_compile_options(test_stream_cpp PRIVATE -fno-exceptions -fno-rtti)
+endif()
 
 hpclang_unit(storage_media test_storage_media.c "${HPCLANG_ROOT}/runtime/libc/storage-media.c")
 target_include_directories(test_storage_media PRIVATE

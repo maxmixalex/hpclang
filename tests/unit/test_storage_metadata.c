@@ -29,6 +29,8 @@ static unsigned media_writes;
 static unsigned controller_acquires;
 static uint8_t card_identity = 0x37;
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
+void test_stream_directory_cpp(void);
+int test_stream_directory_stale_cpp(struct hpclang_stream_directory *stale);
 
 const struct hpclang_device_info *hpclang_device_info(void)
 {
@@ -245,6 +247,8 @@ int main(void)
           !memcmp(&item.created, &info.created, sizeof(info.created)));
     CHECK(hpclang_stream_directory_close(dir) == 0);
 
+    test_stream_directory_cpp();
+
     const uint32_t ro = HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY;
     const uint32_t hidden = HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN;
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", ro | hidden, ro | hidden) == 0);
@@ -314,7 +318,7 @@ int main(void)
     CHECK(media_writes == before_removal);
     CHECK(hpclang_namespace_path_set_attributes("NEW.TXT", 0, hidden) == 0);
     CHECK(hpclang_namespace_close(fd) == -1 && errno == EBADF);
-    CHECK(hpclang_stream_directory_close(old_directory) == -1 && errno == EBADF);
+    CHECK(test_stream_directory_stale_cpp(old_directory) == -1 && errno == EBADF);
     protected_media = 1;
     CHECK(hpclang_namespace_write(fresh, "bad", 3) == -1 && errno == EROFS);
     CHECK(hpclang_namespace_ftruncate(fresh, 0) == -1 && errno == EROFS);

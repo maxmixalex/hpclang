@@ -4479,9 +4479,9 @@ below are retained.
   workaround was added. Diagnostic source/script and reports remain under
   `/work/oct24-sound-vector-src` and `research/oct24-trace-sound-vector.py`.
   The corrected public API artifact `/work/oct24-sound-api-fixed-artifact`
-  passes all six Direct targets and HP49g+, HP50g, HP48gII, HP39g+ and HP39gs Stock
-  (including independent pixels/input). HP40gs Stock still runs on
-  session 70552 / PID 123285 in `/work/oct24-sound-api-fixed-src`,
+  passes all six Direct and all six Stock targets, including independent
+  pixels/input. Session 70552 completed with exit 0 from
+  `/work/oct24-sound-api-fixed-src`,
   logs `oct24-sound-api-fixed-{direct,stock}-*.log`. ARM build and policy analysis
   pass. Native normal/immediate-exit proof and HPGCC mode compatibility remain
   open; public integration is not yet fully accepted or pushed.
@@ -4552,6 +4552,10 @@ below are retained.
   `oct24-audio-{lint,format}-v2.log`. Public docs now clarify that a failed
   replacement preflight preserves the old tone, whereas failure after its
   cancellation leaves it stopped, matching the tested implementation.
+  The whole-project Clang pass has now completed: 323 sources and 1,336 unique
+  configurations from 3,935 compile entries, analysis exit 0. The first combined
+  command still returns failure for its earlier lint/CRLF issues; the separate
+  corrected lint/format runs both pass. Full sanitizer regression remains live.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
@@ -4623,6 +4627,29 @@ three HP39 Aplet package variants. CI acceptance is complete in Runtime
 39928737278 at `5959159a`, merged by PR #7 as `2baebace`: Object Basics passes
 all six Stock models, including the real directory/iterator ownership fixture
 on classic models and the explicit unsupported-context behavior on HP39.
+
+Local M8.5 stream ownership slice (2026-10-24): `hpclang/storage.hpp` adds
+allocation-free C++17 `owned_stream` and `owned_stream_directory`. Move/adopt/
+release semantics preserve exclusive close responsibility; explicit checked
+`close()` consumes the handle even on failure, while destructor/reset cleanup
+preserves errno. Documentation distinguishes cleanup from successful data
+persistence and retains ordinary scope versus exit/_Exit behavior.
+Host ASan/UBSan uses real stdio and the real FatFs namespace, covering move
+replacement, self-move, adoption/release, missing-open preservation, buffered
+reads, close failure, stale-media directory close and no double close.
+The Storage E2E now executes these owners through its real C++ translation unit
+on supported HP49g+/HP50g storage paths; other models retain explicit unsupported
+context checks. The first version passes all six Direct targets and relocated
+SDK builds. Move assignment was then expressed as close-old followed by
+transfer-new, avoiding the analyzer's impossible alias path between independent
+live fopen results; updated sanitizer tests and ARM analysis pass.
+Final artifacts `/work/oct24-storage-cpp-v2-artifact` are built from
+`/work/oct24-storage-cpp-src`; full Direct and HP49g+/HP50g SD-transport Stock
+verification runs on session 45311 / PID 159829: all six Direct and HP49g+ Stock
+pass; HP50g Stock remains active. The expanded installed SDK C++ client and
+six-model package gate pass on session 59414 (exit 0). Logs use
+`oct24-storage-cpp-v2-{direct,stock}-*.log` and `oct24-storage-cpp-sdk-v2.log`.
+HP50g Stock and CI acceptance remain pending; this does not complete M8.5.
 
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications

@@ -68,6 +68,21 @@ owners from `hpclang/object-store.hpp`. Move to transfer ownership; borrow with
 does not discard the old value. These wrappers work in the SDK's no-exceptions,
 no-RTTI profile.
 
+For byte-stream files and directories, `hpclang/storage.hpp` provides C++17
+`owned_stream` and `owned_stream_directory`. Adopt an independently opened
+`FILE*` or `hpclang_stream_directory*`, use `get()` with the existing C I/O
+functions, and move or `release()` to transfer close responsibility. Do not
+adopt standard streams or a borrowed handle. The wrappers add no allocation
+and preserve the C backend's model, media and encoding restrictions.
+
+Call and check `close()` before reporting a write as saved: it returns the
+underlying close result and empties the owner even on failure. Empty `close()`
+is an idempotent success. Destruction, `reset()` and move assignment provide
+best-effort cleanup and preserve `errno`, so they deliberately cannot report a
+close error. Explicitly close a writable stream before replacing its owner.
+To keep an existing handle on open failure, first adopt the new result in a
+temporary owner and replace only after checking it.
+
 Returning normally destroys automatic C++ owners. Calling `exit()` does not
 unwind those scopes; release local resources explicitly before that path.
 `_Exit()` skips language callbacks. SDK-owned hardware restoration does not
