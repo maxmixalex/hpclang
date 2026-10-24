@@ -20,6 +20,19 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Post-return native release verifier `a13a26f4` (local) requires settled Stock
+return, reviewed allocator code fingerprint and a complete consistent free list
+covering the former block, including coalescing. Six Python tests pass; retained
+HP39g+ replay rejects a consistent list missing the block, unsettled return and
+unknown allocator code. Format/lint/strict docs pass. Focused native 76058 exits
+0 for HP39g+ and HP50g; 40563 passes HP39gs and continues the remaining three.
+Independent stricter allocation/release verification passes all three saved
+results: pool/block union 153,620 / 149,524 / 389,140 bytes for HP39g+ / HP39gs /
+HP50g, with 6,164 / 6,164 / 86,036 block bytes returned to the free list. UI,
+stack/heap/timing, pool stability and Stock return also pass. Detailed partial
+ledger and exclusions are in sdk-design.md and `/work/oct24-native-accounting*`.
+No full six-model matrix, transfer/installation peak or CI acceptance yet.
+
 Window controls submitted as `ab91e43a` in draft PR #12:
 https://github.com/maxmixalex/hpclang/pull/12 . It is stacked on PR #11 via
 `m8-flash-write`, not merged into main. Delivery starts at verified `1869e6f2`
