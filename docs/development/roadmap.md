@@ -4982,6 +4982,19 @@ below are retained.
   format/lint and 352-source analysis, local batch gates pass. CI submission
   and acceptance remain open; earlier running entries below are historical.
 
+  Text-only Stock matrix completes (18243 exit 0): all six models pass
+  independent text/input/frame checks and settled return. Image Stock 82374
+  passes HP39g+/HP39gs and continues HP40gs; menu Stock 86659 remains live.
+  Full 143-test regression 63047 continues; 357-source analysis already passes.
+  Independent checkbox follow-up `c0a65c94` on `m8-checkbox-controls` implements
+  six APIs, borrowed labels, selected state, plain-W toggle, arrow focus and
+  soft-menu CHK bindings. Per-install event IDs survive reset/reinstall, first
+  focus binds only after installation, and removal retains the next checkbox
+  binding while clearing a singleton. Focused rebinding/unbinding is explicit.
+  ASan/UBSan lifecycle/input tests and ARM compile/analysis pass, logs
+  `/work/oct24-checkbox-{build,tests}.log`; comparison/pixels/SDK/native remain
+  open. Separate `/work/oct24-checkbox-src` preserves running batch sources.
+
   Component batch pushed as `cb7c7bae` to `m8-flash-write`, draft PR #10.
   Includes custom widgets/focus and progress sliders; text/image/menu branches
   remain local follow-ups. Previous head 0a7c2d8d passed every push/PR workflow
