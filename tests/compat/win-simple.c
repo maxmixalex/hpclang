@@ -232,18 +232,26 @@ void __wrap_win_event_loop(void)
 }
 int main(void)
 {
-    assert(!historical_main() && phase == 11 && !hpclang_win_error());
-    int x, y;
-    win_widget_get_location(slider4, &x, &y);
-    assert(x == 0 && y == 65); /* Preserve, and report, the original 80-line layout. */
-    win_widget_t *widgets[] = {slider4, slider3, slider2, slider1, check, field, label, menu};
-    /* Original process-exit-only ownership is cleaned by the test harness so
-     * sanitizers can check adapter lifetime without attributing app leaks to it. */
-    for (unsigned i = 0; i < sizeof(widgets) / sizeof(widgets[0]); ++i) {
-        win_remove_widget(widgets[i]);
-        win_widget_destroy(widgets[i]);
+    for (screen_height = 64; screen_height <= 80; screen_height += 16) {
+        phase = 0;
+        assert(!historical_main() && phase == 11 && !hpclang_win_error());
+        int x, y;
+        win_widget_get_location(slider4, &x, &y);
+        assert(x == 0 && y == (HPCLANG_SIMPLE_RESPONSIVE ? screen_height - 15 : 65));
+        int width, height;
+        win_widget_get_size(slider2, &width, &height);
+        assert(width == 5 && height == (HPCLANG_SIMPLE_RESPONSIVE ? screen_height - 40 : 40));
+        win_widget_get_size(slider3, &width, &height);
+        assert(width == 5 && height == (HPCLANG_SIMPLE_RESPONSIVE ? screen_height - 40 : 40));
+        win_widget_t *widgets[] = {slider4, slider3, slider2, slider1, check, field, label, menu};
+        /* Original process-exit-only ownership is cleaned by the test harness so
+         * sanitizers can check adapter lifetime without attributing app leaks to it. */
+        for (unsigned i = 0; i < sizeof(widgets) / sizeof(widgets[0]); ++i) {
+            win_remove_widget(widgets[i]);
+            win_widget_destroy(widgets[i]);
+        }
+        assert(!hpclang_win_error() && !hpclang_win_reset());
     }
-    assert(!hpclang_win_error() && !hpclang_win_reset());
     puts("PASS original simple.c: A/B/CLEAR, checkbox menu, four sliders and EXIT in real event "
          "loop");
     return 0;

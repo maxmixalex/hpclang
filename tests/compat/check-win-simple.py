@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import zipfile
 
@@ -33,6 +34,10 @@ def main():
     parser.add_argument("archives", type=Path)
     parser.add_argument("--work", required=True, type=Path)
     parser.add_argument("--compiler", default="cc")
+    parser.add_argument("--layout", choices=("original", "responsive"), default="original")
+    parser.add_argument(
+        "--native", action="store_true", help="Build an instrumented native artifact"
+    )
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     work = args.work.resolve()
@@ -50,6 +55,23 @@ def main():
     header = "#include <hpgcc49.h>\n"
     assert source.count(header) == 1
     adapted = source.replace(header, "")
+    if args.layout == "responsive":
+        for old, new in (
+            (
+                "win_widget_set_size(slider2, 5, 40);",
+                "win_widget_set_size(slider2, 5, hpg_get_height(NULL) - 40);",
+            ),
+            (
+                "win_widget_set_size(slider3, 5, 40);",
+                "win_widget_set_size(slider3, 5, hpg_get_height(NULL) - 40);",
+            ),
+            (
+                "win_widget_set_location(slider4, 0, 65);",
+                "win_widget_set_location(slider4, 0, hpg_get_height(NULL) - 15);",
+            ),
+        ):
+            assert adapted.count(old) == 1
+            adapted = adapted.replace(old, new)
     application = work / "application"
     application.mkdir()
     (application / "main.c").write_text(adapted, encoding="utf-8")
@@ -70,12 +92,16 @@ def main():
         "original_sha256": hashlib.sha256(original).hexdigest(),
         "adapted_sha256": hashlib.sha256(adapted.encode()).hexdigest(),
         "migration": "Remove unused hpgcc49.h include; normalize CRLF to LF",
+        "layout": args.layout,
         "limits": [
             "Host renderer is stubbed; no native application acceptance",
             "Original fourth slider remains at y=65 on 64-line screens",
             "Harness cleans original process-exit-only widget ownership",
         ],
     }
+    if args.layout == "responsive":
+        report["migration"] += "; adapt two vertical heights and bottom slider y to display height"
+        report["limits"].remove("Original fourth slider remains at y=65 on 64-line screens")
     flags = (
         "-std=c11",
         "-funsigned-char",
@@ -83,6 +109,7 @@ def main():
         "-g",
         "-fsanitize=address,undefined",
         "-fno-omit-frame-pointer",
+        f"-DHPCLANG_SIMPLE_RESPONSIVE={int(args.layout == 'responsive')}",
         "-I",
         str(root / "include"),
         "-I",
@@ -121,6 +148,17 @@ def main():
         "hpclang_target_launchers(historical_window)\n",
         encoding="utf-8",
     )
+    if args.native:
+        (application / "instrumented.c").write_text(
+            '#define main historical_main\n#include "main.c"\n', encoding="utf-8"
+        )
+        shutil.copy2(root / "tests/compat/win-simple-native.c", application / "native.c")
+        with (application / "CMakeLists.txt").open("a", encoding="utf-8") as cmake:
+            cmake.write(
+                "hpclang_add_application(historical_window_native instrumented.c native.c)\n"
+                "target_link_options(historical_window_native PRIVATE LINKER:--wrap=win_event_loop)\n"
+                "hpclang_target_launchers(historical_window_native)\n"
+            )
     build = work / "build"
     run(
         "cmake",
@@ -141,9 +179,29 @@ def main():
         wrapped = (launchers / f"{model}.hp").read_bytes()
         assert embedded in binary and binary in wrapped and wrapped[:8] == b"HPHP49-C"
     report["passed"] = [
-        "Production event-loop host interaction under ASan/UBSan",
+        "Production event-loop host interaction under ASan/UBSan at 64 and 80 lines",
         "Relocated SDK ARM compilation and six launcher envelopes",
     ]
+    if args.native:
+        artifact = work / "native-artifact"
+        artifact.mkdir()
+        for suffix in ("elf", "hpc"):
+            shutil.copy2(build / f"historical_window_native.{suffix}", artifact / f"e2e.{suffix}")
+        shutil.copytree(build / "historical_window_native-launchers", artifact / "launchers")
+        symbols = subprocess.check_output(
+            [str(Path(env["ATFE"]) / "bin/llvm-nm"), str(artifact / "e2e.elf")], text=True
+        )
+        address = [
+            line.split()[0]
+            for line in symbols.splitlines()
+            if line.split()[-1] == "hpclang_e2e_result"
+        ]
+        assert len(address) == 1
+        (artifact / "e2e.result-address").write_text("0x" + address[0] + "\n", encoding="utf-8")
+        report["native_artifact"] = str(artifact)
+        report["limits"].append(
+            "Native artifact built only; execute Direct/Stock harnesses separately"
+        )
     (work / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print("PASS original 1.1 simple.c: interaction and relocated SDK six-model packaging")
 

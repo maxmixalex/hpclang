@@ -22,10 +22,34 @@ installs and relocates the SDK, compiles the application for ARM and checks all
 six launcher envelopes. `/work/oct24-simple-gate-final/report.json` records a
 passing run; earlier harness reentrancy failures remain in adjacent logs.
 
-This is not native application acceptance: the original fourth slider at y=65
-remains outside 64-line screens. Layout migration and native input/rendering
-acceptance remain required. This application is from 1.1 only; it is absent
-from the supplied 2.0 archive.
+The default gate preserves the original fourth slider at y=65, including its
+64-line clipping. `--layout responsive` makes exactly three additional source
+changes: the two vertical slider heights become display height minus 40, and
+the bottom slider y becomes display height minus 15. This preserves the original
+80-line geometry and fits 64-line displays. Both versions pass host interaction
+and geometry checks at both heights, plus relocated SDK compilation/packaging.
+The generated `application` directory is a standalone SDK CMake project; the
+source, migration diff and SHA256 report remain in the requested output path.
+This application is from 1.1 only; it is absent from the supplied 2.0 archive.
+
+Add `--native` to also build `native-artifact` with the ordinary E2E artifact
+layout. External instrumentation wraps the original event loop and adds GPIO
+observations; the original application callbacks and control flow remain in
+place. Thirty GPIO changes exercise A/B/CLEAR, focus navigation, the checkbox
+menu, all four slider directions and EXIT. The final EXIT release occurs after
+the event loop stops (29 edges observed in that loop). External teardown cleans
+the original process-exit-only widget ownership before returning to Stock.
+
+All six Direct models pass 15 application-frame captures, independent initial/
+final slider geometry and fill checks, checkbox pixels and settled return.
+Native font glyphs are excluded from exact pixel comparisons; label/menu ink
+presence is checked and HP39g+/HP50g screenshots were visually inspected. The
+unmigrated original app runs successfully but is rejected by the 64-line pixel
+gate at (21,43), proving that the layout check detects the old geometry.
+Both instrumented ARM translation units pass analysis. Evidence is retained in
+`/work/oct24-simple-{original-both,responsive,original-native}` and
+`/work/oct24-simple-{direct,stock}-*`. Stock process 2266 is still running;
+Stock acceptance and broader M8 application/release acceptance remain open.
 
 Box acceptance follow-up compares all seven public APIs and the original
 preferred-size helper from both unchanged 1.1/2.0 releases: 144 dense,
