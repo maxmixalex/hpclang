@@ -4479,8 +4479,9 @@ below are retained.
   workaround was added. Diagnostic source/script and reports remain under
   `/work/oct24-sound-vector-src` and `research/oct24-trace-sound-vector.py`.
   The corrected public API artifact `/work/oct24-sound-api-fixed-artifact`
-  passes all six Direct targets and HP49g+, HP50g and HP48gII Stock; the HP39
-  Stock matrix still runs on session 70552 / PID 123285 in `/work/oct24-sound-api-fixed-src`,
+  passes all six Direct targets and HP49g+, HP50g, HP48gII and HP39g+ Stock
+  (including independent pixels/input). HP39gs/HP40gs Stock still run on
+  session 70552 / PID 123285 in `/work/oct24-sound-api-fixed-src`,
   logs `oct24-sound-api-fixed-{direct,stock}-*.log`. ARM build and policy analysis
   pass. Native normal/immediate-exit proof and HPGCC mode compatibility remain
   open; public integration is not yet fully accepted or pushed.
@@ -4491,8 +4492,9 @@ below are retained.
   watchdog are active. A test-only linker wrapper observes the real sound
   cleanup before power/launcher/host restoration, checking fourteen peripheral,
   controller and vector registers, the independent IRQ-bank snapshot, CPU masks
-  and cleared optional hooks without calling stop/status. HP49g+/HP50g Direct normal
-  exit passes locally. Both ARM variants build; six-model Direct and HP50g Stock
+  and cleared optional hooks without calling stop/status. All six Direct models
+  pass both normal exit and `_Exit`; HP50g Stock normal exit also passes locally.
+  Both ARM variants build; the remaining HP50g Stock immediate-exit
   queues run on session 74777 from `/work/oct24-sound-exit-src`, with artifacts
   `/work/oct24-sound-{exit,immediate}-artifact` and matching logs. A separate
   negative control omits the real release in the test wrapper only, under
@@ -4501,6 +4503,16 @@ below are retained.
   borrowed when cleanup is omitted. Its `build/hp50g-e2e.json` records the
   failure. Strict docs and shell syntax pass. Full exit acceptance remains
   pending; these changes are local only.
+  Maintained CI entry points `system-services-exit` and
+  `system-services-immediate` now build these same variants (both HPC1 images
+  are byte-identical to the locally exercised artifacts). The Runtime suite
+  manifest schedules each on all three Direct families and all six Stock
+  targets, while retaining the blocking-exit suite. The seven existing planner
+  tests, complete-manifest coverage check, shell syntax and both six-launcher
+  ARM builds pass locally. These gates are not yet pushed or CI accepted.
+  The compatibility guide now describes the implemented watchdog/IRQ/public
+  lifetime and its current evidence instead of presenting superseded primitive
+  experiments as current blockers. Historical KOS flags remain unfinished.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;

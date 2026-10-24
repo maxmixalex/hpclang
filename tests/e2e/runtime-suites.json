@@ -2,6 +2,8 @@
   {"mode": "runtime", "keyboard": true},
   {"mode": "object-basics", "keyboard": false},
   {"mode": "system-services", "keyboard": false, "verifier": "tests/e2e/system-services/verify.py"},
+  {"mode": "system-services-exit", "keyboard": false, "verifier": "tests/e2e/system-services/verify.py"},
+  {"mode": "system-services-immediate", "keyboard": false, "verifier": "tests/e2e/system-services/verify.py"},
   {"mode": "hpgcc-system", "keyboard": false, "verifier": "tests/e2e/hpgcc-system/verify.py"},
   {"mode": "hpgcc-console", "keyboard": false, "verifier": "tests/e2e/hpgcc-console/verify.py"},
   {"mode": "display", "keyboard": false, "verifier": "tests/e2e/display/verify.py"},

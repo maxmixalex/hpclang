@@ -3,6 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 4 ]]; then
     echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|hpgcc-console|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
+    echo "sound exit variants: system-services-exit | system-services-immediate" >&2
     exit 2
 fi
 
@@ -97,6 +98,14 @@ case "$MODE" in
         ;;
     hardware)
         E2E_CMAKE_ARGS=()
+        ;;
+    system-services-exit|system-services-immediate)
+        E2E_SOURCE="$ROOT/tests/e2e/system-services"
+        E2E_TARGET="hpclang_system_services_e2e"
+        E2E_ELF="hpclang-system-services-e2e.elf"
+        sound_exit=exit
+        [[ "$MODE" != system-services-immediate ]] || sound_exit=_Exit
+        E2E_CMAKE_ARGS=(-DHPCLANG_E2E_SOUND_EXIT="$sound_exit")
         ;;
     system-services|hpgcc-system|hpgcc-console|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|object-basics|sd-media-manual)
         E2E_SOURCE="$ROOT/tests/e2e/$MODE"

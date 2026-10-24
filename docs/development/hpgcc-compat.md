@@ -884,75 +884,44 @@ six models confirm the completion-query truth table and rejection of a new
 request while the active flags prohibit replacement. The low-level driver
 returns -1 in that case, but the public KOS entry discards it and returns zero.
 These probes restore the native state and return normally; they do not start
-tones or verify real asynchronous timing and permitted preemption. An adapter
-requires owned asynchronous playback and
-completion/preemption state; the current blocking `hpclang_sound_play` alone
-does not implement that contract.
+tones or verify real asynchronous timing and permitted preemption. The adapter
+must apply this completion/preemption policy to the owned asynchronous service
+described below; blocking `hpclang_sound_play` alone does not implement it.
 
-The internal PWM4 one-shot lease now provides a separate deadline timer without
-changing PWM2 audio output or the shared prescaler. It rejects an existing
-running, update, DMA or pending owner before modifying registers. Host sanitizer
-tests cover delay rounding, overflow and resource restoration; native Direct
-probes on all six model emulators pass expiry, rearm and stopped-state restoration.
-Those probes keep the interrupt masked and poll its pending bit. A separate
-supervisor helper now exchanges and restores the banked IRQ stack, link and
-status registers. Six-model Direct probes verify actual interrupt delivery
-while application code runs a busy loop and independently compare the restored
-bank. System Services E2E maintains this test, including the SWI vector, stack
-boundary and retained Stock source latches, and passes all six Direct targets
-locally. The production IRQ dispatcher,
-absolute-deadline handling and autonomous audio shutdown remain required before
-this becomes a public asynchronous sound adapter.
+Current asynchronous sound implementation (local, not yet CI accepted):
+`hpclang_sound_start`, `hpclang_sound_status` and `hpclang_sound_stop` now use
+PWM2 output plus an interrupt-only watchdog deadline. Stock can already own
+PWM3/PWM4, so the production service does not assume either channel is free.
+Admission checks that the watchdog is idle and mapped correctly, disables
+reset output, and borrows an isolated IRQ vector and stack. A real IRQ stops
+the tone while application code is busy; status queries do not drive expiry.
+The foreground collector restores the IRQ bank and vector after completion,
+which cannot safely happen while the handler is executing on that stack.
+Explicit cancellation and runtime exit also release the lease. Power-profile
+changes and blocking playback reject an outstanding asynchronous lease.
 
-Internal absolute-deadline helpers now acquire and advance the PWM4 lease using
-64-bit monotonic timestamps supplied by the caller. Intermediate expiry rearms
-from the remaining time; due or delayed delivery releases the lease. Host
-sanitizers cover wide timestamps, chunking, restoration and invalid ownership,
-and ARMv4T Thumb compilation passes. These helpers do not read the clock or
-enable interrupts. Production clock serialization, IRQ dispatch and audio-stop
-integration remain required; no new public sound compatibility is claimed.
+The clock serializes monotonic state under interrupt masking, and the handler
+uses a masked clock-read path while preserving interrupted `errno`. Shared
+register tests cover deadline chunking, admission rollback, replacement,
+cancellation and restoration. The emulator watchdog overlay now converts PCLK
+cycles to microsecond scheduling and preserves fractional cycles; independent
+arithmetic and register-model tests pass under sanitizers. Earlier investigation
+and intermediate results are retained in the [roadmap](roadmap.md).
 
-The local clock integration now protects foreground monotonic state and civil
-rebasing with IRQ/FIQ masking. An internal already-masked read entry avoids
-supervisor calls from the future owned IRQ dispatcher; the dispatcher must
-preserve the interrupted application's `errno`. Power-profile transitions
-retain their existing mask across prepare/change/commit. Host sanitizers and
-ARM build/analysis pass; the six-model System Services execution matrix is
-still pending. These changes do not themselves enable asynchronous playback.
+Public async replacement, autonomous stop, cancellation and restoration pass
+all six Direct models and HP49g+/HP50g/HP48gII/HP39g+ Stock locally. HP39gs/HP40gs
+Stock runs remain pending. Normal exit and `_Exit` each pass all six Direct targets;
+normal exit also passes HP50g Stock, while its `_Exit` run is pending. The exit
+fixtures inspect real cleanup before power, launcher or host restoration can
+hide missing releases. A negative control that skips cleanup fails at that
+boundary. Runtime CI now schedules both exit variants across all six Stock
+models and all three Direct families, retaining the blocking-exit suite.
+These gates are configured locally, not yet submitted or accepted. Native
+emulator results do not establish audible output from physical hardware.
 
-An internal paired playback engine now coordinates PWM2 audio and PWM4 deadline
-ownership, rolls back the alarm on tone-admission failure, and restores both
-resources on completion or cancellation. Shared-register sanitizer tests and
-ARM analysis pass. The native IRQ fixture starts a real PWM tone and checks
-restoration before foreground cleanup; all six Direct models pass with normal
-return and independent input pixels.
-Public KOS entry points, preemption and production IRQ/exit lifetime are still
-open, as is Stock deadline-channel availability. Emulator register/timing
-evidence does not establish audible output from physical hardware.
-
-Stock deadline-channel investigation: the read-only HP50g application-entry
-probe records `TCON=0x00598909` and `TCFG1=0x00033333`; both PWM3 and PWM4 are
-running. The probe passes ordinary System Services, pixel and return checks.
-An unused-channel fallback must therefore establish live ownership instead of
-assuming PWM3 is free. Saved post-return UI states have the watchdog disabled
-on all six models (`WTCON=0x910`), a candidate for further entry-time validation.
-The [Linux S3C2410 watchdog driver](https://github.com/torvalds/linux/blob/master/drivers/watchdog/s3c2410_wdt.c)
-implements interrupt-only mode by enabling its interrupt and clearing reset
-enable. The pinned emulator currently schedules watchdog ticks in raw PCLK
-divider units against its microsecond clock, so its timing must be repaired and
-independently tested before validating a watchdog-based deadline backend.
-Neither the saved-state observations nor that driver establish a completed
-hpclang backend; no watchdog hardware ownership has been added.
-
-The local emulator overlay now models watchdog count/phase in PCLK units and
-schedules expiration in microseconds, with fractional cycles retained between
-reads. Register and clock-transition tests exercise the same overlay compiled
-into the emulator, alongside an independent counter-arithmetic fixture. Both
-pass sanitizers; reset-only and interrupt-only outputs are tested separately.
-Existing application startup/return regression is running on the patched
-emulator. Application-side watchdog ownership and active deadline/IRQ evidence
-remain unfinished, so this repair does not yet establish Stock asynchronous
-audio support.
+The historical KOS entry points and active-request mode policy remain open.
+The canonical async API is their implementation foundation, not an assertion
+that the KOS compatibility contract has already been delivered.
 
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
