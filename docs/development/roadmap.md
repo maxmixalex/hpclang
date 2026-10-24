@@ -4907,8 +4907,10 @@ below are retained.
   NaN and preferred-size overflow. ARMv4T compile/analysis pass. Logs:
   `/work/oct24-progress-tests.log`; original mistaken back-page blink assertion
   retained in `/work/oct24-progress-back-page-test-failure.log`. The SDK C/C++
-  client now exercises the progress API; full gate runs in process 64824,
-  log `/work/oct24-progress-sdk.log`. Formatting and strict docs pass.
+  client now exercises the progress API. Full gate passes (64824 exit 0):
+  C/C++, six-model launchers, three HP39 Aplet variants, all model-specific
+  Notebook builds and 517 reproducible release outputs. Log:
+  `/work/oct24-progress-sdk.log`. Formatting and strict docs pass.
   Original-progress-source differential and native control execution remain
   open. Local work only; no new push or CI acceptance.
 
