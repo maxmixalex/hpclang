@@ -20,6 +20,19 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Allocation/pool verifier `be686e07` (local) cross-checks both checkpoint reports,
+model/pointer identity, SRAM bounds, allocated flags, page intersections and
+stable cleanup state. It reports the union of pool pages and the validated block,
+subtracting shared pages. A mapped page overlapping only the allocator footer
+is now rejected by both sampler and verifier. Five Python report tests and both
+ASan/UBSan CTest targets pass, including malformed/missing/drifting reports,
+metadata-only overlap and duplicate-count prevention. Format/lint/strict docs
+pass. Native sequence 76058 remains running for HP39g+/HP50g; separate 40563
+runs HP39gs/HP40gs/HP48gII/HP49g+ with the updated sampler/verifier under
+`/work/oct24-native-accounting-rest-*`. The first sequence's frozen sampler is
+not changed in flight; apply the stricter verifier to its retained reports.
+No complete native matrix, whole-system budget or remote acceptance is claimed.
+
 Validated native allocation observer `3b4e5e69` (local) adds opt-in immutable
 allocation reports alongside unchanged pool reports. It bounds reads to SRAM,
 checks allocated flags, size/footer agreement, reciprocal list links and page
