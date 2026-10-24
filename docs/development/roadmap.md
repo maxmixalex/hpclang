@@ -20,6 +20,20 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Principles
 
+Latest follow-up inspection (2026-10-24): `cb7c7bae` Quality, Storage and
+Objects push/PR runs pass; Core, Runtime and Gallery are not yet fully terminal.
+No subsequent push or CI acceptance is claimed. Re-read failed Objects run
+40068713236: HP39g+ fails with `host-gate-failed` during Stock payload transfer,
+before test execution; the transport cause remains open. Inspect again before
+the next push, including any remaining or newly failed jobs.
+
+Image Stock process 82374 has completed all six models successfully, joining
+its six-model Direct, SDK, reference/pixel tests and text/image full regression.
+Menu Stock 86659 and checkbox Stock 73812 remain live on unchanged artifacts.
+Independent chooser foundation `896948b4` passes focused ASan/UBSan, ARMv4T
+compile and analysis: paired option/label removal and allocation rollback.
+It remains internal; public APIs and modal selection acceptance are pending.
+
 - before each subsequent remote push, inspect the previous push's CI and failed-job logs; record unresolved causes explicitly and do not treat cancelled or pending runs as passes; do not poll newly pushed CI;
 - one application ABI: HPC1 / hpclang v1;
 - one common ARMv4T runtime;
