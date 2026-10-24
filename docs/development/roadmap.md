@@ -4907,7 +4907,9 @@ below are retained.
   patterned XOR background, solid foreground and transparency. ARMv4T compile
   and focused Clang analysis pass; log `/work/oct24-win-widget-tests.log`.
   The relocated SDK gate now includes C/C++23 custom-component clients, six
-  launchers and three HP39 Aplet variants; process 14783 is running, log
+  launchers and three HP39 Aplet variants. Process 14783 exits 0: complete
+  relocated-SDK gate passes, including all model-specific Notebook builds and
+  517 byte-identical release outputs across clean builds. Log:
   `/work/oct24-win-widget-sdk.log`. Strict docs pass. Native
   custom-component execution, original-source differential, concrete controls
   and the complete historical win.h remain open. These are local changes only.

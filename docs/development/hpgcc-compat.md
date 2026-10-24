@@ -589,7 +589,7 @@ The HPGCC 1.1/2.0 widget family remains a retained **M8.4 adapter requirement**.
 | Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e bounded application subset complete; Runtime #338 green; M7.3f public mutation implemented and accepted |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `winevent.h`, `wintimer.h`, `winkeys.h` | Bounded foreground event/timer/key service over native input, time and HPG | Adapter implemented locally; see exact validation below | M8.4, CI pending |
-| `winwidget.h`, `wincore.h` | Custom component lifecycle, focus, geometry and base painting | Local sanitizer/pixel checks pass; native/SDK acceptance pending | M8.4 |
+| `winwidget.h`, `wincore.h` | Custom component lifecycle, focus, geometry and base painting | Local sanitizer/pixel and relocated SDK checks pass; native acceptance pending | M8.4 |
 | Concrete `win*` controls and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
 
@@ -754,7 +754,10 @@ Invalid geometry is rejected without changing the previous bounds; failed
 construction leaves application data ownership with the caller. This is local
 custom-component implementation, not acceptance of concrete historical controls,
 the complete `win.h` umbrella, or original multi-control applications. Original
-source differential, relocated SDK and native execution gates remain open.
+source differential and native execution gates remain open. The expanded
+relocated SDK gate passes custom components in C/C++23, all six launchers and
+three HP39 Aplet variants, with 517 byte-identical release outputs across clean
+builds (process 14783, exit 0).
 
 
 An internal `win-key-state` engine now reproduces the original default key
