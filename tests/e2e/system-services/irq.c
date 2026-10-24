@@ -7,6 +7,9 @@
 #define REG(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
 volatile uint32_t hpclang_e2e_irq_hits;
+static volatile unsigned irq_finished, irq_error;
+static uint64_t irq_deadline, irq_last_time;
+static struct hpclang_sound_alarm alarm;
 static uint32_t irq_stack[256] __attribute__((aligned(8)));
 static unsigned register_writes;
 void hpclang_e2e_irq_snapshot(struct hpclang_irq_bank *state);
@@ -25,11 +28,34 @@ static void write_reg(void *context, enum hpclang_sound_alarm_reg reg, uint32_t 
     ++register_writes;
     REG(addresses[reg]) = value;
 }
+static const struct hpclang_sound_alarm_bus bus = {0, read_reg, write_reg};
+
+/* Only the actual IRQ entry calls this. The foreground below executes no
+ * clock or SDK calls until completion. Preserve the interrupted errno. */
+void hpclang_e2e_irq_dispatch(void)
+{
+    int saved_errno = errno;
+    uint64_t now;
+    ++hpclang_e2e_irq_hits;
+    if (hpclang_time_read_us_masked(&now) || now < irq_last_time) {
+        irq_error = 1;
+        hpclang_sound_alarm_release(&bus, &alarm);
+        irq_finished = 1;
+    } else {
+        irq_last_time = now;
+        int result = hpclang_sound_alarm_advance(&bus, &alarm, now, irq_deadline);
+        if (result) {
+            irq_error = result < 0;
+            irq_finished = 1;
+        }
+    }
+    if (irq_finished)
+        REG(0x07100008) = UINT32_MAX;
+    errno = saved_errno;
+}
 
 unsigned hpclang_e2e_irq_test(void)
 {
-    const struct hpclang_sound_alarm_bus bus = {0, read_reg, write_reg};
-    struct hpclang_sound_alarm alarm = {0};
     uint64_t num, den;
     hpclang_clock_pclk(&num, &den);
     uint32_t cpsr = hpclang_irq_save_disable();
@@ -38,6 +64,7 @@ unsigned hpclang_e2e_irq_test(void)
     uint32_t source = REG(0x07100000);
     unsigned failure = 0;
     hpclang_e2e_irq_hits = 0;
+    irq_finished = irq_error = 0;
     irq_stack[0] = 0x51ac7ead;
     /* Stock can own PWM4. An owned-IRQ test may borrow an idle channel only;
      * active/update/DMA or pending state must instead exercise rejection with
@@ -52,6 +79,18 @@ unsigned hpclang_e2e_irq_test(void)
         hpclang_irq_restore(cpsr);
         return failure;
     }
+    if (hpclang_time_read_us_masked(&irq_last_time) || irq_last_time > UINT64_MAX - 100000) {
+        hpclang_sound_alarm_release(&bus, &alarm);
+        hpclang_irq_restore(cpsr);
+        return 7;
+    }
+    irq_deadline = irq_last_time + 100000;
+    /* Force an intermediate interrupt before the actual deadline. */
+    if (hpclang_sound_alarm_rearm(&bus, &alarm, 1000)) {
+        hpclang_sound_alarm_release(&bus, &alarm);
+        hpclang_irq_restore(cpsr);
+        return 8;
+    }
 
     REG(0x07100008) = UINT32_MAX;
     REG(0x07100004) = 0;
@@ -65,12 +104,14 @@ unsigned hpclang_e2e_irq_test(void)
         failure = 2;
     REG(0x08000018) = (uintptr_t)hpclang_e2e_irq_handler;
     REG(0x07100008) = ~UINT32_C(0x4000);
+    errno = EDOM;
     hpclang_irq_restore((cpsr | 0x40u) & ~0x80u);
     /* A bounded busy loop: delivery cannot depend on SDK service calls. */
-    for (volatile unsigned i = 0; i < 20000000 && !hpclang_e2e_irq_hits; ++i)
+    for (volatile unsigned i = 0; i < 20000000 && !irq_finished; ++i)
         __asm__ volatile("nop");
     hpclang_irq_save_disable();
-    if (hpclang_e2e_irq_hits != 1)
+    if (hpclang_e2e_irq_hits < 2 || !irq_finished || irq_error || irq_last_time < irq_deadline ||
+        alarm.owned || errno != EDOM)
         failure = 3;
     REG(0x07100008) = UINT32_MAX;
     REG(0x08000018) = vector;

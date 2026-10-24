@@ -4302,9 +4302,23 @@ below are retained.
   ASan/UBSan and checks masked RTC access, unchanged failure outputs, original
   mask restoration, nested masked callers and backward-date monotonicity.
   The System Services ARM image and all six launchers build; repository-policy
-  ARM static analysis passes. Six-model Direct/Stock execution is running on
-  session 10232 / PID 103418 using `/work/oct24-clock-system`; acceptance is
-  pending. The production sound dispatcher and autonomous stop remain open.
+  ARM static analysis passes. All six Direct System Services targets pass with
+  independent pixels and normal return. The first Stock queue (session 10232)
+  terminated before application execution because copied CRLF sequence files
+  were rejected. After normalizing the container sequences, the Stock-only
+  retry runs on session 66673 / PID 104588 using `/work/oct24-clock-system`,
+  with `oct24-clock-stock-*-v2.log` preserving separate evidence. Stock
+  acceptance remains pending.
+  The maintained IRQ fixture now dispatches from its ARM exception entry into
+  Thumb C, preserves interrupted errno, samples through the already-masked clock
+  path, rearms an early timer expiry and releases at the absolute deadline.
+  Foreground code only runs a bounded busy loop. The fixture requires multiple
+  deliveries, deadline completion, released ownership and the existing exact
+  IRQ bank/vector/mask/stack-guard restoration checks. Its fresh ARM build and
+  static analysis pass; six-model Direct execution runs separately on session
+  50299 / PID 104530, artifact `/work/oct24-irq-deadline-artifact`.
+  This is native integration evidence, not yet the production sound dispatcher
+  or autonomous audio-stop implementation.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
