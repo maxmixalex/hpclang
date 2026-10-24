@@ -4895,6 +4895,24 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Native progress/component Direct acceptance now passes all six models:
+  the maintained hpgcc-window fixture adds four real slider instances, 16 GPIO
+  edges and eight value-change events per model across single/double buffering.
+  It verifies focus, 50-to-60 value changes, removal/destruction/reset, then
+  recreates four static 60% controls for independent full-frame pixel checks
+  (checkpoints 300/400). The verifier checks all orientations, blank background,
+  status column and 16-level LCD mode; a missing filled pixel is rejected.
+  Existing 44 keyboard frames/page exchange and final animation/settled return
+  continue to pass. All six saved JSONs confirm pass/returned/return_settled.
+  Process 53782 exits 0; artifact `/work/oct24-progress-native-arm`, evidence
+  `/work/oct24-progress-direct-<model>-evidence`, logs of the same prefix.
+  This native phase checks taps; repeat/blink timing retains host evidence.
+  Stock assets are prepared from this exact artifact. The first research runner
+  lacked RUNNER_TEMP and exited before emulation; log retained at
+  `/work/oct24-progress-stock-setup-failure.log`. Corrected six-model Stock
+  process 9966 is live, with `/work/oct24-progress-stock-<model>.log` and matching
+  evidence directories. Stock and CI acceptance remain pending; local only.
+
   Progress-control source differential now passes both HPGCC 1.1/2.0:
   `tests/compat/check-win-progress.py` compiles all eight unchanged original
   progress functions against the same production window/widget/event/timer

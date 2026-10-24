@@ -75,6 +75,41 @@ def verify_keys(prefix):
     print(f"PASS {prefix}: 44 physical-key status frames and page exchange")
 
 
+def verify_controls(prefix):
+    for phase in (300, 400):
+        path = Path(f"{prefix}-{phase}.pgm")
+        width, height, pixels = read_pgm(path)
+        if width != 132 or height not in (64, 80):
+            raise AssertionError(f"{path}: unsupported control frame geometry")
+        registers = dict(
+            (int(k), int(v, 16))
+            for k, v in (line.split() for line in path.with_suffix(".lcd").read_text().splitlines())
+        )
+        if (1 << ((registers[0] >> 1) & 15)) != 4:
+            raise AssertionError(f"{path}: expected 16-level control frame")
+        for y in range(height):
+            for x in range(width):
+                ink = False
+                for orientation in range(4):
+                    local_x, local_y = x - (5 + 30 * orientation), y - 15
+                    if 0 <= local_x < 20 and 0 <= local_y < 20:
+                        border = local_x in (0, 19) or local_y in (0, 19)
+                        # Independently evaluated 60% thresholds for a 20x20 bar.
+                        fill = (
+                            local_x <= 11
+                            if orientation == 0
+                            else local_y >= 8
+                            if orientation == 1
+                            else local_x >= 8
+                            if orientation == 2
+                            else local_y <= 11
+                        )
+                        ink = border or fill
+                if pixels[y * width + x] != (0 if ink else 255):
+                    raise AssertionError(f"{path}: unexpected control pixel at {x},{y}")
+    print(f"PASS {prefix}: four progress orientations in both buffer modes")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -86,6 +121,7 @@ def main():
     for target in targets:
         verify(Path(f"build/{target}-pass.pgm"))
         verify_keys(Path(f"build/{target}-frame"))
+        verify_controls(Path(f"build/{target}-frame"))
 
 
 if __name__ == "__main__":

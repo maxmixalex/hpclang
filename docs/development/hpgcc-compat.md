@@ -590,7 +590,7 @@ The HPGCC 1.1/2.0 widget family remains a retained **M8.4 adapter requirement**.
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `winevent.h`, `wintimer.h`, `winkeys.h` | Bounded foreground event/timer/key service over native input, time and HPG | Adapter implemented locally; see exact validation below | M8.4, CI pending |
 | `winwidget.h`, `wincore.h` | Custom component lifecycle, focus, geometry and base painting | Local sanitizer/pixel and relocated SDK checks pass; native acceptance pending | M8.4 |
-| `winprogress.h` | Four-orientation progress/slider, focus, repeat and blinking cursor | Local sanitizer/pixel/SDK/reference checks pass; native pending | M8.4 |
+| `winprogress.h` | Four-orientation progress/slider, focus, repeat and blinking cursor | Local host/SDK/reference and six-model Direct checks pass; Stock pending | M8.4 |
 | Concrete `win*` controls and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
 
@@ -1433,3 +1433,11 @@ this comparison. Separate production HPG tests check pixels. A deliberately
 reversed horizontal increment mapping is rejected. Invalid-input extensions and
 safe removal during notification are covered separately, not claimed identical
 to the original implementation.
+
+The maintained native window fixture also passes the progress controls on all
+six Direct models. Each executes 16 GPIO edges and eight value-change callbacks
+across both buffering modes, checks focus and resulting values, removes and
+recreates controls, and captures four 60% orientations for independent complete
+pixel and LCD-mode checks. Existing keyboard/page-exchange and settled-return
+gates still pass. Repeat/blink timing remains covered by host tests, not this
+native tap phase. Stock execution is running; CI acceptance remains pending.
