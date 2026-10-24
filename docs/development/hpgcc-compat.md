@@ -717,11 +717,11 @@ fixture; the separate native event/timer/repaint acceptance is described below. 
 single-buffer draw calls can publish before the final hook; no atomic-frame
 guarantee is introduced. Declarative widget bridging remains separate work.
 
-`winevent.h` and `wintimer.h` now expose the event/timer subset and the repaint
+`winevent.h`, `wintimer.h` and `winkeys.h` expose event/timer/key services and the repaint
 request. They preserve user IDs starting at 8, synchronous callback results and
 positive millisecond timer intervals. The checked `hpclang_win_error`,
 `hpclang_win_step` and `hpclang_win_reset` extensions make failures of historical
-void functions observable. Default limits are 64 handlers (three reserved),
+void functions observable. Default limits are 64 handlers (five reserved),
 256 concurrent snapshot entries and 32 timers; exhaustion latches `ENOSPC`.
 Reset is rejected during callbacks and does not release HPG's shared display.
 The shipped `hpgcc-window` example builds and links all six launcher variants;
@@ -733,23 +733,34 @@ six Stock targets: four real 30 ms callbacks, synchronous consumed user events,
 four repaint cycles, independent final-frame pixels and settled native return.
 This native fixture uses HPG mono double buffering. Its Runtime CI manifest now
 runs the same client and pixel verifier; formal CI acceptance remains pending.
-Typed-key/modifier
-events 3..6, historical widgets and the complete `win.h` umbrella remain work
-in progress, not supported names with empty implementations.
+Historical widgets and the complete `win.h` umbrella remain work in progress.
 
 An internal `win-key-state` engine now reproduces the original default key
 handler's Alpha/Shift latches, held-state metadata and character tables. Its
 injected synchronous post preserves one-shot clearing before typed callbacks,
 modifier snapshots after those callbacks, and nested modifier notification order.
 Failures of typed/modifier/repaint posts are latched after partial delivery;
-a callback returning -1 remains a completed dispatch result. It is not yet
-connected to the public window generator or model-specific text interpretation.
+a callback returning -1 remains a completed dispatch result. The public window
+service now installs the original-priority (2000000000) press/release translators.
+`winkeys.h` provides the historical event/state constants and typed payload fields;
+callback payloads are borrowed synchronously, including independent nested payloads.
+Earlier physical handlers can consume events before translation. Invalid key codes
+and nested dispatch failures latch the window error; reset clears modifier state.
+Character mapping retains the historical `hpkeyb49.h` numeric namespace on every
+model, including HP39, rather than interpreting each model's printed key legends.
+Use the canonical text-input service for model-native text interpretation.
+Modifier notifications synchronously post repaint event 7, as in the original;
+these posts do not run the idle frame begin/present hooks or draw indicators.
 `tests/compat/check-win-key-state.py <archive-directory>` compiles caller-supplied
 1.1/2.0 sources under ASan/UBSan and compares 94,253 trace lines, including held
 Alpha, crossed shifts and nested callbacks. Both references match; a deliberately
 wrong alpha mapping is rejected. Focused failure tests, host/ARM analysis and
-six-model launcher compilation pass. Public keyboard integration and physical
-input/indicator acceptance remain required.
+six-model launcher compilation pass. Public integration additionally passes
+ASan/UBSan checks for polled matrix transitions, one-shot Alpha, nested payload
+lifetimes, preempted physical events, callback -1 results and error propagation.
+The public adapter passes host analysis and six-model ARM compilation. Native
+physical input, modifier indicators and installed-SDK acceptance of `winkeys.h`
+remain required; the preceding native window evidence predates this integration.
 
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then

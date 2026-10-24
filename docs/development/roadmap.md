@@ -4862,6 +4862,17 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Local public typed-key integration (after 20c24cf2, not pushed): `winkeys.h`
+  exposes historical typed/modifier event constants and payload fields. The
+  service installs priority-2000000000 press/release translators, preserving
+  synchronous borrowed/nested payloads, early event consumption and failure
+  latching. Mapping keeps the historical numeric key namespace on HP39 too;
+  native text interpretation is separate. Modifier repaint notifications do not
+  begin/present frames or draw indicators. Three focused sanitizer targets pass,
+  including public polled-matrix transitions, nested callbacks and invalid keys;
+  host analysis and six-model ARM builds pass. Native physical input, indicators,
+  SDK acceptance of the new header and CI acceptance remain open.
+
   Local typed-key foundation (after submission 95348ce8): `win-key-state` now
   owns Alpha/left/right latch and held states independently of the physical
   polling generator. It preserves the original character tables, one-shot
@@ -4878,7 +4889,7 @@ below are retained.
   Host/ARM analysis, formatter/Ruff and a six-model launcher build pass; evidence
   is `/work/oct24-win-key-state-{test,parity,negative,arm,host-analysis,arm-analysis}.log`.
   This is internal source-compatibility behavior for historical KB_* values;
-  public typed/modifier handlers, model interpretation, indicators and native
+  public handlers were subsequently connected as above; model interpretation, indicators and native
   physical-key acceptance remain open. Existing public window generators are
   unchanged. This local work is outside PR #10's submitted head.
 

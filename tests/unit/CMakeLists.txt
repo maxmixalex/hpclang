@@ -73,6 +73,7 @@ hpclang_unit(win_repaint test_win_repaint.c
     "${HPCLANG_ROOT}/runtime/core/win-loop.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
 target_include_directories(test_win_repaint PRIVATE "${HPCLANG_ROOT}/runtime/core")
 hpclang_unit(win_public test_win_public.c
+    "${HPCLANG_ROOT}/runtime/core/win-key-state.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-window.c"
     "${HPCLANG_ROOT}/runtime/core/win-drivers.c"
     "${HPCLANG_ROOT}/runtime/core/win-keyboard.c"

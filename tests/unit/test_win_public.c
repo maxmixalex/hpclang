@@ -1,12 +1,14 @@
 #include <winevent.h>
 #include <wintimer.h>
+#include <winkeys.h>
+#include <hpkeyb49.h>
 #include "hpgcc-keyboard.h"
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>
 
-static uint64_t now;
+static uint64_t now, physical_matrix;
 static int calls, frames, paints, io_error;
 int hpclang_hpg_frame_begin(void *context)
 {
@@ -25,7 +27,7 @@ int hpclang_hpgcc_keymatrix_read(keymatrix *matrix)
         errno = EIO;
         return -1;
     }
-    matrix->full = 0;
+    matrix->full = physical_matrix;
     now += 1000;
     return 0;
 }
@@ -57,6 +59,89 @@ static int timer(void *data)
         return 1;
     }
     return 0;
+}
+static int typed_calls, nested, broken, changes, repaint_posts;
+static win_keytyped_t captured[4];
+static int typed(void *event, void *data)
+{
+    assert(!data);
+    win_keytyped_t *key = event;
+    unsigned index = (unsigned)typed_calls++;
+    assert(index < 4);
+    captured[index] = *key;
+    assert(hpclang_win_reset() == -1 && errno == EBUSY);
+    if (nested && index == 0) {
+        assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_B) == -1);
+        assert(!hpclang_win_error());
+        assert(key->ascii == 'A' && key->alpha == WIN_KEYSTATE_ON);
+    }
+    if (broken)
+        win_post_event(-1, NULL);
+    return -1;
+}
+static int modifier(void *event, void *data)
+{
+    (void)data;
+    const unsigned expected[] = {WIN_KEYSTATE_PRESSED, WIN_KEYSTATE_ON, WIN_KEYSTATE_OFF};
+    assert(changes < 3 && (uintptr_t)event == expected[changes++]);
+    return 0;
+}
+static int key_repaint(void *event, void *data)
+{
+    assert(!event && !data);
+    ++repaint_posts;
+    return 0;
+}
+static int consume(void *event, void *data)
+{
+    (void)event;
+    (void)data;
+    return 17;
+}
+static void check_keys(void)
+{
+    assert(!hpclang_win_reset());
+    win_add_event_handler(WIN_KEY_TYPED, 0, typed, NULL);
+    win_add_event_handler(WIN_ALPHA_CHANGED, 0, modifier, NULL);
+    win_add_event_handler(7, 0, key_repaint, NULL);
+    assert(!win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_ALPHA));
+    assert(!win_post_event(WIN_KEY_RELEASED, (void *)(uintptr_t)KB_ALPHA));
+    nested = 1;
+    assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_A) == -1);
+    assert(!hpclang_win_error() && typed_calls == 2);
+    assert(captured[0].ascii == 'A' && captured[0].keycode == KB_A);
+    assert(captured[1].ascii == 0 && captured[1].alpha == WIN_KEYSTATE_OFF);
+    assert(changes == 3 && repaint_posts == 3);
+    assert(!win_post_event(WIN_KEY_RELEASED, (void *)(uintptr_t)KB_A));
+    assert(typed_calls == 2);
+    win_add_event_handler(WIN_KEY_PRESSED, INT_MAX, consume, NULL);
+    assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_ALPHA) == 17);
+    assert(changes == 3);
+    win_remove_event_handler(WIN_KEY_PRESSED, consume, NULL);
+    assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_1) == -1);
+    assert(captured[2].ascii == '1' && captured[2].alpha == WIN_KEYSTATE_OFF);
+    broken = 1;
+    assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_A) == -1);
+    assert(hpclang_win_error() == EINVAL && typed_calls == 4);
+    assert(!hpclang_win_reset());
+    assert(win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)UINTPTR_MAX) == -1);
+    assert(hpclang_win_error() == EINVAL);
+    assert(!hpclang_win_reset());
+    typed_calls = nested = broken = changes = repaint_posts = 0;
+    win_add_event_handler(WIN_KEY_TYPED, 0, typed, NULL);
+    win_add_event_handler(WIN_ALPHA_CHANGED, 0, modifier, NULL);
+    win_add_event_handler(7, 0, key_repaint, NULL);
+    physical_matrix = UINT64_C(1) << KB_ALPHA;
+    assert(hpclang_win_step(1) == 1);
+    physical_matrix = 0;
+    assert(hpclang_win_step(1) == 1);
+    physical_matrix = UINT64_C(1) << KB_A;
+    assert(hpclang_win_step(1) == 1);
+    assert(typed_calls == 1 && captured[0].ascii == 'A');
+    assert(changes == 3 && repaint_posts == 3 && !hpclang_win_error());
+    physical_matrix = 0;
+    assert(hpclang_win_step(1) == 1 && typed_calls == 1);
+    assert(!hpclang_win_reset());
 }
 int main(void)
 {
@@ -98,7 +183,7 @@ int main(void)
 
     assert(!hpclang_win_reset());
     event = win_register_event();
-    for (int i = 0; i < 61; ++i)
+    for (int i = 0; i < 59; ++i)
         win_add_event_handler(event, i, callback, &calls);
     assert(!hpclang_win_error());
     win_add_event_handler(event, 0, callback, &calls);
@@ -106,6 +191,7 @@ int main(void)
     assert(!hpclang_win_reset());
     assert(win_post_event(8, NULL) == -1 && hpclang_win_error() == EINVAL);
     assert(!hpclang_win_reset());
+    check_keys();
     io_error = 1;
     win_event_loop();
     assert(hpclang_win_error() == EIO);

@@ -1,5 +1,7 @@
 #include <winevent.h>
 #include <wintimer.h>
+#include <winkeys.h>
+#include "win-key-state.h"
 #include "win-drivers.h"
 #include "win-repaint.h"
 #include "hpg-internal.h"
@@ -12,6 +14,7 @@ static struct hpclang_win_call snapshots[256];
 static struct hpclang_win_timer slots[32];
 static struct hpclang_win_loop loop;
 static struct hpclang_win_keyboard keyboard;
+static struct hpclang_win_key_state key_state;
 static struct hpclang_win_timers timers;
 static struct hpclang_win_repaint repaint;
 static struct hpclang_win_drivers drivers;
@@ -30,6 +33,33 @@ static int ready(void)
     }
     return 1;
 }
+/* Keep the public bitfield payload separate from the internal state machine.
+ * Each recursive dispatch owns its payload until its callbacks return. */
+static int key_post(void *context, int event, void *data, int *result)
+{
+    (void)context;
+    win_keytyped_t typed;
+    if (event == WIN_KEY_TYPED) {
+        const struct hpclang_win_typed_key *key = data;
+        typed = (win_keytyped_t){key->keycode, key->ascii, key->lshift, key->rshift, key->alpha};
+        data = &typed;
+    }
+    if (hpclang_win_events_post(&events, event, data, result))
+        return fail(errno);
+    return loop.failure ? fail(loop.failure) : 0;
+}
+static int key_translate(void *event, void *pressed)
+{
+    if (loop.failure)
+        return fail(loop.failure);
+    uintptr_t key = (uintptr_t)event;
+    if (key >= 64)
+        return fail(EINVAL);
+    int result;
+    if (hpclang_win_key_state_feed(&key_state, (unsigned)key, pressed != NULL, &result))
+        return fail(errno);
+    return result;
+}
 void win_init(void)
 {
     if (initialized)
@@ -45,6 +75,10 @@ void win_init(void)
     hpclang_win_events_add(&events, 0, 2000000002, hpclang_win_keyboard_idle, &drivers);
     hpclang_win_events_add(&events, 0, 2000000001, hpclang_win_repaint_idle, &repaint);
     hpclang_win_events_add(&events, 0, 2000000000, hpclang_win_timer_idle, &drivers);
+    hpclang_win_key_state_init(&key_state, key_post, NULL);
+    hpclang_win_events_add(&events, WIN_KEY_PRESSED, 2000000000, key_translate,
+                           (void *)(uintptr_t)1);
+    hpclang_win_events_add(&events, WIN_KEY_RELEASED, 2000000000, key_translate, NULL);
     next_event = 8;
     initialized = 1;
 }
