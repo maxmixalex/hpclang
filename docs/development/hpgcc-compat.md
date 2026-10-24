@@ -798,6 +798,16 @@ execution, CI acceptance and full widget compatibility remain open. The integrat
 136-test ASan/UBSan suite also passes (671.25 seconds), as do full formatting
 and lint checks; whole-repository host/ARM analysis is still running. This is emulator GPIO evidence, not a physical-calculator test.
 
+The actual installed window example now also passes all six Direct models
+(81150 exit 0). A separate witness compiles its unchanged source with only main
+renamed, captures the display before its real cleanup, and independently checks
+the default animation's final rectangle and settled return. Sources and captures
+remain under `/work/oct24-window-example-native` and
+`/work/oct24-window-example-direct-<model>-evidence`. An initial witness reported
+PASS after cleanup and correctly failed the return screen-transition gate; that
+negative evidence remains preserved. This is default-animation execution, not
+scripted digit/ON interaction or shipped-example Stock acceptance.
+
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter

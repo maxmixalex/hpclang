@@ -4862,6 +4862,22 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Installed-example native witness (local research, not an SDK code change):
+  the exact installed `examples/hpgcc-window/main.c` is compiled with only its
+  main symbol renamed and linked to a cleanup observation wrapper. It captures
+  frame 500 before actual cleanup and checks the frame-19 rectangle at x61..70,
+  y12..21 with a white background. The initial HP39g+ wrapper placed PASS after
+  cleanup, so the unchanged return observer correctly rejected a missing screen
+  transition despite actual return and correct example pixels. That failed
+  evidence is retained in `/work/oct24-window-example-late-pass-failure`.
+  The wrapper now reports at the pre-cleanup observation point and keeps actual
+  cleanup/return. Process 81150 exits 0: all six Direct models pass the exact
+  final-frame pixels and settled return. Sources/runner live in
+  `/work/oct24-window-example-native` and
+  host `research/oct24-window-example-native`; this run exercises the shipped
+  default timer animation, not scripted digit/ON input. Whole static analysis
+  30552 remains on its original process.
+
   Current local window acceptance: all six corrected Stock models pass real
   GPIO input, 44 independent status frames per model, page exchange, final
   rectangle/background pixels and settled return. Final process 68792 exits 0;
@@ -4875,7 +4891,7 @@ below are retained.
   final analysis result is claimed yet. Logs are
   `/work/oct24-window-full-unit-tests.log` and
   `/work/oct24-window-final-{format,lint,analysis}.log`.
-  CI submission/acceptance, shipped-example execution and widget APIs remain
+  CI submission/acceptance, shipped-example Stock execution and widget APIs remain
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
