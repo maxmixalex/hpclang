@@ -20,6 +20,117 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+SDK memory guide (local) now separates application RW, complete launch pool,
+serialized package and whole-system peak. It documents admission/ceiling fields,
+Aplet footprint, transient replacement costs and measurement limits. The guide
+is installed with the SDK and linked from Getting Started and site navigation.
+Strict docs, a fresh installation relocated to a path containing spaces, exact
+installed guide comparison, local links/anchors and the report-reading snippet
+against a generated memory.json pass. Evidence: `/work/oct24-memory-guide-*`.
+
+Native accounting sequences 76058 and 40563 both exit 0, completing all six
+models. The exact local CI verifier step, including post-return free-list release
+and independently checked SRAM proof hashes, passes all six retained results.
+HP40gs/HP48gII/HP49g+ pool/block unions are 149,524/157,716/389,140 bytes;
+released block extents are 6,164/6,164/86,036 bytes. The HP48gII replay initially
+used an incorrect HP49/50 family argument and failed geometry as expected;
+correcting the research script to HP48 passes unchanged artifacts/verifier.
+Detailed ledger is in sdk-design.md; replay artifacts are under
+`/work/oct24-native-release-ci-replay{,-rest}`. This supersedes the pending-model
+status below. Other native allocations, stored objects, installation/transfer
+peaks and remote acceptance remain open. No new push or fresh-CI polling.
+
+Stock UI CI wiring `1ce07b3a` (local) enables native allocation capture and
+requires pool/allocation/post-return release verification. It retains SRAM and
+reports; successful release proof includes allocator/Flash/SRAM hashes and
+free-list roots. Fresh Stock setup removes stale proof output. The exact YAML
+verifier step replays successfully against HP39g+, HP39gs and HP50g retained
+artifacts, and proof SRAM hashes match independently. Actionlint, shellcheck,
+six Python report tests, Ruff and strict docs pass. Replay evidence:
+`/work/oct24-native-release-ci-replay`. Simulator cache inputs already cover the
+new observer header. Four-model sequence 40563 still runs HP40gs before HP48gII
+and HP49g+; no native restart or complete-matrix/remote acceptance is claimed.
+This workflow change remains local, outside submitted PR #12.
+
+Post-return native release verifier `a13a26f4` (local) requires settled Stock
+return, reviewed allocator code fingerprint and a complete consistent free list
+covering the former block, including coalescing. Six Python tests pass; retained
+HP39g+ replay rejects a consistent list missing the block, unsettled return and
+unknown allocator code. Format/lint/strict docs pass. Focused native 76058 exits
+0 for HP39g+ and HP50g; 40563 passes HP39gs and continues the remaining three.
+Independent stricter allocation/release verification passes all three saved
+results: pool/block union 153,620 / 149,524 / 389,140 bytes for HP39g+ / HP39gs /
+HP50g, with 6,164 / 6,164 / 86,036 block bytes returned to the free list. UI,
+stack/heap/timing, pool stability and Stock return also pass. Detailed partial
+ledger and exclusions are in sdk-design.md and `/work/oct24-native-accounting*`.
+No full six-model matrix, transfer/installation peak or CI acceptance yet.
+
+Window controls submitted as `ab91e43a` in draft PR #12:
+https://github.com/maxmixalex/hpclang/pull/12 . It is stacked on PR #11 via
+`m8-flash-write`, not merged into main. Delivery starts at verified `1869e6f2`
+and changes only roadmap tracking; all 4,614 tracked files match its isolated
+mirror. Full format (103 Python files), lint and strict docs pass. Original
+comparisons, 153-test regression/373-source analysis, SDK 517-output check,
+76-name C/C++ export probe and all-six Direct/Stock split/original-app gates
+apply to the unchanged sources. Native-allocation research is outside this batch.
+Before pushing, exact preceding head 9683fd6a was checked: both Quality and both
+Storage runs pass; Objects push runs and five runs queue. PR #11 stays open.
+Fresh PR #12 CI was not polled. Before any next push, check ab91e43a and its
+still-pending dependency, including failed-job logs. This is submission only.
+
+Allocation/pool verifier `be686e07` (local) cross-checks both checkpoint reports,
+model/pointer identity, SRAM bounds, allocated flags, page intersections and
+stable cleanup state. It reports the union of pool pages and the validated block,
+subtracting shared pages. A mapped page overlapping only the allocator footer
+is now rejected by both sampler and verifier. Five Python report tests and both
+ASan/UBSan CTest targets pass, including malformed/missing/drifting reports,
+metadata-only overlap and duplicate-count prevention. Format/lint/strict docs
+pass. Native sequence 76058 remains running for HP39g+/HP50g; separate 40563
+runs HP39gs/HP40gs/HP48gII/HP49g+ with the updated sampler/verifier under
+`/work/oct24-native-accounting-rest-*`. The first sequence's frozen sampler is
+not changed in flight; apply the stricter verifier to its retained reports.
+No complete native matrix, whole-system budget or remote acceptance is claimed.
+
+Validated native allocation observer `3b4e5e69` (local) adds opt-in immutable
+allocation reports alongside unchanged pool reports. It bounds reads to SRAM,
+checks allocated flags, size/footer agreement, reciprocal list links and page
+containment/uniqueness, then separates usable bytes, 20-byte metadata and mapped
+pages. Two focused ASan/UBSan CTest targets pass, including invalid/free blocks,
+overflow/bounds, corrupted links/footer, overlapping/duplicate pages, no-block
+reports and immutable output. Formatting, Ruff and strict docs pass.
+The stricter HP39g+/HP50g native sequence runs as 76058 in independent
+`/work/oct24-native-accounting-*`; no native acceptance yet. Raw observation
+82387 completed successfully: both HP39g+ checkpoints have pointer 0x080053ac,
+6,144-byte extent and flags 0x2102, outside all 36 mapped pool pages. UI pixels,
+stack/heap/timing, pool stability and Stock return pass. This raw capture does
+not contain the distant footer or reciprocal links; no full block budget or
+whole-system peak claim follows from it. No push or milestone closure.
+
+Native allocator ROM audit (local): all six retained images share the 344-byte
+allocation body, except four PC-relative literal displacements in HP39gs. The
+free-path size/footer validation prefix also matches; HP39gs free is separately
+located, correcting the initial adjacency assumption. Decoded block layout is
+16-byte header, four-byte-aligned usable extent and four-byte size footer. A
+validated live block therefore occupies recorded extent + 20 bytes; extent is
+not necessarily original request size. Firmware addresses and limits are in
+sdk-design.md; script `research/oct24-native-allocator-audit.py` and report
+`/work/oct24-native-allocator-code.json` retain image/code hashes and comparisons.
+Strict docs pass. This is static evidence only; the later raw capture and
+validated observer status above supersede its then-pending observation status.
+
+Native-allocation accounting experiment (M8.2/M8.3/M8.6, local): the existing
+six-model mapped-pool reports do not establish native allocator sizes. A separate
+read-only emulator probe captures 256 bytes around the recorded native OS block
+at each UI memory checkpoint, preserving the unchanged application/launcher and
+existing UI/pool/return gates. HP39g+ process 82387 has now completed; its raw
+capture result and remaining validation limits are recorded above. Script:
+`research/oct24-native-allocation-observe.py`; isolated source/emulator/logs:
+`/work/oct24-native-allocation-*`. Setup-only failures (missing observer header,
+headless asset-copy links and RUNNER_TEMP) were corrected before guest execution.
+The frontend was explicitly rebuilt after modifying its optional observer header.
+Raw neighborhood values must be checked against live allocator behavior and
+model firmware before deriving block sizes, overhead or alignment losses.
+
 Window export inventory follow-up (local): audit report v2 records 75 distinct
 original implementation names and the header/source discrepancies in both 1.1
 and 2.0. `check-win-exports.py` derives all 76 original/repaired names and forces

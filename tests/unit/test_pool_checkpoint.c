@@ -14,6 +14,7 @@ typedef struct
 static uint32_t model = 6, count = 3, table = 0x08020000, state = 0x08001000;
 static uint32_t pages[5] = {0x08020ffe, 0x08021ffe, 0x08022ffe, 0x08023ffe, 0x08024ffe};
 static int unreadable;
+static uint32_t block = 0x08030000, footer = 4096;
 static int cpu_memory_rw_debug(void *cpu, uint32_t address, uint8_t *bytes, unsigned size,
                                int write)
 {
@@ -39,7 +40,18 @@ static int cpu_memory_rw_debug(void *cpu, uint32_t address, uint8_t *bytes, unsi
         value = count;
         break;
     case 0x08001918:
-        value = 0x08030000;
+        value = block;
+        break;
+    case 0x0802fff0:
+    case 0x08031000:
+        value = footer;
+        break;
+    case 0x0802fff4:
+        value = 0x2102;
+        break;
+    case 0x0802fff8:
+    case 0x0802fffc:
+        value = 0;
         break;
     case 0x08001920:
         value = table;
@@ -66,6 +78,7 @@ int main(void)
     snprintf(prefix, sizeof prefix, "%s/frame", directory);
     snprintf(path, sizeof path, "%s-pool-2.json", prefix);
     unsetenv("HPCLANG_E2E_CAPTURE_STAGE_POOL");
+    unsetenv("HPCLANG_E2E_CAPTURE_NATIVE_ALLOCATION");
     assert(pool_checkpoint(&hdw, 0x4d101000) == 0);
     setenv("HPCLANG_E2E_CAPTURE_STAGE_POOL", "1", 1);
     setenv("HPCLANG_E2E_FRAME_PREFIX", prefix, 1);
@@ -78,6 +91,27 @@ int main(void)
     assert(strstr(output, "\"physical_pages\":[134348800,134352896,134356992]"));
     assert(pool_checkpoint(&hdw, 0x4d101000) == -1); /* immutable observation */
     assert(!unlink(path));
+    char allocation_path[280];
+    snprintf(allocation_path, sizeof allocation_path, "%s-allocation-2.json", prefix);
+    setenv("HPCLANG_E2E_CAPTURE_NATIVE_ALLOCATION", "1", 1);
+    assert(pool_checkpoint(&hdw, 0x4d101000) == 1);
+    file = fopen(allocation_path, "r");
+    assert(file && fgets(output, sizeof output, file));
+    fclose(file);
+    assert(strstr(output, "\"usable_bytes\":4096"));
+    assert(strstr(output, "\"metadata_bytes\":20,\"mapped_pages\":0"));
+    assert(!unlink(path));
+    assert(pool_checkpoint(&hdw, 0x4d101000) == -1); /* immutable allocation report */
+    assert(!unlink(allocation_path));
+    block = 0;
+    assert(pool_checkpoint(&hdw, 0x4d101000) == 1);
+    file = fopen(allocation_path, "r");
+    assert(file && fgets(output, sizeof output, file));
+    fclose(file);
+    assert(strstr(output, "\"pointer\":0,\"usable_bytes\":0"));
+    assert(!unlink(path) && !unlink(allocation_path));
+    block = 0x08030000;
+    unsetenv("HPCLANG_E2E_CAPTURE_NATIVE_ALLOCATION");
     model = 1;
     assert(pool_checkpoint(&hdw, 0x4d101000) == 1);
     assert(!unlink(path));

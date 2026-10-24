@@ -1305,6 +1305,99 @@ size. The normal memory report and its acknowledgement remain unchanged.
 Stock run setup removes previous pool reports. No guest bytes, fields, symbols
 or allocations are added by this observer.
 
+A read-only ROM audit identifies the native allocator's block format in the
+six retained emulator images. The allocation code rounds requests to four-byte
+alignment, places a 16-byte header before the returned pointer, and maintains
+a four-byte size footer after the block's usable extent. The header contains
+usable extent, flags and two list links; the free path compares the stored
+extent with the footer before unlinking. Consequently, a validated live block
+occupies its recorded usable extent plus 20 bytes. The usable extent must not
+be equated with the original request: allocator splitting/exact-fit behavior
+can retain slack. Page alignment can exclude further bytes from the mapped pool.
+
+| Retained ROM model | Allocation routine | Free routine |
+| --- | --- | --- |
+| HP39g+ | `0x10554` | `0x106ac` |
+| HP39gs | `0x2ca34` | `0x2c12c` |
+| HP40gs | `0x1485c` | `0x149b4` |
+| HP48gII | `0x145e0` | `0x14738` |
+| HP49g+ / HP50g | `0x1c88c` | `0x1c9e4` |
+
+These are firmware-specific research addresses, not callable SDK interfaces.
+The 344-byte allocation bodies match exactly except four PC-relative literal
+displacements in HP39gs; the free-path header/footer validation prefix matches
+on all six. `research/oct24-native-allocator-audit.py` retains the comparison,
+with image/code SHA-256 identities in `/work/oct24-native-allocator-code.json`.
+HP39gs places its free routine separately; adjacency is not assumed.
+This static evidence does not validate the observer's pointer as a live block
+or establish current allocation/installation peaks. Live header, flags, footer
+and page-range checks are still required before accounting for an allocation.
+
+The opt-in `HPCLANG_E2E_CAPTURE_NATIVE_ALLOCATION=1` observer, used together
+with `HPCLANG_E2E_CAPTURE_STAGE_POOL=1`, now performs those checks within the
+audited SRAM bounds. It rejects free-block flags, inconsistent size footers,
+nonreciprocal links, duplicate pages and partial overlaps with mapped pages.
+It writes a separate immutable `*-allocation-ID.json` containing pointer,
+usable extent, flags/links, metadata bytes, mapped-page count and usable bytes
+outside those pages. A zero native pointer produces zero allocation fields.
+The existing pool report schema remains unchanged. This is one block's
+accounting; other native allocations and installation/transfer peaks remain
+outside its scope. Native acceptance of this additional observer is pending.
+
+Use `tests/e2e/ui/verify.py stock FAMILY --pool --allocation` to require both
+checkpoint reports, cross-check their block pointer and model against the pool,
+recompute mapped-page intersections and require identical observations across
+cleanup. Any page intersecting only allocator metadata is also rejected. The
+reported pool/block union is pool bytes plus unmapped usable bytes plus block
+metadata; it avoids counting shared pages twice. It remains a partial resource
+ledger, not total native allocation or a sufficient installation budget.
+
+`--native-release` additionally requires settled Stock return and checks the
+saved post-return SRAM free list. It verifies the reviewed allocator code hash
+before locating that firmware's free-list root, then checks all list links,
+flags, aligned sizes, footer agreement and nonoverlapping ranges. A free block
+must cover the complete previously observed allocation, including metadata;
+coalescing is permitted. A residual old header is insufficient. Unreviewed
+allocator code is rejected instead of applying an assumed layout.
+
+The local Runtime workflow enables both observers for Stock UI jobs and requires
+`--pool --allocation --native-release`. Successful release verification writes
+`*-native-release.json` with model, pointer, released bytes, allocator/Flash/SRAM
+hashes and free-list roots. The job retains the post-return SRAM with allocation,
+pool, release and Stock-status reports for independent replay. Fresh Stock setup
+removes an old release report before executing another application. This workflow
+change has passed actionlint, shellcheck and exact-step replay on all six
+models; remote acceptance remains pending.
+
+Both native sequences complete successfully on all six models, with independent
+UI, memory, pool, allocation and post-return free-list checks. Values are bytes:
+
+| Observed resource | HP39g+ | HP39gs | HP40gs | HP48gII | HP49g+ | HP50g |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Distinct mapped pool | 147,456 | 143,360 | 143,360 | 151,552 | 385,024 | 385,024 |
+| Native block usable extent | 6,144 | 6,144 | 6,144 | 6,144 | 86,016 | 86,016 |
+| Block metadata | 20 | 20 | 20 | 20 | 20 | 20 |
+| Block bytes shared with pool pages | 0 | 0 | 0 | 0 | 81,920 | 81,920 |
+| Pool/block union | 153,620 | 149,524 | 149,524 | 157,716 | 389,140 | 389,140 |
+| Block extent returned to free list | 6,164 | 6,164 | 6,164 | 6,164 | 86,036 | 86,036 |
+
+Both memory checkpoints agree. Evidence is retained under
+`/work/oct24-native-accounting{,-rest}-src/build`; exact CI verifier replays and
+independently checked SRAM proof hashes are under
+`/work/oct24-native-release-ci-replay{,-rest}`. The first HP48gII replay used an
+incorrect HP49/50 family argument and correctly failed geometry validation;
+using its actual HP48 family passes without changing the evidence or verifier.
+Negative replay rejects an otherwise consistent free list missing the released
+block, unsettled return and a changed allocator code fingerprint.
+Other native allocations, stored objects and transfer/installation peaks remain
+outside this ledger. These are emulator observations, not physical-device results.
+
+The preceding raw HP39g+ capture passes UI pixels, memory/pool checks and Stock
+return. Both checkpoints show pointer `0x080053ac`, extent 6,144 bytes and
+allocated flags `0x2102`, with no mapped pool page inside that extent. Its
+neighborhood capture alone does not validate the distant footer or list links;
+the stricter observer above must pass before treating it as a measured block.
+
 Run `tests/e2e/ui/verify.py stock FAMILY --pool` to require both pool reports,
 correct target identity, 36 KiB RW, valid unique physical pages and identical
 pool observations before PASS and after runtime cleanup. The ordinary UI
