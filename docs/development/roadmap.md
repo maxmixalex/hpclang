@@ -20,6 +20,18 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Stock UI CI wiring `1ce07b3a` (local) enables native allocation capture and
+requires pool/allocation/post-return release verification. It retains SRAM and
+reports; successful release proof includes allocator/Flash/SRAM hashes and
+free-list roots. Fresh Stock setup removes stale proof output. The exact YAML
+verifier step replays successfully against HP39g+, HP39gs and HP50g retained
+artifacts, and proof SRAM hashes match independently. Actionlint, shellcheck,
+six Python report tests, Ruff and strict docs pass. Replay evidence:
+`/work/oct24-native-release-ci-replay`. Simulator cache inputs already cover the
+new observer header. Four-model sequence 40563 still runs HP40gs before HP48gII
+and HP49g+; no native restart or complete-matrix/remote acceptance is claimed.
+This workflow change remains local, outside submitted PR #12.
+
 Post-return native release verifier `a13a26f4` (local) requires settled Stock
 return, reviewed allocator code fingerprint and a complete consistent free list
 covering the former block, including coalescing. Six Python tests pass; retained
