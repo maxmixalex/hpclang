@@ -672,7 +672,7 @@ The HPGCC 1.1/2.0 widget family remains a retained **M8.4 adapter requirement**.
 | `winevent.h`, `wintimer.h`, `winkeys.h` | Bounded foreground event/timer/key service over native input, time and HPG | Adapter implemented locally; see exact validation below | M8.4, CI pending |
 | `winwidget.h`, `wincore.h` | Custom component lifecycle, focus, geometry and base painting | Local sanitizer/pixel and relocated SDK checks pass; native acceptance pending | M8.4 |
 | `winprogress.h` | Four-orientation progress/slider, focus, repeat and blinking cursor | Local host/SDK/reference and six-model Direct checks pass; Stock pending | M8.4 |
-| Concrete `win*` controls and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
+| Concrete `win*` controls and `win.h` | Persistent compatibility controls over input/time/HPG services | Implemented locally; source, SDK and native gates detailed in the current application/component sections | M8.4, CI acceptance open |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
 
 ## Historical window adapter feasibility
@@ -682,8 +682,10 @@ The 2026-10-24 review reads the retained HPGCC 1.1/39g distribution's
 then compares all four original release archives. This is static source
 evidence, separate from the subsequent implementation and runtime checks below.
 The installed `winevent.h`, `wintimer.h` and `winkeys.h` now expose working
-event/timer/key adapters. `winwidget.h`/`wincore.h` now add custom components;
-concrete controls and the full `win.h` umbrella remain open.
+event/timer/key adapters. `winwidget.h`/`wincore.h` add custom components;
+text, image, progress, menu, checkbox, chooser and box controls are exposed
+together through `win.h`. The implementation and validation follow-ups are
+recorded separately from this original static feasibility review.
 
 | Release | Source/header files scanned | Window-family evidence |
 | --- | ---: | --- |
