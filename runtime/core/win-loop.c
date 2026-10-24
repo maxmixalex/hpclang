@@ -16,7 +16,7 @@ int hpclang_win_loop_init(struct hpclang_win_loop *loop, struct hpclang_win_even
         errno = EINVAL;
         return -1;
     }
-    *loop = (struct hpclang_win_loop){events, idle_event, 0};
+    *loop = (struct hpclang_win_loop){events, idle_event, 0, 0};
     return 0;
 }
 int hpclang_win_loop_quit(struct hpclang_win_loop *loop)
@@ -26,15 +26,36 @@ int hpclang_win_loop_quit(struct hpclang_win_loop *loop)
     loop->stopped = 1;
     return 0;
 }
+int hpclang_win_loop_fail(struct hpclang_win_loop *loop, int error)
+{
+    if (!valid(loop))
+        return -1;
+    if (error <= 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!loop->failure)
+        loop->failure = error;
+    errno = loop->failure;
+    return -1;
+}
 int hpclang_win_loop_run(struct hpclang_win_loop *loop, size_t budget)
 {
     if (!valid(loop))
         return -1;
+    if (loop->failure) {
+        errno = loop->failure;
+        return -1;
+    }
     loop->stopped = 0;
     for (size_t i = 0; i < budget; ++i) {
         int result;
         if (hpclang_win_events_post(loop->events, loop->idle_event, NULL, &result))
             return -1;
+        if (loop->failure) {
+            errno = loop->failure;
+            return -1;
+        }
         if (loop->stopped)
             return 0;
     }

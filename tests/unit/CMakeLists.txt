@@ -60,6 +60,9 @@ hpclang_unit(win_loop test_win_loop.c
     "${HPCLANG_ROOT}/runtime/core/win-timers.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
 target_include_directories(test_win_loop PRIVATE "${HPCLANG_ROOT}/runtime/core")
 hpclang_unit(win_keyboard test_win_keyboard.c
+    "${HPCLANG_ROOT}/runtime/core/win-drivers.c"
+    "${HPCLANG_ROOT}/runtime/core/win-loop.c"
+    "${HPCLANG_ROOT}/runtime/core/win-timers.c"
     "${HPCLANG_ROOT}/runtime/core/win-keyboard.c"
     "${HPCLANG_ROOT}/runtime/core/win-events.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-keyboard.c"

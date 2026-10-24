@@ -684,7 +684,16 @@ failure leaves the baseline unchanged. Dispatch failure is latched and requires
 the owning loop to stop and unwind before reinitialization, since an earlier
 key may already have been delivered. Host tests exercise all 60 physical inputs
 on all six model mappings, mixed transitions, nesting and partial failure.
-This does not yet validate a complete device window loop or its error handling.
+The internal `win-drivers` idle callbacks now connect this generator and the
+timer pump to the loop. Their device-clock callback uses checked
+`hpclang_time_read_us`, with timer intervals in microseconds. A dedicated loop
+failure latch preserves the first errno across nested runs, quit and later
+callbacks. This is separate from historical handler consumption; an ordinary
+nonzero callback still does not quit or fail the loop. Driver failures consume
+idle and propagate to the caller; the owner must unwind before reinitializing.
+Host integration covers timed quit, keyboard/clock failures and insufficient
+snapshot capacity during nested key dispatch. Native interaction, repaint,
+public APIs and widget acceptance remain open.
 
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then

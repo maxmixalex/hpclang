@@ -4707,6 +4707,18 @@ below are retained.
   are host-controlled physical snapshots and build evidence, not calculator
   window interaction acceptance. Idle-loop error propagation, actual renderer
   integration, public interfaces and widget behavior remain open. Not pushed.
+  The next local integration adds `win-drivers`: idle callbacks connect the
+  keyboard generator and timer pump to the loop, and the device clock adapter
+  delegates to checked `hpclang_time_read_us` (microsecond intervals). A separate
+  first-error latch stops the loop without confusing callback consumption with
+  failure; nested runs, quit and later errno changes cannot hide that cause.
+  Six sanitizer targets pass, including timed quit through the full driver path,
+  unsupported keyboard context, clock failure, nested error preservation and
+  exhaustion inside nested key dispatch. Host/ARM analysis, C/C++ six-model
+  launcher builds and strict docs pass. Logs are
+  `/work/oct24-win-drivers-{build,analysis,arm}.log`. Host tests control the
+  physical and clock sources; native interaction acceptance, actual repaint,
+  public window APIs and widgets remain open. This batch remains local.
 
 #### M8.5 — Modern C++ and migration
 

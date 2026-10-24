@@ -1,5 +1,6 @@
 #include "win-keyboard.h"
 #include "hpgcc-keyboard.h"
+#include "win-drivers.h"
 #include <hpclang/abi.h>
 #include <hpclang/keyboard.h>
 #include <assert.h>
@@ -7,12 +8,39 @@
 
 static struct hpclang_boot_info boot;
 static struct hpclang_win_events events;
-static struct hpclang_win_handler handlers[4];
+static struct hpclang_win_handler handlers[8];
 static struct hpclang_win_call snapshots[8];
 static struct hpclang_win_keyboard keyboard;
 static uint64_t physical;
 static unsigned reads, count;
 static int trace[256], nesting, exhaust;
+static uint64_t clock_now;
+static int clock_error;
+static struct hpclang_win_loop loop;
+static struct hpclang_win_timers timers;
+static struct hpclang_win_timer timer_slots[2];
+static struct hpclang_win_drivers drivers;
+int hpclang_time_read_us(uint64_t *value)
+{
+    if (clock_error) {
+        errno = clock_error;
+        return -1;
+    }
+    *value = clock_now;
+    return 0;
+}
+static int repaint(void *event, void *data)
+{
+    assert(!event && data == &drivers);
+    ++clock_now;
+    return 0;
+}
+static int timed_quit(void *data)
+{
+    assert(data == &loop);
+    assert(!hpclang_win_loop_quit(&loop));
+    return 1;
+}
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
     return &boot;
@@ -47,10 +75,24 @@ static void init(size_t capacity)
     count = reads = 0;
     nesting = exhaust = 0;
     physical = 0;
-    assert(!hpclang_win_events_init(&events, handlers, 4, snapshots, capacity));
+    assert(!hpclang_win_events_init(&events, handlers, 8, snapshots, capacity));
     assert(!hpclang_win_events_add(&events, 1, 0, capture, NULL));
     assert(!hpclang_win_events_add(&events, 2, 0, capture, &keyboard));
     assert(!hpclang_win_keyboard_init(&keyboard, &events, 1, 2));
+}
+static void init_drivers(void)
+{
+    init(8);
+    boot.model = 1;
+    clock_now = 0;
+    clock_error = 0;
+    assert(!hpclang_win_loop_init(&loop, &events, 0));
+    assert(
+        !hpclang_win_timers_init(&timers, timer_slots, 2, hpclang_win_device_clock, NULL, &events));
+    drivers = (struct hpclang_win_drivers){&loop, &keyboard, &timers, SIZE_MAX};
+    assert(!hpclang_win_events_add(&events, 0, 2000000002, hpclang_win_keyboard_idle, &drivers));
+    assert(!hpclang_win_events_add(&events, 0, 2000000001, repaint, &drivers));
+    assert(!hpclang_win_events_add(&events, 0, 2000000000, hpclang_win_timer_idle, &drivers));
 }
 int main(void)
 {
@@ -98,5 +140,33 @@ int main(void)
     assert(hpclang_win_keyboard_poll(&keyboard) == -1 && errno == ENOSPC && !reads);
     assert(count == 1 && !events.depth && !events.used);
     assert(hpclang_win_keyboard_feed(NULL, 0) == -1 && errno == EINVAL);
+
+    init_drivers();
+    physical = UINT64_C(1) << 56;
+    assert(!hpclang_win_timers_add(&timers, timed_quit, &loop, 2, 0));
+    assert(!hpclang_win_loop_run(&loop, 8));
+    assert(clock_now == 2 && reads == 2 && count == 1 && trace[0] == 64);
+    assert(!timers.head && !loop.failure);
+
+    init_drivers();
+    boot.model = 0;
+    assert(hpclang_win_loop_run(&loop, 8) == -1 && errno == ENOSYS);
+    assert(!clock_now && !reads && !count); /* Keyboard failure consumes idle. */
+    boot.model = 1;
+    assert(hpclang_win_loop_run(&loop, 8) == -1 && errno == ENOSYS && !reads);
+
+    init_drivers();
+    assert(!hpclang_win_timers_add(&timers, timed_quit, &loop, 2, 0));
+    clock_error = EIO;
+    assert(hpclang_win_loop_run(&loop, 8) == -1 && errno == EIO);
+    assert(clock_now == 1 && reads == 1 && timers.head && !timers.depth);
+    assert(!events.depth && !events.used && loop.failure == EIO);
+
+    init_drivers();
+    events.snapshot_capacity = 3; /* Idle fits; nested key dispatch does not. */
+    physical = 1;
+    assert(hpclang_win_loop_run(&loop, 8) == -1 && errno == ENOSPC);
+    assert(keyboard.failure == ENOSPC && loop.failure == ENOSPC);
+    assert(reads == 1 && !count && !clock_now && !events.depth && !events.used);
     return 0;
 }

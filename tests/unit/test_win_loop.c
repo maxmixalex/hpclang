@@ -82,6 +82,22 @@ static void init(size_t snapshot_count)
     assert(!hpclang_win_loop_init(&loop, &events, 0));
     assert(!hpclang_win_timers_init(&timers, slots, 2, clock_read, NULL, &events));
 }
+static int failure(void *data, void *context)
+{
+    assert(!data && context == &loop);
+    record('F');
+    if (!nested) {
+        nested = 1;
+        assert(hpclang_win_loop_run(&loop, 1) == -1 && errno == EIO);
+        nested = 0;
+    } else {
+        assert(hpclang_win_loop_fail(&loop, EIO) == -1 && errno == EIO);
+        assert(!hpclang_win_loop_quit(&loop));
+        assert(hpclang_win_loop_fail(&loop, ENOSPC) == -1 && errno == EIO);
+    }
+    errno = EDOM; /* Neither later callbacks nor nested runs hide the cause. */
+    return 0;
+}
 static void add(int priority, hpclang_win_event_fn function)
 {
     assert(!hpclang_win_events_add(&events, 0, priority, function, &loop));
@@ -122,5 +138,15 @@ int main(void)
     assert(!hpclang_win_events_remove(&events, 0, tail, &loop));
     assert(hpclang_win_loop_run(&loop, 1) == 1 && !strcmp(trace, "K"));
     assert(hpclang_win_loop_run(NULL, 1) == -1 && errno == EINVAL);
+
+    init(16);
+    add(1, failure);
+    add(0, tail);
+    assert(hpclang_win_loop_run(&loop, 8) == -1 && errno == EIO);
+    assert(!strcmp(trace, "FFAA") && !events.depth && !events.used);
+    assert(hpclang_win_loop_run(&loop, 1) == -1 && errno == EIO);
+    assert(!strcmp(trace, "FFAA"));
+    assert(hpclang_win_loop_fail(&loop, 0) == -1 && errno == EINVAL);
+    assert(loop.failure == EIO);
     return 0;
 }
