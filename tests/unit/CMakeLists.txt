@@ -26,6 +26,8 @@ hpclang_unit(watchdog_model test_watchdog_model.c)
 target_include_directories(test_watchdog_model PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
 hpclang_unit(memory_checkpoint test_memory_checkpoint.c)
+hpclang_unit(native_allocation test_native_allocation.c)
+target_include_directories(test_native_allocation PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 target_include_directories(test_memory_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
 if(UNIX)

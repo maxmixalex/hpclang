@@ -1333,6 +1333,23 @@ This static evidence does not validate the observer's pointer as a live block
 or establish current allocation/installation peaks. Live header, flags, footer
 and page-range checks are still required before accounting for an allocation.
 
+The opt-in `HPCLANG_E2E_CAPTURE_NATIVE_ALLOCATION=1` observer, used together
+with `HPCLANG_E2E_CAPTURE_STAGE_POOL=1`, now performs those checks within the
+audited SRAM bounds. It rejects free-block flags, inconsistent size footers,
+nonreciprocal links, duplicate pages and partial overlaps with mapped pages.
+It writes a separate immutable `*-allocation-ID.json` containing pointer,
+usable extent, flags/links, metadata bytes, mapped-page count and usable bytes
+outside those pages. A zero native pointer produces zero allocation fields.
+The existing pool report schema remains unchanged. This is one block's
+accounting; other native allocations and installation/transfer peaks remain
+outside its scope. Native acceptance of this additional observer is pending.
+
+The preceding raw HP39g+ capture passes UI pixels, memory/pool checks and Stock
+return. Both checkpoints show pointer `0x080053ac`, extent 6,144 bytes and
+allocated flags `0x2102`, with no mapped pool page inside that extent. Its
+neighborhood capture alone does not validate the distant footer or list links;
+the stricter observer above must pass before treating it as a measured block.
+
 Run `tests/e2e/ui/verify.py stock FAMILY --pool` to require both pool reports,
 correct target identity, 36 KiB RW, valid unique physical pages and identical
 pool observations before PASS and after runtime cleanup. The ordinary UI
