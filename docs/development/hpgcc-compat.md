@@ -1492,5 +1492,7 @@ and extended beyond the small host display; corrected expectations use the
 relative pattern origin and fit the display. Failed evidence is retained in
 `/work/oct24-image-pattern-origin-failure.log`; passing log is
 `/work/oct24-image-tests.log`. ARMv4T compilation and analysis pass. SDK clients
-include image construction; full gate runs in 55970 (`/work/oct24-image-sdk.log`).
+include image construction; the complete gate passes (55970 exit 0): C/C++,
+six launchers, three Aplet variants, notebooks and 517 byte-identical release
+outputs (`/work/oct24-image-sdk.log`).
 Original-source differential and native image-control acceptance remain open.
