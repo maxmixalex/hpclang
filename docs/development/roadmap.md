@@ -30,10 +30,15 @@ restored build passes. This is name/linkage evidence, not behavioral or ABI
 proof. Corrected the erroneous 74-name count and nonexistent box-span claim.
 Ruff format/lint and strict docs pass. Remote CI acceptance remains open.
 
-Previous-push CI review of exact head `9683fd6a` finds both Quality runs
-(40086239513/40086235523) and Storage push 40086235524 successful; the other
-seven listed runs are queued. This is not CI acceptance. Before another push,
-recheck that submission and inspect any failed-job logs; do not poll fresh CI.
+Previous-push CI review of exact head `9683fd6a` before this delivery finds
+both Quality and both Storage runs successful. Objects push 40086235494 runs;
+the other five runs queue. No failed run is listed at that head. PR #11 remains
+open and unaccepted. This window-control batch is prepared on a separate branch
+based on verified `1869e6f2`, for a draft PR stacked on PR #11. It retains local
+153-test regression, 373-source analysis, original-source comparisons, full SDK
+517-output reproducibility and all-six Direct/Stock split-window/original-app
+acceptance. The independent native-allocation observer stays in local research.
+Do not poll fresh-push CI; inspect this delivery before any subsequent push.
 Recent failed logs were reread: 40068713236 is HP39g+ Stock catalog transfer
 `host-gate-failed`; 40061641253 includes HP40gs audio restoration 0x46417b0a
 and transfer failure. Those investigations remain open. Core 40061641258 and
