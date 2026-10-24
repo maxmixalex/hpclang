@@ -37,8 +37,8 @@ Follow-up `eaa91dc4` adds all nine public chooser APIs, scrolling modal selectio
 confirm/cancel, empty lists and lifecycle-safe menu overlays. Three focused
 ASan/UBSan targets pass including real HPG pixels on 64/80-line displays in both
 buffer modes, plus ARM compile/analysis. Logs `/work/oct24-choose-*-tests.log`.
-SDK process 38518 reports 517 reproducible outputs and six-model C/C++ packaging;
-terminal status is tracked on the issue board. Original-source comparison,
+SDK process 38518 exits 0: 517 reproducible outputs, six-model C/C++ launchers,
+three Aplet variants and notebooks pass (`/work/oct24-choose-sdk.log`). Original-source comparison,
 native matrix and CI acceptance remain open. All chooser work remains local on
 `m8-choose-controls`; no subsequent push or M8 completion is claimed.
 
