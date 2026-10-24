@@ -1352,6 +1352,33 @@ reported pool/block union is pool bytes plus unmapped usable bytes plus block
 metadata; it avoids counting shared pages twice. It remains a partial resource
 ledger, not total native allocation or a sufficient installation budget.
 
+`--native-release` additionally requires settled Stock return and checks the
+saved post-return SRAM free list. It verifies the reviewed allocator code hash
+before locating that firmware's free-list root, then checks all list links,
+flags, aligned sizes, footer agreement and nonoverlapping ranges. A free block
+must cover the complete previously observed allocation, including metadata;
+coalescing is permitted. A residual old header is insufficient. Unreviewed
+allocator code is rejected instead of applying an assumed layout.
+
+The focused native sequence completes on HP39g+ and HP50g, with independent
+UI, memory, pool, allocation and post-return free-list checks. Values are bytes:
+
+| Observed resource | HP39g+ | HP50g |
+| --- | ---: | ---: |
+| Distinct mapped pool | 147,456 | 385,024 |
+| Native block usable extent | 6,144 | 86,016 |
+| Block metadata | 20 | 20 |
+| Block bytes shared with pool pages | 0 | 81,920 |
+| Pool/block union | 153,620 | 389,140 |
+| Block extent returned to free list | 6,164 | 86,036 |
+
+Both memory checkpoints agree. Evidence is retained under
+`/work/oct24-native-accounting-src/build`; the other four models remain under
+validation. Negative replay rejects an otherwise consistent free list missing
+the released block, unsettled return and a changed allocator code fingerprint.
+Other native allocations, stored objects and transfer/installation peaks remain
+outside this ledger. These are emulator observations, not physical-device results.
+
 The preceding raw HP39g+ capture passes UI pixels, memory/pool checks and Stock
 return. Both checkpoints show pointer `0x080053ac`, extent 6,144 bytes and
 allocated flags `0x2102`, with no mapped pool page inside that extent. Its

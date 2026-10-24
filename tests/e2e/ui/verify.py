@@ -2,8 +2,10 @@
 """Verify the device-manager LCD checkpoints independently of guest assertions."""
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
+import struct
 
 
 def read_frame(path: Path, height: int) -> bytes:
@@ -204,6 +206,78 @@ def verify_allocation(prefix: Path, model: int) -> int:
     return total
 
 
+def free_list_covers(
+    read32, head: int, begin: int, end: int, heap: int, low: int, high: int
+) -> bool:
+    """Require a valid complete free list, including a block covering the released extent."""
+    assert begin <= low < high <= end and heap in (0x100, 0x200)
+    seen, spans = set(), []
+    previous = 0
+    while head:
+        assert head not in seen and head % 4 == 0 and begin <= head <= end - 20
+        seen.add(head)
+        size, flags, following, backlink = (read32(head + i) for i in range(0, 16, 4))
+        assert size % 4 == 0 and size <= end - head - 20
+        assert flags & 0xF000 == 0 and flags & 0x300 == heap
+        assert backlink == previous and read32(head + 16 + size) == size
+        spans.append((head, head + size + 20))
+        previous, head = head, following
+    spans.sort()
+    assert all(left[1] <= right[0] for left, right in zip(spans, spans[1:]))
+    return any(start <= low and high <= stop for start, stop in spans)
+
+
+def verify_native_release(prefix: Path, model: int, state: Path) -> int:
+    verify_allocation(prefix, model)
+    status_path = state.parent / f"{state.name.removesuffix('-state')}-stock.json"
+    status = json.loads(status_path.read_text())
+    assert (
+        status["status"] == "pass"
+        and status["returned"] is True
+        and status["return_settled"] is True
+    )
+    report = json.loads(Path(f"{prefix}-allocation-2.json").read_text())
+    pointer = report["pointer"]
+    if not pointer:
+        print(f"PASS: {prefix}: no optional native block to release")
+        return 0
+    rom, ram = (state / "flash").read_bytes(), (state / "sram").read_bytes()
+    begin = 0x08000000
+    extent = 0x40000 if model == 4 else 0x80000
+    assert len(ram) == extent
+    end = begin + extent
+    pattern = struct.pack("<3I", 0xE2810003, 0xE3C05003, 0xE2854014)
+    assert rom.count(pattern) == 1, "unrecognized allocator layout"
+    function = rom.index(pattern) - 0x4C
+    assert function >= 0
+    fingerprint = hashlib.sha256(rom[function : function + 0x158]).hexdigest()
+    expected = (
+        "b34c84fce1a31f720682ee404ee5b7dca5572ee9199008a6b33c1e4f298a9a12"
+        if model == 2
+        else "2b15eda432b4983009cd537704439d7c1159e28ae04b3a6a09bd220497166e54"
+    )
+    assert fingerprint == expected, "unreviewed allocator code"
+    instruction = struct.unpack_from("<I", rom, function + 0x58)[0]
+    assert instruction & 0xFFFFF000 == 0xE59F6000
+    literal = function + 0x60 + (instruction & 0xFFF)
+    assert literal <= len(rom) - 4
+    roots = struct.unpack_from("<I", rom, literal)[0]
+
+    def read32(address):
+        assert address % 4 == 0 and begin <= address <= end - 4
+        return struct.unpack_from("<I", ram, address - begin)[0]
+
+    heap = report["flags"] & 0x300
+    assert heap in (0x100, 0x200)
+    head = read32(roots + ((heap >> 8) - 1) * 16)
+    released = report["usable_bytes"] + 20
+    assert free_list_covers(
+        read32, head, begin, end, heap, pointer - 16, pointer + released - 16
+    ), f"{prefix}: native allocation not covered by the post-return free list"
+    print(f"PASS: {prefix}: {released} native block bytes returned to validated free list")
+    return released
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -214,11 +288,16 @@ def main() -> None:
     parser.add_argument(
         "--allocation", action="store_true", help="also require validated native-block observations"
     )
+    parser.add_argument(
+        "--native-release", action="store_true", help="check post-return native free list"
+    )
     args = parser.parse_args()
     if args.pool and args.mode != "stock":
         parser.error("--pool requires Stock mode")
     if args.allocation and not args.pool:
         parser.error("--allocation requires --pool")
+    if args.native_release and not args.allocation:
+        parser.error("--native-release requires --allocation")
     for target in Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines():
         verify(
             Path(f"build/{target}-frame"),
@@ -227,8 +306,15 @@ def main() -> None:
         )
         if args.pool:
             models = ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g")
-            check = verify_allocation if args.allocation else verify_pool
-            check(Path(f"build/{target}-frame"), models.index(target) + 1)
+            if args.native_release:
+                verify_native_release(
+                    Path(f"build/{target}-frame"),
+                    models.index(target) + 1,
+                    Path(f"build/{target}-state"),
+                )
+            else:
+                check = verify_allocation if args.allocation else verify_pool
+                check(Path(f"build/{target}-frame"), models.index(target) + 1)
 
 
 if __name__ == "__main__":
