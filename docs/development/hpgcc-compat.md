@@ -1510,5 +1510,6 @@ The native fixture now captures image-over-pattern pixels and borrowed-image
 retention at checkpoints 700/800. Six-model Direct process 1287 uses separate
 source `/work/oct24-image-native-src` and artifact `/work/oct24-image-native-arm`,
 so the existing text-only Stock run keeps its original binary and evidence.
-HP39g+ and HP39gs Direct pass; remaining native results are pending. Full
-isolated control regression (63047) and host/ARM analysis also run separately.
+All six Direct models pass (1287 exit 0). Image Stock process 82374 runs in
+that separate directory. Full 143-test control regression (63047) and host/ARM
+analysis (54292) also run separately; Stock completion and CI remain open.
