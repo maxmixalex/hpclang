@@ -904,6 +904,14 @@ locally. The production IRQ dispatcher,
 absolute-deadline handling and autonomous audio shutdown remain required before
 this becomes a public asynchronous sound adapter.
 
+Internal absolute-deadline helpers now acquire and advance the PWM4 lease using
+64-bit monotonic timestamps supplied by the caller. Intermediate expiry rearms
+from the remaining time; due or delayed delivery releases the lease. Host
+sanitizers cover wide timestamps, chunking, restoration and invalid ownership,
+and ARMv4T Thumb compilation passes. These helpers do not read the clock or
+enable interrupts. Production clock serialization, IRQ dispatch and audio-stop
+integration remain required; no new public sound compatibility is claimed.
+
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
 - `sys_bcd2bin(value)` converts the low **two** nibbles. Its macro evaluates the

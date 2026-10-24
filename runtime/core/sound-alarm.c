@@ -131,3 +131,34 @@ void hpclang_sound_alarm_release(const struct hpclang_sound_alarm_bus *bus,
     replace(bus, ALARM_MASK, IRQ, alarm->mask);
     alarm->owned = 0;
 }
+
+static uint32_t remaining(uint64_t now, uint64_t deadline)
+{
+    uint64_t delay = deadline - now;
+    return delay > UINT32_MAX ? UINT32_MAX : (uint32_t)delay;
+}
+
+int hpclang_sound_alarm_acquire_until(const struct hpclang_sound_alarm_bus *bus,
+                                      struct hpclang_sound_alarm *alarm, uint64_t clock_num,
+                                      uint64_t clock_den, uint64_t now, uint64_t deadline)
+{
+    if (deadline <= now) {
+        errno = EINVAL;
+        return -1;
+    }
+    return hpclang_sound_alarm_acquire(bus, alarm, clock_num, clock_den, remaining(now, deadline));
+}
+
+int hpclang_sound_alarm_advance(const struct hpclang_sound_alarm_bus *bus,
+                                struct hpclang_sound_alarm *alarm, uint64_t now, uint64_t deadline)
+{
+    if (!valid(bus, alarm) || !alarm->owned) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (now >= deadline) {
+        hpclang_sound_alarm_release(bus, alarm);
+        return 1;
+    }
+    return hpclang_sound_alarm_rearm(bus, alarm, remaining(now, deadline));
+}

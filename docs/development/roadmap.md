@@ -4285,6 +4285,15 @@ below are retained.
   during a busy loop; System Services E2E now maintains this check and passes all
   six Direct targets locally. Owned dispatch,
   absolute-deadline handling and autonomous audio shutdown remain unfinished.
+  Local 2026-10-24 follow-up adds internal absolute-deadline acquire/advance
+  helpers: long remaining intervals are clamped before narrowing, early delivery
+  rearms from the current timestamp, and on-time/late delivery releases the
+  timer without scheduling an extra period. Host ASan/UBSan tests cover the
+  UINT64_MAX boundary, repeated expiry, source-mask preservation, invalid state
+  and complete register restoration; ARMv4T Thumb compilation passes with
+  warnings treated as errors. This is a tested timer primitive, not production
+  IRQ/audio integration. The clock sampling/serialization, dispatcher, autonomous
+  audio stop, preemption and Stock timer ownership requirements remain open.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
