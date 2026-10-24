@@ -25,17 +25,24 @@ layout and borrowed nested groups. Group installation runs outside callbacks
 and rolls back failures; dynamic add/remove, cycle rejection and bound-child
 lifetime checks pass ten related sanitizer targets. ARM compile/analysis and
 full SDK 69480 pass (517 outputs, C/C++, six launchers, three Aplet variants).
-Box source comparison and native acceptance remain open; logs `/work/oct24-box-*`.
+Follow-up `cf8c97cc` passes 48,816-line original 1.1/2.0 grid comparisons,
+wrong-padding and missing-pixel negatives, eleven sanitizer targets and all six
+Direct models (40 additional GPIO edges/model, full-frame nested layout/removal
+and settled return). Stock 74185, full 153-test regression 37870 and whole
+analysis 18338 run. Logs `/work/oct24-box-*`; CI acceptance remains open.
 
-Independent box foundation `2c4b6502` on `m8-box-controls` passes focused
+Historical foundation note (superseded by `d5cbc83f`): `2c4b6502` passes focused
 ASan/UBSan, ARM compile and analysis. Checked axis allocation/alignment handles
 zero weights, padding deficits, allocation rollback and coordinate overflow,
 retaining historical signed rounding. Original NULL-placeholder looping and
-zero-weight division are identified for repair. Public container APIs/grouped
-lifecycle and native acceptance remain pending. Logs `/work/oct24-box-*`.
+zero-weight division were identified for repair. Public APIs and native
+acceptance were pending at that earlier stage. Logs `/work/oct24-box-*`.
 
 Latest follow-up inspection (2026-10-24): `cb7c7bae` Quality, Storage and
-Objects push/PR runs pass; Core, Runtime and Gallery are not yet fully terminal.
+Objects push/PR runs pass; Gallery 40078983286 now also passes. Core and Runtime
+remain unfinished with no failed jobs at inspection: Core PR/push have 8/7
+successful and 10/11 unfinished jobs; Runtime PR/push have 93/91 successful
+and 24/26 unfinished jobs. No new push was made.
 No subsequent push or CI acceptance is claimed. Re-read failed Objects run
 40068713236: HP39g+ fails with `host-gate-failed` during Stock payload transfer,
 before test execution; the transport cause remains open. Inspect again before
@@ -64,9 +71,10 @@ the final check attributed stale errno to a successful switch. Fixture fix
 `fc6d7d01` clears errno immediately before the mode-switch check; original
 RAM/state/ELF/HPC are preserved in
 `/work/oct24-choose-stock-hp39gplus-failure-state`. Process 69407 validates
-fresh Direct then Stock using `/work/oct24-choose-return-arm`; replay pending.
-Whole analysis 29830 passes 368 sources; full 150-test regression 29287 runs.
-Logs `/work/oct24-choose-*`. Stock, full regression and CI acceptance remain open. All chooser work remains local on
+fresh Direct then Stock using `/work/oct24-choose-return-arm`: all six Direct
+models pass, Stock pending. Whole analysis 29830 passes 368 sources; full
+150-test regression 29287 passes in 1359.26 seconds. Neither covers box changes.
+Logs `/work/oct24-choose-*`. Stock and CI acceptance remain open. All chooser work remains local on
 `m8-choose-controls`; no subsequent push or M8 completion is claimed.
 
 ## Principles
