@@ -20,6 +20,15 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Text/image batch submitted as `9683fd6a` in draft PR #11:
+https://github.com/maxmixalex/hpclang/pull/11 . Source audit matches 4,581 tracked
+files against the verified text/image mirror except the two documented tracking
+files; pinned format, lint and strict docs pass. Existing 143-test/357-source,
+SDK 517-output and all-six Direct/Stock gates apply to the unchanged sources.
+Previous cb7c7bae CI was inspected and accepted before this push; no fresh
+PR #11 CI or merge-main CI was polled. Recheck 9683fd6a before the next push.
+The following local status update is intentionally not a second immediate push.
+
 PR #10 is accepted and merged as `ed5f470d` at submitted head `cb7c7bae`.
 Previous-push review confirms all eleven listed push/PR runs pass across
 Quality, Core, Runtime, Storage, Objects and Gallery. Core has 18 successful
