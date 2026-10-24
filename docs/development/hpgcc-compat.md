@@ -1441,3 +1441,27 @@ recreates controls, and captures four 60% orientations for independent complete
 pixel and LCD-mode checks. Existing keyboard/page-exchange and settled-return
 gates still pass. Repeat/blink timing remains covered by host tests, not this
 native tap phase. Stock execution is running; CI acceptance remains pending.
+
+### Text label and entry adapter (isolated following batch)
+
+`wintext.h` supplies labels and editable byte strings with historical arrow-key
+focus/cursor behavior, backspace, left-shift delete-at-cursor, right-shift clear,
+and blinking cursor glyph 28. The entry keyboard limit is distinct from storage
+capacity: programmatic replacement may exceed the limit without increasing it
+or automatically repacking. Borrowed mutable strings may be shortened in place;
+use the setter for growth. Aliased replacement and allocation failure preserve
+valid ownership and cursor bounds. Null pointers, wrong control types, invalid limits and dimension
+overflow use the window error latch.
+
+Sanitizer tests cover editing, focus, allocation failures, aliasing and mutable
+buffer shortening. Production HPG/custom-font pixel tests check glyphs, cursor
+replacement and clearing after deletion. The optional source comparison compiles
+all three original text source files (four public entry points) from supplied
+HPGCC 1.1/2.0 archives over the same production window foundation. Both match
+13,837 trace lines, including four entry limits, multiline labels, high bytes,
+programmatic over-limit replacement and 512 deterministic editing actions.
+Both sides use unsigned char to match the ARM byte convention. A deliberately
+wrong shifted-backspace precedence is rejected. These checks exclude original
+undefined allocation/alias/mutable-cursor cases, tested separately as repairs.
+SDK and native acceptance remain open; this work is isolated on
+`m8-widget-controls`, outside the frozen progress/component batch.
