@@ -20,6 +20,28 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Box public follow-up implements all seven APIs, explicit weighted grid layout,
+NULL placeholders and nested borrowed children. The widget foundation walks
+groups outside callbacks, rolls back failed installation, rejects cycles and
+destruction of bound children, and detaches bindings when a box is destroyed.
+Dynamic membership installs/removes the affected subtree. Layout measures and
+validates all rectangles before publishing any changes. Ten related ASan/UBSan
+targets pass, including dynamic failure rollback, overflow and retained controls;
+ARM compile/analysis pass. SDK 69480 exits 0: 517 reproducible outputs, C/C++,
+six launchers, three Aplet variants and notebooks pass. Logs `/work/oct24-box-*`.
+Historical box source comparison and native group/pixel acceptance remain open.
+Two initial test-build errors (unused helper, missing limits header) are retained.
+
+Chooser Stock 51380 terminated with HP39g+ runtime failure 0x46417805 after
+all chooser frames. Saved SRAM has errno=ENOMEM while both final display pages
+are already monochrome, proving the final mode switch succeeded. Fixture fix
+`fc6d7d01` clears errno immediately before that checked operation. Original
+RAM/state/ELF/HPC remain in `/work/oct24-choose-stock-hp39gplus-failure-state`.
+Process 69407 runs fresh six-model Direct followed by Stock on a separate
+return-check artifact; no replay acceptance yet. Chooser whole analysis 29830
+passes 368 sources; regression 29287 remains live. Checkbox Stock 73812 passes
+all six models. These results do not cover the new box implementation.
+
 Independent `m8-box-controls` work adds a checked internal grid-axis allocator
 and alignment helper. It preserves padding-first deficits and historical signed
 rounding, handles fixed zero-weight cells without division by zero, and computes

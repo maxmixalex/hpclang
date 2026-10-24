@@ -4,6 +4,17 @@ This page records the M7 source-compatibility inventory. Historical names are in
 
 ## Sources and method
 
+Local box adapter follow-up supplies all seven `winbox.h` functions, explicit
+grid layout and nested grouping. Children are borrowed with one parent; cycles
+and bound-child destruction are rejected. Group installation is iterative and
+rolls back on failure, removal uses reverse order, and destroying a detached
+box releases bindings without destroying children. Dynamic membership changes
+on installed boxes take effect immediately. Layout validates all geometry before
+publication, preserving existing positions on failure. Placeholder entries have
+no lifecycle, fixing the original infinite loop. Ten related sanitizer targets,
+ARM compile/analysis and the full relocated SDK pass (69480 exit 0, 517 outputs).
+Historical source-equivalence and native group/pixel acceptance remain open.
+
 Box follow-up source review (2026-10-24): the original grid layout divides by
 the remaining weight even when it is zero and fails to advance past NULL
 placeholder children. The local internal axis helper handles zero weights,

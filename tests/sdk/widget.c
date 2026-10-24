@@ -5,6 +5,7 @@
 #include <winsoftmenu.h>
 #include <wincheckbox.h>
 #include <winchoose.h>
+#include <winbox.h>
 #include <string.h>
 
 static int paint(void *event, void *data)
@@ -123,6 +124,25 @@ int main(void)
     win_widget_destroy(choice);
     win_remove_widget(menu);
     win_widget_destroy(menu);
-    return !focused || !destroyed || !correct || !checked || !chosen || value != 3.5 ||
+    win_widget_t *group = win_box_new_padding(2, 2), *nested = win_box_new();
+    win_widget_t *group_label = win_text_new_label(action), *group_check = win_checkbox_new(action);
+    if (!group || !nested || !group_label || !group_check)
+        return 8;
+    win_box_add(group, nested);
+    win_box_add_at(nested, group_label, 0, 0);
+    win_box_add_with(nested, group_check, 0, 1, 1, 1, -1, -1, WIN_BOX_FILL, WIN_BOX_CENTER);
+    win_widget_pack(nested);
+    win_widget_pack(group);
+    win_box_layout(group);
+    win_box_layout(nested);
+    win_add_widget(group);
+    int grouped = win_widget_has_focus(group_check);
+    win_remove_widget(group);
+    win_box_remove(group, nested);
+    win_widget_destroy(group);
+    win_widget_destroy(nested);
+    win_widget_destroy(group_label);
+    win_widget_destroy(group_check);
+    return !focused || !destroyed || !correct || !checked || !chosen || !grouped || value != 3.5 ||
            hpclang_win_error();
 }

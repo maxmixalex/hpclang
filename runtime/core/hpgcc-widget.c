@@ -6,6 +6,7 @@
 
 struct win_widget
 {
+    win_widget_t *parent, *first_child, *last_child, *previous_sibling, *next_sibling;
     struct hpclang_win_focus_node node;
     void (*install)(win_widget_t *), (*deinstall)(win_widget_t *), (*destroy)(win_widget_t *);
     void (*preferred_size)(win_widget_t *, int *, int *);
@@ -15,6 +16,7 @@ struct win_widget
     int x, y, width, height;
     unsigned char foreground, background, transparent;
 };
+static unsigned group_busy;
 static int valid(win_widget_t *widget)
 {
     win_init();
@@ -125,33 +127,128 @@ void win_widget_destroy(win_widget_t *widget)
 {
     if (!valid(widget))
         return;
-    if (widget->node.owner || hpclang_win_dispatch_active()) {
+    if (widget->node.owner || widget->parent || group_busy || hpclang_win_dispatch_active()) {
         hpclang_win_fail(EBUSY);
         return;
     }
+    while (widget->first_child) {
+        win_widget_t *child = widget->first_child;
+        widget->first_child = child->next_sibling;
+        child->parent = child->previous_sibling = child->next_sibling = NULL;
+    }
+    widget->last_child = NULL;
     call(widget, widget->destroy);
     free(widget);
+}
+static win_widget_t *next_in_group(win_widget_t *root, win_widget_t *node)
+{
+    if (node->first_child)
+        return node->first_child;
+    while (node != root) {
+        if (node->next_sibling)
+            return node->next_sibling;
+        node = node->parent;
+    }
+    return NULL;
+}
+static win_widget_t *last_in_group(win_widget_t *node)
+{
+    while (node->last_child)
+        node = node->last_child;
+    return node;
+}
+static win_widget_t *previous_in_group(win_widget_t *root, win_widget_t *node)
+{
+    if (node == root)
+        return NULL;
+    return node->previous_sibling ? last_in_group(node->previous_sibling) : node->parent;
+}
+int hpclang_win_widget_bind(win_widget_t *parent, win_widget_t *child)
+{
+    if (!valid(parent) || !valid(child))
+        return -1;
+    if (group_busy || hpclang_win_widget_callbacks || child->parent || child->node.owner)
+        return hpclang_win_fail(EBUSY);
+    for (win_widget_t *ancestor = parent; ancestor; ancestor = ancestor->parent)
+        if (ancestor == child)
+            return hpclang_win_fail(EINVAL);
+    child->parent = parent;
+    child->previous_sibling = parent->last_child;
+    if (parent->last_child)
+        parent->last_child->next_sibling = child;
+    else
+        parent->first_child = child;
+    parent->last_child = child;
+    return 0;
+}
+int hpclang_win_widget_unbind(win_widget_t *parent, win_widget_t *child)
+{
+    if (!valid(parent) || !valid(child))
+        return -1;
+    if (group_busy || hpclang_win_widget_callbacks || child->node.owner)
+        return hpclang_win_fail(EBUSY);
+    if (child->parent != parent)
+        return hpclang_win_fail(EINVAL);
+    if (child->previous_sibling)
+        child->previous_sibling->next_sibling = child->next_sibling;
+    else
+        parent->first_child = child->next_sibling;
+    if (child->next_sibling)
+        child->next_sibling->previous_sibling = child->previous_sibling;
+    else
+        parent->last_child = child->previous_sibling;
+    child->parent = child->previous_sibling = child->next_sibling = NULL;
+    return 0;
 }
 void win_add_widget(win_widget_t *widget)
 {
     if (!valid(widget) || hpclang_win_error())
         return;
-    if (hpclang_win_widget_callbacks) {
+    if (group_busy || hpclang_win_widget_callbacks) {
         hpclang_win_fail(EBUSY);
         return;
     }
     hpclang_win_widgets.repaint = repaint;
-    if (hpclang_win_focus_add(&hpclang_win_widgets, &widget->node))
-        hpclang_win_fail(errno);
-}
-void win_remove_widget(win_widget_t *widget)
-{
-    if (hpclang_win_widget_callbacks) {
+    if (widget->parent && !widget->parent->node.owner) {
         hpclang_win_fail(EBUSY);
         return;
     }
-    if (valid(widget) && hpclang_win_focus_remove(&hpclang_win_widgets, &widget->node))
-        hpclang_win_fail(errno);
+    for (win_widget_t *node = widget; node; node = next_in_group(widget, node))
+        if (node->node.owner) {
+            hpclang_win_fail(EEXIST);
+            return;
+        }
+    ++group_busy;
+    win_widget_t *last = NULL;
+    for (win_widget_t *node = widget; node; node = next_in_group(widget, node)) {
+        if (hpclang_win_focus_add(&hpclang_win_widgets, &node->node)) {
+            hpclang_win_fail(errno);
+            break;
+        }
+        last = node;
+        if (hpclang_win_error())
+            break;
+    }
+    if (hpclang_win_error())
+        while (last) {
+            hpclang_win_focus_remove(&hpclang_win_widgets, &last->node);
+            last = previous_in_group(widget, last);
+        }
+    --group_busy;
+}
+void win_remove_widget(win_widget_t *widget)
+{
+    if (group_busy || hpclang_win_widget_callbacks) {
+        hpclang_win_fail(EBUSY);
+        return;
+    }
+    if (!valid(widget))
+        return;
+    ++group_busy;
+    for (win_widget_t *node = last_in_group(widget); node; node = previous_in_group(widget, node))
+        if (hpclang_win_focus_remove(&hpclang_win_widgets, &node->node))
+            hpclang_win_fail(errno);
+    --group_busy;
 }
 void win_focus_next(void)
 {
@@ -211,6 +308,16 @@ void win_widget_set_location(win_widget_t *widget, int x, int y)
     if (valid(widget) && geometry(x, y, widget->width, widget->height)) {
         widget->x = x;
         widget->y = y;
+        win_repaint();
+    }
+}
+void hpclang_win_widget_geometry(win_widget_t *widget, int x, int y, int width, int height)
+{
+    if (valid(widget) && geometry(x, y, width, height)) {
+        widget->x = x;
+        widget->y = y;
+        widget->width = width;
+        widget->height = height;
         win_repaint();
     }
 }

@@ -590,6 +590,9 @@ int main(void)
         failure = failure ? failure : 16;
     if (!failure && (choose_check(0) || choose_check(1)))
         failure = failure ? failure : 17;
+    /* Successful allocations may retain errno from an internal failed growth
+     * attempt. Attribute errors to this mode switch, not prior successful work. */
+    errno = 0;
     hpg_set_mode_mono(1);
     hpg_clip_reset(NULL);
     if (errno || hpclang_time_read_us(&start))

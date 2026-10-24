@@ -916,3 +916,8 @@ target_include_directories(test_win_choose_reference PRIVATE "${HPCLANG_ROOT}/ru
 hpclang_unit(win_box_axis test_win_box_axis.c "${HPCLANG_ROOT}/runtime/core/win-box-axis.c")
 target_include_directories(test_win_box_axis PRIVATE "${HPCLANG_ROOT}/runtime/core")
 target_compile_definitions(test_win_box_axis PRIVATE malloc=hpclang_test_malloc)
+
+hpclang_unit(win_box test_win_box.c ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-box.c" "${HPCLANG_ROOT}/runtime/core/win-box-axis.c")
+target_include_directories(test_win_box PRIVATE "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/include")
