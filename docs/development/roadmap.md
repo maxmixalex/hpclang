@@ -4862,6 +4862,26 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Updated pre-push CI investigation, 95348ce8: PR Objects 40068713236 fails
+  only Stock object-catalog/HP39g+ (job 120798037735); push Objects 40068703277
+  passes. Downloaded Kermit evidence proves completed HP39DIR.CUR/HP39DIR.000,
+  followed by unfinished HPGCC000.000 with no acknowledged progress for 90s.
+  The host gate fails before payload execution (PC 0x000044c4, no object phase),
+  rather than an object-runtime assertion. Logs/artifacts are retained under
+  host `research/ci-40068713236-{failed.log,catalog}`. Transport root cause is
+  unresolved; a passing companion run is not treated as a repair. Core push
+  40068703216 is running; Core PR/Runtime and one Gallery run still queue.
+  No new push, merge or overall CI acceptance.
+
+  Fixed window-key validation, 72b187cb: HP48gII Direct and HP50g Stock both
+  pass input, 44 status frames, page exchange, final pixels and settled return
+  (59175 exit 0). HP50g evidence is preserved in
+  `/work/oct24-win-settled-stock-hp50g-evidence`. Fixed HP39g+ Stock now runs
+  in 69002 using the candidate settled build. Original 32221 has failed both
+  HP39g+ and HP39gs at 0x46417806 and continues HP40gs; those failures remain
+  recorded, with HP39gs state also preserved. The fixed all-six matrix remains
+  incomplete. Do not restart either live process based on observation latency.
+
   Stock key-fixture failure and local correction (after 8db74b41): original
   process 32221 reports HP39g+ runtime failure 0x46417806 and continues HP39gs;
   completion of one target was not a pass. Saved SRAM resolves the historical

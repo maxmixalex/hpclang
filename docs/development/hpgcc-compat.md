@@ -788,7 +788,9 @@ fixture found an HP39g+ launch-boundary failure: the first poll also observed
 Stock's still-held Enter key. Saved RAM proves matrix bits 7/60 and two edges
 for the first requested Alpha. The test now announces payload entry, waits for
 launch-key release before installing observers, and retains the first failure
-code. Fixed native reruns remain pending; neither Stock matrix acceptance nor
+code. The fixed HP48gII Direct and HP50g Stock runs pass all input, status-frame,
+page-exchange and return checks (59175 exit 0); fixed HP39g+ Stock is running.
+Neither the complete Stock matrix acceptance nor
 shipped-example native execution is claimed complete. This is emulator GPIO evidence, not a physical-calculator test.
 
 The useful implementation path is an owned compatibility state/event layer
