@@ -4362,8 +4362,8 @@ below are retained.
   delayed processing, rate changes, stopped counters, reset-only and IRQ-only
   modes. The Python tool suite, Ruff/format and patched emulator build pass.
   Six-model Direct System Services plus HP50g Stock regression is running on
-  session 65553 / PID 107813 using `/work/oct24-watchdog-x50ng`; HP39g+, HP39gs
-  and HP40gs pass already. These existing payloads test startup/return and
+  session 65553 / PID 107813 using `/work/oct24-watchdog-x50ng`; all six Direct
+  models now pass, and HP50g Stock is running. These existing payloads test startup/return and
   interference, not a new application watchdog backend. Guest watchdog lease,
   active IRQ timing and Stock availability tests remain required.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
