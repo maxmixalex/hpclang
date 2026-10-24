@@ -5016,6 +5016,12 @@ below are retained.
   143 sanitizers/357-source analysis/SDK/native results retain exact source
   coverage. Image Stock remains pending; no new push or fresh CI query.
 
+  Checkbox native follow-up `2927ab3b` passes all six Direct models (25391
+  exit 0): 32 GPIO edges per model, focus/CHK/rebind/unbind/removal checks and
+  independent complete selected/focus/label frames in both buffering modes.
+  Wrong focus pixel is rejected. Stock 73812 runs from its fixed checkbox
+  artifact; acceptance remains open. Local text/image merge is `161374d2`.
+
   Component batch pushed as `cb7c7bae` to `m8-flash-write`, draft PR #10.
   Includes custom widgets/focus and progress sliders; text/image/menu branches
   remain local follow-ups. Previous head 0a7c2d8d passed every push/PR workflow
