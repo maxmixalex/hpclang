@@ -920,6 +920,16 @@ retain their existing mask across prepare/change/commit. Host sanitizers and
 ARM build/analysis pass; the six-model System Services execution matrix is
 still pending. These changes do not themselves enable asynchronous playback.
 
+An internal paired playback engine now coordinates PWM2 audio and PWM4 deadline
+ownership, rolls back the alarm on tone-admission failure, and restores both
+resources on completion or cancellation. Shared-register sanitizer tests and
+ARM analysis pass. The native IRQ fixture starts a real PWM tone and checks
+restoration before foreground cleanup; all six Direct models pass with normal
+return and independent input pixels.
+Public KOS entry points, preemption and production IRQ/exit lifetime are still
+open, as is Stock deadline-channel availability. Emulator register/timing
+evidence does not establish audible output from physical hardware.
+
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
 - `sys_bcd2bin(value)` converts the low **two** nibbles. Its macro evaluates the

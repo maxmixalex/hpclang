@@ -3,13 +3,14 @@
 #include "clock-internal.h"
 #include "irq.h"
 #include "sound-alarm.h"
+#include "sound-playback.h"
 
 #define REG(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
 volatile uint32_t hpclang_e2e_irq_hits;
 static volatile unsigned irq_finished, irq_error;
 static uint64_t irq_deadline, irq_last_time;
-static struct hpclang_sound_alarm alarm;
+static struct hpclang_sound_playback playback;
 static uint32_t irq_stack[256] __attribute__((aligned(8)));
 static unsigned register_writes;
 void hpclang_e2e_irq_snapshot(struct hpclang_irq_bank *state);
@@ -29,6 +30,21 @@ static void write_reg(void *context, enum hpclang_sound_alarm_reg reg, uint32_t 
     REG(addresses[reg]) = value;
 }
 static const struct hpclang_sound_alarm_bus bus = {0, read_reg, write_reg};
+static const uintptr_t audio_addresses[] = {0x07600000, 0x07600004, 0x07600008, 0x07600024,
+                                            0x07600028, 0x0760002c, 0x07a00010, 0x07100008,
+                                            0x07100000, 0x07100010};
+static uint32_t audio_read(void *context, enum hpclang_sound_reg reg)
+{
+    (void)context;
+    return REG(audio_addresses[reg]);
+}
+static void audio_write(void *context, enum hpclang_sound_reg reg, uint32_t value)
+{
+    (void)context;
+    ++register_writes;
+    REG(audio_addresses[reg]) = value;
+}
+static const struct hpclang_sound_bus audio = {audio_read, audio_write, 0};
 
 /* Only the actual IRQ entry calls this. The foreground below executes no
  * clock or SDK calls until completion. Preserve the interrupted errno. */
@@ -39,11 +55,11 @@ void hpclang_e2e_irq_dispatch(void)
     ++hpclang_e2e_irq_hits;
     if (hpclang_time_read_us_masked(&now) || now < irq_last_time) {
         irq_error = 1;
-        hpclang_sound_alarm_release(&bus, &alarm);
+        hpclang_sound_playback_stop(&audio, &bus, &playback);
         irq_finished = 1;
     } else {
         irq_last_time = now;
-        int result = hpclang_sound_alarm_advance(&bus, &alarm, now, irq_deadline);
+        int result = hpclang_sound_playback_advance(&audio, &bus, &playback, now);
         if (result) {
             irq_error = result < 0;
             irq_finished = 1;
@@ -62,6 +78,9 @@ unsigned hpclang_e2e_irq_test(void)
     uint32_t mask = REG(0x07100008), mode = REG(0x07100004);
     uint32_t vector = REG(0x08000018), swi = REG(0x08000008);
     uint32_t source = REG(0x07100000);
+    uint32_t audio_before[7];
+    for (unsigned i = 0; i < 7; ++i)
+        audio_before[i] = REG(audio_addresses[i]);
     unsigned failure = 0;
     hpclang_e2e_irq_hits = 0;
     irq_finished = irq_error = 0;
@@ -74,20 +93,25 @@ unsigned hpclang_e2e_irq_test(void)
                     ((source | REG(0x07100010)) & 0x4000u);
     register_writes = 0;
     errno = 0;
-    if (hpclang_sound_alarm_acquire(&bus, &alarm, num, den, 20000)) {
-        failure = busy && errno == EBUSY && !register_writes && !alarm.owned ? 0 : 1;
-        hpclang_irq_restore(cpsr);
-        return failure;
-    }
     if (hpclang_time_read_us_masked(&irq_last_time) || irq_last_time > UINT64_MAX - 100000) {
-        hpclang_sound_alarm_release(&bus, &alarm);
         hpclang_irq_restore(cpsr);
         return 7;
     }
     irq_deadline = irq_last_time + 100000;
+    if (hpclang_sound_playback_begin(&audio, &bus, &playback, num, den, 880, irq_last_time,
+                                     irq_deadline)) {
+        failure = busy && errno == EBUSY && !register_writes && !playback.alarm.owned &&
+                          !playback.tone.owned
+                      ? 0
+                      : 1;
+        hpclang_irq_restore(cpsr);
+        return failure;
+    }
+    if ((REG(0x07600008) & 0xf000) != 0x9000 || (REG(0x07a00010) & 0x30) != 0x20)
+        failure = 9;
     /* Force an intermediate interrupt before the actual deadline. */
-    if (hpclang_sound_alarm_rearm(&bus, &alarm, 1000)) {
-        hpclang_sound_alarm_release(&bus, &alarm);
+    if (hpclang_sound_alarm_rearm(&bus, &playback.alarm, 1000)) {
+        hpclang_sound_playback_stop(&audio, &bus, &playback);
         hpclang_irq_restore(cpsr);
         return 8;
     }
@@ -111,7 +135,7 @@ unsigned hpclang_e2e_irq_test(void)
         __asm__ volatile("nop");
     hpclang_irq_save_disable();
     if (hpclang_e2e_irq_hits < 2 || !irq_finished || irq_error || irq_last_time < irq_deadline ||
-        alarm.owned || errno != EDOM)
+        playback.alarm.owned || playback.tone.owned || errno != EDOM)
         failure = 3;
     REG(0x07100008) = UINT32_MAX;
     REG(0x08000018) = vector;
@@ -121,7 +145,11 @@ unsigned hpclang_e2e_irq_test(void)
         failure = 4;
     if (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi)
         failure = 5;
-    hpclang_sound_alarm_release(&bus, &alarm);
+    /* Check audio restoration before foreground cleanup could repair it. */
+    for (unsigned i = 0; i < 7; ++i)
+        if (REG(audio_addresses[i]) != audio_before[i])
+            failure = 10;
+    hpclang_sound_playback_stop(&audio, &bus, &playback);
     REG(0x07100004) = mode;
     REG(0x07100008) = mask;
     if ((REG(0x07100000) & source) != source || REG(0x07100004) != mode ||

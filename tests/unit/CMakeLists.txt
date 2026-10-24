@@ -346,6 +346,11 @@ hpclang_unit(sound test_sound.c "${HPCLANG_ROOT}/runtime/core/sound-engine.c")
 target_include_directories(test_sound PRIVATE "${HPCLANG_ROOT}/runtime/core")
 hpclang_unit(sound_alarm test_sound_alarm.c "${HPCLANG_ROOT}/runtime/core/sound-alarm.c")
 target_include_directories(test_sound_alarm PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(sound_playback test_sound_playback.c
+    "${HPCLANG_ROOT}/runtime/core/sound-playback.c"
+    "${HPCLANG_ROOT}/runtime/core/sound-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/sound-alarm.c")
+target_include_directories(test_sound_playback PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(time test_time.c "${HPCLANG_ROOT}/runtime/core/time-math.c")
 target_include_directories(test_time PRIVATE "${HPCLANG_ROOT}/runtime/core")

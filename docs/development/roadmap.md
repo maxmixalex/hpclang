@@ -4320,6 +4320,22 @@ below are retained.
   the tested artifact is `/work/oct24-irq-deadline-artifact`.
   This is native integration evidence, not yet the production sound dispatcher
   or autonomous audio-stop implementation.
+  The next local slice adds `sound-playback`, an internal paired PWM2 output /
+  PWM4 deadline owner. Alarm admission precedes tone admission; tone failure
+  restores the alarm, and completion/cancellation restores both resources.
+  Shared-register ASan/UBSan tests cover continued playback across early expiry,
+  64-bit deadlines, conflict rollback, stopped-counter/mux/pin restoration,
+  double-start rejection and idempotent cancellation. The maintained real IRQ
+  fixture now starts an 880 Hz tone and advances this engine while foreground
+  code only spins; it compares the audio registers with their original values
+  before foreground cleanup can repair them. ARM build, static analysis and
+  all six Direct System Services runs pass, including independent pixels and
+  normal return. Session 76793 completes successfully using
+  `/work/oct24-irq-audio-artifact`. The combined sound, alarm, playback and real
+  clock-state host fixtures all pass ASan/UBSan.
+  This verifies configuration and autonomous restoration, not audible hardware
+  output. Public asynchronous entry points, production IRQ lifetime, preemption,
+  exit integration and a usable Stock deadline channel remain unfinished.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
