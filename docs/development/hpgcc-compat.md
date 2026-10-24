@@ -588,8 +588,53 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 | HPGCC2/3 `FS*` | bounded source adapter above owned FatFs storage | Adapter | M7.2d implemented; Storage #53 green |
 | Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e bounded application subset complete; Runtime #338 green; M7.3f public mutation implemented and accepted |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
-| `win*` widgets | future UI toolkit | Migration, adapter later | later |
+| `win*` widgets | Declarative UI; compatibility state/event bridge still required | Source review below; adapters remain open | later |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
+
+## Historical window adapter feasibility
+
+The 2026-10-24 review reads the retained HPGCC 1.1/39g distribution's
+`sources/win` headers and implementations (`/work/hpgcc39-review` locally).
+This is static source evidence for that version, not a four-generation or
+runtime compatibility claim. No `win*` compatibility header is installed yet.
+
+| Historical behavior and primary source | Existing service and required bridge |
+| --- | --- |
+| `common/win_post_event.c` snapshots the current handler chain and invokes it synchronously until a handler returns nonzero. `win_add_event_handler.c` orders higher priorities first and newer equal-priority handlers first. Changes to registration affect nested/future dispatch, not the copied outer chain. | UI actions are application messages, not this dispatcher. Preserve synchronous return values, nested dispatch and snapshot lifetimes in a separate compatibility event layer. Do not defer an event carrying borrowed stack data. |
+| `common/win_init.c` installs keyboard, repaint and timer generators on the idle event in that priority order. `win_event_loop.c` repeatedly dispatches idle until quit. | A compatibility loop can drive existing keyboard, UI and clock services, but must preserve ordering, callback consumption and quit behavior. Rendering must occur outside the declarative view's pure construction phase. |
+| `common/_win_timer_generator.c` invokes due timers from the idle handler. Periodic timers advance the previous deadline and may catch up repeatedly; delay timers schedule from the time after the callback. Nonzero callback results remove the timer. | Use monotonic time in foreground dispatch. The RTC coalescing adapter and asynchronous audio IRQ are not substitutes for these timer semantics. Define and test invalid intervals and callback-side cancellation before publishing adapters. |
+| `common/win_remove_widget.c` deinstalls handlers and updates focus; `win_widget_destroy.c` invokes destruction and frees memory separately. | Retained compatibility objects must own state and stable UI keys, with distinct install/remove/destroy operations. Removing a declarative node alone does not satisfy old pointer ownership or an in-progress event snapshot. |
+| `text/win_text_new.c` maintains editable byte text, cursor state and a blink timer; `win_text_set_text.c` copies replacement text. `checkbox` owns selection and updates menu bindings. | Labels, controlled `hpclang_ui_text_input` and `hpclang_ui_toggle` provide rendering/input foundations. A bridge must accept proposals into its own state before redeclaration, translate legacy byte text explicitly and preserve getter lifetimes. Direct aliases would change who owns the model. |
+| `choose/win_choose_set_choice.c` uses a past-end selection for NULL or an unmatched choice; `win_choose_get_choice.c` then returns NULL. `winsoftmenu.h` provides up to 30 entries with enabled states and associated events. | Compose selection/menu views from existing controls while retaining no-selection, dynamic option identity, menu paging and model-specific function-key routing. A fixed six-button view is insufficient. |
+| `progress/win_progress_set_value.c` clamps a double to its range. `win_progress_new.c` implements four orientations, slider key-repeat, focus changes at limits and change events. | The canvas callback can render a progress view, but the compatibility layer must retain numeric state, orientation, repeat timing and focus behavior. A painted rectangle alone is not a slider adapter. |
+| `winbox.h` exposes positioned/spanning children and alignment; `winimg.h` combines an HPG pattern and image. | Compare legacy layout results with row/column/scroll composition, and preserve borrowed image lifetimes and clipping through the canvas/surface backend. Do not silently discard positioning or spans. |
+
+Header/source discrepancies also need explicit treatment: this distribution's
+`wincheckbox.h` names `win_text_get_text` and `win_text_is_selected` in its
+checkbox declarations. A declaration inventory must be checked against actual
+exported implementations and application use before generating aliases.
+
+Source fingerprints for the dispatch/timing findings (SHA-256):
+
+```text
+common/win_post_event.c
+19399f4eb254d1175eedc230a4f786dfe1e27a8b9013eba91ed95f000b9e06d9
+common/win_add_event_handler.c
+be05eb8b7ecc671078ad2a2cb0547433c319a55d9f74235098e1727d9c30331a
+common/_win_timer_generator.c
+04033bf94a0c72d7df31d10ee0c39da56cd7c313c01cbe933a5436d77488c0cf
+```
+
+The useful implementation path is an owned compatibility state/event layer
+above the accepted UI, beginning with dispatch and widget lifetimes, then
+text/checkbox and the more stateful controls. These remain retained adapter
+work, not approved omissions. Before acceptance, compare the other historical
+versions and run original widget applications with documented edits. Required
+tests include priority/tie ordering, nested dispatch during removal, borrowed
+payload lifetime, timer catch-up versus delay, removal during callbacks,
+focus/menu transitions, exhausted storage and exit cleanup. Cross-model UI
+pixels and Stock return must follow; passing current clean-UI tests alone is
+insufficient evidence for historical semantics.
 
 ## Design consequence
 

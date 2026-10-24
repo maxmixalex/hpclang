@@ -17,8 +17,8 @@ Do not put historical include directories before the installed headers.
 | KOS filesystem handles or raw SD/controller calls | Move file operations to standard C streams and the services in `hpclang/storage.h`. Preserve operation failures and removable-media handling. |
 | Raw Saturn addresses, `sat_peek`-style traversal or retained pointers into native objects | Use independent snapshots from `hpclang/object.h` and logical handles from `hpclang/object-store.h`; use `hpclang/port.h` for native port objects. |
 | Direct LCD addresses, packed framebuffer writes, MMU changes or interrupt handlers | Express drawing through `hpclang/display.h` surfaces and fonts, and timing through `hpclang/time.h` / `timer.h`. A raw hardware algorithm requires a separate design review. |
-| `win*` widgets | Port the view and event logic to the [declarative UI](declarative-ui.md); a compatible historical widget family is not provided. |
-| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags; locally verified on all six Direct models, Stock/CI acceptance pending. A true completion query can still mean a nonwaiting tone is playing. See the [mode contract](../development/hpgcc-compat.md). |
+| `win*` widgets | Port the view and event logic to the [declarative UI](declarative-ui.md); compatibility adapters remain in development. Preserve synchronous event delivery, callback lifetimes and widget-owned state; the [source review](../development/hpgcc-compat.md#historical-window-adapter-feasibility) explains the required bridge. |
+| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags; mode tests pass locally on all six Direct/Stock models. Full KOS-entry exit validation and CI acceptance remain pending. A true completion query can still mean a nonwaiting tone is playing. See the [mode contract](../development/hpgcc-compat.md). |
 
 Compile with the normal SDK target options and resolve diagnostics one family
 at a time. Do not suppress undeclared functions or cast away mismatched pointer

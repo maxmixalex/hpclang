@@ -4562,6 +4562,11 @@ below are retained.
   completed: all 126 targets pass in 1,403.11 seconds, with the terminal CTest
   log ending at 2026-10-24 03:49 UTC. This suite covers the audio baseline;
   the later C++ storage owners have their separate focused sanitizer evidence.
+  KOS mode validation subsequently completed on session 98967 (exit 0): all six
+  Direct and all six Stock targets pass, including the independent physical
+  input/pixel verifier. Logs are `/work/oct24-kos-sound-{direct,stock}-*.log`.
+  The full KOS-entry normal/immediate-exit matrix remains live on session 21588;
+  passing the mode matrix does not close that separate cleanup requirement.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
@@ -4583,6 +4588,14 @@ below are retained.
 - [ ] Evaluate useful historical `win*` adapters on the accepted UI core where
   semantics fit. Keep raw KOS/Saturn/MMU migration guidance explicit, and
   preserve unsupported-context errors rather than supplying silent stubs.
+  The 2026-10-24 first source review covers HPGCC 1.1/39g's actual window
+  implementation: synchronous snapshot dispatch, priority/tie order, idle-driven
+  timer catch-up/delay, separate widget removal/destruction and stateful control
+  behavior. The [compatibility review](hpgcc-compat.md#historical-window-adapter-feasibility)
+  maps each family onto the accepted UI and records source hashes, gaps and
+  concrete acceptance cases. An owned state/event bridge is needed; no family
+  is silently omitted or declared compatible. Other versions and original
+  application execution remain open; this is static evidence only.
 
 #### M8.5 — Modern C++ and migration
 
