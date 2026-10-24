@@ -20,6 +20,26 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Previous-push CI review of exact head `9683fd6a` finds both Quality runs
+(40086239513/40086235523) and Storage push 40086235524 successful; the other
+seven listed runs are queued. This is not CI acceptance. Before another push,
+recheck that submission and inspect any failed-job logs; do not poll fresh CI.
+Recent failed logs were reread: 40068713236 is HP39g+ Stock catalog transfer
+`host-gate-failed`; 40061641253 includes HP40gs audio restoration 0x46417b0a
+and transfer failure. Those investigations remain open. Core 40061641258 and
+Objects 40061641226 contain the previously diagnosed Flash-busy exception-fetch
+crash repaired by 4c87835f and accepted in PR #10. Later passes do not establish
+a repair for the separate intermittent transfer/audio failures.
+
+Local window integration `6edfcb18` combines the maintained split fixtures,
+box guard and original application with the primary branch. Source audit matches
+4,613 tracked files; installed SDK passes C/C++, six launchers, three HP39 Aplet
+families, notebooks and 517 byte-identical outputs (56378 exit 0). The SDK C
+widget client now exercises `win.h` with `wincore.h`. Pinned format/lint/strict
+docs pass after normalizing 93 mirrored Python files from CRLF to LF; no
+unrelated source formatting changes. Logs: `/work/oct24-window-release-*`.
+This integration remains local; remote CI acceptance is open.
+
 Text/image batch submitted as `9683fd6a` in draft PR #11:
 https://github.com/maxmixalex/hpclang/pull/11 . Source audit matches 4,581 tracked
 files against the verified text/image mirror except the two documented tracking
@@ -46,14 +66,15 @@ calls, preserving the 80-line layout. All six Direct models pass 30 GPIO changes
 (29 delivered before EXIT), 15 captured application frames, slider/checkbox
 pixels and settled return. Original fixed geometry is independently rejected
 at (21,43) on 64 lines. Two ARM translation-unit analyses pass; HP39g+/HP50g
-screenshots were inspected. Stock 2266 now passes HP39g+ and continues. Logs,
+screenshots were inspected. All six Stock models now pass (2266 exit 0). Logs,
 source hashes, migration diff and native artifact: `/work/oct24-simple-*`.
 Documentation follow-up `5ffeda4e` reconciles implemented window APIs and removes
 unshipped-development-document links from the installed migration guide.
 Strict docs and fresh installed guide equality/local-link checks pass.
 
-Split window Stock 51945/76541 both pass HP39g+ and HP39gs, continuing with
-HP40gs and the classic models. No all-six Stock acceptance is claimed yet.
+Split window processes 51945/76541 both exit 0: all six Direct and all six
+Stock models pass for each group, including actual buffering, independent
+pixels and settled return. These are local results; CI acceptance stays open.
 
 Window follow-up `cfa7c751` keeps all native checks while splitting the
 universal payload into foundation (63,648 bytes) and dialogs (65,488 bytes),
@@ -62,7 +83,7 @@ now checks actual surface levels and back-page exchange. Runtime CI includes
 both suites on all six models in both contexts; eight plan tests pass. Six
 Direct models pass for each group, and maintained HPC/raw launchers match the
 running artifacts byte-for-byte. Both ARM fixture analyses, verifier dispatch
-and missing-frame negative checks pass. Stock 51945/76541 continue in isolated
+and missing-frame negative checks pass. Stock 51945/76541 complete in isolated
 `/work/oct24-window-split{1,2}-src`; logs `/work/oct24-window-split*`. No push.
 
 Diagnosis is now concrete: `/work/oct24-mode-diag-*` records ENOMEM (12),

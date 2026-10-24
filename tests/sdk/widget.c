@@ -1,11 +1,5 @@
+#include <win.h>
 #include <wincore.h>
-#include <winprogress.h>
-#include <wintext.h>
-#include <winimg.h>
-#include <winsoftmenu.h>
-#include <wincheckbox.h>
-#include <winchoose.h>
-#include <winbox.h>
 #include <string.h>
 
 static int paint(void *event, void *data)

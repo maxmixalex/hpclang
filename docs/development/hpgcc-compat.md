@@ -48,8 +48,8 @@ unmigrated original app runs successfully but is rejected by the 64-line pixel
 gate at (21,43), proving that the layout check detects the old geometry.
 Both instrumented ARM translation units pass analysis. Evidence is retained in
 `/work/oct24-simple-{original-both,responsive,original-native}` and
-`/work/oct24-simple-{direct,stock}-*`. Stock process 2266 is still running;
-Stock acceptance and broader M8 application/release acceptance remain open.
+`/work/oct24-simple-{direct,stock}-*`. All six Stock models also pass
+(2266 exit 0). Broader M8 application/release and CI acceptance remain open.
 
 ### Current window validation follow-up
 
@@ -78,8 +78,11 @@ Payloads are 63,648 and 65,488 bytes (16 code pages each), compared with the
 this is a fixture budget, not a general application memory guarantee. All six
 Direct models pass for both groups. HPC files and all six raw launchers match
 the maintained builds byte-for-byte. Eight planning tests, both ARM analysis
-configurations, verifier dispatch and missing-frame rejection pass. Stock
-processes 51945/76541 continue; no Stock or CI acceptance is claimed yet.
+configurations, verifier dispatch and missing-frame rejection pass. Both Stock
+processes 51945/76541 exit 0 with all six models passing for each group.
+Integrated SDK validation also passes (517 byte-identical outputs), including
+the C widget client using `win.h` and `wincore.h`. These are local results;
+CI acceptance remains open.
 
 The earlier component snapshots below retain their original validation stage.
 
