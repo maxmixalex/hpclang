@@ -98,6 +98,12 @@ hpclang_unit(win_text test_win_text.c ${win_adapter_sources}
 target_include_directories(test_win_text PRIVATE "${HPCLANG_ROOT}/runtime/core"
     "${HPCLANG_ROOT}/include")
 target_compile_definitions(test_win_text PRIVATE malloc=hpclang_test_malloc)
+hpclang_unit(win_text_reference "${HPCLANG_ROOT}/tests/compat/win-text.c" ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-text.c")
+target_include_directories(test_win_text_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+target_compile_options(test_win_text_reference PRIVATE -funsigned-char)
 hpclang_unit(win_widget_reference "${HPCLANG_ROOT}/tests/compat/win-widgets.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
     "${HPCLANG_ROOT}/runtime/core/win-focus.c")
@@ -267,6 +273,7 @@ hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-text.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-progress.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
     "${HPCLANG_ROOT}/runtime/core/win-focus.c"
