@@ -20,6 +20,21 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Validated native allocation observer `3b4e5e69` (local) adds opt-in immutable
+allocation reports alongside unchanged pool reports. It bounds reads to SRAM,
+checks allocated flags, size/footer agreement, reciprocal list links and page
+containment/uniqueness, then separates usable bytes, 20-byte metadata and mapped
+pages. Two focused ASan/UBSan CTest targets pass, including invalid/free blocks,
+overflow/bounds, corrupted links/footer, overlapping/duplicate pages, no-block
+reports and immutable output. Formatting, Ruff and strict docs pass.
+The stricter HP39g+/HP50g native sequence runs as 76058 in independent
+`/work/oct24-native-accounting-*`; no native acceptance yet. Raw observation
+82387 completed successfully: both HP39g+ checkpoints have pointer 0x080053ac,
+6,144-byte extent and flags 0x2102, outside all 36 mapped pool pages. UI pixels,
+stack/heap/timing, pool stability and Stock return pass. This raw capture does
+not contain the distant footer or reciprocal links; no full block budget or
+whole-system peak claim follows from it. No push or milestone closure.
+
 Native allocator ROM audit (local): all six retained images share the 344-byte
 allocation body, except four PC-relative literal displacements in HP39gs. The
 free-path size/footer validation prefix also matches; HP39gs free is separately
@@ -29,15 +44,15 @@ validated live block therefore occupies recorded extent + 20 bytes; extent is
 not necessarily original request size. Firmware addresses and limits are in
 sdk-design.md; script `research/oct24-native-allocator-audit.py` and report
 `/work/oct24-native-allocator-code.json` retain image/code hashes and comparisons.
-Strict docs pass. This is static evidence only. HP39g+ observation 82387 remains
-live without a captured checkpoint; do not restart or infer live allocation size.
+Strict docs pass. This is static evidence only; the later raw capture and
+validated observer status above supersede its then-pending observation status.
 
 Native-allocation accounting experiment (M8.2/M8.3/M8.6, local): the existing
 six-model mapped-pool reports do not establish native allocator sizes. A separate
 read-only emulator probe captures 256 bytes around the recorded native OS block
 at each UI memory checkpoint, preserving the unchanged application/launcher and
-existing UI/pool/return gates. HP39g+ process 82387 is running; no capture result
-or allocator interpretation is accepted yet. Script:
+existing UI/pool/return gates. HP39g+ process 82387 has now completed; its raw
+capture result and remaining validation limits are recorded above. Script:
 `research/oct24-native-allocation-observe.py`; isolated source/emulator/logs:
 `/work/oct24-native-allocation-*`. Setup-only failures (missing observer header,
 headless asset-copy links and RUNNER_TEMP) were corrected before guest execution.
