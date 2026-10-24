@@ -20,6 +20,20 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+M8.5 Port iterator owner (local worktree `m8-port-cpp`): new allocation-free
+`hpclang::owned_port_iterator` preserves errno on cleanup and follows unique_ptr
+move/adopt/release semantics. The real C Port fixture plus C++17 ASan/UBSan
+passes move replacement, failed-open preservation, original-mapping loss,
+independent snapshot enumeration and destructor cleanup. Strict docs pass.
+The installed object-cpp example and Object Basics native fixture now consume
+the owner; the new native fixture is not built or executed yet. SDK check
+session 69651 exits 1 (child exit 120), followed by container-wide I/O errors
+including /work and /bin/cat. Host C: has zero free bytes; Docker subsequently
+returns Bad Gateway. This is an environment failure, not SDK/native acceptance.
+Implementation remains local, no push. Resume SDK/ARM/native verification after
+recovering disk capacity; do not discard prior emulator evidence to make room.
+Evidence: `/work/oct24-port-cpp-{check,sdk}.log`; host source stays on D:.
+
 Native allocation and SDK memory guide submitted as `b64b68ea` in draft
 [PR #13](https://github.com/maxmixalex/hpclang/pull/13), stacked on PR #12 via
 `m8-window-delivery`. The delivery merge changes only roadmap relative to

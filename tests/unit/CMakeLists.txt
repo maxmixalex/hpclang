@@ -676,6 +676,7 @@ target_compile_options(test_object_store PRIVATE
 
 hpclang_unit(port
     test_port.c
+    test_port_cpp.cpp
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
     "${HPCLANG_ROOT}/runtime/core/object-construct.c"
@@ -689,6 +690,9 @@ hpclang_unit(port
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_compile_features(test_port PRIVATE cxx_std_17)
+target_compile_options(test_port PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
 target_include_directories(test_port PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 

@@ -82,6 +82,27 @@ packages printable ASCII for its formatted result. Check both missing-glyph
 behavior and the intended calculator's display size. Legacy default fonts can
 use native or packaged fallback faces, so pixel-identical glyphs are not promised.
 
+## Enumerate native ports from C++
+
+`hpclang/port.hpp` provides `hpclang::owned_port_iterator`, an allocation-free
+owner for an independently allocated metadata snapshot. Open a candidate and
+swap after success when replacing an existing snapshot:
+
+```cpp
+hpclang::owned_port_iterator candidate{hpclang_port_iterator_open(port)};
+if (!candidate)
+    return -1;
+entries.swap(candidate); // entries is an owned_port_iterator; old snapshot closes hereafter.
+```
+
+Use `get()` with `hpclang_port_iterator_read`; initialize each entry's size and
+version as required by the C interface. Names remain raw calculator bytes.
+Moving transfers close responsibility, `release()` transfers it to the caller,
+and destruction/reset preserves errno. Ordinary scope exit closes the snapshot;
+`exit()` and `_Exit()` do not unwind automatic C++ objects. Opening Port 2 retains
+the C service's recovery behavior and can write recovery metadata. The owner
+does not change model/context availability or imply new port capabilities.
+
 ## Make ownership visible
 
 `ints`, `uints` and `sys_bcd2str` return borrowed formatting buffers. Copy a result

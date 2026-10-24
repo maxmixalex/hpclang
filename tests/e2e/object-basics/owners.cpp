@@ -1,6 +1,7 @@
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
 #include <hpclang/object-store.hpp>
+#include <hpclang/port.hpp>
 #include <cstdint>
 #include <utility>
 
@@ -22,6 +23,50 @@ static int digest(hpclang_object_store_iterator *iterator, std::uint32_t &hash)
     }
 }
 
+static int port_digest(hpclang_port_iterator *iterator, std::uint32_t &hash)
+{
+    hash = 2166136261u;
+    for (;;) {
+        hpclang_port_entry entry{};
+        entry.size = sizeof entry;
+        entry.version = HPCLANG_PORT_ENTRY_VERSION;
+        int result = hpclang_port_iterator_read(iterator, &entry);
+        if (result <= 0)
+            return result;
+        hash = (hash ^ entry.kind) * 16777619u;
+        hash = (hash ^ entry.library_number) * 16777619u;
+        hash = (hash ^ entry.name_length) * 16777619u;
+        for (uint32_t i = 0; i < entry.name_length; ++i)
+            hash = (hash ^ entry.name[i]) * 16777619u;
+    }
+}
+
+static int port_owners(bool live)
+{
+    hpclang::owned_port_iterator first{hpclang_port_iterator_open(0)};
+    if (!live)
+        return !first && errno == ENOSYS ? 0 : 1;
+    if (!first)
+        return 2;
+    hpclang::owned_port_iterator second{hpclang_port_iterator_open(0)};
+    if (!second)
+        return 3;
+    std::uint32_t expected, actual;
+    if (port_digest(first.get(), expected))
+        return 4;
+    first = std::move(second);
+    if (second || port_digest(first.get(), actual) || actual != expected)
+        return 5;
+    auto *released = first.release();
+    if (first)
+        return 6;
+    errno = EIO;
+    {
+        hpclang::owned_port_iterator adopted{released};
+    }
+    return errno == EIO ? 0 : 7;
+}
+
 extern "C" int hpclang_e2e_object_store_owners()
 {
     const auto *boot = hpclang_boot_info();
@@ -29,6 +74,9 @@ extern "C" int hpclang_e2e_object_store_owners()
         boot && boot->saturn_state &&
         (boot->model == HPCLANG_MODEL_HP48GII || boot->model == HPCLANG_MODEL_HP49GPLUS ||
          boot->model == HPCLANG_MODEL_HP50G);
+    int port_result = port_owners(live);
+    if (port_result)
+        return 0x80 + port_result;
     hpclang::owned_object_store home{hpclang_object_store_home()};
     if (!live)
         return !home && errno == ENOSYS ? 0 : 1;
