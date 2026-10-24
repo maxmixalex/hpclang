@@ -4895,6 +4895,20 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Independent following control batch: branch `m8-widget-controls` in
+  `research/m8-widget-controls`, commit `da17a3f9`, adds `wintext.h` labels and
+  editable fields. It uses `/work/oct24-controls-src` and separate sanitizer
+  build `/work/oct24-text-tests`; the current progress-batch source/artifact and
+  running processes are unchanged. Text storage capacity is separate from the
+  historical keyboard insertion limit; programmatic replacement may exceed the
+  limit without changing it. Tests pass insertion bounds, cursor movement,
+  three deletion modes, focus, cursor rendering-call positions, mutable-buffer
+  shortening, aliased replacement, and allocation-failure preservation/cleanup.
+  ARMv4T compile/analysis pass; logs `/work/oct24-text-{build,tests}.log`.
+  This is not yet integrated into m8-flash-write, its SDK, native matrix or CI.
+  Text original-source differential, real pixel verification and native/SDK
+  acceptance remain open. Later integrate this commit after the frozen batch.
+
   Pre-next-push CI inspection of 0a7c2d8d: both Quality (40073587007 /
   40073583118), Storage (40073587032 / 40073583077) and Objects (40073587006 /
   40073583192) runs pass. PR Gallery 40073586972 passes; push Gallery
@@ -4913,8 +4927,8 @@ below are retained.
   The mirror Git index includes all current files. Full format/lint pass, logs
   `/work/oct24-progress-{format,lint}.log`. Full 140-target ASan/UBSan regression
   runs in process 10200, logs `/work/oct24-progress-full-{build,tests}.log`.
-  Whole host/ARM analysis runs in process 37052, log
-  `/work/oct24-progress-analysis.log`. Neither full result is claimed yet.
+  Whole host/ARM analysis passes (37052 exit 0, 352 sources), log
+  `/work/oct24-progress-analysis.log`. Full sanitizer result remains pending.
   Stock process 9966 remains active; HP39g+ directory transfer completed and
   payload packet sends are progressing. Keep the same processes until terminal.
 
@@ -4934,9 +4948,9 @@ below are retained.
   lacked RUNNER_TEMP and exited before emulation; log retained at
   `/work/oct24-progress-stock-setup-failure.log`. Corrected six-model Stock
   process 9966 is live, with `/work/oct24-progress-stock-<model>.log` and matching
-  evidence directories. HP39g+ Stock now passes input, all 46 captured frames,
+  evidence directories. HP39g+/HP39gs Stock now pass input, all 46 captured frames,
   page exchange, final animation and settled return; the same process continues
-  with HP39gs. Remaining Stock models and CI acceptance are pending; local only.
+  with HP40gs. Remaining Stock models and CI acceptance are pending; local only.
 
   Progress-control source differential now passes both HPGCC 1.1/2.0:
   `tests/compat/check-win-progress.py` compiles all eight unchanged original
