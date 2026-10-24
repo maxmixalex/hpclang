@@ -4680,6 +4680,18 @@ The example is locally verified and has not yet been pushed for CI acceptance.
 
 #### M8.6 — Application and release acceptance
 
+Local release reproducibility follow-up (2026-10-24): the installed SDK gate
+now performs a second clean build from a copied external source directory.
+It compares generated font C/headers, HPC1 images, all six raw/wrapped launchers
+and memory reports, plus three HP39 Aplet envelopes and companions when enabled.
+The expanded run passes all 353 release-output byte comparisons, relocated
+C/C++ packaging, all six model-specific Notebook builds and the three HP39
+Aplet variants (session 77295, exit 0), logged in
+`/work/oct24-sdk-reproducible.log`. Ruff and strict docs pass. This is a same-toolchain,
+same-configuration check of maintained clients, excluding ELF/debug/build-system
+metadata; it does not close resource limits or the broader release milestone.
+CI acceptance has not yet been submitted.
+
 Current scenario acceptance (reconciled 2026-10-23): Runtime
 [39928737278](https://github.com/maxmixalex/hpclang/actions/runs/39928737278)
 at `5959159a`, merged through PR #7 as `2baebace`, passes Notebook on all six

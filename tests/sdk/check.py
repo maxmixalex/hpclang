@@ -146,12 +146,7 @@ endforeach()
 """.replace("TARGET_NAME", target)
                     )
         build = work / "build"
-        run(
-            "cmake",
-            "-S",
-            str(application),
-            "-B",
-            str(build),
+        configure_options = [
             "-DCMAKE_BUILD_TYPE=MinSizeRel",
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
             f"-DCMAKE_PREFIX_PATH={sdk}",
@@ -164,8 +159,8 @@ endforeach()
                 if args.aplet_tool
                 else []
             ),
-            env=env,
-        )
+        ]
+        run("cmake", "-S", str(application), "-B", str(build), *configure_options, env=env)
         run("cmake", "--build", str(build), "--parallel", "2", env=env)
         counter_args = (
             (build / "counter/declarative_ui_cpp-launchers.args").read_text().splitlines()
@@ -178,6 +173,7 @@ endforeach()
             for forbidden in (str(root), str(prefix)):
                 if forbidden in serialized:
                     raise AssertionError(f"Nonrelocatable build dependency: {forbidden}")
+        reproducible_outputs = []
         for name, output in (
             ("hello_c", build),
             ("hello_cpp", build),
@@ -192,6 +188,10 @@ endforeach()
             ("hpgcc_console", build / "console"),
             ("notebook", build / "notebook"),
         ):
+            reproducible_outputs.extend(
+                (output / filename).relative_to(build)
+                for filename in (f"{name}.hpc", f"{name}-launchers/memory.json")
+            )
             elf = (output / f"{name}.elf").read_bytes()
             hpc = (output / f"{name}.hpc").read_bytes()
             if elf[:4] != b"\x7fELF" or int.from_bytes(elf[18:20], "little") != 40:
@@ -232,6 +232,9 @@ endforeach()
                 "hp50g",
             ):
                 launcher = output / f"{name}-launchers" / model
+                reproducible_outputs.extend(
+                    launcher.with_suffix(suffix).relative_to(build) for suffix in (".bin", ".hp")
+                )
                 binary = launcher.with_suffix(".bin").read_bytes()
                 wrapped = launcher.with_suffix(".hp").read_bytes()
                 sizes = memory["serialized"]["models"][model]
@@ -247,6 +250,16 @@ endforeach()
                     )
                 if args.aplet_tool and model in ("hp39gplus", "hp39gs", "hp40gs"):
                     bundle = output / f"{name}-aplet" / model
+                    reproducible_outputs.extend(
+                        (bundle / filename).relative_to(build)
+                        for filename in (
+                            "HPGCC000.000",
+                            "HPCRESET.000",
+                            "LIB275L.000",
+                            "HP39DIR.000",
+                            "HP39DIR.CUR",
+                        )
+                    )
                     aplet = (bundle / "HPGCC000.000").read_bytes()
                     if not aplet.startswith(b"HP39BinB\x0bSDK example") or embedded not in aplet:
                         raise AssertionError(f"{name}/{model}: invalid installable Aplet")
@@ -258,6 +271,34 @@ endforeach()
                     ):
                         if not (bundle / asset).stat().st_size:
                             raise AssertionError(f"missing Aplet companion: {asset}")
+        # Clean builds in distinct source/output directories must publish the
+        # same resources. CMake caches, debug/ELF metadata and dependency files
+        # are not portable release artifacts and are deliberately excluded.
+        for directory in build.rglob("hpclang-fonts"):
+            reproducible_outputs.extend(
+                path.relative_to(build)
+                for path in directory.rglob("*")
+                if path.is_file() and path.suffix in (".c", ".h")
+            )
+        if not any("hpclang-fonts" in path.parts for path in reproducible_outputs):
+            raise AssertionError("No generated font resources in reproducibility gate")
+        repeated_source = work / "second source directory"
+        repeated_build = work / "second clean build"
+        shutil.copytree(application, repeated_source)
+        run(
+            "cmake",
+            "-S",
+            str(repeated_source),
+            "-B",
+            str(repeated_build),
+            *configure_options,
+            env=env,
+        )
+        run("cmake", "--build", str(repeated_build), "--parallel", "2", env=env)
+        for relative in reproducible_outputs:
+            if (build / relative).read_bytes() != (repeated_build / relative).read_bytes():
+                raise AssertionError(f"Nonreproducible installed SDK output: {relative}")
+        print(f"Installed SDK: {len(reproducible_outputs)} release outputs byte-identical PASS")
         # A missing declared output must be regenerated without touching source.
         missing = [build / "hello_c-launchers/hp50g.hp", build / "hello_cpp-launchers/memory.json"]
         if args.aplet_tool:
