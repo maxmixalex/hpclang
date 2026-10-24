@@ -4479,8 +4479,8 @@ below are retained.
   workaround was added. Diagnostic source/script and reports remain under
   `/work/oct24-sound-vector-src` and `research/oct24-trace-sound-vector.py`.
   The corrected public API artifact `/work/oct24-sound-api-fixed-artifact`
-  passes all six Direct targets and HP49g+, HP50g, HP48gII and HP39g+ Stock
-  (including independent pixels/input). HP39gs/HP40gs Stock still run on
+  passes all six Direct targets and HP49g+, HP50g, HP48gII, HP39g+ and HP39gs Stock
+  (including independent pixels/input). HP40gs Stock still runs on
   session 70552 / PID 123285 in `/work/oct24-sound-api-fixed-src`,
   logs `oct24-sound-api-fixed-{direct,stock}-*.log`. ARM build and policy analysis
   pass. Native normal/immediate-exit proof and HPGCC mode compatibility remain
@@ -4534,6 +4534,24 @@ below are retained.
   (session 31182, exit 0), alongside existing SDK clients and model-specific
   Notebook builds. Ruff/format and ARM analysis pass. Full Stock and CI
   acceptance are not yet claimed.
+  Subsequent batch review: KOS mode tests now also pass HP49g+/HP50g/HP48gII
+  Stock, including independent input/pixel checks; HP39 Stock continues on the
+  original process. The exit fixture now starts through `kos_beep(..., 1)` so
+  the compatibility entry point itself is active at normal/immediate exit,
+  extending the earlier canonical-API exit evidence. ARM analysis passes both
+  variants; full Direct/Stock runs are active on session 21588 from
+  `/work/oct24-kos-exit-src`, using `/work/oct24-kos-{exit,immediate}-artifact`
+  and matching logs. All six Direct targets pass KOS normal exit; Stock normal
+  exit is running, with immediate-exit runs following in that queue.
+  Complete source lint/format passes after quoting the shell mode string
+  (`sound_exit="exit"`) and normalizing copied Python CRLF to LF in the container
+  only; no unrelated formatting edits enter the repository. Full 126-target
+  ASan/UBSan host regression runs on session 24974 and whole-project Clang
+  analysis on 93989; neither is yet claimed complete. Logs are
+  `/work/oct24-audio-all-host.log`, `oct24-audio-analysis.log`, and the corrected
+  `oct24-audio-{lint,format}-v2.log`. Public docs now clarify that a failed
+  replacement preflight preserves the old tone, whereas failure after its
+  cancellation leaves it stopped, matching the tested implementation.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;

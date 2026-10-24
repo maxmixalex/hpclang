@@ -909,8 +909,8 @@ arithmetic and register-model tests pass under sanitizers. Earlier investigation
 and intermediate results are retained in the [roadmap](roadmap.md).
 
 Public async replacement, autonomous stop, cancellation and restoration pass
-all six Direct models and HP49g+/HP50g/HP48gII/HP39g+ Stock locally. HP39gs/HP40gs
-Stock runs remain pending. Normal exit and `_Exit` each pass all six Direct targets;
+all six Direct models and HP49g+/HP50g/HP48gII/HP39g+/HP39gs Stock locally. HP40gs
+Stock remains pending. Normal exit and `_Exit` each pass all six Direct targets;
 both exit paths also pass HP50g Stock. The exit
 fixtures inspect real cleanup before power, launcher or host restoration can
 hide missing releases. A negative control that skips cleanup fails at that
@@ -951,7 +951,8 @@ Host sanitizer checks cover all sixteen low-nibble states crossed with four
 incoming modes, overlapping waits, failure propagation, invalid inputs and
 client identity. All six Direct models pass native KOS waiting-duration,
 actual PWM replacement/rejection, busy-loop autonomous completion and restored
-hardware checks. Full Stock validation and CI acceptance remain pending.
+hardware checks. HP49g+/HP50g/HP48gII Stock also pass. HP39 Stock validation,
+the extended KOS-entry exit matrix and CI acceptance remain pending.
 
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 

@@ -23,7 +23,8 @@ extern "C"
                            hpclang_sound_cancel_fn cancel, void *context);
 
     /* Foreground-only asynchronous tone. replace != 0 cancels our active tone
-     * before admitting a new one; a failed replacement leaves it stopped.
+     * before hardware admission of a new one. Preflight failures preserve the
+     * old request; admission failures after cancellation leave it stopped.
      * Nonzero frequency/duration are required. Start temporarily enables owned
      * IRQ delivery and masks FIQ: do not call inside a critical section or from
      * interrupt context. Other IRQ sources stay masked. Audio stops without

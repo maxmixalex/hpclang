@@ -103,7 +103,7 @@ case "$MODE" in
         E2E_SOURCE="$ROOT/tests/e2e/system-services"
         E2E_TARGET="hpclang_system_services_e2e"
         E2E_ELF="hpclang-system-services-e2e.elf"
-        sound_exit=exit
+        sound_exit="exit"
         [[ "$MODE" != system-services-immediate ]] || sound_exit=_Exit
         E2E_CMAKE_ARGS=(-DHPCLANG_E2E_SOUND_EXIT="$sound_exit")
         ;;

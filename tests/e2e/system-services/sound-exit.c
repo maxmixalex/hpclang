@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <kos.h>
 #include <hpclang/sound.h>
 #include "exit-hooks.h"
 #include "irq.h"
@@ -31,7 +32,7 @@ void hpclang_e2e_sound_exit(void)
     hpclang_e2e_irq_snapshot(&bank);
     hpclang_irq_restore(baseline);
     /* Long enough to require cancellation, rather than natural completion. */
-    if (hpclang_sound_start(880, 60000, 0))
+    if (kos_beep(880, 60000, 1))
         fail(1);
     if (hpclang_sound_status() != 1 || !(REG(0x07600008) & 0x1000u) || !(REG(0x07800000) & 0x20u))
         fail(2);
