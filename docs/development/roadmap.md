@@ -18,7 +18,7 @@ The project target is stronger than "substantial calculator-facing functionality
 
 HPGCC 1.1-p1 with 39G support is the historical HP39-family application reference; HPGCC 2.0 SP2 is the principal HP48/49/50 parity reference. HPGCC3 remains an additional API/design reference, not a ROMLIB ABI or custom-ROM target.
 
-## Principles
+## Current M8 follow-up evidence
 
 Latest follow-up inspection (2026-10-24): `cb7c7bae` Quality, Storage and
 Objects push/PR runs pass; Core, Runtime and Gallery are not yet fully terminal.
@@ -29,10 +29,20 @@ the next push, including any remaining or newly failed jobs.
 
 Image Stock process 82374 has completed all six models successfully, joining
 its six-model Direct, SDK, reference/pixel tests and text/image full regression.
-Menu Stock 86659 and checkbox Stock 73812 remain live on unchanged artifacts.
+Menu Stock 86659 also completes all six models successfully; checkbox Stock
+73812 passes HP39g+ and continues HP39gs on its unchanged artifact.
 Independent chooser foundation `896948b4` passes focused ASan/UBSan, ARMv4T
 compile and analysis: paired option/label removal and allocation rollback.
-It remains internal; public APIs and modal selection acceptance are pending.
+Follow-up `eaa91dc4` adds all nine public chooser APIs, scrolling modal selection,
+confirm/cancel, empty lists and lifecycle-safe menu overlays. Three focused
+ASan/UBSan targets pass including real HPG pixels on 64/80-line displays in both
+buffer modes, plus ARM compile/analysis. Logs `/work/oct24-choose-*-tests.log`.
+SDK process 38518 reports 517 reproducible outputs and six-model C/C++ packaging;
+terminal status is tracked on the issue board. Original-source comparison,
+native matrix and CI acceptance remain open. All chooser work remains local on
+`m8-choose-controls`; no subsequent push or M8 completion is claimed.
+
+## Principles
 
 - before each subsequent remote push, inspect the previous push's CI and failed-job logs; record unresolved causes explicitly and do not treat cancelled or pending runs as passes; do not poll newly pushed CI;
 - one application ABI: HPC1 / hpclang v1;
