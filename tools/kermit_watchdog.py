@@ -21,6 +21,9 @@ class Progress:
     def __init__(self) -> None:
         self.pending = ""
         self.window = None
+        self.last_nak = None
+        self.naks = 0
+        self.resends = 0
 
     def feed(self, chunk: str) -> bool:
         lines = (self.pending + chunk).split("\n")
@@ -36,7 +39,23 @@ class Progress:
                     if window != self.window:
                         advanced = True
                         self.window = window
+                        self.last_nak = None
+                        self.naks = self.resends = 0
+            elif line.startswith("input send NAK="):
+                value = line.removeprefix("input send NAK=").strip()
+                if value.isdigit() and 0 <= int(value) < 64:
+                    self.last_nak = int(value)
+                    self.naks += 1
+            elif line.startswith("resend seq="):
+                value = line.removeprefix("resend seq=").strip()
+                if value.isdigit() and 0 <= int(value) < 64:
+                    self.resends += 1
         return advanced
+
+    def diagnostic(self) -> str:
+        window = self.window if self.window is not None else "unknown"
+        nak = self.last_nak if self.last_nak is not None else "none"
+        return f"send-window={window}, last-NAK={nak}, NAKs={self.naks}, resends={self.resends}"
 
 
 class Watchdog:
@@ -51,9 +70,9 @@ class Watchdog:
     def failure(self) -> str | None:
         now = time.monotonic()
         if now - self.started >= TOTAL_SECONDS:
-            return f"transfer exceeded absolute ceiling ({TOTAL_SECONDS}s)"
+            return f"transfer exceeded absolute ceiling ({TOTAL_SECONDS}s); {self.progress.diagnostic()}"
         if now - self.updated >= IDLE_SECONDS:
-            return f"no acknowledged transfer progress for {IDLE_SECONDS}s"
+            return f"no acknowledged transfer progress for {IDLE_SECONDS}s; {self.progress.diagnostic()}"
         return None
 
 

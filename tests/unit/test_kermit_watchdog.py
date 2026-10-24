@@ -50,6 +50,24 @@ class TransferWatchdogTests(unittest.TestCase):
             timer.observe(ack(63))
             self.assertIn("absolute ceiling", timer.failure())
 
+    def test_nak_diagnostics_do_not_count_as_progress(self) -> None:
+        with patch.object(watchdog.time, "monotonic", return_value=0) as clock:
+            timer = watchdog.Watchdog()
+            timer.observe(ack(48))
+            clock.return_value = 80
+            timer.observe("input send NA")
+            timer.observe("K=48\r\nresend seq=48\n")
+            timer.observe("input send NAK=48\nresend seq=48\n")
+            timer.observe("input send NAK=64\nresend seq=-1\n")
+            self.assertEqual(timer.updated, 0)
+            clock.return_value = watchdog.IDLE_SECONDS
+            self.assertIn("send-window=48, last-NAK=48, NAKs=2, resends=2", timer.failure())
+            timer.observe(ack(49))
+            self.assertIsNone(timer.failure())
+            self.assertEqual(
+                timer.progress.diagnostic(), "send-window=49, last-NAK=none, NAKs=0, resends=0"
+            )
+
     def test_process_exit_status_and_stale_log(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "kermit.log"

@@ -789,7 +789,10 @@ Stock's still-held Enter key. Saved RAM proves matrix bits 7/60 and two edges
 for the first requested Alpha. The test now announces payload entry, waits for
 launch-key release before installing observers, and retains the first failure
 code. The fixed HP48gII Direct and HP50g Stock runs pass all input, status-frame,
-page-exchange and return checks (59175 exit 0); fixed HP39g+ Stock is running.
+page-exchange and return checks (59175 exit 0). Fixed HP39g+ Stock also passes
+(69002 exit 0), including all 44 independently checked status frames. Fixed
+HP39gs/HP48gII/HP49g+ runs continue; fixed HP40gs is also running after the
+original three-model HP39 run ended with failures.
 Neither the complete Stock matrix acceptance nor
 shipped-example native execution is claimed complete. This is emulator GPIO evidence, not a physical-calculator test.
 

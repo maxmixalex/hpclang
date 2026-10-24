@@ -4862,6 +4862,25 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Latest local window/transport checkpoint: fixed HP39g+ Stock now passes
+  (69002 exit 0), including independent final pixels, 44 status frames, page
+  exchange and settled return. Evidence is preserved separately in
+  `/work/oct24-win-settled-stock-hp39gplus-evidence`; the original failed state
+  remains intact. Process 68792 runs fixed HP39gs, HP48gII and HP49g+ sequentially
+  and preserves each result. Original process 32221 is terminal (exit 1), with
+  all three HP39 failures retained. Fixed HP40gs now runs in 96971 after saving
+  its original failed state. Fixed HP50g Stock and HP48gII Direct already
+  pass. The complete fixed Stock matrix is not yet accepted.
+
+  CI transfer diagnostics now append send-window, last NAK, NAK count and resend
+  count since advancing ACK to watchdog failures. This changes no timeout or
+  success criterion; NAK/retry traffic still cannot renew the idle budget.
+  Twelve watchdog/HP39 gate unit tests and Ruff pass. Replaying the actual
+  40068713236 log in 137-character chunks yields window 48, last NAK 48,
+  three NAKs and five resends. The receiver's NAK packets have valid block
+  checks. This narrows the stalled transfer evidence but does not establish its
+  root cause or repair it. The new diagnostics are local and not pushed.
+
   Updated pre-push CI investigation, 95348ce8: PR Objects 40068713236 fails
   only Stock object-catalog/HP39g+ (job 120798037735); push Objects 40068703277
   passes. Downloaded Kermit evidence proves completed HP39DIR.CUR/HP39DIR.000,
