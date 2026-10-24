@@ -20,6 +20,19 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Window controls submitted as `ab91e43a` in draft PR #12:
+https://github.com/maxmixalex/hpclang/pull/12 . It is stacked on PR #11 via
+`m8-flash-write`, not merged into main. Delivery starts at verified `1869e6f2`
+and changes only roadmap tracking; all 4,614 tracked files match its isolated
+mirror. Full format (103 Python files), lint and strict docs pass. Original
+comparisons, 153-test regression/373-source analysis, SDK 517-output check,
+76-name C/C++ export probe and all-six Direct/Stock split/original-app gates
+apply to the unchanged sources. Native-allocation research is outside this batch.
+Before pushing, exact preceding head 9683fd6a was checked: both Quality and both
+Storage runs pass; Objects push runs and five runs queue. PR #11 stays open.
+Fresh PR #12 CI was not polled. Before any next push, check ab91e43a and its
+still-pending dependency, including failed-job logs. This is submission only.
+
 Allocation/pool verifier `be686e07` (local) cross-checks both checkpoint reports,
 model/pointer identity, SRAM bounds, allocated flags, page intersections and
 stable cleanup state. It reports the union of pool pages and the validated block,
