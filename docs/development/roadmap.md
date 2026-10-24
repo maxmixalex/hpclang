@@ -4336,6 +4336,22 @@ below are retained.
   This verifies configuration and autonomous restoration, not audible hardware
   output. Public asynchronous entry points, production IRQ lifetime, preemption,
   exit integration and a usable Stock deadline channel remain unfinished.
+  A read-only HP50g Stock entry probe now confirms PWM4 and PWM3 are both
+  running (`TCON=0x00598909`, `TCFG1=0x00033333`); automatically falling back to
+  PWM3 would take an existing owner. Its ordinary System Services/pixel/return
+  checks pass, and memory report 3 records the entry state before admission.
+  Evidence: `/work/oct24-timer-observe-hp50g.log`, report under
+  `/work/oct24-timer-observe-src/build`, artifact
+  `/work/oct24-timer-observe-artifact`; isolated probe source is retained as
+  `research/oct24-timer-observation-irq.c`. Session 42113 completed successfully.
+  Saved post-return UI states on all six models have watchdog `WTCON=0x910`,
+  with enable clear. This suggests an independent interrupt-only deadline
+  candidate; it does not prove availability at every application entry. The
+  Linux S3C2410 driver supports interrupt-only operation with reset disabled.
+  However, the pinned emulator's watchdog adds raw prescaler/divider PCLK ticks
+  to a microsecond timer clock without conversion. Correct and independently
+  verify that timing model before using watchdog E2E as deadline evidence;
+  no watchdog runtime acquisition or public fallback is enabled yet.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;

@@ -930,6 +930,20 @@ Public KOS entry points, preemption and production IRQ/exit lifetime are still
 open, as is Stock deadline-channel availability. Emulator register/timing
 evidence does not establish audible output from physical hardware.
 
+Stock deadline-channel investigation: the read-only HP50g application-entry
+probe records `TCON=0x00598909` and `TCFG1=0x00033333`; both PWM3 and PWM4 are
+running. The probe passes ordinary System Services, pixel and return checks.
+An unused-channel fallback must therefore establish live ownership instead of
+assuming PWM3 is free. Saved post-return UI states have the watchdog disabled
+on all six models (`WTCON=0x910`), a candidate for further entry-time validation.
+The [Linux S3C2410 watchdog driver](https://github.com/torvalds/linux/blob/master/drivers/watchdog/s3c2410_wdt.c)
+implements interrupt-only mode by enabling its interrupt and clearing reset
+enable. The pinned emulator currently schedules watchdog ticks in raw PCLK
+divider units against its microsecond clock, so its timing must be repaired and
+independently tested before validating a watchdog-based deadline backend.
+Neither the saved-state observations nor that driver establish a completed
+hpclang backend; no watchdog hardware ownership has been added.
+
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
 - `sys_bcd2bin(value)` converts the low **two** nibbles. Its macro evaluates the
