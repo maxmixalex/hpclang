@@ -717,6 +717,18 @@ fixture, so native window display/return acceptance remains outstanding. Legacy
 single-buffer draw calls can publish before the final hook; no atomic-frame
 guarantee is introduced. Declarative widget bridging remains separate work.
 
+`winevent.h` and `wintimer.h` now expose the event/timer subset and the repaint
+request. They preserve user IDs starting at 8, synchronous callback results and
+positive millisecond timer intervals. The checked `hpclang_win_error`,
+`hpclang_win_step` and `hpclang_win_reset` extensions make failures of historical
+void functions observable. Default limits are 64 handlers (three reserved),
+256 concurrent snapshot entries and 32 timers; exhaustion latches `ENOSPC`.
+Reset is rejected during callbacks and does not release HPG's shared display.
+The shipped `hpgcc-window` example builds and links all six launcher variants;
+native execution and installed-SDK validation are pending. Typed-key/modifier
+events 3..6, historical widgets and the complete `win.h` umbrella remain work
+in progress, not supported names with empty implementations.
+
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter

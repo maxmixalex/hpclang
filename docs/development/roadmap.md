@@ -463,9 +463,9 @@ Formal CI acceptance remains open. All original M8 milestone requirements
 remain retained.
 
 Subsequent single CI inspection at exact head `99168c1be049b815ffc318a1db9ecd2dc9ea247e`:
-Quality 40061641240 and Storage 40061641296 pass. At the next work-turn
-inspection, Core 40061641258, Font Gallery 40061641275, Runtime 40061641253
-and Objects 40061641226 are queued. This does not establish batch acceptance.
+Quality 40061641240 and Storage 40061641296 pass. At the public-window work-turn
+inspection, Core 40061641258 and Font Gallery 40061641275 are running;
+Runtime 40061641253 and Objects 40061641226 are queued. Batch acceptance remains open.
 Later local window-audit/dispatch changes are outside that head.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
@@ -4742,6 +4742,18 @@ below are retained.
   return, declarative widget state bridging and public interfaces remain open.
   Legacy single-buffer primitives may publish during drawing, so these hooks
   do not claim atomic frames. This extension is local and not CI accepted.
+  Public `winevent.h`/`wintimer.h` now expose lazy event, loop, repaint and timer
+  adapters with explicit checked error/step/reset extensions. Custom IDs start
+  at 8; positive milliseconds convert to the checked microsecond clock. The
+  bounded default has 64 handlers (three internal), 256 snapshot entries and
+  32 timers, with latched exhaustion instead of silent void-call failure.
+  Nine sanitizer targets pass, including callback -1 versus dispatch failure,
+  millisecond timing, active-reset rejection and capacity limits. The new
+  `examples/hpgcc-window` actually links these APIs and builds its HPC1 and all
+  six launchers; host/ARM analysis passes. Logs are
+  `/work/oct24-win-public-{build,analysis,arm}.log`. This is local only: native
+  example execution, installed-SDK acceptance, typed-key/modifier generation,
+  widget bridges and a complete `win.h` remain open; no scope reduction.
 
 #### M8.5 — Modern C++ and migration
 
