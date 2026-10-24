@@ -671,6 +671,24 @@ focus/menu transitions, exhausted storage and exit cleanup. Cross-model UI
 pixels and Stock return must follow; passing current clean-UI tests alone is
 insufficient evidence for historical semantics.
 
+The initial internal `runtime/core/win-events` foundation now implements
+synchronous snapshot dispatch with caller-provided registry/snapshot storage.
+It preserves higher-priority/newer-tie ordering, nonzero callback results and
+outer-snapshot stability while nested dispatch observes registry changes.
+Registration or snapshot exhaustion reports `ENOSPC` before partial delivery;
+reset during a callback reports `EBUSY`. Callback data is borrowed, so removal
+does not permit freeing data still captured by an outer dispatch. Duplicate
+removal follows the first matching callback/data in dispatch order, as the
+historical implementation does even across different priorities.
+
+The `win_events` host test passes ASan/UBSan, including callback-side mutations,
+self-removal, nested exhaustion, short-circuit cleanup, extreme priorities and
+borrowed stack arguments. Host and ARM analysis and C/C++ six-model launcher
+builds pass. This module has no installed historical API, event registration
+namespace, idle loop, timers or widget binding yet; it establishes the dispatch
+semantics without claiming complete original-application compatibility or
+native execution evidence.
+
 ## Design consequence
 
 Historical source compatibility remains important, but it must sit on the clean dependency stack already established:

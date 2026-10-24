@@ -49,6 +49,9 @@ target_include_directories(test_sst_flash PRIVATE "${HPCLANG_ROOT}/runtime/core"
 hpclang_unit(rtc_tick test_rtc_tick.c "${HPCLANG_ROOT}/runtime/core/rtc-tick.c")
 target_include_directories(test_rtc_tick PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(win_events test_win_events.c "${HPCLANG_ROOT}/runtime/core/win-events.c")
+target_include_directories(test_win_events PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(rpl_flash_record test_rpl_flash_record.c
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"

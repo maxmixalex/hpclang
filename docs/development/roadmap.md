@@ -4644,6 +4644,14 @@ below are retained.
   including four slider orientations and a documented 64-line layout issue.
   The audit and Ruff checks pass locally; actual adapter/original-application
   execution remains open. This is static evidence only.
+  The subsequent internal `win-events` module implements bounded synchronous
+  snapshot dispatch: priority/newer-tie order, callback results, nested mutation,
+  first-matching duplicate removal, preflight exhaustion and busy reset.
+  `win_events` ASan/UBSan tests cover these cases plus self-removal and borrowed
+  stack arguments; host/ARM analysis and C/C++ six-model launcher builds pass.
+  Evidence uses `/work/oct24-win-events-{tests,arm}` and corresponding
+  build/analysis logs. This is local implementation, not submitted or CI accepted;
+  no public `win*` API, idle/timer loop or widget integration is claimed.
 
 #### M8.5 — Modern C++ and migration
 

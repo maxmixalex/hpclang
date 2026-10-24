@@ -29,6 +29,7 @@ add_compile_options(
 set(HPCLANG_RUNTIME_START
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/start.S")
 set(HPCLANG_RUNTIME
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-events.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-layout.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-focus.c"
