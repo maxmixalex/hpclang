@@ -4895,6 +4895,22 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Custom-component original-source differential now passes: the optional
+  `tests/compat/check-win-widgets.py` compiles 21 unchanged original functions
+  from each caller-supplied HPGCC 1.1/2.0 archive with host-only structural glue.
+  Both match all 86,172 candidate trace lines across 384 focusability/insertion
+  scenarios: properties, preferred-size/packing, transparency bit semantics,
+  paint call ordering, focus callback observations, forward/backward traversal,
+  and removal with/without moving focus. SHA256:
+  `6bf7816d0ba81810fb8ce3e32ffeb3dd353446af16e8d251bebe54d608d4d2ca`.
+  The comparison avoids the original dangling-cursor removal UB; the separate
+  sanitizer suite verifies that repaired case. A deliberately incorrect boolean
+  transparency assignment is rejected. Logs:
+  `/work/oct24-win-widget-{reference,negative}.log`; process 37724 exits 0.
+  The candidate harness is also a maintained ASan/UBSan CTest target and passes.
+  This proves host semantics only; native custom components, concrete controls
+  and original multi-control application acceptance remain open. Local only.
+
   Local public custom-component follow-up: `winwidget.h`/`wincore.h` now
   expose allocation, lifecycle, focus, geometry, borrowed fonts/colors and base
   painting. Runtime profile includes the adapters. Reset rejects installed

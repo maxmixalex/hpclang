@@ -753,8 +753,13 @@ return EBUSY. Cleanup/unregistration stays available after a latched error.
 Invalid geometry is rejected without changing the previous bounds; failed
 construction leaves application data ownership with the caller. This is local
 custom-component implementation, not acceptance of concrete historical controls,
-the complete `win.h` umbrella, or original multi-control applications. Original
-source differential and native execution gates remain open. The expanded
+the complete `win.h` umbrella, or original multi-control applications. Native execution gates remain open. The optional
+`tests/compat/check-win-widgets.py` compiles 21 original functions from each
+caller-supplied HPGCC 1.1/2.0 archive. Both match 86,172 trace lines across 384
+scenarios, including focus callback order, safe current-node removal, component
+properties and painting calls. It excludes the original dangling-cursor UB;
+separate sanitizer tests cover the repaired removal. An intentionally wrong
+transparency conversion is rejected by the comparison. The expanded
 relocated SDK gate passes custom components in C/C++23, all six launchers and
 three HP39 Aplet variants, with 517 byte-identical release outputs across clean
 builds (process 14783, exit 0).
