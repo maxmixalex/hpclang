@@ -4352,6 +4352,20 @@ below are retained.
   to a microsecond timer clock without conversion. Correct and independently
   verify that timing model before using watchdog E2E as deadline evidence;
   no watchdog runtime acquisition or public fallback is enabled yet.
+  Local emulator repair now replaces per-tick scheduling with a PCLK-based
+  counter model retaining fractional cycles. Register reads advance the live
+  count, WTDAT changes only the next reload, and PCLK transitions settle elapsed
+  time at the old rate before preserving the remaining phase at the new rate.
+  Interrupt and reset outputs remain distinct; late expiries coalesce at the
+  interrupt controller. Separate counter-arithmetic and actual register-overlay
+  fixtures pass ASan/UBSan, including one million fine-grained observations,
+  delayed processing, rate changes, stopped counters, reset-only and IRQ-only
+  modes. The Python tool suite, Ruff/format and patched emulator build pass.
+  Six-model Direct System Services plus HP50g Stock regression is running on
+  session 65553 / PID 107813 using `/work/oct24-watchdog-x50ng`; HP39g+, HP39gs
+  and HP40gs pass already. These existing payloads test startup/return and
+  interference, not a new application watchdog backend. Guest watchdog lease,
+  active IRQ timing and Stock availability tests remain required.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;

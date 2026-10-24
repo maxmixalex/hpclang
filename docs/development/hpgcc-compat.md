@@ -944,6 +944,16 @@ independently tested before validating a watchdog-based deadline backend.
 Neither the saved-state observations nor that driver establish a completed
 hpclang backend; no watchdog hardware ownership has been added.
 
+The local emulator overlay now models watchdog count/phase in PCLK units and
+schedules expiration in microseconds, with fractional cycles retained between
+reads. Register and clock-transition tests exercise the same overlay compiled
+into the emulator, alongside an independent counter-arithmetic fixture. Both
+pass sanitizers; reset-only and interrupt-only outputs are tested separately.
+Existing application startup/return regression is running on the patched
+emulator. Application-side watchdog ownership and active deadline/IRQ evidence
+remain unfinished, so this repair does not yet establish Stock asynchronous
+audio support.
+
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
 - `sys_bcd2bin(value)` converts the low **two** nibbles. Its macro evaluates the
