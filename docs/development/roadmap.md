@@ -20,6 +20,18 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Native allocator ROM audit (local): all six retained images share the 344-byte
+allocation body, except four PC-relative literal displacements in HP39gs. The
+free-path size/footer validation prefix also matches; HP39gs free is separately
+located, correcting the initial adjacency assumption. Decoded block layout is
+16-byte header, four-byte-aligned usable extent and four-byte size footer. A
+validated live block therefore occupies recorded extent + 20 bytes; extent is
+not necessarily original request size. Firmware addresses and limits are in
+sdk-design.md; script `research/oct24-native-allocator-audit.py` and report
+`/work/oct24-native-allocator-code.json` retain image/code hashes and comparisons.
+Strict docs pass. This is static evidence only. HP39g+ observation 82387 remains
+live without a captured checkpoint; do not restart or infer live allocation size.
+
 Native-allocation accounting experiment (M8.2/M8.3/M8.6, local): the existing
 six-model mapped-pool reports do not establish native allocator sizes. A separate
 read-only emulator probe captures 256 bytes around the recorded native OS block

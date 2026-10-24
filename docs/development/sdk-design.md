@@ -1305,6 +1305,34 @@ size. The normal memory report and its acknowledgement remain unchanged.
 Stock run setup removes previous pool reports. No guest bytes, fields, symbols
 or allocations are added by this observer.
 
+A read-only ROM audit identifies the native allocator's block format in the
+six retained emulator images. The allocation code rounds requests to four-byte
+alignment, places a 16-byte header before the returned pointer, and maintains
+a four-byte size footer after the block's usable extent. The header contains
+usable extent, flags and two list links; the free path compares the stored
+extent with the footer before unlinking. Consequently, a validated live block
+occupies its recorded usable extent plus 20 bytes. The usable extent must not
+be equated with the original request: allocator splitting/exact-fit behavior
+can retain slack. Page alignment can exclude further bytes from the mapped pool.
+
+| Retained ROM model | Allocation routine | Free routine |
+| --- | --- | --- |
+| HP39g+ | `0x10554` | `0x106ac` |
+| HP39gs | `0x2ca34` | `0x2c12c` |
+| HP40gs | `0x1485c` | `0x149b4` |
+| HP48gII | `0x145e0` | `0x14738` |
+| HP49g+ / HP50g | `0x1c88c` | `0x1c9e4` |
+
+These are firmware-specific research addresses, not callable SDK interfaces.
+The 344-byte allocation bodies match exactly except four PC-relative literal
+displacements in HP39gs; the free-path header/footer validation prefix matches
+on all six. `research/oct24-native-allocator-audit.py` retains the comparison,
+with image/code SHA-256 identities in `/work/oct24-native-allocator-code.json`.
+HP39gs places its free routine separately; adjacency is not assumed.
+This static evidence does not validate the observer's pointer as a live block
+or establish current allocation/installation peaks. Live header, flags, footer
+and page-range checks are still required before accounting for an allocation.
+
 Run `tests/e2e/ui/verify.py stock FAMILY --pool` to require both pool reports,
 correct target identity, 36 KiB RW, valid unique physical pages and identical
 pool observations before PASS and after runtime cleanup. The ordinary UI
