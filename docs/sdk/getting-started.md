@@ -214,6 +214,13 @@ API; owning a snapshot does not grant access to a native RPL stack on HP39.
 See `examples/object-cpp` for a complete C++17 application. Automatic local
 cleanup applies to normal returns; `exit()` does not unwind local C++ objects.
 
+For byte streams, `<hpclang/storage.hpp>` supplies move-only `owned_stream`
+and `owned_stream_directory` owners. The installed `examples/storage-cpp`
+is a standalone C++17 application that opens `README.TXT` on an HP49g+/HP50g
+FAT SD card and checks reading and both close results. Cleanup on an early
+return preserves `errno`; call `close()` explicitly when its result matters.
+The owners retain the C backend's model and media requirements.
+
 ### Own directory handles and iterators
 
 `<hpclang/object-store.hpp>` adds `owned_object_store` and
@@ -346,7 +353,9 @@ The installed `examples/notebook` combines the declarative C UI, calculator
 clock and native object persistence. It uses Aplet-owned data on HP39 Stock
 and a dedicated HOME object on classic Stock, with explicit Save/Reload
 actions and rejection of foreign data. Its README describes the storage and
-encoding contract; device persistence acceptance is still pending.
+encoding contract. All six original-ROM Stock emulator persistence cases
+passed Runtime 39928737278; this is emulator evidence, not physical-device
+validation.
 
 Include `<hpclang/device.h>` and read `hpclang_device_info()` for model and
 visible display dimensions. Use `hpclang_device_capability()` to decide whether

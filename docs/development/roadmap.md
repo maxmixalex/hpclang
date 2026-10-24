@@ -4558,7 +4558,10 @@ below are retained.
   The whole-project Clang pass has now completed: 323 sources and 1,336 unique
   configurations from 3,935 compile entries, analysis exit 0. The first combined
   command still returns failure for its earlier lint/CRLF issues; the separate
-  corrected lint/format runs both pass. Full sanitizer regression remains live.
+  corrected lint/format runs both pass. Full sanitizer regression subsequently
+  completed: all 126 targets pass in 1,403.11 seconds, with the terminal CTest
+  log ending at 2026-10-24 03:49 UTC. This suite covers the audio baseline;
+  the later C++ storage owners have their separate focused sanitizer evidence.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
@@ -4653,6 +4656,18 @@ and both HP49g+/HP50g Stock storage paths pass. The expanded installed SDK C++ c
 six-model package gate pass on session 59414 (exit 0). Logs use
 `oct24-storage-cpp-v2-{direct,stock}-*.log` and `oct24-storage-cpp-sdk-v2.log`.
 This slice is locally verified; CI acceptance remains pending and M8.5 is not complete.
+
+The installed `examples/storage-cpp` now exposes the stream owners as a
+standalone C++17 application, with explicit SD/model/input requirements and
+checked read/close results. The relocation gate consumes that installed example
+instead of a test-only duplicate and retains six-model launcher and optional
+HP39 Aplet checks. Ruff, C++ formatting, ARM static analysis and strict docs
+pass. The expanded relocation gate passes on session 24066; its optional
+HP39g+/HP39gs/HP40gs C/C++ Aplet variant also passes on session 5520.
+Logs are `/work/oct24-storage-example-sdk.log` and
+`/work/oct24-storage-example-aplet.log`. These validate installed packaging;
+the native owner behavior retains the separately recorded Storage E2E evidence.
+The example is locally verified and has not yet been pushed for CI acceptance.
 
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications
