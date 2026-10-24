@@ -20,6 +20,21 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Native allocation and SDK memory guide submitted as `b64b68ea` in draft
+[PR #13](https://github.com/maxmixalex/hpclang/pull/13), stacked on PR #12 via
+`m8-window-delivery`. The delivery merge changes only roadmap relative to
+verified `10eb7dd7`; all 4,617 tracked files match the isolated mirror. Full
+format (103 Python files), lint and strict docs pass. Six-model native and exact
+CI-verifier replay, two sanitizer targets, six report tests, negative replays
+and relocated SDK guide checks apply to the unchanged implementation.
+Before this push, preceding `ab91e43a` had all 12 runs queued. Dependency
+`9683fd6a` had both Quality, Storage and Objects runs pass; both Core and Runtime
+runs remained queued. Failed logs 40068713236/40061641253 were reread: transfer
+and HP40gs sound restoration remain unresolved; accepted Flash-busy fixes are
+tracked separately. Neither dependency is accepted/merged. Fresh PR #13 CI is
+not polled. Before the next push inspect `b64b68ea` and pending dependencies,
+including failed-job logs. This is submission, not CI acceptance or M8 closure.
+
 SDK memory guide (local) now separates application RW, complete launch pool,
 serialized package and whole-system peak. It documents admission/ceiling fields,
 Aplet footprint, transient replacement costs and measurement limits. The guide
