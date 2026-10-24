@@ -1558,7 +1558,7 @@ per model across both buffering modes, checking first/last visible options,
 forward/back paging including the repaired wrap, disabled-item suppression and
 payload shift states. Recreated menus use a known font for independent complete
 page/disabled-color/glyph checks at checkpoints 900/901/1000/1001. The retained
-text, image, progress, keyboard and settled-return gates still run. HP39g+,
-HP39gs and HP40gs Direct pass; the six-model runner (32162) continues in
-`/work/oct24-menu-src`, artifact `/work/oct24-menu-native-arm`. Stock assets are
-prepared; native matrix completion and CI acceptance remain open.
+text, image, progress, keyboard and settled-return gates all pass on six Direct
+models (32162 exit 0). A wrong disabled-color pixel is rejected. Stock process
+86659 runs in `/work/oct24-menu-src`, artifact `/work/oct24-menu-native-arm`;
+Stock completion and CI acceptance remain open.
