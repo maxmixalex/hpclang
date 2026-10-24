@@ -86,8 +86,10 @@ rectangle through HPG, then quit after twenty 50 ms timer callbacks. Check
 `hpclang_win_error()` after the loop: historical void calls latch failures.
 Callbacks borrow their application data through synchronous dispatch. The
 installed-SDK gate also builds this source as C++23 and packages all three HP39
-Aplet variants. Typed-key/modifier events and historical widgets remain under
-development; this example is not a complete `win.h` compatibility claim.
+Aplet variants. `winkeys.h` also supplies typed-key/modifier events, while
+`win.h` includes the persistent control adapters. This small example exercises
+events, keys and timers; see the [migration guide](migration.md) for control
+ownership and adapting historical applications to 64/80-line screens.
 
 `examples/hpgcc-console` combines C `printf`/`puts`, C++ `std::printf` and HPG
 graphics, edits a name in a 16-byte buffer, reads a count and a value, prints

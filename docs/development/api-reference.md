@@ -715,7 +715,7 @@ Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Bui
 | conio | 27 | 27 | 26 | 49 in new `conio.h` | not implemented as a subsystem |
 | raw `syscall.h` | 9 | 9 | 9 | 9 | intentionally not canonical |
 
-HPGCC 1.1/2.0 also contain a substantial win widget/event family with 74 stable implementation names between those releases. HPGCC3 moves to a different GUI family. hpclang has not started a widget subsystem.
+HPGCC 1.1/2.0 also contain a substantial win widget/event family with 75 distinct implementation names between those releases. hpclang now implements the event/timer/key foundation, custom widgets and focus, text, image, progress, menu, checkbox, chooser and box adapters, exposed together through `win.h`. See the [compatibility inventory](hpgcc-compat.md) for source comparisons, ownership repairs and current native/application acceptance. HPGCC3 moves to a different GUI family.
 
 ## HPG graphics: detailed progress
 
@@ -919,7 +919,11 @@ The raw nine-function `syscall.h` surface is declaration-stable across all four 
 
 Status: no canonical raw-syscall API. Required host services stay behind typed hpclang services; compatibility wrappers can be considered in M8.
 
-HPGCC 1.1/2.0 win widgets and HPGCC3 GUI are also not implemented. Graphics/input/time/storage should stabilize first.
+HPGCC 1.1/2.0 window adapters are implemented over hpclang's input, timing and
+HPG services, with their persistent ownership and synchronous event contracts.
+They coexist with the canonical declarative C UI. HPGCC3's distinct C++ GUI
+family is not implemented by these adapters. The compatibility inventory tracks
+validation separately from implementation and broader M8 completion.
 
 ## Compatibility classes
 

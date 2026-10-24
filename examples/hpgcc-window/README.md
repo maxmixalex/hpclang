@@ -7,7 +7,9 @@ event/timer/key adapter. Typed digits 0–9 change the rectangle's vertical
 position; ON exits early. The character mapping uses the historical
 `hpkeyb49.h` numeric namespace on every model, including HP39; it does not
 reinterpret model-specific key legends. Default repaint draws the Alpha/Shift status segments; their printed icons
-vary by model. Historical widgets remain separate work.
+vary by model. `win.h` also provides persistent control adapters; this example
+focuses on the event/timer/key foundation. The installed migration guide covers
+control ownership and screen-height adaptation.
 
 Build as an ordinary hpclang SDK example with `find_package(hpclang)` and the
 ARMv4T toolchain. The target produces an HPC1 payload and all six launchers.

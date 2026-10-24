@@ -46,6 +46,40 @@ def compare(left, right):
     }
 
 
+def window_functions(tree, headers):
+    """Inventory ordinary C declarations/definitions in the historical sources.
+
+    This is a lexical inventory, not preprocessing, type checking or ABI proof.
+    Keep paths so header typos and duplicate definitions remain visible.
+    """
+
+    def scan(files, suffix, terminator):
+        found = {}
+        pattern = re.compile(r"(?m)^[A-Za-z_][\w\s*]*?\b(win_\w+)\s*\([^;{}]*\)\s*" + terminator)
+        for name, data in sorted(files.items()):
+            if not name.endswith(suffix):
+                continue
+            source = data.decode("latin1")
+            source = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.S)
+            for symbol in pattern.findall(source):
+                found.setdefault(symbol, []).append(name)
+        return dict(sorted(found.items()))
+
+    definitions = scan(tree, ".c", r"\{")
+    declarations = scan(headers, ".h", ";")
+    return {
+        "definition_names": len(definitions),
+        "declaration_names": len(declarations),
+        "definitions": definitions,
+        "declarations": declarations,
+        "source_only": sorted(definitions.keys() - declarations.keys()),
+        "header_only": sorted(declarations.keys() - definitions.keys()),
+        "duplicate_definitions": {
+            name: paths for name, paths in definitions.items() if len(paths) > 1
+        },
+    }
+
+
 def audit(directory):
     releases = {}
     trees = {}
@@ -79,11 +113,12 @@ def audit(directory):
             "window_source_files": len(tree),
             "installed_window_headers": sorted(installed),
             "distinct_gui_headers": sorted(gui_headers),
+            "window_functions": window_functions(tree, installed),
         }
         trees[name] = tree
         headers[name] = installed
     return {
-        "version": 1,
+        "version": 2,
         "scope": "Static source/header evidence; references include comments; no runtime proof",
         "releases": releases,
         "window_sources_1_1_vs_2_0": compare(trees[ARCHIVES[1]], trees[ARCHIVES[2]]),

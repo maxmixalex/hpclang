@@ -152,20 +152,131 @@ def verify_image(prefix):
     print(f"PASS {prefix}: image/pattern composition in both buffer modes")
 
 
-def main():
+def verify_menu(prefix):
+    for base in (900, 1000):
+        for page in (0, 1):
+            path = Path(f"{prefix}-{base + page}.pgm")
+            width, height, pixels = read_pgm(path)
+            if width != 132 or height not in (64, 80):
+                raise AssertionError(f"{path}: unsupported menu frame geometry")
+            for y in range(height):
+                for x in range(width):
+                    cell, local = divmod(x, 22)
+                    row = y - (height - 6)
+                    ink = 0
+                    if x < 131 and y >= height - 7 and local <= 20 and (page == 0 or cell == 0):
+                        ink = 238 if page else 102 if cell == 1 else 255
+                        if 0 <= row < 4 and local == 9 + row:
+                            ink = 17 if page else 51 if cell == 1 else 0
+                    if pixels[y * width + x] != 255 - ink:
+                        raise AssertionError(f"{path}: unexpected menu pixel at {x},{y}")
+    print(f"PASS {prefix}: menu pages, disabled colors and labels in both buffer modes")
+
+
+def verify_checkbox(prefix):
+    checked = (0, 0x20, 0x30, 0x1A, 0x0E, 4, 0x3E, 0)
+    empty = (0, 0, 0, 0, 0, 0, 0x3E, 0)
+    for base in (1100, 1200):
+        for focus in (0, 1):
+            path = Path(f"{prefix}-{base + focus}.pgm")
+            width, height, pixels = read_pgm(path)
+            if width != 132 or height not in (64, 80):
+                raise AssertionError(f"{path}: unsupported checkbox geometry")
+            for y in range(height):
+                for x in range(width):
+                    ink = 0
+                    for index, pattern in enumerate((checked, empty)):
+                        local, row = x - (5 + index * 20), y - 15
+                        if not (0 <= local < 12 and 0 <= row < 9):
+                            continue
+                        if focus == index and local <= 6:
+                            ink = 255
+                        if local <= 8 and pattern[row % 8] & (1 << (local % 8)):
+                            ink = 0 if focus == index else 255
+                        if index == 0 and 1 <= row <= 3 and local == 7 + row:
+                            ink = 255
+                    if pixels[y * width + x] != 255 - ink:
+                        raise AssertionError(f"{path}: unexpected checkbox pixel at {x},{y}")
+    print(f"PASS {prefix}: selected/unselected checkbox focus and labels in both buffer modes")
+
+
+def verify_choose(prefix):
+    for base in (1300, 1400):
+        for frame in range(4):
+            path = Path(f"{prefix}-{base + frame}.pgm")
+            width, height, pixels = read_pgm(path)
+            if width != 132 or height not in (64, 80):
+                raise AssertionError(f"{path}: unsupported chooser geometry")
+            rows = 13 if height == 64 else 17
+            first = 40 - rows if frame == 2 else 0
+            selected = 39 if frame == 2 else 0
+            bottom = rows * 4 + 3
+            # The model's built-in menu font is tested separately. Check every
+            # content pixel, including the status column, and footer cell edges.
+            for y in range(height - 7):
+                for x in range(width):
+                    ink = 255 if 1 <= x < 6 and 1 <= y < 6 else 0
+                    if 2 <= y <= 4 and x == y:
+                        ink = 0
+                    if frame in (1, 2) and 15 <= x <= 115 and y <= bottom + 1:
+                        ink = 0
+                        if x <= 114 and y <= bottom and (y in (0, bottom) or x in (15, 114)):
+                            ink = 255
+                        row, local_y = divmod(y - 2, 4)
+                        if 0 <= row < rows and 17 <= x <= 112:
+                            chosen = first + row == selected
+                            ink = 255 if chosen else 0
+                            glyph_x = 3 - local_y if (first + row) % 2 else local_y - 1
+                            if local_y >= 1 and x == 18 + glyph_x:
+                                ink = 0 if chosen else 255
+                    if pixels[y * width + x] != 255 - ink:
+                        raise AssertionError(f"{path}: unexpected chooser pixel at {x},{y}")
+            if frame in (1, 2):
+                for x, expected in ((0, 255), (88, 0), (110, 0), (131, 255)):
+                    if pixels[(height - 7) * width + x] != expected:
+                        raise AssertionError(f"{path}: unexpected modal footer at {x}")
+    print(f"PASS {prefix}: chooser labels, modal scroll/selection and footer edges in both buffers")
+
+
+def verify_box(prefix):
+    for base in (1500, 1600):
+        for frame in range(3):
+            path = Path(f"{prefix}-{base + frame}.pgm")
+            width, height, pixels = read_pgm(path)
+            if width != 132 or height not in (64, 80):
+                raise AssertionError(f"{path}: unsupported box geometry")
+            for y in range(height):
+                for x in range(width):
+                    ink = False
+                    if frame < 2:
+                        ink = 5 <= x < 21 and 15 <= y < 25 and (x + y) % 2 == 0
+                        ink |= 19 <= y <= 21 and x == 32 + y - 19
+                    if pixels[y * width + x] != (0 if ink else 255):
+                        raise AssertionError(f"{path}: unexpected grouped-layout pixel at {x},{y}")
+    print(f"PASS {prefix}: nested grid geometry, pattern/text and group removal in both buffers")
+
+
+def main(suite="foundation"):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
     parser.add_argument("family", choices=("hp39", "hp48", "hp4950"))
+    parser.add_argument("--suite", choices=("foundation", "dialogs", "all"), default=suite)
     args = parser.parse_args()
     targets = Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines()
     if not targets:
         raise AssertionError("No executed targets to verify")
     for target in targets:
         verify(Path(f"build/{target}-pass.pgm"))
-        verify_keys(Path(f"build/{target}-frame"))
-        verify_controls(Path(f"build/{target}-frame"))
-        verify_text(Path(f"build/{target}-frame"))
-        verify_image(Path(f"build/{target}-frame"))
+        if args.suite in ("foundation", "all"):
+            verify_keys(Path(f"build/{target}-frame"))
+            verify_controls(Path(f"build/{target}-frame"))
+            verify_text(Path(f"build/{target}-frame"))
+            verify_image(Path(f"build/{target}-frame"))
+            verify_menu(Path(f"build/{target}-frame"))
+            verify_checkbox(Path(f"build/{target}-frame"))
+        if args.suite in ("dialogs", "all"):
+            verify_choose(Path(f"build/{target}-frame"))
+            verify_box(Path(f"build/{target}-frame"))
 
 
 if __name__ == "__main__":

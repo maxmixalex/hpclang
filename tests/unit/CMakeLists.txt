@@ -14,6 +14,10 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(win_choices test_win_choices.c "${HPCLANG_ROOT}/runtime/core/win-choices.c")
+target_include_directories(test_win_choices PRIVATE "${HPCLANG_ROOT}/runtime/core")
+target_compile_definitions(test_win_choices PRIVATE realloc=hpclang_test_realloc)
+
 hpclang_unit(flash_busy test_flash_busy.c)
 target_include_directories(test_flash_busy PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 hpclang_unit(watchdog_clock test_watchdog_clock.c)
@@ -278,6 +282,12 @@ hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-box.c"
+    "${HPCLANG_ROOT}/runtime/core/win-box-axis.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-choose.c"
+    "${HPCLANG_ROOT}/runtime/core/win-choices.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-checkbox.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-image.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-text.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-progress.c"
@@ -866,3 +876,56 @@ target_compile_definitions(runtime_exit_model_fixture PRIVATE
 hpclang_unit(runtime_exit_model test_runtime_exit.c $<TARGET_OBJECTS:runtime_exit_model_fixture>)
 target_include_directories(test_runtime_exit_model PRIVATE "${HPCLANG_ROOT}/include")
 target_compile_definitions(test_runtime_exit_model PRIVATE HPCLANG_COMPILED_MODEL=1)
+
+hpclang_unit(win_softmenu test_win_softmenu.c ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_softmenu PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+hpclang_unit(win_softmenu_reference "${HPCLANG_ROOT}/tests/compat/win-softmenu.c"
+    ${win_adapter_sources} "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_softmenu_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+
+hpclang_unit(win_checkbox test_win_checkbox.c ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-checkbox.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_checkbox PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+hpclang_unit(win_checkbox_reference "${HPCLANG_ROOT}/tests/compat/win-checkbox.c"
+    ${win_adapter_sources} "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-checkbox.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_checkbox_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+
+# Selection controls use the production lifecycle and event dispatcher.
+hpclang_unit(win_choose test_win_choose.c ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-choose.c" "${HPCLANG_ROOT}/runtime/core/win-choices.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_choose PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+
+hpclang_unit(win_choose_reference "${HPCLANG_ROOT}/tests/compat/win-choose.c" ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-choose.c" "${HPCLANG_ROOT}/runtime/core/win-choices.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_choose_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
+
+hpclang_unit(win_box_axis test_win_box_axis.c "${HPCLANG_ROOT}/runtime/core/win-box-axis.c")
+target_include_directories(test_win_box_axis PRIVATE "${HPCLANG_ROOT}/runtime/core")
+target_compile_definitions(test_win_box_axis PRIVATE malloc=hpclang_test_malloc)
+
+hpclang_unit(win_box test_win_box.c ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-box.c" "${HPCLANG_ROOT}/runtime/core/win-box-axis.c")
+target_include_directories(test_win_box PRIVATE "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/include")
+
+hpclang_unit(win_box_reference "${HPCLANG_ROOT}/tests/compat/win-box.c" ${win_adapter_sources}
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c" "${HPCLANG_ROOT}/runtime/core/win-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-box.c" "${HPCLANG_ROOT}/runtime/core/win-box-axis.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
+target_include_directories(test_win_box_reference PRIVATE "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/include")

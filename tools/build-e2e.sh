@@ -4,7 +4,7 @@ set -euo pipefail
 if [[ $# -lt 1 || $# -gt 4 ]]; then
     echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|hpgcc-console|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
     echo "sound exit variants: system-services-exit | system-services-immediate" >&2
-    echo "window event/timer/repaint suite: hpgcc-window" >&2
+    echo "window suites: hpgcc-window | hpgcc-window-dialogs" >&2
     exit 2
 fi
 
@@ -108,7 +108,17 @@ case "$MODE" in
         [[ "$MODE" != system-services-immediate ]] || sound_exit=_Exit
         E2E_CMAKE_ARGS=(-DHPCLANG_E2E_SOUND_EXIT="$sound_exit")
         ;;
-    system-services|hpgcc-system|hpgcc-console|hpgcc-window|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|object-basics|sd-media-manual)
+    hpgcc-window|hpgcc-window-dialogs)
+        # Keep both universal payloads small enough to leave Stock heap space
+        # for old and new DMA pages during transactional mode replacement.
+        E2E_SOURCE="$ROOT/tests/e2e/hpgcc-window"
+        E2E_TARGET="hpclang_hpgcc_window_e2e"
+        E2E_ELF="hpclang-hpgcc-window-e2e.elf"
+        window_group=1
+        [[ "$MODE" != hpgcc-window-dialogs ]] || window_group=2
+        E2E_CMAKE_ARGS=(-DHPCLANG_WINDOW_GROUP="$window_group")
+        ;;
+    system-services|hpgcc-system|hpgcc-console|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|object-basics|sd-media-manual)
         E2E_SOURCE="$ROOT/tests/e2e/$MODE"
         E2E_TARGET="hpclang_${MODE//-/_}_e2e"
         E2E_ELF="hpclang-$MODE-e2e.elf"
@@ -168,6 +178,15 @@ PATH="$ATFE/bin:$PATH" cmake --build "$OUT/cmake" --target "$E2E_TARGET" -j2
 
 cp "$OUT/cmake/$E2E_ELF" "$OUT/e2e.elf"
 python3 "$ROOT/tools/hpclang-pack.py" "$OUT/e2e.elf" "$OUT/e2e.hpc"
+
+if [[ "$MODE" == hpgcc-window || "$MODE" == hpgcc-window-dialogs ]]; then
+    # A seventeenth code page consumed the HP39 Stock heap needed for DMA
+    # replacement. Keep the fixtures split; this bound is not a RAM guarantee.
+    if (( $(stat -c '%s' "$OUT/e2e.hpc") > 16 + 16 * 4096 )); then
+        echo "Window fixture exceeds 16 code pages; split its checks while retaining coverage" >&2
+        exit 1
+    fi
+fi
 
 result_addr="$("$NM" -n "$OUT/e2e.elf" |
     awk '$3 == "hpclang_e2e_result" {print "0x"$1}')"
