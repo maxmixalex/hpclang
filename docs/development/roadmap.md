@@ -4871,7 +4871,11 @@ below are retained.
   begin/present frames or draw indicators. Three focused sanitizer targets pass,
   including public polled-matrix transitions, nested callbacks and invalid keys;
   host analysis and six-model ARM builds pass. Native physical input, indicators,
-  SDK acceptance of the new header and CI acceptance remain open.
+  CI acceptance remains open. The installed window example now consumes typed
+  digits to move the rectangle and ON to quit. Its C/C++23 relocated-SDK builds,
+  six-model launchers, all three HP39 Aplet variants and 453 byte-identical release
+  outputs pass (`/work/oct24-win-keys-sdk.log`, process 11638 exit 0). This closes
+  new-header SDK build/package acceptance, not native physical-key execution.
 
   Local typed-key foundation (after submission 95348ce8): `win-key-state` now
   owns Alpha/left/right latch and held states independently of the physical
@@ -4890,8 +4894,7 @@ below are retained.
   is `/work/oct24-win-key-state-{test,parity,negative,arm,host-analysis,arm-analysis}.log`.
   This is internal source-compatibility behavior for historical KB_* values;
   public handlers were subsequently connected as above; model interpretation, indicators and native
-  physical-key acceptance remain open. Existing public window generators are
-  unchanged. This local work is outside PR #10's submitted head.
+  physical-key acceptance remain open. This local work is outside PR #10's submitted head.
 
 #### M8.5 — Modern C++ and migration
 

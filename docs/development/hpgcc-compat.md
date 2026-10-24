@@ -759,8 +759,12 @@ six-model launcher compilation pass. Public integration additionally passes
 ASan/UBSan checks for polled matrix transitions, one-shot Alpha, nested payload
 lifetimes, preempted physical events, callback -1 results and error propagation.
 The public adapter passes host analysis and six-model ARM compilation. Native
-physical input, modifier indicators and installed-SDK acceptance of `winkeys.h`
-remain required; the preceding native window evidence predates this integration.
+physical input and modifier indicators remain required; the preceding native
+window evidence predates this integration. The installed window example now
+uses typed digits to move the rectangle and ON to exit. Its relocated C/C++23
+SDK builds, six-model launchers and three HP39 Aplet variants pass, with 453
+byte-identical outputs from two clean builds (`/work/oct24-win-keys-sdk.log`).
+This validates header delivery and application packaging, not physical input.
 
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
