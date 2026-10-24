@@ -30,7 +30,7 @@ the next push, including any remaining or newly failed jobs.
 Image Stock process 82374 has completed all six models successfully, joining
 its six-model Direct, SDK, reference/pixel tests and text/image full regression.
 Menu Stock 86659 also completes all six models successfully; checkbox Stock
-73812 passes HP39g+ and continues HP39gs on its unchanged artifact.
+73812 passes HP39g+/HP39gs and continues HP40gs on its unchanged artifact.
 Independent chooser foundation `896948b4` passes focused ASan/UBSan, ARMv4T
 compile and analysis: paired option/label removal and allocation rollback.
 Follow-up `eaa91dc4` adds all nine public chooser APIs, scrolling modal selection,
@@ -38,8 +38,15 @@ confirm/cancel, empty lists and lifecycle-safe menu overlays. Three focused
 ASan/UBSan targets pass including real HPG pixels on 64/80-line displays in both
 buffer modes, plus ARM compile/analysis. Logs `/work/oct24-choose-*-tests.log`.
 SDK process 38518 exits 0: 517 reproducible outputs, six-model C/C++ launchers,
-three Aplet variants and notebooks pass (`/work/oct24-choose-sdk.log`). Original-source comparison,
-native matrix and CI acceptance remain open. All chooser work remains local on
+three Aplet variants and notebooks pass (`/work/oct24-choose-sdk.log`).
+Follow-up `991afcd4` compares all nine unchanged 1.1/2.0 functions: 1,337 matching
+state/keyboard trace lines. Wrong index and selected-row pixel are rejected;
+four focused sanitizer targets pass. All six Direct models pass 104 GPIO
+edges/model, modal confirm/cancel/scrolling, content/status pixels, footer edges
+and settled return (67716 exit 0). Built-in footer glyphs are outside the pixel
+claim. Stock 51380 runs on the fixed chooser artifact. Full 150-test regression
+29287 and whole analysis 29830 run. Logs `/work/oct24-choose-*`. Stock, full
+regression/analysis and CI acceptance remain open. All chooser work remains local on
 `m8-choose-controls`; no subsequent push or M8 completion is claimed.
 
 ## Principles
