@@ -4876,7 +4876,7 @@ below are retained.
   `/work/oct24-window-example-native` and
   host `research/oct24-window-example-native`; this run exercises the shipped
   default timer animation, not scripted digit/ON input. Whole static analysis
-  30552 remains on its original process.
+  30552 has now exited 0 after completing all 345 sources.
 
   Current local window acceptance: all six corrected Stock models pass real
   GPIO input, 44 independent status frames per model, page exchange, final
@@ -4887,8 +4887,8 @@ below are retained.
   validation and post-indicator SDK gates pass; the corrected fixture also
   passes HP48gII Direct. Full 136-test ASan/UBSan regression passes (68707 exit
   0, 671.25 seconds); full format/lint pass with all 4,556 tracked files in the
-  container quality index. Whole host/ARM static analysis runs in 30552; no
-  final analysis result is claimed yet. Logs are
+  container quality index. Whole host/ARM static analysis passes (30552 exit
+  0, all 345 sources completed). Logs are
   `/work/oct24-window-full-unit-tests.log` and
   `/work/oct24-window-final-{format,lint,analysis}.log`.
   CI submission/acceptance, shipped-example Stock execution and widget APIs remain
@@ -4897,7 +4897,7 @@ below are retained.
 
   Latest preceding-head CI inspection (95348ce8): push Core 40068703216 now
   passes, as do both Quality/Storage/Gallery runs and push Objects. PR Core
-  40068713317 is running; both Runtime runs queue. PR Objects 40068713236's
+  40068713317 also passes; both Runtime runs queue. PR Objects 40068713236's
   pre-execution HP39g+ transfer stall remains unresolved with evidence below.
   No new push or merge was made.
 
