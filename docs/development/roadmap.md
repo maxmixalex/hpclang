@@ -419,6 +419,10 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Maintainer push rule (2026-10-24): before every subsequent remote push, inspect
+the preceding push's CI and investigate failures. Record pending/failed runs
+explicitly; do not replace their acceptance with a newer submission.
+
 2026-10-24 acceptance: all six workflows pass at `64d223d9` (Quality
 39935566666, Core 39935566642, Runtime 39935566879, Objects 39935566875,
 Storage 39935566853 and Font Gallery 39935566811). Runtime includes every
@@ -463,9 +467,16 @@ Formal CI acceptance remains open. All original M8 milestone requirements
 remain retained.
 
 Subsequent single CI inspection at exact head `99168c1be049b815ffc318a1db9ecd2dc9ea247e`:
-Quality 40061641240 and Storage 40061641296 pass. At the public-window work-turn
-inspection, Core 40061641258 and Font Gallery 40061641275 are running;
-Runtime 40061641253 and Objects 40061641226 are queued. Batch acceptance remains open.
+Quality 40061641240, Storage 40061641296 and Gallery 40061641275 pass. Core
+40061641258 fails 14 native Port lifecycle jobs; Runtime 40061641253 is queued
+and Objects 40061641226 is running at the failure-review checkpoint. Main Core
+40059453759 separately fails HP49g+ recovery after retirement resume with a
+blank Stock display. Neither failure is accepted or dismissed as transient.
+Downloaded branch recovery/publication logs show execution at unmapped
+`0x00000008`. The exact CI recovery build reproduces locally with matching
+registers on the current watchdog emulator (`/work/oct24-ci-recovery-repro`,
+session 2634 exit 1). An older-emulator comparison is running on session 9666,
+with output `/work/oct24-ci-recovery-old-emulator.log`; root cause remains open.
 Later local window-audit/dispatch changes are outside that head.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
@@ -4764,6 +4775,15 @@ below are retained.
   window SDK installation/relocation validation, not native execution, full
   compatibility, or CI acceptance. Getting started and migration now link the
   bounded event/timer example and explain its error query and unfinished scope.
+  Maintained `hpgcc-window` E2E now exercises four real 30 ms timer callbacks,
+  synchronous user-event consumption, four repaint cycles and normal return.
+  All six Direct targets pass locally (session 2448 exit 0). An independent
+  full-frame verifier checks the final 10-by-10 rectangle and cleared background
+  on every capture; a corrupted-frame negative control is rejected. The ARM
+  payload analysis, formatter and verifier Ruff checks pass. Artifact:
+  `/work/oct24-window-e2e-artifact`; logs: `/work/oct24-window-direct-*.log`;
+  captures/results: `/work/oct24-prepush-src/build`. Stock execution, original
+  window-client/widget acceptance and CI remain open. No new push occurred.
 
 #### M8.5 — Modern C++ and migration
 
