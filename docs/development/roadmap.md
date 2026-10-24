@@ -4895,6 +4895,22 @@ below are retained.
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
 
+  Progress-control source differential now passes both HPGCC 1.1/2.0:
+  `tests/compat/check-win-progress.py` compiles all eight unchanged original
+  progress functions against the same production window/widget/event/timer
+  foundation as the candidate. Host device glue records rendering calls and
+  supplies time/key input. Twenty-four orientation/range/focusability scenarios
+  produce 7,011 identical lines, including bounds, preferred sizes, rendering,
+  blink pattern bytes, value-change events, delayed/periodic repeats, release
+  cancellation and focus transitions. SHA256:
+  `de1f7cea4a937a58bdf295c8dcd4cddd3de7b55ef7c96b96f66db5e458ba0784`.
+  Deliberately reversed horizontal increment keys are rejected. The candidate
+  harness is a maintained ASan/UBSan CTest target and passes. Logs:
+  `/work/oct24-progress-{reference,negative}.log`; reference process 78872
+  exits 0. Invalid-input extensions and callback-removal safety retain their
+  separate sanitizer tests; this differential does not claim original behavior
+  for those extensions. Native control/application acceptance remains open.
+
   Local concrete progress/slider adapter: `winprogress.h` now implements all
   eight historical entry points, four orientations, range/value/increment,
   key-driven changes and boundary focus transfer, delayed/periodic repeat,

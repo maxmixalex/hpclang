@@ -590,7 +590,7 @@ The HPGCC 1.1/2.0 widget family remains a retained **M8.4 adapter requirement**.
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `winevent.h`, `wintimer.h`, `winkeys.h` | Bounded foreground event/timer/key service over native input, time and HPG | Adapter implemented locally; see exact validation below | M8.4, CI pending |
 | `winwidget.h`, `wincore.h` | Custom component lifecycle, focus, geometry and base painting | Local sanitizer/pixel and relocated SDK checks pass; native acceptance pending | M8.4 |
-| `winprogress.h` | Four-orientation progress/slider, focus, repeat and blinking cursor | Local sanitizer/pixel/SDK checks pass; native/reference pending | M8.4 |
+| `winprogress.h` | Four-orientation progress/slider, focus, repeat and blinking cursor | Local sanitizer/pixel/SDK/reference checks pass; native pending | M8.4 |
 | Concrete `win*` controls and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
 
@@ -1418,7 +1418,18 @@ key increments/decrements, delayed and periodic repeats, release cancellation,
 focus transfer, published blink pixels, callback removal, invalid values/types
 and preferred-size overflow. The first blink assertion read the back page after
 presentation; the corrected check observes the front page. Failure evidence is
-retained. Native execution and original-progress-source differential remain open;
+retained. Native execution remains open;
 the installed SDK client exercises these symbols in C/C++. The complete gate
 passes six-model launchers, three HP39 Aplet variants, model-specific Notebook
 builds and 517 reproducible release outputs (64824 exit 0).
+
+The optional `tests/compat/check-win-progress.py` compiles eight unchanged
+original progress-control functions from each supplied HPGCC 1.1/2.0 archive.
+Both match 7,011 trace lines across 24 orientation/range/focus configurations,
+including preferred sizes, rendering calls, pattern bytes, key-driven events,
+repeat timing, release cancellation and focus transfer. Both sides use the same
+production window foundation; HPG device calls are recorded, not rendered by
+this comparison. Separate production HPG tests check pixels. A deliberately
+reversed horizontal increment mapping is rejected. Invalid-input extensions and
+safe removal during notification are covered separately, not claimed identical
+to the original implementation.

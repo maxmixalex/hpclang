@@ -97,6 +97,11 @@ hpclang_unit(win_widget_reference "${HPCLANG_ROOT}/tests/compat/win-widgets.c"
     "${HPCLANG_ROOT}/runtime/core/win-focus.c")
 target_include_directories(test_win_widget_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
     "${HPCLANG_ROOT}/include")
+hpclang_unit(win_progress_reference "${HPCLANG_ROOT}/tests/compat/win-progress.c"
+    ${win_adapter_sources} "${HPCLANG_ROOT}/runtime/core/hpgcc-widget.c"
+    "${HPCLANG_ROOT}/runtime/core/win-focus.c" "${HPCLANG_ROOT}/runtime/core/hpgcc-progress.c")
+target_include_directories(test_win_progress_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/include")
 hpclang_unit(win_keyboard test_win_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/win-drivers.c"
     "${HPCLANG_ROOT}/runtime/core/win-loop.c"
