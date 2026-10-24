@@ -9,7 +9,7 @@ int main()
     assert(stream);
     assert(std::fputs("saved", stream.get()) >= 0);
     assert(std::fflush(stream.get()) == 0);
-    std::rewind(stream.get());
+    assert(std::fseek(stream.get(), 0, SEEK_SET) == 0);
     assert(std::fgetc(stream.get()) == 's');
     int fd = fileno(stream.get());
     auto *original = stream.get();

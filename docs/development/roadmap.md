@@ -435,24 +435,32 @@ now also passes, including every native Port lifecycle job. Font Gallery
 therefore pass at exactly `d409b01453cddc77fc60932ac20d52f06dee4052`.
 [PR #9](https://github.com/maxmixalex/hpclang/pull/9) merged this accepted batch
 into main as `23338a57`. The local work branch merged that ancestry without
-changing its tree; later audio and C++ storage-owner work remains local and
-separately unaccepted. Fresh PR/main CI runs were not polled.
+changing its tree. The later audio, C++ storage-owner and SDK batch is submitted
+separately as described below and is not CI accepted. Fresh PR/main CI runs
+were not polled.
 This does not complete M8.
 
-Batch review (2026-10-24, before submission): canonical and KOS mode matrices
+Batch submission (2026-10-24): canonical and KOS mode matrices
 pass all six Direct/Stock targets. The KOS-entry normal-exit matrix now also
 passes all six Direct/Stock targets; the same queue (21588) has advanced to
 immediate exit. Earlier canonical-API immediate-exit evidence remains recorded
 below and does not substitute for the pending complete KOS-entry matrix.
 The current tracked tree is copied into `/work/oct24-prepush-src`. Final whole
-lint/format and all 173 Python tests pass. Whole-project analysis remains live
-on session 71555, covering 326 sources and 1,339 configurations from 4,047
-compile entries. Logs are `/work/oct24-prepush-{lint,format,python,analysis}.log`.
+lint/format and all 173 Python tests pass. Whole-project analysis completed
+on session 71555 across 326 sources and 1,339 configurations from 4,047
+compile entries. It returned exit 1 for one unchecked `rewind()` error in the
+new stream-owner host test; the other 325 sources passed. The test now uses
+checked `fseek()`. Its exact host analysis configuration and ASan/UBSan test
+both pass after correction; no runtime code changed. Logs are
+`/work/oct24-prepush-{lint,format,python,analysis}.log` and
+`/work/oct24-prepush-stream-{analysis,build,test}.log`.
 KOS immediate exit now passes all six Direct models and HP49g+/HP50g/HP48gII
 Stock; HP39 Stock continues on the same queue. C++ owners retain their
 separate native Storage and focused sanitizer evidence; the final SDK gate
 includes 389 reproducible release outputs and HP39 footprint regeneration.
-This batch is not yet submitted; remaining local/CI gates stay explicit.
+This reviewed batch is submitted on `m8-flash-write`; fresh CI is not polled.
+The complete KOS immediate-exit Stock matrix and formal CI acceptance remain
+open. All original M8 milestone requirements remain retained.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
 actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
