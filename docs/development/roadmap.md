@@ -4920,7 +4920,15 @@ below are retained.
   in `a0e285df`; full relocated SDK process 14789 exits 0: C/C++, six-model
   launchers, three HP39 Aplet variants, notebooks and 517 byte-identical outputs
   pass (`/work/oct24-text-sdk.log`). Text native/CI acceptance remains pending.
-  Integrate these following-batch commits only after the frozen batch.
+  Text native follow-up `308da748` passes all six Direct models (68819 exit 0):
+  52 physical GPIO edges per model cover insertion limits, cursor movement,
+  three deletion behaviors and focus; complete-frame checks verify multiline
+  labels and entry glyphs in both buffer modes. All saved return records pass;
+  a missing label pixel is rejected. Stock process 18243 now runs. Initial
+  isolated setup failures (emulator symlink and CRLF sequence) occurred before
+  payload execution and are retained in `/work/oct24-text-direct-setup-failure.log`
+  and `/work/oct24-text-stock-sequence-failure.log`. SDK follow-up `d699fe5e`
+  records completed acceptance. Integrate this batch after the frozen batch.
   Final frozen-batch verification: all six Stock models pass independent
   keyboard/control pixels and settled return (9966 exit 0). Full ASan/UBSan
   regression passes all 140 tests in 1351.00 seconds (10200 exit 0), log
@@ -4931,10 +4939,10 @@ below are retained.
   Pre-next-push CI inspection of 0a7c2d8d: both Quality (40073587007 /
   40073583118), Storage (40073587032 / 40073583077) and Objects (40073587006 /
   40073583192) runs pass. Both Gallery runs 40073586972 /
-  40073583076 pass. PR Core 40073586985 runs; push Core 40073583179 queues.
+  40073583076 pass. PR Core 40073586985 passes; push Core 40073583179 queues.
   Runtime's aggregate queued label does not mean no work: 40073586999 has
-  69 successful / 48 unfinished jobs; 40073583151 has 72 successful /
-  45 unfinished jobs. Neither reports a failed job at this inspection.
+  78 successful / 39 unfinished jobs; 40073583151 has 76 successful /
+  41 unfinished jobs. Neither reports a failed job at this inspection.
   Preceding 95348ce8 Runtime runs were cancelled by workflow concurrency after
   101 and 90 successful jobs respectively, not accepted as whole-suite passes.
   The older transport/audio failures remain unresolved; a passing Objects run
