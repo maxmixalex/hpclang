@@ -409,6 +409,35 @@ Host checkpoint waits and keyboard injection waits are excluded. These are
 separate sampled paths: adding their maxima would not establish an end-to-end
 latency bound. Renderer construction, asynchronous provider work and initial
 display acquisition are outside these measurements.
+
+The maintained UI test also exports these observations as checkpoint ID 2
+(`*-frame-memory-2.json`). The checkpoint envelope has version 1; its five
+payload words are payload version 1, maximum frame microseconds, maximum input
+microseconds, frame sample count and input sample count. The independent verifier
+requires all nine timed updates and 34 key edges, rejects missing or saturated
+timings, and prints both maxima. Initial painting is measured separately and is
+not one of those nine updates. The original memory report remains checkpoint
+ID 1. Each launch removes old checkpoint files so a previous run cannot supply
+the required observations. Timing is published before application PASS; memory
+is published once after runtime cleanup, preserving Stock's return-monitoring
+boundary. These sampled emulator values are evidence for
+comparison, not a physical-device deadline or worst-case execution bound.
+
+The maintained artifact requests both `MIN_RW_BYTES 36864` and
+`MAX_RW_BYTES 36864`. Its Direct launch gate first rejects zero, one, oversized
+and one-below-required page counts without changing the temporary pool, caller
+registers or mappings, then runs the UI with exactly the required pool count.
+This verifies bounded admission for the tested UI allocation policy; the
+legacy Stock allocation policy and other system-memory costs remain separate.
+
+The installed C device-manager example now declares the same 36 KiB minimum
+and ceiling. The relocated SDK check builds this example without rewriting its
+launcher settings and verifies its memory report and all six packaged launchers.
+The pool requirement in its own `memory.json` is authoritative for that linked
+image; the larger instrumented C/C++ acceptance fixture has different code and
+static-data sizes. Both settings govern application RW admission, not the total
+system allocation or installation footprint.
+
 The standalone C and C++ examples also deliberately sleep for 20 milliseconds
 per event-loop iteration. They process one keyboard event per iteration and
 draw an accepted model change on the following iteration. That scheduling and

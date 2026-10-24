@@ -9,7 +9,9 @@ volatile uint32_t hpclang_ui_stack_witness[3];
 static uintptr_t stack_bottom, stack_top;
 extern volatile uint32_t hpclang_e2e_result;
 extern volatile uint32_t hpclang_ui_heap_witness[2];
+extern volatile uint32_t hpclang_ui_update_witness[4];
 static volatile uint32_t report[10];
+static volatile uint32_t updates[7];
 
 uint32_t hpclang_ui_stack_sample(void)
 {
@@ -57,4 +59,23 @@ int __wrap_hpclang_start(const struct hpclang_boot_info *boot)
         }
     }
     return status;
+}
+
+int hpclang_ui_report_updates(void)
+{
+    /* Publish before PASS: Stock return monitoring may take over after the
+     * single post-cleanup memory checkpoint. Neither handshake is timed. */
+    updates[0] = 2;
+    updates[1] = 5;
+    updates[2] = 1;
+    for (unsigned i = 0; i < 4; ++i)
+        updates[3 + i] = hpclang_ui_update_witness[i];
+    uint32_t offset = (uint32_t)((uintptr_t)updates - HPCLANG_BOOT_BASE);
+    hpclang_e2e_result = 0x4d100000u | offset;
+    uint64_t start = hpclang_time_monotonic_us();
+    while (hpclang_e2e_result != (0x4d200000u | offset)) {
+        if (hpclang_time_monotonic_us() - start > 2000000u)
+            return -1;
+    }
+    return 0;
 }

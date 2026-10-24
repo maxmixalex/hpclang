@@ -421,7 +421,7 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Execution discipline: read this roadmap and remote issue #1 before selecting work;
 reconcile implementation, branch and verification evidence, then update both when
-results or scope facts change. M8.0 remains the primary track. Port 2 recovery
+results or scope facts change. The 2026-10-23 sequencing decision below now governs current work. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
@@ -437,12 +437,80 @@ The observed pre-recovery traversal into SRAM remains a known limitation to
 resolve or exclude from that envelope, not a reason to collect unlimited
 additional successful corruption samples.
 
+Maintainer sequencing decision (2026-10-23): keep Port 2 reclamation and automatic
+startup recovery within M8, but advance other modules first. No scope reduction
+was approved. Current implementation work resumes M8.2/M8.3 UI resource and
+update-cost acceptance; M8.0 requirements stay open, while the recovery repair
+is accepted below. This explicitly supersedes the earlier restriction that other modules
+advance only during an external wait on the native-port track.
+Current UI follow-up (local, 2026-10-23): `bd1b0d56` is not accepted. Its six
+Direct models and HP50g Stock pass, but HP39g+ Stock reaches PASS and then waits
+forever for the second post-PASS report: the existing return monitor has already
+taken over after the first report. The captured PC is the report-timeout loop;
+checkpoint ID 2 is absent. The old remaining Stock queue was intentionally
+terminated after this confirmed defect, not restarted because of elapsed time.
+Local fix `3425073b` publishes timing checkpoint ID 2 before PASS and retains the single
+post-cleanup memory checkpoint ID 1. Strict return checks are unchanged. A fresh
+six-model Direct matrix passes in separate v2 output directories, including
+timing, pixels, memory and return; all six Stock models pass both
+reports, independent pixels and normal return. HP39gs reports 2,424/8,192
+touched stack bytes, 18,892/22,888 heap bytes and observed frame/input maxima
+18,913/610 us over 9/34 samples. The complete Stock queue exits successfully;
+the independent verifier passes all six saved result sets.
+The changed UI sources pass ARM analysis and pinned formatting; report verifier tests pass.
+
+Current minimum-RW admission follow-up (local, 2026-10-23): optional
+MIN_RW_BYTES/--min-rw-bytes establishes an application requirement independent
+of MAX_RW_BYTES. Packaging rejects invalid/conflicting bounds and impossible
+pool totals; stage0 checks the complete required pool before copy/mapping/stack
+changes, and stage1 rechecks RW admission. The maintained UI requests exactly
+36 KiB. All six Direct models pass zero/one/oversized/one-below-required refusal
+with unchanged caller state and full pool, then UI execution on the exact minimum
+pool, independent pixels, memory/timing reports and normal return. Eight host
+tests, relocated installed-SDK C/C++/six-model packaging, Ruff/format and ARM
+analysis (using the repository's fixed-address MMIO exclusion) pass. Default
+launchers without a minimum remain byte-identical on all six models. Focused
+HP39g+ and HP50g Stock pass pixels, both reports and normal return; the focused
+queue exits successfully. HP50g reports 2,432/8,192 touched stack bytes,
+20,076/22,888 heap bytes and frame/input maxima 28,188/610 us over 9/34 samples.
+The separate timing-only Stock matrix also finishes successfully on all six models.
+This adds an admission condition, not a reduced Stock
+allocation policy or whole-system resource proof. No milestone is closed.
+The installed C device-manager example now declares the same 36 KiB minimum
+and ceiling instead of relying on the launcher's remaining pages. The relocated
+SDK check now builds this unmodified C example alongside the existing clients,
+validates its memory report and all six launchers, and optionally includes it in
+Aplet packaging. The expanded SDK suite, including all three HP39 C/C++ Aplet
+families, Ruff/format and strict docs pass locally. The example README's obsolete 16,764-byte pool is corrected to
+13,692 bytes. This does not assert a whole-system 36 KiB footprint.
+Local `a1aae4e8` adds a launcher-memory report that accounts for code, RW minimum/ceiling,
+linked stage, stage stack, MMU workspace and HP39 Stock's native workspace.
+CMake regenerates a deleted report. Seven host tests and the relocated installed
+SDK C/C++/font/six-model packaging checks pass, including missing-report rebuild.
+The first instrumented UI artifact requires 30 pool pages for its complete
+36 KiB RW ceiling, or 32 on HP39 Stock. Stored objects, transfer staging, native
+allocator policy/overhead and separate LCD DMA allocations remain excluded.
+The report-only change produces byte-identical six-model launchers. Whole-app
+admission and actual Stock reservation reduction remain open. No new CI submission
+or M8.2/M8.3 completion is claimed.
+Accepted repair (2026-10-23): `5959159a` on `m8-flash-write` includes safe
+admission folding, maintained copy-size preflight and the four preceding
+startup-evidence commits. Local dual-model recovery, the separate size-check
+supplement, 93 Python tests, Ruff/format and strict docs pass. The batch is
+pushed for CI. Quality 39928737438, Objects 39928737244, Core 39928737294 and
+Runtime 39928737278 now all pass, including both native recovery/retirement
+models and the maintained direct-call relocation cases. Storage 39916501477
+and Font Gallery 39916501572 passed at `3d1a665e`; subsequent changes touch
+only recovery packaging/tests and this roadmap. PR #7 merges this accepted
+batch into main as `2baebace`. The local UI timing/accounting/MIN_RW follow-up
+is excluded from that merge. Main's newly triggered CI is not polled.
+M8.0 remains open; the earlier failed recovery run is historical evidence.
 The direct-call root-discovery follow-up and maintained native code-relocation
 acceptance are submitted together after local verification. Both models pass
 fresh standard Stock startup, all 88 existing native cases and three new direct
 call cases. Host sanitizers, ARM compilation/analysis, pinned formatting and
-strict docs pass. CI acceptance for this new batch remains pending; newly
-triggered workflows are not polled. This is not M8.0 completion.
+strict docs pass. These changes are included in the accepted PR #7 batch
+above. This is not M8.0 completion.
 
 The completed `3d1a665e` CI results are Quality 39916501552, Objects 39916501560,
 Storage 39916501477, Font Gallery 39916501572 and Runtime 39916501501 successful.
@@ -2106,13 +2174,14 @@ triggered CI workflows pass at `d94580b4`, without closing an entire M8 stage.
 | M8.5 | Initial C++ UI/object wrappers accepted; additional owners verified locally. | Broader ownership/migration guidance, examples and pending integration acceptance. |
 | M8.6 | Integrated examples and relocated packaging have substantial local evidence. | Complete downstream scenarios, resource/error/return and release acceptance; retain the independent-launcher evaluation without presuming retirement. |
 
-The next implementation track is M8.0's existing native-port work: establish
+The retained M8.0 implementation track is native-port work: establish
 complete execution-reference coverage for safe movement/registration, then
 finish the trusted recovery installation/authority and startup requirements
 needed for reclamation. Those requirements must be satisfied together before
 public reclamation is enabled. Asynchronous sound is an M8.4 obligation, not a
 dependency of Port 2. Its verified timer/IRQ foundations remain available for
-later continuation. UI/resource and other adapter work may proceed independently
+later continuation. The following earlier scheduling rule is superseded by the
+2026-10-23 sequencing decision above: UI/resource and other adapter work could proceed independently
 when the native-port track has a concrete external wait; this does not silently
 replace that track or close its remaining requirements.
 

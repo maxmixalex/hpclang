@@ -83,6 +83,7 @@ def main():
         check_interworking(package, work, env)
         application = work / "external application"
         shutil.copytree(package / "examples/hello", application)
+        shutil.copytree(package / "examples/declarative-ui", application / "devices")
         shutil.copytree(package / "examples/declarative-ui-cpp", application / "counter")
         counter_cmake = application / "counter/CMakeLists.txt"
         counter_source = counter_cmake.read_text()
@@ -91,7 +92,8 @@ def main():
             raise AssertionError("C++ counter launcher declaration changed")
         counter_cmake.write_text(
             counter_source.replace(
-                launcher_call, "hpclang_target_launchers(declarative_ui_cpp MAX_RW_BYTES 36864)"
+                launcher_call,
+                "hpclang_target_launchers(declarative_ui_cpp MIN_RW_BYTES 36864 MAX_RW_BYTES 36864)",
             )
         )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
@@ -102,7 +104,7 @@ def main():
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
-                "add_subdirectory(notebook)\nadd_subdirectory(console)\n"
+                "add_subdirectory(notebook)\nadd_subdirectory(console)\nadd_subdirectory(devices)\n"
                 "hpclang_add_application(numeric_input numeric-input.cpp)\n"
                 "target_compile_features(numeric_input PRIVATE cxx_std_17)\n"
                 "hpclang_target_launchers(numeric_input)\n"
@@ -118,6 +120,7 @@ foreach(application IN ITEMS hello_c hello_cpp numeric_input)
 endforeach()
 """)
             for directory, target in (
+                ("devices", "declarative_ui"),
                 ("counter", "declarative_ui_cpp"),
                 ("objects", "object_cpp"),
                 ("timer", "hpgcc_timer"),
@@ -158,7 +161,7 @@ endforeach()
         counter_args = (
             (build / "counter/declarative_ui_cpp-launchers.args").read_text().splitlines()
         )
-        if counter_args[-2:] != ["--max-rw-bytes", "36864"]:
+        if counter_args[-4:] != ["--min-rw-bytes", "36864", "--max-rw-bytes", "36864"]:
             raise AssertionError("Relocated SDK lost the requested application RW limit")
         commands = json.loads((build / "compile_commands.json").read_text())
         for command in commands:
@@ -170,6 +173,7 @@ endforeach()
             ("hello_c", build),
             ("hello_cpp", build),
             ("numeric_input", build),
+            ("declarative_ui", build / "devices"),
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
@@ -182,6 +186,21 @@ endforeach()
                 raise AssertionError(f"{name}: expected an ARM ELF executable")
             if hpc[:4] != b"HPC1" or len(hpc) <= 64:
                 raise AssertionError(f"{name}: expected a packaged HPC1 application")
+            memory = json.loads((output / f"{name}-launchers/memory.json").read_text())
+            if (
+                memory["version"] != 1
+                or memory["page_bytes"] != 4096
+                or memory["application"]["image_bytes"] != len(hpc) - 16
+                or memory["application"]["static_bytes"] != int.from_bytes(hpc[12:16], "little")
+            ):
+                raise AssertionError(f"{name}: memory report does not describe the application")
+            ceiling = 36864 if name in ("declarative_ui", "declarative_ui_cpp") else None
+            if memory["application"]["rw_ceiling_bytes"] != ceiling:
+                raise AssertionError(f"{name}: memory report lost its configured RW ceiling")
+            if memory["application"]["required_rw_bytes"] != ceiling:
+                raise AssertionError(f"{name}: memory report lost its required RW size")
+            if len(memory["models"]) != 6 or not memory["excludes"]:
+                raise AssertionError(f"{name}: incomplete memory report scope")
             embedded = (output / f"{name}-launchers/objects/application.bin").read_bytes()
             restored = embedded
             if embedded[:4] == b"HPCZ":
@@ -217,7 +236,7 @@ endforeach()
                         if not (bundle / asset).stat().st_size:
                             raise AssertionError(f"missing Aplet companion: {asset}")
         # A missing declared output must be regenerated without touching source.
-        missing = [build / "hello_c-launchers/hp50g.hp"]
+        missing = [build / "hello_c-launchers/hp50g.hp", build / "hello_cpp-launchers/memory.json"]
         if args.aplet_tool:
             missing.append(build / "hello_cpp-aplet/hp39gs/HPCRESET.000")
         for path in missing:

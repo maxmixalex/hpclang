@@ -165,6 +165,7 @@ struct e2e
     struct input_sequence input_sequence;
     unsigned media_phase;
     unsigned preflight_rejections;
+    uint32_t minimum_pool_pages;
     uint32_t launch_regs[15], launch_cpsr;
     int returned;
     int failed;
@@ -736,7 +737,8 @@ static void monitor(void *arg)
     /* Exercise the actual packaged ARM entry before allowing the application
      * to run. Rejection must leave the entire temporary pool untouched and
      * return with caller registers, mappings and interrupt state intact. */
-    if (s->preflight_rejections < 3u) {
+    unsigned rejection_count = s->minimum_pool_pages ? 4u : 3u;
+    if (s->preflight_rejections < rejection_count) {
         if (s->hdw->cpu->regs[15] == SENTINEL_VA) {
             uint32_t data, code, stage, swi;
             if (memcmp(s->launch_regs, s->hdw->cpu->regs, sizeof s->launch_regs) ||
@@ -755,7 +757,9 @@ static void monitor(void *arg)
                     return;
                 }
             }
-            static const uint32_t pages[] = {0u, 1u, 257u, STAGE_PAGES};
+            const uint32_t pages[] = {
+                0u, 1u, 257u, s->minimum_pool_pages ? s->minimum_pool_pages - 1u : STAGE_PAGES,
+                s->minimum_pool_pages ? s->minimum_pool_pages : STAGE_PAGES};
             ++s->preflight_rejections;
             stl_phys(INJECT_PHYS + 0x914u, pages[s->preflight_rejections]);
             s->hdw->cpu->regs[15] = STAGE0_VA;
@@ -969,6 +973,15 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
     s.result_addr = (uint32_t)result;
+    const char *pool_text = getenv("HPCLANG_E2E_MIN_POOL_PAGES");
+    if (pool_text) {
+        result = strtoul(pool_text, &end, 0);
+        if (end == pool_text || *end != '\0' || result < 2u || result > STAGE_PAGES) {
+            fprintf(stderr, "invalid minimum pool pages\n");
+            return EXIT_FAILURE;
+        }
+        s.minimum_pool_pages = (uint32_t)result;
+    }
 
     s.lcd_height = lcd_height_text ? atoi(lcd_height_text) : 80;
     if (s.lcd_height != 64 && s.lcd_height != 80) {

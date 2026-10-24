@@ -62,6 +62,48 @@ class UiMemoryTests(unittest.TestCase):
             with self.subTest(report=invalid), self.assertRaises(AssertionError):
                 self.check(invalid)
 
+    def test_update_observations_require_complete_unsaturated_samples(self):
+        path = Path(f"{self.prefix}-memory-2.json")
+        with self.assertRaises(FileNotFoundError):
+            VERIFY.verify_updates(self.prefix)
+        report = {"version": 1, "id": 2, "words": [1, 5614, 1234, 9, 34]}
+        path.write_text(json.dumps(report))
+        self.assertEqual(VERIFY.verify_updates(self.prefix), (5614, 1234, 9, 34))
+        for index, value in (
+            (0, 2),
+            (1, 0),
+            (1, 0xFFFFFFFF),
+            (2, 0),
+            (2, 0xFFFFFFFF),
+            (3, 0),
+            (3, 8),
+            (3, 10),
+            (4, 0),
+            (4, 1),
+            (4, 32),
+            (4, 33),
+            (4, 36),
+            (1, True),
+            (1, 1.5),
+            (1, -1),
+            (1, 0x100000000),
+        ):
+            invalid = dict(report, words=report["words"].copy())
+            invalid["words"][index] = value
+            path.write_text(json.dumps(invalid))
+            with self.subTest(index=index, value=value), self.assertRaises(AssertionError):
+                VERIFY.verify_updates(self.prefix)
+        for invalid in (
+            dict(report, version=True),
+            dict(report, version=2),
+            dict(report, id=1),
+            dict(report, extra=0),
+            dict(report, words=report["words"][:-1]),
+        ):
+            path.write_text(json.dumps(invalid))
+            with self.subTest(report=invalid), self.assertRaises(AssertionError):
+                VERIFY.verify_updates(self.prefix)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,7 +9,8 @@ fi
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TARGET="$1"
 export HPCLANG_E2E_FRAME_PREFIX="$ROOT/build/$TARGET-frame"
-rm -f "$HPCLANG_E2E_FRAME_PREFIX"-*.pgm "$HPCLANG_E2E_FRAME_PREFIX"-*.lcd
+rm -f "$HPCLANG_E2E_FRAME_PREFIX"-*.pgm "$HPCLANG_E2E_FRAME_PREFIX"-*.lcd \
+    "$HPCLANG_E2E_FRAME_PREFIX"-memory-*.json
 
 while IFS= read -r line; do
     env_name="${line%%=*}"

@@ -46,8 +46,27 @@ def verify_memory(prefix: Path) -> tuple[int, int, int, int]:
     return final_peak, stack_limit, heap_peak, heap_limit
 
 
+def verify_updates(prefix: Path) -> tuple[int, int, int, int]:
+    report = json.loads(Path(f"{prefix}-memory-2.json").read_text())
+    assert set(report) == {"version", "id", "words"}, f"{prefix}: update report fields"
+    assert type(report["version"]) is int and type(report["id"]) is int
+    assert report["version"] == 1 and report["id"] == 2, f"{prefix}: update report schema"
+    assert isinstance(report["words"], list) and len(report["words"]) == 5
+    assert all(type(value) is int and 0 <= value <= 0xFFFFFFFF for value in report["words"])
+    version, frame_us, input_us, frames, inputs = report["words"]
+    assert version == 1, f"{prefix}: update payload version"
+    assert 0 < frame_us < 0xFFFFFFFF and 0 < input_us < 0xFFFFFFFF, (
+        f"{prefix}: absent or saturated update timing"
+    )
+    # Six timed application/theme updates, one font update and two pressure updates.
+    assert frames == 9, f"{prefix}: incomplete frame timing coverage"
+    assert inputs == 34, f"{prefix}: incomplete key-edge timing"
+    return frame_us, input_us, frames, inputs
+
+
 def verify(prefix: Path, height: int, stock: bool = False) -> None:
     final_peak, stack_limit, heap_peak, heap_limit = verify_memory(prefix)
+    frame_us, input_us, frame_samples, input_samples = verify_updates(prefix)
     frames = [read_frame(Path(f"{prefix}-{phase}.pgm"), height) for phase in range(1, 8)]
     assert len(set(frames)) == 7, f"{prefix}: distinct application/theme states missing"
 
@@ -86,6 +105,10 @@ def verify(prefix: Path, height: int, stock: bool = False) -> None:
     print(f"PASS: {prefix}: UI states, waveform, independent theme and font layout")
     print(
         f"PASS: {prefix}: touched stack {final_peak}/{stack_limit}, heap {heap_peak}/{heap_limit}"
+    )
+    print(
+        f"PASS: {prefix}: observed frame/input maxima {frame_us}/{input_us} us, "
+        f"samples {frame_samples}/{input_samples} (emulator observations)"
     )
 
 
