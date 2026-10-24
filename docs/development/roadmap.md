@@ -4906,8 +4906,19 @@ below are retained.
   shortening, aliased replacement, and allocation-failure preservation/cleanup.
   ARMv4T compile/analysis pass; logs `/work/oct24-text-{build,tests}.log`.
   This is not yet integrated into m8-flash-write, its SDK, native matrix or CI.
-  Text original-source differential, real pixel verification and native/SDK
-  acceptance remain open. Later integrate this commit after the frozen batch.
+  Text follow-up `9cf24d5f` compares all three original source files/four public
+  APIs from both HPGCC 1.1/2.0 versions over the same window foundation. Both
+  match 13,837 lines (SHA256
+  `5053bfb5a00912b263eb38c7acfd6beb75966317959c7c8e9df2a9246b9c0534`),
+  including six label layouts, four entry limits, high bytes, programmatic
+  over-limit replacement and 512 editing actions. Both use unsigned char like
+  ARM. Wrong shifted-backspace precedence is rejected. Logs:
+  `/work/oct24-text-{reference,negative}.log`. Three sanitizer targets pass,
+  including production HPG custom-font pixels for glyphs/cursor/deletion
+  (`/work/oct24-text-pixels-tests.log`). Strict docs pass. SDK clients expanded
+  in `a0e285df`; full relocated SDK process 14789 runs with log
+  `/work/oct24-text-sdk.log`. Text native/SDK acceptance remains pending.
+  Integrate these following-batch commits only after the frozen batch.
 
   Pre-next-push CI inspection of 0a7c2d8d: both Quality (40073587007 /
   40073583118), Storage (40073587032 / 40073583077) and Objects (40073587006 /
