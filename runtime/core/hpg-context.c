@@ -164,21 +164,26 @@ struct hpg_graphics *hpclang_hpg_acquire_screen(void)
     }
     return &screen;
 }
-void hpg_set_indicator(unsigned char indicator, unsigned char color)
+int hpclang_hpg_indicator_set(unsigned char indicator, unsigned char color)
 {
     if (indicator >= 6) {
         errno = EINVAL;
-        return;
+        return -1;
     }
     if (!hpclang_hpg_acquire_screen())
-        return;
+        return -1;
     struct hpclang_surface view;
     if (!status_view(&view))
-        return;
+        return -1;
     if (screen.mode == HPG_MODE_XOR)
         color ^= hpclang_surface_get_pixel(&view, (int)view.width - 1, indicator);
-    if (!hpclang_display_indicator_set(indicator, color))
-        hpclang_hpg_finish(&screen);
+    if (hpclang_display_indicator_set(indicator, color))
+        return -1;
+    return double_buffered ? 0 : hpclang_display_publish();
+}
+void hpg_set_indicator(unsigned char indicator, unsigned char color)
+{
+    (void)hpclang_hpg_indicator_set(indicator, color);
 }
 hpg_t *hpclang_hpg_resolve(hpg_t *g)
 {

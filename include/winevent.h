@@ -10,7 +10,7 @@ extern "C"
     /* Foreground source adapter. Callbacks/data are borrowed through synchronous
      * snapshots, including after removal. Higher priority/newer ties run first.
      * Initialization is lazy. The current bounded service provides 64 handler
-     * slots (five reserved for idle/key drivers), 256 simultaneous snapshot entries
+     * slots (six reserved for idle/key/indicator drivers), 256 simultaneous snapshot entries
      * and 32 timers. Exhaustion reports ENOSPC, never silently drops a registration.
      * System IDs 0..7 are reserved; user event registration starts at 8. Physical
      * key events 1/2, typed/modifier events 3..6 (winkeys.h), and repaint 7

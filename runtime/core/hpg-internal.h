@@ -41,6 +41,9 @@ int hpclang_hpg_console_present(void);
  * publish before the final hook; this is not an atomic-frame guarantee. */
 int hpclang_hpg_frame_begin(void *context);
 int hpclang_hpg_frame_present(void *context);
+/* Checked form of hpg_set_indicator, including single-page publication errors.
+ * Preserves the current PAINT/XOR and buffering semantics. */
+int hpclang_hpg_indicator_set(unsigned char indicator, unsigned char color);
 void hpclang_hpg_finish(struct hpg_graphics *g);
 void hpclang_hpg_builtin_glyph(struct hpclang_surface *surface, hpg_font_t *font,
                                unsigned char code, int x, int y);

@@ -4862,16 +4862,36 @@ below are retained.
   current submission; formal CI acceptance remains pending.
 
 
+  Local modifier-indicator integration (after 526669a8, not pushed): the default
+  priority-2000000000 repaint handler sets historical Alpha/Shift segments from
+  current held/latch states: white off, black on/held, gray 9 locked Alpha.
+  Existing HPG PAINT/XOR and page buffering apply. A checked internal indicator
+  hook propagates display errors; public void HPG behavior is preserved. Six
+  internal handlers leave 58 application slots. Four focused sanitizer targets
+  pass, including modifier colors, repaint consumption, first-error propagation
+  and actual HPG status-page/publication behavior. Six-model ARM builds and host
+  analysis pass (`/work/oct24-win-indicator-{tests,arm,analysis}.log`). Native
+  physical input and indicator pixels remain open; prior SDK/native evidence
+  predates this indicator change.
+
+  Pre-next-push CI inspection of 95348ce8: Quality 40068713244/40068703255,
+  Storage 40068713251/40068703345, Gallery 40068713225 and Objects 40068703277
+  pass. Objects 40068713236 is running; Core 40068713317/40068703216,
+  Runtime 40068713291/40068703319 and Gallery 40068703246 are queued.
+  No completed failures were present at inspection. No CI acceptance or merge
+  is claimed, and no new push was made; inspect remaining results before pushing.
+
   Local public typed-key integration (after 20c24cf2, not pushed): `winkeys.h`
   exposes historical typed/modifier event constants and payload fields. The
   service installs priority-2000000000 press/release translators, preserving
   synchronous borrowed/nested payloads, early event consumption and failure
   latching. Mapping keeps the historical numeric key namespace on HP39 too;
   native text interpretation is separate. Modifier repaint notifications do not
-  begin/present frames or draw indicators. Three focused sanitizer targets pass,
+  begin/present frames; indicator drawing was subsequently connected above.
+  Three focused sanitizer targets pass,
   including public polled-matrix transitions, nested callbacks and invalid keys;
   host analysis and six-model ARM builds pass. Native physical input, indicators,
-  CI acceptance remains open. The installed window example now consumes typed
+  and CI acceptance remain open. The installed window example now consumes typed
   digits to move the rectangle and ON to quit. Its C/C++23 relocated-SDK builds,
   six-model launchers, all three HP39 Aplet variants and 453 byte-identical release
   outputs pass (`/work/oct24-win-keys-sdk.log`, process 11638 exit 0). This closes

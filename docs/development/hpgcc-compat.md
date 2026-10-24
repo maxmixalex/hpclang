@@ -721,7 +721,7 @@ guarantee is introduced. Declarative widget bridging remains separate work.
 request. They preserve user IDs starting at 8, synchronous callback results and
 positive millisecond timer intervals. The checked `hpclang_win_error`,
 `hpclang_win_step` and `hpclang_win_reset` extensions make failures of historical
-void functions observable. Default limits are 64 handlers (five reserved),
+void functions observable. Default limits are 64 handlers (six reserved),
 256 concurrent snapshot entries and 32 timers; exhaustion latches `ENOSPC`.
 Reset is rejected during callbacks and does not release HPG's shared display.
 The shipped `hpgcc-window` example builds and links all six launcher variants;
@@ -750,7 +750,12 @@ Character mapping retains the historical `hpkeyb49.h` numeric namespace on every
 model, including HP39, rather than interpreting each model's printed key legends.
 Use the canonical text-input service for model-native text interpretation.
 Modifier notifications synchronously post repaint event 7, as in the original;
-these posts do not run the idle frame begin/present hooks or draw indicators.
+these posts do not run the idle frame begin/present hooks. A default repaint
+handler at priority 2000000000 draws Alpha/Shift segments through HPG: white
+when off, black when on/held, and gray 9 for locked Alpha. HPG's PAINT/XOR and
+buffering rules apply, and earlier handlers may consume repaint. A checked
+internal indicator hook propagates acquisition/segment/publication failures to
+the window loop; the public void HPG function keeps its existing contract.
 `tests/compat/check-win-key-state.py <archive-directory>` compiles caller-supplied
 1.1/2.0 sources under ASan/UBSan and compares 94,253 trace lines, including held
 Alpha, crossed shifts and nested callbacks. Both references match; a deliberately
@@ -759,7 +764,7 @@ six-model launcher compilation pass. Public integration additionally passes
 ASan/UBSan checks for polled matrix transitions, one-shot Alpha, nested payload
 lifetimes, preempted physical events, callback -1 results and error propagation.
 The public adapter passes host analysis and six-model ARM compilation. Native
-physical input and modifier indicators remain required; the preceding native
+physical input and native modifier-indicator acceptance remain required; the preceding native
 window evidence predates this integration. The installed window example now
 uses typed digits to move the rectangle and ON to exit. Its relocated C/C++23
 SDK builds, six-model launchers and three HP39 Aplet variants pass, with 453

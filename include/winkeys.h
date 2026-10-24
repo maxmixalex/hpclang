@@ -20,7 +20,10 @@
  * The default press/release handlers have priority 2000000000. A handler
  * running before them can consume physical events and suppress translation.
  * Modifier changes synchronously post repaint event 7, as in HPGCC; they
- * do not begin/present an HPG frame or draw built-in modifier indicators.
+ * do not begin/present an HPG frame. The default repaint handler (priority
+ * 2000000000) draws Alpha/Shift segments through HPG: off white, on/held black,
+ * locked Alpha gray 9. HPG PAINT/XOR and page buffering remain in effect;
+ * physical icon legends vary by model. Display failures latch the window error.
  */
 typedef struct
 {

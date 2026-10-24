@@ -60,6 +60,24 @@ static int key_translate(void *event, void *pressed)
         return fail(errno);
     return result;
 }
+static int indicator_paint(void *event, void *context)
+{
+    (void)event;
+    (void)context;
+    if (loop.failure)
+        return fail(loop.failure);
+    static const unsigned char indicators[] = {HPG_INDICATOR_ALPHA, HPG_INDICATOR_LSHIFT,
+                                               HPG_INDICATOR_RSHIFT};
+    for (unsigned i = 0; i < 3; ++i) {
+        unsigned state = key_state.held[i] ? WIN_KEYSTATE_PRESSED : key_state.latched[i];
+        unsigned char color = state == WIN_KEYSTATE_LOCK ? HPG_COLOR_GRAY_9
+                              : state                    ? HPG_COLOR_BLACK
+                                                         : HPG_COLOR_WHITE;
+        if (hpclang_hpg_indicator_set(indicators[i], color))
+            return fail(errno);
+    }
+    return 0;
+}
 void win_init(void)
 {
     if (initialized)
@@ -79,6 +97,7 @@ void win_init(void)
     hpclang_win_events_add(&events, WIN_KEY_PRESSED, 2000000000, key_translate,
                            (void *)(uintptr_t)1);
     hpclang_win_events_add(&events, WIN_KEY_RELEASED, 2000000000, key_translate, NULL);
+    hpclang_win_events_add(&events, 7, 2000000000, indicator_paint, NULL);
     next_event = 8;
     initialized = 1;
 }

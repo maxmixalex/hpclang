@@ -2,6 +2,7 @@
 #include <wintimer.h>
 #include <winkeys.h>
 #include <hpkeyb49.h>
+#include <hpgraphics.h>
 #include "hpgcc-keyboard.h"
 #include <assert.h>
 #include <errno.h>
@@ -10,6 +11,19 @@
 
 static uint64_t now, physical_matrix;
 static int calls, frames, paints, io_error;
+static unsigned char indicators[6];
+static int indicator_failure, indicator_calls;
+int hpclang_hpg_indicator_set(unsigned char indicator, unsigned char color)
+{
+    assert(indicator < 6);
+    ++indicator_calls;
+    if (indicator_failure) {
+        errno = EIO;
+        return -1;
+    }
+    indicators[indicator] = color;
+    return 0;
+}
 int hpclang_hpg_frame_begin(void *context)
 {
     assert(!context);
@@ -143,6 +157,39 @@ static void check_keys(void)
     assert(hpclang_win_step(1) == 1 && typed_calls == 1);
     assert(!hpclang_win_reset());
 }
+static void check_indicators(void)
+{
+    assert(!hpclang_win_reset());
+    assert(!win_post_event(7, NULL));
+    assert(indicators[HPG_INDICATOR_ALPHA] == HPG_COLOR_WHITE);
+    assert(!win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_ALPHA));
+    assert(indicators[HPG_INDICATOR_ALPHA] == HPG_COLOR_BLACK);
+    assert(!win_post_event(WIN_KEY_RELEASED, (void *)(uintptr_t)KB_ALPHA));
+    assert(indicators[HPG_INDICATOR_ALPHA] == HPG_COLOR_BLACK);
+    assert(!win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_ALPHA));
+    assert(indicators[HPG_INDICATOR_ALPHA] == HPG_COLOR_BLACK);
+    assert(!win_post_event(WIN_KEY_RELEASED, (void *)(uintptr_t)KB_ALPHA));
+    assert(indicators[HPG_INDICATOR_ALPHA] == HPG_COLOR_GRAY_9);
+    assert(!win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_LSHIFT));
+    assert(indicators[HPG_INDICATOR_LSHIFT] == HPG_COLOR_BLACK);
+    assert(!win_post_event(WIN_KEY_RELEASED, (void *)(uintptr_t)KB_LSHIFT));
+    assert(!win_post_event(WIN_KEY_PRESSED, (void *)(uintptr_t)KB_RSHIFT));
+    assert(indicators[HPG_INDICATOR_LSHIFT] == HPG_COLOR_WHITE);
+    assert(indicators[HPG_INDICATOR_RSHIFT] == HPG_COLOR_BLACK);
+    assert(!hpclang_win_reset());
+    assert(!win_post_event(7, NULL));
+    assert(indicators[HPG_INDICATOR_ALPHA] == HPG_COLOR_WHITE);
+    assert(indicators[HPG_INDICATOR_RSHIFT] == HPG_COLOR_WHITE);
+    int before = indicator_calls;
+    win_add_event_handler(7, INT_MAX, consume, NULL);
+    assert(win_post_event(7, NULL) == 17 && indicator_calls == before);
+    win_remove_event_handler(7, consume, NULL);
+    indicator_failure = 1;
+    assert(win_post_event(7, NULL) == -1 && hpclang_win_error() == EIO);
+    assert(indicator_calls == before + 1);
+    indicator_failure = 0;
+    assert(!hpclang_win_reset());
+}
 int main(void)
 {
     assert(!hpclang_win_error());
@@ -183,7 +230,7 @@ int main(void)
 
     assert(!hpclang_win_reset());
     event = win_register_event();
-    for (int i = 0; i < 59; ++i)
+    for (int i = 0; i < 58; ++i)
         win_add_event_handler(event, i, callback, &calls);
     assert(!hpclang_win_error());
     win_add_event_handler(event, 0, callback, &calls);
@@ -192,6 +239,7 @@ int main(void)
     assert(win_post_event(8, NULL) == -1 && hpclang_win_error() == EINVAL);
     assert(!hpclang_win_reset());
     check_keys();
+    check_indicators();
     io_error = 1;
     win_event_loop();
     assert(hpclang_win_error() == EIO);

@@ -208,7 +208,7 @@ static unsigned borrowed;
 static struct hpclang_surface *pages[2];
 static unsigned page_count, back, published, flips, ended;
 static int mode_failure;
-static int present_failure;
+static int present_failure, publish_failure;
 static unsigned display_height = 6;
 static int configure(unsigned levels, unsigned count)
 {
@@ -243,6 +243,10 @@ int hpclang_display_replace_pages(uint32_t levels, unsigned count)
 int hpclang_display_publish(void)
 {
     assert(page_count);
+    if (publish_failure) {
+        errno = EIO;
+        return -1;
+    }
     ++published;
     return 0;
 }
@@ -333,6 +337,9 @@ static void indicators(void)
     assert(hpclang_surface_get_pixel(&status, 8, HPG_INDICATOR_ALPHA) == 255);
     assert(hpclang_surface_get_pixel(&status, 8, HPG_INDICATOR_WAIT) == 255);
     assert(hpclang_surface_get_pixel(&original, 8, HPG_INDICATOR_ALPHA) == 0);
+    publish_failure = 1;
+    assert(hpclang_hpg_indicator_set(HPG_INDICATOR_ALPHA, 255) == -1 && errno == EIO);
+    publish_failure = 0;
     hpg_set_mode(NULL, HPG_MODE_XOR);
     hpg_set_indicator(HPG_INDICATOR_ALPHA, 255);
     assert(hpclang_surface_get_pixel(&status, 8, HPG_INDICATOR_ALPHA) == 0);
@@ -347,6 +354,7 @@ static void indicators(void)
     status = *pages[back];
     ++status.width;
     assert(hpclang_surface_get_pixel(&status, 8, HPG_INDICATOR_BATTERY) == 0);
+    assert(hpclang_hpg_indicator_set(6, 255) == -1);
     hpg_set_indicator(6, 255);
     assert(errno == EINVAL && published == previous);
     hpg_cleanup();
