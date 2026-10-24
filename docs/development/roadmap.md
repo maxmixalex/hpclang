@@ -20,6 +20,13 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Independent box foundation `2c4b6502` on `m8-box-controls` passes focused
+ASan/UBSan, ARM compile and analysis. Checked axis allocation/alignment handles
+zero weights, padding deficits, allocation rollback and coordinate overflow,
+retaining historical signed rounding. Original NULL-placeholder looping and
+zero-weight division are identified for repair. Public container APIs/grouped
+lifecycle and native acceptance remain pending. Logs `/work/oct24-box-*`.
+
 Latest follow-up inspection (2026-10-24): `cb7c7bae` Quality, Storage and
 Objects push/PR runs pass; Core, Runtime and Gallery are not yet fully terminal.
 No subsequent push or CI acceptance is claimed. Re-read failed Objects run
