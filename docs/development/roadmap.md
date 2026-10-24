@@ -4695,6 +4695,18 @@ below are retained.
   Actual keyboard and renderer generators, public adapters and calculator
   loop acceptance remain open. Source anchors are the original `win_init.c`,
   `win_event_loop.c` and `win_event_quit.c`; no historical source is bundled.
+  The internal `win-keyboard` generator now polls the existing six-model
+  historical matrix adapter through a checked read path. Changed physical bits
+  dispatch in ascending order; the baseline updates before callbacks, preserving
+  nested snapshot semantics. Per-key consumption does not suppress other keys.
+  Read errors preserve the baseline; a partially failed dispatch latches failure
+  so the future owner must unwind rather than silently lose/replay transitions.
+  Six focused sanitizer targets pass, including all 60 physical bits on each
+  model, mixed press/release, nesting and failure. Host/ARM analysis and six-model
+  C/C++ builds pass (`/work/oct24-win-keyboard-{build,analysis,arm}.log`). These
+  are host-controlled physical snapshots and build evidence, not calculator
+  window interaction acceptance. Idle-loop error propagation, actual renderer
+  integration, public interfaces and widget behavior remain open. Not pushed.
 
 #### M8.5 — Modern C++ and migration
 

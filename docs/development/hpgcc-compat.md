@@ -674,6 +674,18 @@ timed quit, consumption, nesting and failed-dispatch retry. Those generators
 are controlled test callbacks; device input, rendering and public window
 adapters still require integration and calculator acceptance.
 
+The internal `win-keyboard` generator now uses the existing model-aware
+historical matrix reader, with an explicit checked read result. As in the
+original `_win_key_generator.c`, it updates the baseline before callbacks and
+dispatches changed bit numbers in ascending order. Nested polling sees that
+baseline; consumption applies to one key event. Codes remain physical matrix
+positions, including HP39's distinct modifier labels, rather than text. Read
+failure leaves the baseline unchanged. Dispatch failure is latched and requires
+the owning loop to stop and unwind before reinitialization, since an earlier
+key may already have been delivered. Host tests exercise all 60 physical inputs
+on all six model mappings, mixed transitions, nesting and partial failure.
+This does not yet validate a complete device window loop or its error handling.
+
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter
