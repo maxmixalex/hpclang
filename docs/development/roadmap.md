@@ -20,6 +20,17 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Independent `m8-box-controls` work adds a checked internal grid-axis allocator
+and alignment helper. It preserves padding-first deficits and historical signed
+rounding, handles fixed zero-weight cells without division by zero, and computes
+remaining weights without subtractive cancellation. Invalid weights, allocation
+failure and coordinate overflow leave caller output unchanged. ASan/UBSan,
+ARMv4T compilation and static analysis pass (`/work/oct24-box-{build,tests}.log`).
+Source review also finds the original NULL-placeholder loop fails to advance;
+the future container adapter must fix that path. No public box API, grouped
+installation/removal, source-equivalence, SDK or native acceptance is claimed.
+Chooser regression/analysis/Stock runs remain on their original fixed sources.
+
 Selection-control foundation on `m8-choose-controls` remains local and internal:
 paired borrowed option/label descriptors preserve numeric selection semantics;
 allocation failure leaves state intact, and removal shifts both fields together.

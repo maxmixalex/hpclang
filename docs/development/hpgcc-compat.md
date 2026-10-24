@@ -4,6 +4,15 @@ This page records the M7 source-compatibility inventory. Historical names are in
 
 ## Sources and method
 
+Box follow-up source review (2026-10-24): the original grid layout divides by
+the remaining weight even when it is zero and fails to advance past NULL
+placeholder children. The local internal axis helper handles zero weights,
+padding deficits, checked coordinate arithmetic and allocation rollback; its
+four alignment modes retain historical behavior. Negative-space distribution
+retains the original `(share + 0.5)` truncation, including a possible one-pixel
+overhang. Focused sanitizer tests and ARM compile/analysis pass. Container
+ownership, grouped lifecycle, public APIs and native acceptance remain pending.
+
 Primary function-level evidence comes from complete historical distributions:
 
 - HPGCC 1.0.3 beta;

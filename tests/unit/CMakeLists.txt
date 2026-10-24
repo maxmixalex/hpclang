@@ -912,3 +912,7 @@ hpclang_unit(win_choose_reference "${HPCLANG_ROOT}/tests/compat/win-choose.c" ${
     "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
 target_include_directories(test_win_choose_reference PRIVATE "${HPCLANG_ROOT}/runtime/core"
     "${HPCLANG_ROOT}/include")
+
+hpclang_unit(win_box_axis test_win_box_axis.c "${HPCLANG_ROOT}/runtime/core/win-box-axis.c")
+target_include_directories(test_win_box_axis PRIVATE "${HPCLANG_ROOT}/runtime/core")
+target_compile_definitions(test_win_box_axis PRIVATE malloc=hpclang_test_malloc)
