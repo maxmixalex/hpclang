@@ -1336,7 +1336,8 @@ the complete UI/return flow and both pool checks locally. The local Runtime
 workflow now opts Stock UI jobs into capture and
 requires `--pool` verification, uploading the linked `launchers/memory.json`
 alongside observed reports. Other suites and Direct runs retain their existing
-behavior. This workflow change is not yet submitted or CI accepted.
+behavior. This workflow change is submitted in `d409b014`; CI acceptance is
+pending.
 
 Stock startup has an earlier admission boundary than the application's RW
 budget. Stage0 must fit the linked stage1 memory extent (including its prefix,

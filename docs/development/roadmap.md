@@ -425,7 +425,10 @@ Storage 39935566853 and Font Gallery 39935566811). Runtime includes every
 Direct family and all six Stock UI targets. PR #8 merged the timing, linked
 memory-report, minimum-RW admission and installed C example budget batch into
 main as `17444cb7`. Later pool-observer, serialized-report, sketch-review and
-migration-guide changes remain a separate batch; this does not complete M8.
+migration-guide changes were pushed separately as `d409b014` after all six
+local Stock observations, relevant host/sanitizer/Python checks, SDK packaging,
+Ruff and strict docs passed. That batch is submitted, not CI accepted; its new
+CI has not been polled. This does not complete M8.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
 actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
@@ -460,7 +463,7 @@ The design record contains the mapped-pool ledger for all six launches.
 The local Runtime workflow enables capture and requires `--pool` for Stock UI,
 uploading the linked memory report alongside runtime observations. YAML parsing,
 verifier shell syntax and all six retained UI report/pixel flows pass; this
-workflow change is not yet submitted.
+workflow change is submitted in `d409b014` and awaits CI acceptance.
 The earlier instrumented HP39g+ experiment exits
 successfully, but its final snapshot no longer contains the marker, so it
 provides no pool measurement. The new observer captures while the application
