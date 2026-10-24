@@ -1366,25 +1366,29 @@ The local Runtime workflow enables both observers for Stock UI jobs and requires
 hashes and free-list roots. The job retains the post-return SRAM with allocation,
 pool, release and Stock-status reports for independent replay. Fresh Stock setup
 removes an old release report before executing another application. This workflow
-change has passed actionlint, shellcheck and exact-step replay on the three
-completed models; remote acceptance remains pending.
+change has passed actionlint, shellcheck and exact-step replay on all six
+models; remote acceptance remains pending.
 
-The focused native sequence completes on HP39g+ and HP50g; HP39gs also passes, with independent
+Both native sequences complete successfully on all six models, with independent
 UI, memory, pool, allocation and post-return free-list checks. Values are bytes:
 
-| Observed resource | HP39g+ | HP39gs | HP50g |
-| --- | ---: | ---: | ---: |
-| Distinct mapped pool | 147,456 | 143,360 | 385,024 |
-| Native block usable extent | 6,144 | 6,144 | 86,016 |
-| Block metadata | 20 | 20 | 20 |
-| Block bytes shared with pool pages | 0 | 0 | 81,920 |
-| Pool/block union | 153,620 | 149,524 | 389,140 |
-| Block extent returned to free list | 6,164 | 6,164 | 86,036 |
+| Observed resource | HP39g+ | HP39gs | HP40gs | HP48gII | HP49g+ | HP50g |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Distinct mapped pool | 147,456 | 143,360 | 143,360 | 151,552 | 385,024 | 385,024 |
+| Native block usable extent | 6,144 | 6,144 | 6,144 | 6,144 | 86,016 | 86,016 |
+| Block metadata | 20 | 20 | 20 | 20 | 20 | 20 |
+| Block bytes shared with pool pages | 0 | 0 | 0 | 0 | 81,920 | 81,920 |
+| Pool/block union | 153,620 | 149,524 | 149,524 | 157,716 | 389,140 | 389,140 |
+| Block extent returned to free list | 6,164 | 6,164 | 6,164 | 6,164 | 86,036 | 86,036 |
 
 Both memory checkpoints agree. Evidence is retained under
-`/work/oct24-native-accounting{,-rest}-src/build`; the other three models remain
-under validation. Negative replay rejects an otherwise consistent free list missing
-the released block, unsettled return and a changed allocator code fingerprint.
+`/work/oct24-native-accounting{,-rest}-src/build`; exact CI verifier replays and
+independently checked SRAM proof hashes are under
+`/work/oct24-native-release-ci-replay{,-rest}`. The first HP48gII replay used an
+incorrect HP49/50 family argument and correctly failed geometry validation;
+using its actual HP48 family passes without changing the evidence or verifier.
+Negative replay rejects an otherwise consistent free list missing the released
+block, unsettled return and a changed allocator code fingerprint.
 Other native allocations, stored objects and transfer/installation peaks remain
 outside this ledger. These are emulator observations, not physical-device results.
 

@@ -20,6 +20,26 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+SDK memory guide (local) now separates application RW, complete launch pool,
+serialized package and whole-system peak. It documents admission/ceiling fields,
+Aplet footprint, transient replacement costs and measurement limits. The guide
+is installed with the SDK and linked from Getting Started and site navigation.
+Strict docs, a fresh installation relocated to a path containing spaces, exact
+installed guide comparison, local links/anchors and the report-reading snippet
+against a generated memory.json pass. Evidence: `/work/oct24-memory-guide-*`.
+
+Native accounting sequences 76058 and 40563 both exit 0, completing all six
+models. The exact local CI verifier step, including post-return free-list release
+and independently checked SRAM proof hashes, passes all six retained results.
+HP40gs/HP48gII/HP49g+ pool/block unions are 149,524/157,716/389,140 bytes;
+released block extents are 6,164/6,164/86,036 bytes. The HP48gII replay initially
+used an incorrect HP49/50 family argument and failed geometry as expected;
+correcting the research script to HP48 passes unchanged artifacts/verifier.
+Detailed ledger is in sdk-design.md; replay artifacts are under
+`/work/oct24-native-release-ci-replay{,-rest}`. This supersedes the pending-model
+status below. Other native allocations, stored objects, installation/transfer
+peaks and remote acceptance remain open. No new push or fresh-CI polling.
+
 Stock UI CI wiring `1ce07b3a` (local) enables native allocation capture and
 requires pool/allocation/post-return release verification. It retains SRAM and
 reports; successful release proof includes allocator/Flash/SRAM hashes and
