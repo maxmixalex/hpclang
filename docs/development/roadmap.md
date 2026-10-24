@@ -463,10 +463,10 @@ Formal CI acceptance remains open. All original M8 milestone requirements
 remain retained.
 
 Subsequent single CI inspection at exact head `99168c1be049b815ffc318a1db9ecd2dc9ea247e`:
-Quality 40061641240 passes. Core 40061641258 and Font Gallery 40061641275 are
-running; Runtime 40061641253, Objects 40061641226 and Storage 40061641296 are
-queued. This does not establish batch acceptance, and those live runs are not
-being polled. Later local window-audit/dispatch changes are outside that head.
+Quality 40061641240 and Storage 40061641296 pass. At the next work-turn
+inspection, Core 40061641258, Font Gallery 40061641275, Runtime 40061641253
+and Objects 40061641226 are queued. This does not establish batch acceptance.
+Later local window-audit/dispatch changes are outside that head.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
 actual HPC1 and embedded-payload bytes plus per-model raw launcher/transfer
@@ -4683,6 +4683,18 @@ below are retained.
   `/work/oct24-win-timers-{build,differential,analysis,arm}.log`.
   Public window interfaces, the device clock/idle loop and widget integration
   remain open; this internal implementation has not been submitted to CI.
+  The subsequent internal `win-loop` joins idle dispatch with the event/timer
+  foundation. Entry clears a prior quit; consuming idle does not quit; a quit
+  completes the current snapshot; nested runs share the historical quit flag.
+  A bounded run retains registrations and pending timers. The host integration
+  exercises keyboard/repaint/timer priority, timed quit, callback consumption,
+  nested quit and snapshot exhaustion/retry; all four focused sanitizer targets
+  pass. Host/ARM static analysis and six-model C/C++ launcher builds also pass;
+  logs are `/work/oct24-win-loop-{build,analysis,arm}.log`. The ARM build needed
+  the ATFE bin directory on PATH for `llvm-ar`; the corrected build passes.
+  Actual keyboard and renderer generators, public adapters and calculator
+  loop acceptance remain open. Source anchors are the original `win_init.c`,
+  `win_event_loop.c` and `win_event_quit.c`; no historical source is bundled.
 
 #### M8.5 — Modern C++ and migration
 

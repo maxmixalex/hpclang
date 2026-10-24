@@ -31,6 +31,7 @@ set(HPCLANG_RUNTIME_START
 set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-events.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-timers.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-loop.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-layout.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-focus.c"

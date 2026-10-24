@@ -55,6 +55,10 @@ target_include_directories(test_win_events PRIVATE "${HPCLANG_ROOT}/runtime/core
 hpclang_unit(win_timers test_win_timers.c
     "${HPCLANG_ROOT}/runtime/core/win-timers.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
 target_include_directories(test_win_timers PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(win_loop test_win_loop.c
+    "${HPCLANG_ROOT}/runtime/core/win-loop.c"
+    "${HPCLANG_ROOT}/runtime/core/win-timers.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
+target_include_directories(test_win_loop PRIVATE "${HPCLANG_ROOT}/runtime/core")
 hpclang_unit(win_timer_reference "${HPCLANG_ROOT}/tests/compat/win-timers.c"
     "${HPCLANG_ROOT}/runtime/core/win-timers.c" "${HPCLANG_ROOT}/runtime/core/win-events.c")
 target_include_directories(test_win_timer_reference PRIVATE "${HPCLANG_ROOT}/runtime/core")

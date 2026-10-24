@@ -665,6 +665,15 @@ Additional focused tests cover capacity, budget, clock and overflow failures;
 host/ARM analysis and six-model C/C++ launcher builds pass. Public window
 interfaces, a device-clock idle loop and widget integration remain unfinished.
 
+The internal `win-loop` now dispatches idle through this event bus. It retains
+the original entry-time quit reset and shared quit flag for nested runs. A
+handler consuming idle does not terminate the loop; requesting quit allows the
+current snapshot to finish. Bounded runs leave pending timers and registrations
+intact. Host integration checks the keyboard/repaint/timer priority sequence,
+timed quit, consumption, nesting and failed-dispatch retry. Those generators
+are controlled test callbacks; device input, rendering and public window
+adapters still require integration and calculator acceptance.
+
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter
