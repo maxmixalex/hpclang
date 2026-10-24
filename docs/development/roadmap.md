@@ -4934,8 +4934,9 @@ below are retained.
   allocation cleanup and detached repaint on removal. Real HPG ASan/UBSan
   composition/clipping/removal/resource-reuse tests and ARM compile/analysis
   pass. Corrected test expectations use the relative pattern origin and fit
-  the host display; initial failure log is retained. SDK process 55970 runs
-  (`/work/oct24-image-sdk.log`); original-source/native acceptance remain open.
+  the host display; initial failure log is retained. SDK process 55970 exits 0: C/C++, six launchers, three Aplet variants,
+  notebooks and 517 byte-identical outputs pass (`/work/oct24-image-sdk.log`).
+  Original-source/native acceptance remain open.
   Final frozen-batch verification: all six Stock models pass independent
   keyboard/control pixels and settled return (9966 exit 0). Full ASan/UBSan
   regression passes all 140 tests in 1351.00 seconds (10200 exit 0), log
