@@ -4294,6 +4294,17 @@ below are retained.
   warnings treated as errors. This is a tested timer primitive, not production
   IRQ/audio integration. The clock sampling/serialization, dispatcher, autonomous
   audio stop, preemption and Stock timer ownership requirements remain open.
+  A further local clock change serializes foreground monotonic sampling,
+  initialization and civil-time rebasing with IRQ/FIQ masking, and supplies an
+  internal already-masked read path that does not enter the supervisor bridge.
+  This prevents a future owned IRQ handler from observing torn 64-bit state or
+  half-published epochs. A Linux MMIO fixture executes the real clock code under
+  ASan/UBSan and checks masked RTC access, unchanged failure outputs, original
+  mask restoration, nested masked callers and backward-date monotonicity.
+  The System Services ARM image and all six launchers build; repository-policy
+  ARM static analysis passes. Six-model Direct/Stock execution is running on
+  session 10232 / PID 103418 using `/work/oct24-clock-system`; acceptance is
+  pending. The production sound dispatcher and autonomous stop remain open.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;

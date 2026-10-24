@@ -7,6 +7,7 @@
 #include "time-math.h"
 #include "clock-internal.h"
 #include "datetime-internal.h"
+#include "irq.h"
 
 #define XTAL_HZ UINT64_C(12000000)
 #define USEC_PER_SEC UINT64_C(1000000)
@@ -133,7 +134,7 @@ static int timer_frequency(uint64_t *num, uint64_t *den)
     return 1;
 }
 
-void hpclang_time_init(void)
+static void time_init_unlocked(void)
 {
     state.ready = 0;
     state.last_us = 0u;
@@ -177,10 +178,17 @@ void hpclang_time_init(void)
     state.ready = 1;
 }
 
-static int monotonic_now(uint64_t *value)
+void hpclang_time_init(void)
+{
+    uint32_t flags = hpclang_irq_save_disable();
+    time_init_unlocked();
+    hpclang_irq_restore(flags);
+}
+
+static int monotonic_now_unlocked(uint64_t *value)
 {
     if (!state.ready) {
-        hpclang_time_init();
+        time_init_unlocked();
         if (!state.ready)
             return 0;
     }
@@ -203,10 +211,21 @@ static int monotonic_now(uint64_t *value)
     return 1;
 }
 
+static int monotonic_now(uint64_t *value)
+{
+    uint32_t flags = hpclang_irq_save_disable();
+    int result = monotonic_now_unlocked(value);
+    if (!result)
+        *value = state.last_us;
+    hpclang_irq_restore(flags);
+    return result;
+}
+
 uint64_t hpclang_time_monotonic_us(void)
 {
     uint64_t value;
-    return monotonic_now(&value) ? value : state.last_us;
+    (void)monotonic_now(&value);
+    return value;
 }
 
 int hpclang_time_read_us(uint64_t *microseconds)
@@ -215,10 +234,12 @@ int hpclang_time_read_us(uint64_t *microseconds)
         errno = EINVAL;
         return -1;
     }
-    if (!monotonic_now(microseconds)) {
+    uint64_t value;
+    if (!monotonic_now(&value)) {
         errno = EIO;
         return -1;
     }
+    *microseconds = value;
     return 0;
 }
 
@@ -272,7 +293,7 @@ void hpclang_time_clock_commit(const struct hpclang_clock_epoch *epoch)
     state.last_us = base;
 }
 
-int hpclang_datetime_set(const struct hpclang_datetime *value)
+static int datetime_set_unlocked(const struct hpclang_datetime *value)
 {
     if (!hpclang_datetime_valid(value)) {
         errno = EINVAL;
@@ -316,6 +337,27 @@ int hpclang_datetime_set(const struct hpclang_datetime *value)
     int64_t requested;
     hpclang_datetime_to_seconds(value, &requested);
     if (rtc_after < (uint64_t)requested || rtc_after - (uint64_t)requested > 1) {
+        errno = EIO;
+        return -1;
+    }
+    return 0;
+}
+
+int hpclang_datetime_set(const struct hpclang_datetime *value)
+{
+    uint32_t flags = hpclang_irq_save_disable();
+    int result = datetime_set_unlocked(value);
+    hpclang_irq_restore(flags);
+    return result;
+}
+
+int hpclang_time_read_us_masked(uint64_t *microseconds)
+{
+    if (!microseconds) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!monotonic_now_unlocked(microseconds)) {
         errno = EIO;
         return -1;
     }

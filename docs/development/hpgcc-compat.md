@@ -912,6 +912,14 @@ and ARMv4T Thumb compilation passes. These helpers do not read the clock or
 enable interrupts. Production clock serialization, IRQ dispatch and audio-stop
 integration remain required; no new public sound compatibility is claimed.
 
+The local clock integration now protects foreground monotonic state and civil
+rebasing with IRQ/FIQ masking. An internal already-masked read entry avoids
+supervisor calls from the future owned IRQ dispatcher; the dispatcher must
+preserve the interrupted application's `errno`. Power-profile transitions
+retain their existing mask across prepare/change/commit. Host sanitizers and
+ARM build/analysis pass; the six-model System Services execution matrix is
+still pending. These changes do not themselves enable asynchronous playback.
+
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
 - `sys_bcd2bin(value)` converts the low **two** nibbles. Its macro evaluates the
