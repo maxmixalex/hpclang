@@ -4730,6 +4730,18 @@ below are retained.
   Logs: `/work/oct24-win-repaint-{build,analysis,arm}.log`. Hooks are controlled
   in these tests; actual surface/UI rendering, original window clients and
   native pixel/return acceptance remain open. Not pushed.
+  Checked HPG frame hooks now connect repaint to real surface drawing and the
+  existing display lease: clear the current target, then publish or flip while
+  preserving its selected mode/buffering. They do not adopt a foreign clean
+  display lease; `hpg_cleanup` retains release ownership. Host pixel integration
+  covers 2/4/16 levels with one/two pages, two distinct frames, old-pixel clearing,
+  flip-timeout front preservation and foreign-lease rejection. Eight sanitizer
+  targets, host/ARM analysis, six-model C/C++ builds and strict docs pass.
+  Evidence: `/work/oct24-win-hpg-{build,analysis,arm}.log`. Actual raster code is
+  exercised with a host display-session fixture; calculator window pixels and
+  return, declarative widget state bridging and public interfaces remain open.
+  Legacy single-buffer primitives may publish during drawing, so these hooks
+  do not claim atomic frames. This extension is local and not CI accepted.
 
 #### M8.5 — Modern C++ and migration
 

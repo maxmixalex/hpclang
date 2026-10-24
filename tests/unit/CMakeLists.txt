@@ -222,6 +222,9 @@ hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/win-repaint.c"
+    "${HPCLANG_ROOT}/runtime/core/win-loop.c"
+    "${HPCLANG_ROOT}/runtime/core/win-events.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-console.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-line.c"
     "${HPCLANG_ROOT}/runtime/core/console.c"

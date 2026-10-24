@@ -7,6 +7,7 @@
 #include <hpclang/font-package.h>
 #include "display-surface.h"
 #include "hpg-internal.h"
+#include "win-repaint.h"
 #define HPCLANG_HPCONIO_NO_AUTOINIT
 #include <hpconio.h>
 #include <hpclang/sound.h>
@@ -661,6 +662,73 @@ static void text(void)
     hpg_free_image(g);
 }
 
+static unsigned window_frame;
+static int window_paint(void *event, void *context)
+{
+    assert(!event && !context);
+    ++window_frame;
+    hpg_set_color(NULL, 255);
+    hpg_draw_pixel((int)window_frame, 2);
+    return 0;
+}
+static void window_frames(void)
+{
+    for (unsigned levels = 2; levels <= 16; levels *= levels == 2 ? 2 : 4)
+        for (unsigned buffered = 0; buffered < 2; ++buffered) {
+            hpg_cleanup();
+            if (levels == 2)
+                hpg_set_mode_mono((int)buffered);
+            else if (levels == 4)
+                hpg_set_mode_gray4((int)buffered);
+            else
+                hpg_set_mode_gray16((int)buffered);
+            struct hpclang_win_events events;
+            struct hpclang_win_handler handlers[2];
+            struct hpclang_win_call snapshots[2];
+            struct hpclang_win_loop loop;
+            struct hpclang_win_repaint repaint;
+            assert(!hpclang_win_events_init(&events, handlers, 2, snapshots, 2));
+            assert(!hpclang_win_loop_init(&loop, &events, 0));
+            assert(!hpclang_win_repaint_init(&repaint, &loop, 1, hpclang_hpg_frame_begin,
+                                             hpclang_hpg_frame_present, NULL));
+            assert(!hpclang_win_events_add(&events, 0, 0, hpclang_win_repaint_idle, &repaint));
+            assert(!hpclang_win_events_add(&events, 1, 0, window_paint, NULL));
+            window_frame = 0;
+            unsigned before_flips = flips, before_publish = published;
+            for (unsigned frame = 1; frame <= 2; ++frame) {
+                assert(!hpclang_win_repaint_request(&repaint));
+                assert(hpclang_win_loop_run(&loop, 1) == 1);
+                struct hpclang_surface *shown = pages[buffered ? back ^ 1 : back];
+                assert(hpclang_surface_levels(shown) == levels);
+                assert(hpclang_surface_get_pixel(shown, (int)frame, 2) == 255);
+                assert(hpclang_surface_get_pixel(shown, frame == 1 ? 2 : 1, 2) == 0);
+                assert(page_count == 1 + buffered);
+            }
+            if (buffered) {
+                assert(flips == before_flips + 2 && published == before_publish);
+                present_failure = 1;
+                assert(!hpclang_win_repaint_request(&repaint));
+                assert(hpclang_win_loop_run(&loop, 1) == -1 && errno == ETIMEDOUT);
+                assert(flips == before_flips + 2);
+                assert(hpclang_surface_get_pixel(pages[back ^ 1], 2, 2) == 255);
+                assert(hpclang_surface_get_pixel(pages[back ^ 1], 3, 2) == 0);
+                present_failure = 0;
+            } else {
+                assert(flips == before_flips && published >= before_publish + 2);
+            }
+            unsigned before_end = ended;
+            hpg_cleanup();
+            assert(!page_count && ended == before_end + 1);
+        }
+    /* A foreign clean display lease must not be adopted by window rendering. */
+    assert(!hpclang_display_begin_pages(2, 1));
+    assert(hpclang_hpg_frame_begin(NULL) == -1 && errno == EBUSY);
+    hpg_cleanup();
+    assert(page_count == 1);
+    hpclang_display_end();
+    assert(hpclang_hpg_frame_present(NULL) == -1 && errno == EPERM);
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -756,6 +824,7 @@ int main(void)
     indicators();
     shared_screen();
     historical_console();
+    window_frames();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

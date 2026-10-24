@@ -83,6 +83,29 @@ void hpg_flip(void)
     if (owns_display && double_buffered)
         (void)hpclang_display_present(100000);
 }
+int hpclang_hpg_frame_begin(void *context)
+{
+    (void)context;
+    hpg_t *g = hpclang_hpg_acquire_screen();
+    if (!g)
+        return -1;
+    struct hpclang_surface *surface = hpclang_hpg_surface(g);
+    if (!surface) {
+        errno = ENODEV;
+        return -1;
+    }
+    hpclang_surface_clear(surface, 0);
+    return 0;
+}
+int hpclang_hpg_frame_present(void *context)
+{
+    (void)context;
+    if (!owns_display) {
+        errno = EPERM;
+        return -1;
+    }
+    return double_buffered ? hpclang_display_present(100000) : hpclang_display_publish();
+}
 static int status_view(struct hpclang_surface *view)
 {
     struct hpclang_surface *surface = hpclang_display_surface();

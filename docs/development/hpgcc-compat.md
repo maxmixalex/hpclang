@@ -706,6 +706,17 @@ Host tests cover coalescing, re-request, nesting, consumption/quit and each
 failure stage. Their hooks record calls rather than draw pixels; surface/UI
 integration and calculator rendering acceptance remain unfinished.
 
+Checked HPG frame hooks now provide a concrete repaint backend: acquire or
+reuse HPG's display lease, clear the current surface, and publish/flip after
+the callbacks. Existing grayscale and buffering choices remain intact, and a
+foreign clean display lease returns `EBUSY`. HPG cleanup retains ownership of
+release. Pixel tests use actual HPG/surface code across 2/4/16 levels and both
+buffering modes, checking successive frames, stale-pixel clearing, failed-flip
+front preservation and ownership conflicts. Their display session is a host
+fixture, so native window display/return acceptance remains outstanding. Legacy
+single-buffer draw calls can publish before the final hook; no atomic-frame
+guarantee is introduced. Declarative widget bridging remains separate work.
+
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then
 text/checkbox and the more stateful controls. These remain retained adapter
