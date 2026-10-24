@@ -1,6 +1,7 @@
 #include <wincore.h>
 #include <winprogress.h>
 #include <wintext.h>
+#include <winimg.h>
 #include <string.h>
 
 static int paint(void *event, void *data)
@@ -76,5 +77,11 @@ int main(void)
     win_remove_widget(label);
     win_widget_destroy(entry);
     win_widget_destroy(label);
+    win_widget_t *picture = win_img_new(NULL, NULL);
+    if (!picture)
+        return 4;
+    win_add_widget(picture);
+    win_remove_widget(picture);
+    win_widget_destroy(picture);
     return !focused || !destroyed || !correct || value != 3.5 || hpclang_win_error();
 }

@@ -1476,3 +1476,21 @@ clear and focus transfer. Independent complete-frame checks verify multiline
 labels and adjacent entry glyphs with a known custom font. Existing keyboard,
 progress, final-frame and settled-return checks still pass. Cursor timing
 remains a host gate; Stock execution and CI acceptance remain open.
+
+### Image adapter (isolated following batch)
+
+`win_img_new` borrows an optional HPG pattern and image. Preferred size follows
+the image, or is zero without one. Painting applies the widget background and
+clip, fills the pattern, then blits the image; removal detaches repaint, and
+destruction retains both borrowed resources. Allocation failures use the window
+error latch and release partial state.
+
+Production HPG ASan/UBSan tests pass pattern/image composition, source clipping,
+background pixels, removal and borrowed-resource reuse, plus pattern-only and
+empty construction. The initial expected pattern used screen-relative coordinates
+and extended beyond the small host display; corrected expectations use the
+relative pattern origin and fit the display. Failed evidence is retained in
+`/work/oct24-image-pattern-origin-failure.log`; passing log is
+`/work/oct24-image-tests.log`. ARMv4T compilation and analysis pass. SDK clients
+include image construction; full gate runs in 55970 (`/work/oct24-image-sdk.log`).
+Original-source differential and native image-control acceptance remain open.

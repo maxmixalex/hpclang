@@ -40,6 +40,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-widget.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-progress.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-text.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-image.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/win-focus.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-layout.c"
