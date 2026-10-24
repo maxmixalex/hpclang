@@ -1463,5 +1463,8 @@ programmatic over-limit replacement and 512 deterministic editing actions.
 Both sides use unsigned char to match the ARM byte convention. A deliberately
 wrong shifted-backspace precedence is rejected. These checks exclude original
 undefined allocation/alias/mutable-cursor cases, tested separately as repairs.
-SDK and native acceptance remain open; this work is isolated on
-`m8-widget-controls`, outside the frozen progress/component batch.
+The installed SDK gate passes C/C++ text clients, six-model launchers, all three
+HP39 Aplet variants, model-specific notebooks and 517 byte-identical release
+outputs (14789 exit 0; `/work/oct24-text-sdk.log`). Native and CI acceptance
+remain open; this work is isolated on `m8-widget-controls`, outside the frozen
+progress/component batch.
