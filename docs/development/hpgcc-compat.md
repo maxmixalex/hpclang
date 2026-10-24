@@ -1534,3 +1534,21 @@ removal and 64/80-line placement calls. ARMv4T compile/analysis pass. Logs:
 `/work/oct24-menu-sanitizer-{build,tests}.log`. This is isolated on
 `m8-menu-controls` using `/work/oct24-menu-src`; original-source comparison,
 production pixels, installed SDK and native acceptance remain open.
+
+Soft-menu follow-up verification passes production HPG pixels on both 64/80-line
+screens and both buffering modes: six cells, copied labels, disabled colors and
+page-two contents. Three sanitizer targets (state, original-source harness,
+production pixels) pass. The optional original-source comparison covers all eight
+entry points, counts 1..30, forward pages, safe backward traversal, modifiers,
+enabling, colors and full-list insert/delete. Both HPGCC 1.1/2.0 match 6,840 lines
+(SHA256 `ff26b00eaaf70e25d0df2f9b42ed9e1d4bd9d87bd061e2177529cb1d97ba3632`).
+Only the duplicate disabled-color symbol and external alloca declaration are
+adapted to link on the host; original executable behavior is retained. The
+initial external-alloca link failure is preserved. Backward underflow and sparse
+packing repairs remain separate tests. The wrong four-byte truncation negative
+is rejected. Logs: `/work/oct24-menu-{reference,negative}.log` and
+`/work/oct24-menu-reference-tests.log`.
+
+Installed SDK acceptance passes (74007 exit 0): C/C++ menu clients, six model
+launchers, three HP39 Aplet variants, notebooks and 517 byte-identical outputs,
+log `/work/oct24-menu-sdk.log`. Native menu acceptance remains open.

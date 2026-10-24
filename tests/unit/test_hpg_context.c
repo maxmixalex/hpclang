@@ -14,6 +14,8 @@
 #include <winprogress.h>
 #include <wintext.h>
 #include <winimg.h>
+#include <winsoftmenu.h>
+#include <hpclang/device.h>
 #include <winkeys.h>
 #include "hpgcc-keyboard.h"
 #define HPCLANG_HPCONIO_NO_AUTOINIT
@@ -229,7 +231,14 @@ static struct hpclang_surface *pages[2];
 static unsigned page_count, back, published, flips, ended;
 static int mode_failure;
 static int present_failure, publish_failure;
-static unsigned display_height = 6;
+static unsigned display_height = 6, display_width = 8;
+const struct hpclang_device_info *hpclang_device_info(void)
+{
+    static struct hpclang_device_info info;
+    info.display_width = display_width;
+    info.display_height = display_height;
+    return &info;
+}
 static int configure(unsigned levels, unsigned count)
 {
     if (mode_failure) {
@@ -238,10 +247,11 @@ static int configure(unsigned levels, unsigned count)
     }
     for (unsigned i = 0; i < 2; ++i) {
         hpclang_surface_destroy(pages[i]);
-        pages[i] = i < count ? hpclang_surface_create(9, display_height, levels) : NULL;
+        pages[i] =
+            i < count ? hpclang_surface_create(display_width + 1, display_height, levels) : NULL;
         assert(i >= count || pages[i]);
         if (pages[i])
-            pages[i]->width = 8;
+            pages[i]->width = display_width;
     }
     page_count = count;
     back = count - 1;
@@ -275,7 +285,7 @@ int hpclang_display_indicator_set(unsigned segment, uint8_t color)
     assert(segment < 6 && page_count);
     struct hpclang_surface view = *pages[back];
     ++view.width;
-    hpclang_surface_set_pixel(&view, 8, (int)segment, color);
+    hpclang_surface_set_pixel(&view, (int)display_width, (int)segment, color);
     return 0;
 }
 int hpclang_display_present(uint32_t timeout)
@@ -1047,6 +1057,62 @@ static void image_widget_pixels(void)
     hpg_cleanup();
 }
 
+static void menu_widget_pixels(void)
+{
+    struct hpclang_surface *saved = display;
+    display_width = 131;
+    for (display_height = 64; display_height <= 80; display_height += 16) {
+        display = hpclang_surface_create_mono(132, display_height);
+        assert(display);
+        display->width = 131;
+        for (int buffered = 0; buffered < 2; ++buffered) {
+            assert(!hpclang_win_reset());
+            hpg_set_mode_gray16(buffered);
+            char glyphs[256 * 6] = {0};
+            for (unsigned row = 0; row < 4; ++row)
+                glyphs['A' * 6 + row] = (char)(1u << row);
+            hpg_font_t *font = hpg_alloc_font(glyphs, 256, 6, 4);
+            win_widget_t *menu = win_softmenu_new();
+            assert(menu && font);
+            win_widget_set_font(menu, font);
+            for (int i = 0; i < 7; ++i)
+                win_softmenu_set_item(menu, i, "A", -1, NULL);
+            win_softmenu_set_disable_colors(menu, 1, 51, 102);
+            win_softmenu_set_enabled(menu, 1, 0);
+            win_softmenu_set_colors(menu, 6, 17, 238);
+            win_add_widget(menu);
+            for (int page = 0; page < 2; ++page) {
+                hpg_clip_reset(NULL);
+                hpg_clear();
+                assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+                for (int y = 0; y < (int)display_height; ++y)
+                    for (int x = 0; x < 131; ++x) {
+                        int cell = x / 22, local = x % 22;
+                        int row = y - ((int)display_height - 6);
+                        int expected = 0;
+                        if (y >= (int)display_height - 7 && local <= 20 && (!page || cell == 0)) {
+                            expected = page ? 238 : cell == 1 ? 102 : 255;
+                            if (row >= 0 && row < 4 && local == 9 + row)
+                                expected = page ? 17 : cell == 1 ? 51 : 0;
+                        }
+                        assert(hpg_get_pixel(NULL, x, y) == expected);
+                    }
+                win_keytyped_t key = {KB_L, 0, 0, 0, 0};
+                assert(win_post_event(WIN_KEY_TYPED, &key) == 1);
+            }
+            win_remove_widget(menu);
+            win_widget_destroy(menu);
+            hpg_free_font(font);
+            assert(!hpclang_win_error() && !hpclang_win_reset());
+            hpg_cleanup();
+        }
+        hpclang_surface_destroy(display);
+    }
+    display = saved;
+    display_width = 8;
+    display_height = 6;
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -1147,6 +1213,7 @@ int main(void)
     progress_widgets();
     text_widget_pixels();
     image_widget_pixels();
+    menu_widget_pixels();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

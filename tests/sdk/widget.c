@@ -2,6 +2,7 @@
 #include <winprogress.h>
 #include <wintext.h>
 #include <winimg.h>
+#include <winsoftmenu.h>
 #include <string.h>
 
 static int paint(void *event, void *data)
@@ -83,5 +84,19 @@ int main(void)
     win_add_widget(picture);
     win_remove_widget(picture);
     win_widget_destroy(picture);
+    win_widget_t *menu = win_softmenu_new();
+    if (!menu)
+        return 5;
+    char action[] = "Close";
+    win_softmenu_add_item(menu, action, -1, NULL);
+    win_softmenu_insert_item(menu, 0, action, -1, NULL);
+    win_softmenu_set_item(menu, 6, action, -1, NULL);
+    win_softmenu_set_colors(menu, 0, 0, 255);
+    win_softmenu_set_disable_colors(menu, 0, 0, 119);
+    win_softmenu_set_enabled(menu, 0, 0);
+    win_softmenu_delete_item(menu, 0, 29);
+    win_add_widget(menu);
+    win_remove_widget(menu);
+    win_widget_destroy(menu);
     return !focused || !destroyed || !correct || value != 3.5 || hpclang_win_error();
 }
