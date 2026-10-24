@@ -794,7 +794,9 @@ page-exchange and return checks (59175 exit 0). Fixed HP39g+ Stock also passes
 All six corrected Stock models now pass the same checks (final process 68792
 exit 0); each model retains its JSON result and all 44 frame/register pairs.
 The original three-model HP39 failures remain preserved. Shipped-example native
-execution, CI acceptance and full widget compatibility remain open. This is emulator GPIO evidence, not a physical-calculator test.
+execution, CI acceptance and full widget compatibility remain open. The integrated
+136-test ASan/UBSan suite also passes (671.25 seconds), as do full formatting
+and lint checks; whole-repository host/ARM analysis is still running. This is emulator GPIO evidence, not a physical-calculator test.
 
 The useful implementation path is an owned compatibility state/event layer
 above the accepted UI, beginning with dispatch and widget lifetimes, then

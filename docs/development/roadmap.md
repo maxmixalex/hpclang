@@ -4869,7 +4869,12 @@ below are retained.
   records report pass/returned/return_settled, with every frame/register pair in
   `/work/oct24-win-settled-stock-<model>-evidence`. Earlier six-model Direct
   validation and post-indicator SDK gates pass; the corrected fixture also
-  passes HP48gII Direct. Full 136-test host regression 68707 remains running.
+  passes HP48gII Direct. Full 136-test ASan/UBSan regression passes (68707 exit
+  0, 671.25 seconds); full format/lint pass with all 4,556 tracked files in the
+  container quality index. Whole host/ARM static analysis runs in 30552; no
+  final analysis result is claimed yet. Logs are
+  `/work/oct24-window-full-unit-tests.log` and
+  `/work/oct24-window-final-{format,lint,analysis}.log`.
   CI submission/acceptance, shipped-example execution and widget APIs remain
   open. Below are retained earlier checkpoints; their pending labels describe
   those checkpoints, not the current native matrix.
