@@ -432,7 +432,8 @@ Storage 40050688494, Runtime 40050688507 and Objects 40050688481 pass. Runtime's
 three Direct UI families and all six Stock UI/pool jobs pass. Core 40050688514
 still has running/queued native Port jobs. All Font Gallery 40050688484 test
 jobs pass, but its queued evidence publisher was cancelled; only that terminal
-job (120751449957) was re-run. The batch is not yet fully CI accepted or merged.
+job (120751449957) was re-run and Gallery now passes. Core remains in progress
+on the 2026-10-24 follow-up check. The batch is not yet fully CI accepted or merged.
 This does not complete M8.
 
 Local serialized-footprint follow-up (2026-10-23): memory.json now records
@@ -4478,11 +4479,28 @@ below are retained.
   workaround was added. Diagnostic source/script and reports remain under
   `/work/oct24-sound-vector-src` and `research/oct24-trace-sound-vector.py`.
   The corrected public API artifact `/work/oct24-sound-api-fixed-artifact`
-  passes HP49g+, HP50g and HP48gII Direct; the remaining Direct and full Stock
-  matrix runs on session 70552 / PID 123285 in `/work/oct24-sound-api-fixed-src`,
+  passes all six Direct targets and HP49g+, HP50g and HP48gII Stock; the HP39
+  Stock matrix still runs on session 70552 / PID 123285 in `/work/oct24-sound-api-fixed-src`,
   logs `oct24-sound-api-fixed-{direct,stock}-*.log`. ARM build and policy analysis
   pass. Native normal/immediate-exit proof and HPGCC mode compatibility remain
   open; public integration is not yet fully accepted or pushed.
+  Native exit follow-up: `HPCLANG_E2E_SOUND_EXIT=exit` or `_Exit` selects an
+  asynchronous exit variant through `tools/build-e2e.sh system-services`; the
+  default `blocking` retains the earlier callback-exit test. Each variant starts
+  a 60-second tone after borrowing the economy profile and exits while PWM and
+  watchdog are active. A test-only linker wrapper observes the real sound
+  cleanup before power/launcher/host restoration, checking fourteen peripheral,
+  controller and vector registers, the independent IRQ-bank snapshot, CPU masks
+  and cleared optional hooks without calling stop/status. HP49g+/HP50g Direct normal
+  exit passes locally. Both ARM variants build; six-model Direct and HP50g Stock
+  queues run on session 74777 from `/work/oct24-sound-exit-src`, with artifacts
+  `/work/oct24-sound-{exit,immediate}-artifact` and matching logs. A separate
+  negative control omits the real release in the test wrapper only, under
+  `/work/oct24-sound-exit-negative-src` (session 92952, terminal exit 1) fails
+  as intended with `0x46417d03` before host return: CPU interrupt masks remain
+  borrowed when cleanup is omitted. Its `build/hp50g-e2e.json` records the
+  failure. Strict docs and shell syntax pass. Full exit acceptance remains
+  pending; these changes are local only.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;

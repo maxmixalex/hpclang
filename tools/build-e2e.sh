@@ -136,6 +136,10 @@ case "$MODE" in
         ;;
 esac
 
+if [[ "$MODE" == system-services ]]; then
+    E2E_CMAKE_ARGS+=(-DHPCLANG_E2E_SOUND_EXIT="${HPCLANG_E2E_SOUND_EXIT:-blocking}")
+fi
+
 rm -rf "$OUT"
 mkdir -p "$OUT/launchers"
 
