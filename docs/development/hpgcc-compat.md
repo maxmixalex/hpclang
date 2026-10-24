@@ -1442,4 +1442,77 @@ pixel and LCD-mode checks. Existing keyboard/page-exchange and settled-return
 gates still pass. Repeat/blink timing remains covered by host tests, not this
 native tap phase. All six Stock models also pass the same independent input,
 pixel and settled-return gates (9966 exit 0). The full 140-test sanitizer
-regression passes (10200 exit 0); CI submission/acceptance remains pending.
+regression passes (10200 exit 0); submitted in cb7c7bae, CI acceptance remains pending.
+
+### Text label and entry adapter (local integrated batch)
+
+`wintext.h` supplies labels and editable byte strings with historical arrow-key
+focus/cursor behavior, backspace, left-shift delete-at-cursor, right-shift clear,
+and blinking cursor glyph 28. The entry keyboard limit is distinct from storage
+capacity: programmatic replacement may exceed the limit without increasing it
+or automatically repacking. Borrowed mutable strings may be shortened in place;
+use the setter for growth. Aliased replacement and allocation failure preserve
+valid ownership and cursor bounds. Null pointers, wrong control types, invalid limits and dimension
+overflow use the window error latch.
+
+Sanitizer tests cover editing, focus, allocation failures, aliasing and mutable
+buffer shortening. Production HPG/custom-font pixel tests check glyphs, cursor
+replacement and clearing after deletion. The optional source comparison compiles
+all three original text source files (four public entry points) from supplied
+HPGCC 1.1/2.0 archives over the same production window foundation. Both match
+13,837 trace lines, including four entry limits, multiline labels, high bytes,
+programmatic over-limit replacement and 512 deterministic editing actions.
+Both sides use unsigned char to match the ARM byte convention. A deliberately
+wrong shifted-backspace precedence is rejected. These checks exclude original
+undefined allocation/alias/mutable-cursor cases, tested separately as repairs.
+The installed SDK gate passes C/C++ text clients, six-model launchers, all three
+HP39 Aplet variants, model-specific notebooks and 517 byte-identical release
+outputs (14789 exit 0; `/work/oct24-text-sdk.log`). All six Stock text models pass (18243 exit 0). This work is now integrated
+locally into `m8-flash-write`; its CI submission/acceptance remains open.
+
+The maintained native window fixture passes text controls on all six Direct
+models (68819 exit 0). Per model it exercises 52 GPIO edges across both
+buffering modes: insertion limits, cursor movement, backspace, shifted deletion,
+clear and focus transfer. Independent complete-frame checks verify multiline
+labels and adjacent entry glyphs with a known custom font. Existing keyboard,
+progress, final-frame and settled-return checks still pass. Cursor timing
+remains a host gate; all six Stock models also pass. CI acceptance remains open.
+
+### Image adapter (local integrated batch)
+
+`win_img_new` borrows an optional HPG pattern and image. Preferred size follows
+the image, or is zero without one. Painting applies the widget background and
+clip, fills the pattern, then blits the image; removal detaches repaint, and
+destruction retains both borrowed resources. Allocation failures use the window
+error latch and release partial state.
+
+Production HPG ASan/UBSan tests pass pattern/image composition, source clipping,
+background pixels, removal and borrowed-resource reuse, plus pattern-only and
+empty construction. The initial expected pattern used screen-relative coordinates
+and extended beyond the small host display; corrected expectations use the
+relative pattern origin and fit the display. Failed evidence is retained in
+`/work/oct24-image-pattern-origin-failure.log`; passing log is
+`/work/oct24-image-tests.log`. ARMv4T compilation and analysis pass. SDK clients
+include image construction; the complete gate passes (55970 exit 0): C/C++,
+six launchers, three Aplet variants, notebooks and 517 byte-identical release
+outputs (`/work/oct24-image-sdk.log`).
+Original-source differential and native image-control acceptance remain open.
+
+The image source comparison compiles unchanged `img/win_img_new.c` from both
+HPGCC 1.1 and 2.0 over the same production widget/event foundation. All 32
+resource/transparency/geometry combinations match 577 trace lines (SHA256
+`4bf8c7cd9944ed93bc85a1c3b58f1a0b0182518dc87c964538f2ed0c14295bde`).
+The missing-pattern negative is rejected; image reference and real HPG pixel
+CTest targets pass under sanitizers. Logs: `/work/oct24-image-{reference,negative}.log`
+and `/work/oct24-image-reference-tests.log`. Zero-sized drawing and allocation
+failures are extension boundaries, not claimed identical call traces.
+
+The native fixture now captures image-over-pattern pixels and borrowed-image
+retention at checkpoints 700/800. Six-model Direct process 1287 uses separate
+source `/work/oct24-image-native-src` and artifact `/work/oct24-image-native-arm`,
+so the existing text-only Stock run keeps its original binary and evidence.
+All six Direct models pass (1287 exit 0). Image Stock process 82374 runs in
+that separate directory. Full 143-test control regression passes (63047 exit 0,
+1553.33 seconds), as does whole host/ARM analysis (89153 exit 0, 357 sources).
+Stock completion and CI remain open. The earlier analysis setup failure is
+preserved; no source analyzer ran until the missing Git metadata was corrected.

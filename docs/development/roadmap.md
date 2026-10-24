@@ -5006,6 +5006,16 @@ below are retained.
   143 tests (63047 exit 0, 1553.33 seconds), log
   `/work/oct24-controls-full-tests.log`; no menu/checkbox full-suite claim.
 
+  Text/image branch integrated locally into m8-flash-write after component
+  submission. The only merge conflict was compatibility-document status; all
+  4,581 tracked files match the verified control mirror after newline
+  normalization. Full formatting/lint and strict docs pass with pinned ATFE
+  clang-format and the quality venv. Initial local checks used system
+  clang-format 18 and CRLF Python copies; corrected environment/line endings
+  without behavioral source changes. Logs `/work/oct24-integrated-*`. Existing
+  143 sanitizers/357-source analysis/SDK/native results retain exact source
+  coverage. Image Stock remains pending; no new push or fresh CI query.
+
   Component batch pushed as `cb7c7bae` to `m8-flash-write`, draft PR #10.
   Includes custom widgets/focus and progress sliders; text/image/menu branches
   remain local follow-ups. Previous head 0a7c2d8d passed every push/PR workflow
