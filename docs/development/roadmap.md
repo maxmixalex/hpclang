@@ -20,6 +20,32 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+PR #10 is accepted and merged as `ed5f470d` at submitted head `cb7c7bae`.
+Previous-push review confirms all eleven listed push/PR runs pass across
+Quality, Core, Runtime, Storage, Objects and Gallery. Core has 18 successful
+jobs in each run; Runtime push 40078980241 has 118 successes, PR 40078983291
+has 117 successes plus one conditional skip. Remote main's merge tree equals
+the accepted head. Local ancestry merge `1a6b7893` changes no files; new main CI
+was not polled. The next text/image batch is prepared separately, retaining
+143-test, 357-source, SDK and all-six Direct/Stock evidence. Only the two
+tracking/compatibility documents differ from verified text/image `fb77d9e8`.
+
+Original application follow-up `1044543d` passes both original and responsive
+layouts through host ASan/UBSan at 64/80 lines and relocated SDK builds. The
+responsive variant removes the old umbrella and changes exactly three geometry
+calls, preserving the 80-line layout. All six Direct models pass 30 GPIO changes
+(29 delivered before EXIT), 15 captured application frames, slider/checkbox
+pixels and settled return. Original fixed geometry is independently rejected
+at (21,43) on 64 lines. Two ARM translation-unit analyses pass; HP39g+/HP50g
+screenshots were inspected. Stock 2266 now passes HP39g+ and continues. Logs,
+source hashes, migration diff and native artifact: `/work/oct24-simple-*`.
+Documentation follow-up `5ffeda4e` reconciles implemented window APIs and removes
+unshipped-development-document links from the installed migration guide.
+Strict docs and fresh installed guide equality/local-link checks pass.
+
+Split window Stock 51945/76541 both pass HP39g+ and HP39gs, continuing with
+HP40gs and the classic models. No all-six Stock acceptance is claimed yet.
+
 Window follow-up `cfa7c751` keeps all native checks while splitting the
 universal payload into foundation (63,648 bytes) and dialogs (65,488 bytes),
 16 code pages each instead of the 72,048-byte monolith. Every requested mode
@@ -66,9 +92,8 @@ allocation diagnostics in hpgcc-box.c:180/182 on two configurations, despite
 373 sources processed. These original failures are superseded by the guard
 and regression results above; the monolithic Stock failure remains recorded.
 
-Latest previous-push CI inspection: cb7c7bae still has passing Quality,
-Storage, Objects and Gallery. Both Core and Runtime runs remain unfinished;
-all completed jobs inspected pass, with no failed jobs. No push was made.
+Earlier cb7c7bae inspection found unfinished Core/Runtime runs; the completed
+acceptance and merge above supersede that pending state.
 
 Box follow-up `d5cbc83f` supplies all seven public APIs, transactional grid
 layout and borrowed nested groups. Group installation runs outside callbacks
