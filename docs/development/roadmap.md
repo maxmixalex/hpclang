@@ -4929,6 +4929,13 @@ below are retained.
   payload execution and are retained in `/work/oct24-text-direct-setup-failure.log`
   and `/work/oct24-text-stock-sequence-failure.log`. SDK follow-up `d699fe5e`
   records completed acceptance. Integrate this batch after the frozen batch.
+  Independent image follow-up `0716c8d8` adds `winimg.h`: borrowed optional
+  image/pattern, preferred image size, clipped pattern-before-image painting,
+  allocation cleanup and detached repaint on removal. Real HPG ASan/UBSan
+  composition/clipping/removal/resource-reuse tests and ARM compile/analysis
+  pass. Corrected test expectations use the relative pattern origin and fit
+  the host display; initial failure log is retained. SDK process 55970 runs
+  (`/work/oct24-image-sdk.log`); original-source/native acceptance remain open.
   Final frozen-batch verification: all six Stock models pass independent
   keyboard/control pixels and settled return (9966 exit 0). Full ASan/UBSan
   regression passes all 140 tests in 1351.00 seconds (10200 exit 0), log
