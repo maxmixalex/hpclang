@@ -725,7 +725,9 @@ void functions observable. Default limits are 64 handlers (three reserved),
 256 concurrent snapshot entries and 32 timers; exhaustion latches `ENOSPC`.
 Reset is rejected during callbacks and does not release HPG's shared display.
 The shipped `hpgcc-window` example builds and links all six launcher variants;
-native execution and installed-SDK validation are pending. Typed-key/modifier
+native execution remains pending. The installed/relocated SDK gate now passes
+for this client in C and C++23, all six launchers and three HP39 Aplet variants;
+453 complete-gate release artifacts match across two clean builds. Typed-key/modifier
 events 3..6, historical widgets and the complete `win.h` umbrella remain work
 in progress, not supported names with empty implementations.
 

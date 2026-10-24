@@ -81,6 +81,14 @@ It measures a short delay, draws the duration and returns. Its README explains
 the units and the boundary between historical timer calls and hpclang rendering;
 it does not imply complete HPGCC compatibility.
 
+`examples/hpgcc-window` uses `winevent.h` and `wintimer.h` to repaint a moving
+rectangle through HPG, then quit after twenty 50 ms timer callbacks. Check
+`hpclang_win_error()` after the loop: historical void calls latch failures.
+Callbacks borrow their application data through synchronous dispatch. The
+installed-SDK gate also builds this source as C++23 and packages all three HP39
+Aplet variants. Typed-key/modifier events and historical widgets remain under
+development; this example is not a complete `win.h` compatibility claim.
+
 `examples/hpgcc-console` combines C `printf`/`puts`, C++ `std::printf` and HPG
 graphics, edits a name in a 16-byte buffer, reads a count and a value, prints
 their product, then waits for a key before returning.

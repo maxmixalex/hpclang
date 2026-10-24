@@ -4754,6 +4754,16 @@ below are retained.
   `/work/oct24-win-public-{build,analysis,arm}.log`. This is local only: native
   example execution, installed-SDK acceptance, typed-key/modifier generation,
   widget bridges and a complete `win.h` remain open; no scope reduction.
+  Installed-SDK follow-up: the maintained relocation gate now copies the shipped
+  window example and also compiles it as C++23. Both clients build all six
+  launchers and all three HP39 Aplet variants without source-tree dependencies.
+  The complete gate passes (session 43086 exit 0): 453 release artifacts are
+  byte-identical across two clean builds, all six model-specific Notebook builds
+  pass, and deleted-output regeneration remains checked. Evidence is
+  `/work/oct24-win-sdk.log`; Ruff/format and strict docs pass. This closes local
+  window SDK installation/relocation validation, not native execution, full
+  compatibility, or CI acceptance. Getting started and migration now link the
+  bounded event/timer example and explain its error query and unfinished scope.
 
 #### M8.5 — Modern C++ and migration
 

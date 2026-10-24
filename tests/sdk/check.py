@@ -98,6 +98,8 @@ def main():
         )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
         shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
+        shutil.copytree(package / "examples/hpgcc-window", application / "window")
+        shutil.copyfile(application / "window/main.c", application / "window.cpp")
         shutil.copytree(package / "examples/hpgcc-console", application / "console")
         shutil.copytree(package / "examples/notebook", application / "notebook")
         shutil.copyfile(root / "tests/sdk/numeric-input.cpp", application / "numeric-input.cpp")
@@ -116,11 +118,15 @@ def main():
                 "hpclang_target_launchers(sound_c)\n"
                 "hpclang_target_launchers(sound_cpp)\n"
                 "add_subdirectory(storage)\n"
+                "add_subdirectory(window)\n"
+                "hpclang_add_application(window_cpp window.cpp)\n"
+                "target_compile_features(window_cpp PRIVATE cxx_std_23)\n"
+                "hpclang_target_launchers(window_cpp)\n"
             )
         if args.aplet_tool:
             with (application / "CMakeLists.txt").open("a") as source:
                 source.write("""
-foreach(application IN ITEMS hello_c hello_cpp numeric_input sound_c sound_cpp)
+foreach(application IN ITEMS hello_c hello_cpp numeric_input sound_c sound_cpp window_cpp)
     foreach(model IN ITEMS hp39gplus hp39gs hp40gs)
         hpclang_target_aplet(${application} MODEL ${model} NAME "SDK example"
             AUTHOR hpclang TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")
@@ -133,6 +139,7 @@ endforeach()
                 ("objects", "object_cpp"),
                 ("storage", "storage_cpp"),
                 ("timer", "hpgcc_timer"),
+                ("window", "hpgcc_window"),
                 ("console", "hpgcc_console"),
                 ("notebook", "notebook"),
             ):
@@ -185,6 +192,8 @@ endforeach()
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
+            ("hpgcc_window", build / "window"),
+            ("window_cpp", build),
             ("hpgcc_console", build / "console"),
             ("notebook", build / "notebook"),
         ):

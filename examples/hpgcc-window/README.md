@@ -7,7 +7,10 @@ event/timer adapter, not historical widgets or typed keyboard input.
 
 Build as an ordinary hpclang SDK example with `find_package(hpclang)` and the
 ARMv4T toolchain. The target produces an HPC1 payload and all six launchers.
-Native execution and independent pixel acceptance are still pending.
+The installed-SDK gate builds this source as C and C++23 after relocating the
+package, packages all three HP39 Aplet variants, and compares release outputs
+from two clean builds. Native execution and independent pixel acceptance are
+still pending.
 
 Historical void functions report errors through `hpclang_win_error()`. The
 example checks it after the loop and explicitly releases HPG's display lease.
