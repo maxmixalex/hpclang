@@ -62,4 +62,20 @@ int hpclang_rpl_port0_shift_backups(const struct hpclang_rpl_mutation_io *io, ui
 int hpclang_rpl_port0_remove_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *name,
                                     uint32_t name_length);
 
+struct hpclang_rpl_catalog_insertion;
+struct hpclang_rpl_library_binding;
+/* Internal catalog commit, not public registration authorization. Revalidate
+ * the strictly ordered catalog and the expected insertion plan before writes.
+ * binding uses FINAL post-move coordinates, independently proven by the caller;
+ * its payload, bank selector, flags and execution safety are not inferred here.
+ * Caller supplies complete reference repairs and retains mapping/IRQ ownership
+ * through growth, record publication and count publication (last). Input objects
+ * and backend remain stable throughout. No callbacks/configuration are executed.
+ * Preflight errors do not write. Any failure after growth starts is INCOMPLETE:
+ * retain ownership, do not resume Stock or retry this non-replayable operation. */
+int hpclang_rpl_catalog_insert_repaired(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                        const struct hpclang_rpl_library_binding *binding,
+                                        const struct hpclang_rpl_catalog_insertion *expected,
+                                        const struct hpclang_rpl_catalog_repairs *repairs);
+
 #endif

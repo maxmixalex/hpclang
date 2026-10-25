@@ -2482,6 +2482,74 @@ static struct hpclang_rpl_mutation_io setup_catalog_growth(void)
     return io;
 }
 
+static void test_catalog_insert_commit(void)
+{
+    const struct hpclang_rpl_library_binding binding = {0x83022, 0x26c30, 7};
+    uint32_t complete_writes = 0;
+    for (unsigned number = 5; number <= 25; number += 10) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        const struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        struct hpclang_rpl_catalog_insertion plan;
+        assert(hpclang_rpl_catalog_plan_insert(&reader, io.library_table,
+                                               0x100000 - io.library_table, number, &plan) == 1);
+        assert(!hpclang_rpl_catalog_insert_repaired(&io, number, &binding, &plan, NULL));
+        assert(get_word(io.library_table, 3) == 3);
+        assert(get_word(plan.slot, 3) == number);
+        assert(get_word(plan.slot + 3, 5) == binding.address);
+        assert(get_word(plan.slot + 8, 5) == binding.bank_switch);
+        assert(get_word(plan.slot + 13, 3) == binding.flags);
+        assert(writes < sizeof write_trace / sizeof write_trace[0]);
+        for (unsigned i = 0; i < 3; ++i)
+            assert(write_trace[writes - 3 + i] == io.library_table + i);
+        for (unsigned i = 0; i < 16; ++i)
+            assert(write_trace[writes - 19 + i] == plan.slot + i);
+        struct hpclang_rpl_library_binding found;
+        assert(hpclang_rpl_library_lookup(&reader, io.library_table, 0x100000 - io.library_table,
+                                          number, &found) == 1);
+        assert(found.address == binding.address && found.bank_switch == binding.bank_switch &&
+               found.flags == binding.flags);
+        if (number == 15)
+            complete_writes = writes;
+    }
+    /* Commit failure at growth start/end and every record/count publication nibble. */
+    for (unsigned fault = 0; fault < 21; ++fault) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        const struct hpclang_rpl_catalog_insertion plan = {0x82013, 0x82023, 2};
+        rejected_write = fault == 0 ? 0 : complete_writes - 21 + fault;
+        assert(hpclang_rpl_catalog_insert_repaired(&io, 15, &binding, &plan, NULL) ==
+               HPCLANG_RPL_MUTATION_INCOMPLETE);
+        assert(writes == rejected_write);
+        if (fault <= 18)
+            assert(get_word(io.library_table, 3) == 2);
+    }
+    for (unsigned fault = 0; fault < 8; ++fault) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        struct hpclang_rpl_catalog_insertion plan = {0x82013, 0x82023, 2};
+        struct hpclang_rpl_library_binding added = binding;
+        uint32_t number = 15;
+        if (fault == 0)
+            ++plan.slot;
+        if (fault == 1)
+            ++plan.end;
+        if (fault == 2)
+            ++plan.count;
+        if (fault == 3)
+            number = 20;
+        if (fault == 4)
+            added.address = 0x100000;
+        if (fault == 5)
+            added.bank_switch = 0x100000;
+        if (fault == 6)
+            added.flags = 0x1000;
+        if (fault == 7)
+            put_word(0x82013, 3, 9);
+        int result = hpclang_rpl_catalog_insert_repaired(&io, number, &added, &plan, NULL);
+        assert(result ==
+               (fault == 3 ? HPCLANG_RPL_MUTATION_EXISTS : HPCLANG_RPL_MUTATION_MALFORMED));
+        assert(!writes && get_word(io.library_table, 3) == 2);
+    }
+}
+
 static int stage_read_word(void *context, uint32_t address, unsigned width, uint32_t *value)
 {
     *value = 0;
@@ -3100,6 +3168,7 @@ int main(void)
     test_conditional_return_relocation();
     test_return_chain_relocation();
     test_catalog_growth();
+    test_catalog_insert_commit();
     test_catalog_switch_growth();
     test_temp_allocation_visit();
     test_read_only_root_visit();

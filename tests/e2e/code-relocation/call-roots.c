@@ -8,6 +8,7 @@
 #include "stage-stack.h"
 #include "rpl-reference.h"
 #include "rpl-port.h"
+#include "rpl-port-mutation.h"
 extern volatile uint32_t hpclang_e2e_result;
 static int prepare_call(struct hpclang_rpl_mutation_io *, uint32_t **);
 
@@ -160,12 +161,8 @@ static int probe_register(void)
     const struct hpclang_rpl_catalog_repairs repairs = {1,    p->edits, p->builder.count, NULL, 0,
                                                         NULL, 0};
     /* After this boundary an error must halt the test, never return Stock. */
-    if (hpclang_rpl_mutation_catalog_grow_repaired(&io, insertion.slot, &repairs) ||
-        probe_write_word(&io, insertion.slot, 123, 3) ||
-        probe_write_word(&io, insertion.slot + 3, binding, 5) ||
-        probe_write_word(&io, insertion.slot + 8, 0, 5) ||
-        probe_write_word(&io, insertion.slot + 13, 0, 3) ||
-        probe_write_word(&io, io.library_table, insertion.count + 1, 3)) {
+    const struct hpclang_rpl_library_binding added = {binding, 0, 0};
+    if (hpclang_rpl_catalog_insert_repaired(&io, 123, &added, &insertion, &repairs)) {
         hpclang_e2e_result = 0x46410ffe;
         for (;;)
             __asm__ volatile("nop");

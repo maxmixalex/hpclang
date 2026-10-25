@@ -388,3 +388,39 @@ int hpclang_rpl_port0_replace_backup(const struct hpclang_rpl_mutation_io *io,
         return HPCLANG_RPL_MUTATION_UNSUPPORTED;
     return hpclang_rpl_mutation_port0_replace_record(io, target.address, target.span, packed, span);
 }
+
+int hpclang_rpl_catalog_insert_repaired(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                        const struct hpclang_rpl_library_binding *binding,
+                                        const struct hpclang_rpl_catalog_insertion *expected,
+                                        const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    if (!io || !io->read_nibble || !io->write_nibble || !binding || !expected)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    const struct hpclang_rpl_library_binding added = *binding;
+    if (io->library_table < 0x80000 || io->library_table > 0xffffd || !added.address ||
+        added.address > 0xfffff || added.bank_switch > 0xfffff || added.flags > 0xfff)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    struct hpclang_rpl_catalog_insertion plan;
+    int result = hpclang_rpl_catalog_plan_insert(&reader, io->library_table,
+                                                 0x100000 - io->library_table, number, &plan);
+    if (result != 1)
+        return result ? parse_error(result) : HPCLANG_RPL_MUTATION_EXISTS;
+    if (plan.slot != expected->slot || plan.end != expected->end || plan.count != expected->count)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = hpclang_rpl_mutation_catalog_grow_repaired(io, plan.slot, repairs);
+    if (result)
+        return result;
+    const uint32_t values[] = {number, added.address, added.bank_switch, added.flags,
+                               plan.count + 1};
+    const uint32_t widths[] = {3, 5, 5, 3, 3};
+    uint32_t at = plan.slot;
+    for (unsigned field = 0; field < 5; ++field) {
+        if (field == 4)
+            at = io->library_table;
+        for (unsigned nibble = 0; nibble < widths[field]; ++nibble)
+            if (!io->write_nibble(io->context, at++, (values[field] >> (4 * nibble)) & 15))
+                return HPCLANG_RPL_MUTATION_INCOMPLETE;
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
