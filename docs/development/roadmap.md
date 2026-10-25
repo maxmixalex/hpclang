@@ -25,9 +25,17 @@ resolver qualifies contiguous Saturn spans by absolute physical nibble address;
 main-RAM capture now rejects the physical SRAM overrun formerly admitted by
 its section-sized mask. Primary-source sanitizer tests, ten saved-map replays,
 ARM analysis, SDK/229-output checks and 4077-input fingerprint audit pass.
-Fresh native HP50g five-case replay and eight corrupted-evidence controls pass;
-HP49g+ remains running. Isolated-build checks and complete native acceptance
-are still required before submission. This neither completes execution-root
+Fresh native queue 11045 completes all ten HP50g/HP49g+ call/root cases.
+Independent saved-state replay and sixteen corrupted-evidence controls pass.
+The isolated branch passes ASan/UBSan, six-model SDK builds/229 reproducible
+outputs, formatting and strict docs. Its payload, result address and six
+launchers match the native-tested artifacts byte-for-byte; verifier inputs
+are unchanged. All 4618 tracked files match, with no extra SDK-installed files.
+Evidence: /work/oct26-physical-mapping/{isolated-identity.json,isolated-unit.log,
+isolated-sdk.log,native/audit-hp50g-hp49gplus.json} and
+research/oct26-physical-isolated-source-audit.json. Previous push #19 at
+2ac66080 was reviewed (two queued checks); this batch still requires remote
+CI and #22 acceptance. This neither completes execution-root
 coverage nor enables public Port1 edits, library movement or reclamation.
 
 M8.0 return-root delivery: RTNSXM and proven-carry GOC/GONC/RTNC/RTNNC
