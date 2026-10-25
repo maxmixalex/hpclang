@@ -1962,6 +1962,52 @@ static void test_port1_edit_owned_suffix(void)
     assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
     assert_char_at(entry.value_address, 'B');
     assert(get_word(small_span, 5) == 0x02b40);
+    /* Growth, shrinkage, same-size replacement and deletion must distinguish
+     * interrupted commits from preflight I/O errors at every write boundary. */
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        const uint8_t *old = mode == 1 ? large : small;
+        uint32_t old_span = mode == 1 ? large_span : small_span;
+        const uint8_t *next = mode == 0 ? large : mode == 1 ? small : same;
+        uint32_t next_span = mode == 0 ? large_span : mode == 3 ? 0 : small_span;
+        uint32_t expected_writes = next_span + (mode == 2 ? 0 : tail_span + 6);
+        for (uint32_t fault = 0; fault <= expected_writes; ++fault) {
+            io = setup(1);
+            fixture.result = 0;
+            assert(!hpclang_rpl_port1_create_backup(&io, 256, old, old_span));
+            assert(!hpclang_rpl_port1_create_backup(&io, 256, tail, tail_span));
+            memory[256] = 11;
+            writes = 0;
+            rejected_write = fault;
+            int result =
+                mode == 3
+                    ? hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA", 4, &guard)
+                    : hpclang_rpl_port1_replace_backup(&io, 256, next, next_span, &guard);
+            assert(result == (fault == expected_writes ? HPCLANG_RPL_MUTATION_OK
+                                                       : HPCLANG_RPL_MUTATION_INCOMPLETE));
+            assert(writes == fault && memory[256] == 11);
+            if (fault == expected_writes) {
+                cursor = (struct hpclang_rpl_port_cursor){0, 0x40000u, 0};
+                if (mode != 3)
+                    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 &&
+                           entry.span == next_span);
+                assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
+                assert_char_at(entry.value_address, 'T');
+                assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
+            }
+        }
+        if (mode == 2)
+            continue;
+        io = setup(1);
+        assert(!hpclang_rpl_port1_create_backup(&io, 256, old, old_span));
+        assert(!hpclang_rpl_port1_create_backup(&io, 256, tail, tail_span));
+        writes = 0;
+        rejected_commit_read = old_span + (mode == 0 ? tail_span + 4 : 1);
+        int result =
+            mode == 3
+                ? hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA", 4, &guard)
+                : hpclang_rpl_port1_replace_backup(&io, 256, next, next_span, &guard);
+        assert(result == HPCLANG_RPL_MUTATION_INCOMPLETE && writes == 1);
+    }
     free(small);
     free(same);
     free(tail);

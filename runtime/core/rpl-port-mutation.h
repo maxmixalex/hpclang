@@ -24,7 +24,11 @@ struct hpclang_rpl_port1_guard
 
 /* Internal ERAM edits require the reference guard; absence is UNAVAILABLE.
  * These routines do not relocate banked references. Libraries after the target
- * cannot move. The launcher ownership fence and append commit contract apply. */
+ * cannot move. The launcher ownership fence and append commit contract apply.
+ * Input/guard/preflight failures do not write. Once the guarded commit begins,
+ * a backend read/write failure is INCOMPLETE, not a preflight IO failure. Retain
+ * ownership and do not resume Stock or retry: earlier writes may have changed
+ * the chain and the reference guard does not provide rollback. */
 int hpclang_rpl_port1_replace_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
                                      const uint8_t *packed, uint32_t span,
                                      const struct hpclang_rpl_port1_guard *guard);

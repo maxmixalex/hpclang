@@ -162,13 +162,13 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
             uint8_t nibble;
             if (!io->read_nibble(io->context, from + offset, &nibble) ||
                 !io->write_nibble(io->context, to + offset, nibble))
-                return HPCLANG_RPL_MUTATION_IO;
+                return HPCLANG_RPL_MUTATION_INCOMPLETE;
         }
     }
     for (uint32_t n = 0; n < span; ++n) {
         uint8_t nibble = (packed[n / 2u] >> (4u * (n & 1u))) & 15u;
         if (!io->write_nibble(io->context, target.address + n, nibble))
-            return HPCLANG_RPL_MUTATION_IO;
+            return HPCLANG_RPL_MUTATION_INCOMPLETE;
     }
     return HPCLANG_RPL_MUTATION_OK;
 }
