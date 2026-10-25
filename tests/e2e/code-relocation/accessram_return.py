@@ -44,6 +44,13 @@ class Literal(c.Structure):
     _fields_ += [("mask", c.c_uint64), ("value", c.c_uint64)]
 
 
+class Exchange(c.Structure):
+    _fields_ = [
+        (name, c.c_uint32)
+        for name in ("instruction", "length", "left", "right", "first", "nibbles")
+    ]
+
+
 class Assignment(c.Structure):
     _fields_ = [
         (name, c.c_uint32)
@@ -61,6 +68,11 @@ class Assignment(c.Structure):
 
 
 base = Path(__file__).resolve().parents[3] / "runtime/core"
+decoder_hashes = {
+    name: hashlib.sha256((base / name).read_bytes()).hexdigest()
+    for name in ("rpl-code.c", "rpl-code.h")
+}
+driver_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 subprocess.run(
     [
         args.cc,
@@ -92,6 +104,14 @@ code.hpclang_rpl_code_assignment_inspect.argtypes = [
     c.POINTER(Assignment),
 ]
 
+code.hpclang_rpl_code_exchange_inspect.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.c_uint,
+    c.POINTER(Exchange),
+]
+
 for model in (args.model,):
     state = args.state
     flash, ram = (state / "flash").read_bytes(), (state / "sram").read_bytes()
@@ -109,6 +129,8 @@ for model in (args.model,):
 
     assert encoding(start + 0xCA, 13) == "3403c6281af0c"
     assert encoding(start + 0x450, 10) == "81af1c81b3"
+    assert encoding(0x88A82, 0x1E) == "7792afa0787021afe7511130afe850"
+    assert encoding(0x88BAC, 0x15) == "0634fff10cafe0ef60701"
     assert encoding(0x26C30, 7) == "8d91842"
     assert encoding(0x26C37, 7) == "8d12c32"
     for pc, p in ((0x889F7, 0), (0x88B30, 1), (0x889EE, 8), (0x88AB4, 1)):
@@ -116,12 +138,21 @@ for model in (args.model,):
 
     @Read
     def read_code(_, at, value):
-        if not start + 0xCA <= at < start + 0xD7:
+        if not (start + 0xCA <= at < start + 0xD7 or 0x88A82 <= at < 0x88AA0):
             return 0
         value[0] = mapping(at, 1)
         return 1
 
     reader = Reader(read_code, None)
+    exchanges = []
+    for at in (0x88A90, 0x88A9A):
+        exchange = Exchange()
+        assert (
+            code.hpclang_rpl_code_exchange_inspect(c.byref(reader), at, 3, 0, c.byref(exchange))
+            == 0
+        )
+        assert (exchange.left, exchange.right, exchange.first, exchange.nibbles) == (0, 2, 0, 16)
+        exchanges.append(exchange)
     literal, assignment = Literal(), Assignment()
     assert (
         code.hpclang_rpl_code_literal_inspect(
@@ -284,6 +315,7 @@ for model in (args.model,):
             service_trace = list(trace)
             service_state = bytes(uc.mem_read(cpu, 0xD00))
             conversions = []
+            alignments = []
             for logical in (0x80000, 0x80001, 0x86500, 0x88D67, 0xE1C86, 0xFFFFF):
                 uc.mem_write(cpu, service_state)
                 uc.mem_write(cpu + 0x91C, struct.pack("<Q", logical))
@@ -299,6 +331,92 @@ for model in (args.model,):
                 assert bytes(uc.mem_read(cpu, 0x900)) == after_tables
                 assert int.from_bytes(uc.mem_read(cpu + 0x998, 4), "little") == ((cursor - 1) & 7)
                 conversions.append(dict(logical=hex(logical), physical=hex(physical)))
+                # Execute the original conversion call and both ST-controlled
+                # continuations. The saved logical address is an explicit caller
+                # input, not inferred from the physical result or a scalar scan.
+                for skip_alignment in (False, True):
+                    uc.mem_write(cpu, service_state)
+                    uc.mem_write(cpu + 0x91C, struct.pack("<Q", logical))
+                    uc.mem_write(cpu + 0x978 + 4 * ((cursor - 1) & 7), struct.pack("<I", logical))
+                    flags = int.from_bytes(uc.mem_read(cpu + 0x968, 4), "little")
+                    uc.mem_write(cpu + 0x968, struct.pack("<I", (flags & ~1) | skip_alignment))
+                    before = [
+                        int.from_bytes(uc.mem_read(cpu + 0x90C + 8 * i, 8), "little")
+                        for i in range(9)
+                    ]
+                    before_d0 = int.from_bytes(uc.mem_read(cpu + 0x954, 4), "little")
+                    before_stack = bytes(uc.mem_read(cpu + 0x978, 32))
+                    stop = 0x88AA0
+                    trace = []
+                    uc.reg_write(UC_ARM_REG_R7, 0x88A82)
+                    uc.reg_write(UC_ARM_REG_SP, 0x308000)
+                    uc.emu_start(0x28828, 0x400000, count=30000)
+                    suffix = [0x88A86, 0x88A89, 0x88A8B]
+                    expected = list(before)
+                    expected[0] = physical
+                    expected[2] = (physical & ~0xFFFFF) | logical
+                    aligned = (logical + 0x1FFF) & 0xFE000
+                    if not skip_alignment:
+                        # C descriptors specify simultaneous swaps. Arithmetic,
+                        # C/RSTK and D0 effects are independently predicted here.
+                        for index, exchange in enumerate(exchanges):
+                            mask = ((1 << (4 * exchange.nibbles)) - 1) << (4 * exchange.first)
+                            left, right = exchange.left, exchange.right
+                            old_left, old_right = expected[left], expected[right]
+                            expected[left] = (old_left & ~mask) | (old_right & mask)
+                            expected[right] = (old_right & ~mask) | (old_left & mask)
+                            if index == 0:
+                                expected[0] = (expected[0] & ~0xFFFFF) | aligned
+                        suffix += [
+                            0x88A90,
+                            0x88A93,
+                            0x88BAC,
+                            0x88BAE,
+                            0x88BB5,
+                            0x88BB7,
+                            0x88BB9,
+                            0x88BBD,
+                            0x88BBF,
+                            0x88A97,
+                            0x88A9A,
+                            0x88A9D,
+                        ]
+                    suffix += [stop]
+                    assert trace[trace.index(0x88A86) :] == suffix
+                    assert trace[0] == 0x88A82 and trace[trace.index(indirect) + 1] == 0x26C30
+                    actual = [
+                        int.from_bytes(uc.mem_read(cpu + 0x90C + 8 * i, 8), "little")
+                        for i in range(9)
+                    ]
+                    assert actual == expected, (hex(logical), skip_alignment, actual, expected)
+                    assert int.from_bytes(uc.mem_read(cpu + 0x954, 4), "little") == (
+                        before_d0 if skip_alignment else aligned
+                    )
+                    assert int.from_bytes(uc.mem_read(cpu + 0x95C, 4), "little") == 0
+                    assert int.from_bytes(uc.mem_read(cpu + 0x968, 4), "little") == flags | 1
+                    assert int.from_bytes(uc.mem_read(cpu + 0x998, 4), "little") == (
+                        (cursor - 1) & 7
+                    )
+                    # Calls may reuse the free slot and consumed caller slot.
+                    # All other ring slots must survive; this is not a depth proof.
+                    after_stack = bytes(uc.mem_read(cpu + 0x978, 32))
+                    for slot in range(8):
+                        if slot not in (cursor, (cursor - 1) & 7):
+                            assert (
+                                after_stack[4 * slot : 4 * slot + 4]
+                                == before_stack[4 * slot : 4 * slot + 4]
+                            )
+                    assert bytes(uc.mem_read(cpu, 0x900)) == after_tables
+                    alignments.append(
+                        dict(
+                            logical=hex(logical),
+                            skip_alignment=skip_alignment,
+                            d0=hex(before_d0 if skip_alignment else aligned),
+                            physical=hex(actual[0]),
+                            restored=hex(actual[2]),
+                        )
+                    )
+
             rows.append(
                 dict(
                     model=model,
@@ -312,18 +430,28 @@ for model in (args.model,):
                     trace=[hex(x) for x in service_trace],
                     changed_mapping_words=[hex(x) for x in changed],
                     conversions=conversions,
+                    alignments=alignments,
                 )
             )
+assert decoder_hashes == {
+    name: hashlib.sha256((base / name).read_bytes()).hexdigest() for name in decoder_hashes
+}
+assert driver_hash == hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 report = dict(
     cases=rows,
     inputs=inputs,
-    decoder_sha256={
-        name: hashlib.sha256((base / name).read_bytes()).hexdigest()
-        for name in ("rpl-code.c", "rpl-code.h")
-    },
-    driver_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-    scope="Four real command-4 ACCESSRAM1 call sites, original ROM and pinned saved mappings; R4 initialization parsed by C descriptors and executed by the original interpreter, with controlled P=0 and other caller registers. P=8 covers saved contents, one/two controlled size-delimited library records and an overflowing extent. This does not validate arbitrary object contents, all bank configurations or full launcher closure.",
-    implication="R4 is never written by the observed ROM service paths. All main-RAM read mappings remain stable and six subsequent SAT2ARM conversions retain correct physical byte addresses.",
+    decoder_sha256=decoder_hashes,
+    driver_sha256=driver_hash,
+    scope="Four real command-4 ACCESSRAM1 call sites, original ROM and pinned saved mappings; R4 initialization parsed by C descriptors and executed by the original interpreter, with controlled P=0 and other caller registers. The original SAT2ARM call and both ST-controlled alignment continuations also run with an explicitly seeded saved logical address; this does not establish return-stack capacity or provenance of arbitrary caller inputs. P=8 covers saved contents, one/two controlled size-delimited library records and an overflowing extent. This does not validate arbitrary object contents, all bank configurations or full launcher closure.",
+    implication="R4 is never written by the observed ROM service paths. All main-RAM read mappings remain stable and six subsequent SAT2ARM conversions retain correct physical byte addresses. Both ST-controlled original caller continuations preserve physical A while restoring or aligning the saved logical address in C; arithmetic can wrap at 20 bits and is not relocation authorization.",
 )
 (OUT / "accessram-return.json").write_text(json.dumps(report, indent=2) + "\n")
-print(json.dumps(dict(cases=len(rows), conversions=sum(len(x["conversions"]) for x in rows))))
+print(
+    json.dumps(
+        dict(
+            cases=len(rows),
+            conversions=sum(len(x["conversions"]) for x in rows),
+            alignments=sum(len(x["alignments"]) for x in rows),
+        )
+    )
+)

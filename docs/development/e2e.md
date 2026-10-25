@@ -709,14 +709,25 @@ and driver fingerprints, executed paths and changed mapping words. The P=8
 call additionally walks one and two controlled library records and rejects an
 overflowing extent. These inputs are placed through the mapping established by
 the original CONFIG sequence; exact returned free space, carry, and traversal
-counts are checked. Each model runs 56 service cases and 336 conversions. Input guards
-reject changed reviewed call encodings and remove any stale report on that failure.
+counts are checked. Each model runs 56 service cases, 336 conversions and 672
+original caller continuations. Input guards reject changed reviewed call,
+exchange and alignment encodings and remove any stale report on that failure.
 
 The gate compiles the current C literal/assignment inspectors and compares
 their register predictions with execution of the original LC→R4 initialization
 pair, after establishing P=0 through its original instruction. R4 is then
 preserved across the service and conversion checks. Decoder source fingerprints
 are retained; changed initialization/call encodings reject stale reports.
+The subsequent original call at `88A82` executes SAT2ARM, restores a caller-saved
+logical address through C=RSTK, and follows both ST-controlled paths to `88AA0`.
+For the alignment path, the C exchange inspector predicts both ACEX W swaps;
+the independent arithmetic expectation rounds the logical address to an 0x2000
+boundary modulo 20 bits. All nine working/saved registers, D0, P, ST, the
+return-stack cursor, unaffected ring slots and mappings are checked. The skip
+path preserves D0. The maximum-address case wraps to zero; matching original
+arithmetic does not establish a usable address. Saved logical addresses are
+explicit caller inputs, and ring-cursor coverage does not prove stack capacity.
+Decoder and driver fingerprints must remain stable throughout the run.
 This is a controlled entry, not execution of all preceding launcher branches.
 
 The other entry registers and mappings are controlled. P=8 coverage tests the ROM
