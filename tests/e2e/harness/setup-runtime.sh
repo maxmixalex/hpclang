@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# != 2 ]]; then
-    echo "usage: $0 <direct|stock> <hp39|hp48|hp4950>" >&2
+if (( $# != 2 )) && { (( $# < 4 )) || [[ "$3" != -- ]]; }; then
+    echo "usage: $0 <direct|stock> <hp39|hp48|hp4950> [-- command [args...]]" >&2
     exit 2
 fi
 
@@ -65,3 +65,14 @@ if [[ -n "${GITHUB_PATH:-}" && -d "$TOOLDIR" ]]; then
 fi
 
 printf 'portable x50ng ready: mode=%s family=%s\n' "$MODE" "$FAMILY"
+
+# A standalone setup process cannot export into its caller. Local runs can
+# execute their harness here so they use the same portable tools/libraries as CI.
+if (( $# > 2 )); then
+    shift 3
+    export LD_LIBRARY_PATH="$RUNTIME_LD_LIBRARY_PATH"
+    if [[ -d "$TOOLDIR" ]]; then
+        export PATH="$TOOLDIR:$PATH"
+    fi
+    exec "$@"
+fi
