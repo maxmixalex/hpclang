@@ -20,6 +20,121 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+2026-10-25 acceptance: PR #11 (`9683fd6a`) is merged as `69c2b831`.
+Its PR Runtime passes 117 jobs with one conditional skip; other PR/push gates
+pass except the cancelled duplicate push Runtime, which is not called a pass.
+Merged main has the exact accepted source tree. PR #12 (`ab91e43a`) passes all
+12 push/PR workflows and is merged as `67b8e26d`; retargeting to main introduced
+no tree difference because #11's merge equals its accepted head. Main's resulting
+tree equals #12's tested head. Primary branch merges accepted main, resolving
+roadmap-only tracking conflicts; its remaining difference is tracking text.
+Fresh merge/retarget CI is not polled. PR #13 is now based on main, still open.
+
+PR #13 exact head `b64b68ea` has ten successful runs, but Runtime push
+40090614391 and PR 40090621638 fail. Push HP39g+ system-services-immediate and
+PR HP50g system-services both report `0x46417b8e`: watchdog fixture result 14
+(register restoration comparison), not the earlier audio result 10. The check
+can overwrite an earlier fixture failure, so this alone does not prove root
+cause. PR HP40gs UI fails during host transfer before application verification.
+Failed logs and application artifacts are saved under `research/oct25-pr13-*`
+and `research/oct25-ci-watchdog-*`. No SRAM snapshot was retained in those
+service artifacts. These failures remain unresolved; #13 is not accepted.
+
+Port C++ owner `e181fe7c` (M8.5, local acceptance): queue 71073 exits 0;
+all six Direct and all six original-Stock models pass. Each Stock result confirms
+PASS, returned=true and return_settled=true. This supersedes the pending native
+status below. Fresh ASan/UBSan real-service Port tests, ARM C++ analysis,
+formatting, strict docs and installed/relocated SDK acceptance also pass.
+Evidence: `/work/oct25-port-cpp-{artifact,stock-assets,native,quality.log}` and
+`/work/oct24-port-cpp-sdk.log`. Remote acceptance remains open; no new push.
+
+PR #13 diagnostics `d1e36601` (local, not a runtime fix): preserve the first
+watchdog failure, record before/after registers, IRQ delivery and ownership,
+and upload failed system-service SRAM/state plus matching ELF. Exact emulator
+from run 40090614391 passes six Direct diagnostic runs and HP50g normal Stock.
+Final diagnostic ordering also passes ARM analysis/format and HP50g Direct.
+A masked-IRQ negative on HP39gs returns the expected `0x46417b83`, with zero
+IRQs, unfinished session, both owners retained and register mismatch mask 7;
+the mailbox contains all 24 version-2 observation words. It proves diagnostic
+capture, not a runtime fix. Final source keeps the original interrupt-only wait.
+Evidence: `/work/oct25-watchdog-{ci-direct,ci-stock,final-check.log,final-negative}`.
+HP39g+ immediate Stock remains live in session 80581 (x50ng PID 11065 observed);
+do not restart it. Runtime CI acceptance remains unresolved and no push occurred.
+Earlier probes used the old one-tick-per-callback emulator; those failures do
+not establish this CI cause. The speculative elapsed-wait change was withdrawn.
+
+PR #13 HP40gs UI artifact narrows the separate failure to transport: directory
+fetch succeeds, then the payload receives no acknowledged progress for 90s
+(send-window 15, last NAK 15, three NAKs/four resends). The host gate aborts before
+application execution. Full evidence is in `research/oct25-ci-ui-hp40gs`;
+no UI/native-allocation root cause or transport fix is claimed.
+Further user-requested cleanup reclaims about 1.9 GiB: three reproducible font
+trees, old object files, pip cache and verified temporary duplicates; three source
+archives are gzip-compressed with decompressed SHA-256 verification. `/work`
+is 28.5 GiB after cleanup. Manifest: `research/oct25-extra-cleanup.json` and
+`research/oct25-temp-cleanup.json`. Generated fonts in the window-release,
+window-delivery and allocation-delivery container mirrors need regeneration
+before reuse. Current Port validation and original ROM/SRAM evidence are intact.
+
+### Earlier follow-up checkpoints
+Second container cleanup (user requested): removed 1,008 obsolete CMakeFiles
+folders, 18 commit-free temporary Git stores, 10 obsolete SDK installations and
+small Python/Ruff caches (7.30 GiB). Preserved 1,008 build diagnostic files in
+`/work/oct24-cleanup-build-diagnostics.tar.gz`, verified readable. Compressed
+2,558 old logs, verifying each decompressed SHA-256 before deleting its original
+(8.24 GiB reclaimed). `/work` now uses 30.1 GiB; both cleanup rounds recover
+about 40.3 GiB. ROM/Flash/SRAM evidence, current sources and toolchains remain.
+Manifests are copied to `research/oct24-{build,log}-cleanup.json`; use
+`research/restore-container-log.py` inside the container to restore a listed
+.log.gz when a verifier requires the original filename. Cleaned build/SDK paths
+must be rebuilt, not treated as available artifacts. Filesystem trim completed.
+Port C++ SDK verification 33637 now exits 0 after verified source repair;
+installed C/C++ example, relocation and six-model packaging pass. Native owner
+execution and remote acceptance remain open. No push or CI polling.
+
+Development volume cleanup (user requested): removed generated font trees from
+96 obsolete isolated source copies, reclaiming 24.74 GiB; /work drops from
+about 71 to 46 GiB. Source archives, source files, logs, ROM/SRAM evidence and
+current worktrees are retained. Old cleaned mirrors need font regeneration
+before rebuilding; their paths/source archives are recorded in
+`research/oct24-generated-font-cleanup.json`. No host-mounted directory was
+deleted. Filesystem trim completed; the VHD file need not shrink immediately.
+After the disk-full incident, the current Port C++ source mirror was repaired
+from a D: archive and all 4,619 tracked files verified against SHA-256 manifests
+(3,856 mismatches/missing files repaired). Do not trust pre-crash mirror content
+without verification. SDK verification restarted as session 33637; pending.
+Future isolated experiments must avoid copying the entire generated font tree
+and retain evidence separately from rebuildable scratch files.
+
+M8.5 Port iterator owner (local worktree `m8-port-cpp`): new allocation-free
+`hpclang::owned_port_iterator` preserves errno on cleanup and follows unique_ptr
+move/adopt/release semantics. The real C Port fixture plus C++17 ASan/UBSan
+passes move replacement, failed-open preservation, original-mapping loss,
+independent snapshot enumeration and destructor cleanup. Strict docs pass.
+The installed object-cpp example and Object Basics native fixture now consume
+the owner; the new native fixture is not built or executed yet. SDK check
+session 69651 exits 1 (child exit 120), followed by container-wide I/O errors
+including /work and /bin/cat. Host C: has zero free bytes; Docker subsequently
+returns Bad Gateway. This is an environment failure, not SDK/native acceptance.
+Implementation remains local, no push. Resume SDK/ARM/native verification after
+recovering disk capacity; do not discard prior emulator evidence to make room.
+Evidence: `/work/oct24-port-cpp-{check,sdk}.log`; host source stays on D:.
+
+Native allocation and SDK memory guide submitted as `b64b68ea` in draft
+[PR #13](https://github.com/maxmixalex/hpclang/pull/13), stacked on PR #12 via
+`m8-window-delivery`. The delivery merge changes only roadmap relative to
+verified `10eb7dd7`; all 4,617 tracked files match the isolated mirror. Full
+format (103 Python files), lint and strict docs pass. Six-model native and exact
+CI-verifier replay, two sanitizer targets, six report tests, negative replays
+and relocated SDK guide checks apply to the unchanged implementation.
+Before this push, preceding `ab91e43a` had all 12 runs queued. Dependency
+`9683fd6a` had both Quality, Storage and Objects runs pass; both Core and Runtime
+runs remained queued. Failed logs 40068713236/40061641253 were reread: transfer
+and HP40gs sound restoration remain unresolved; accepted Flash-busy fixes are
+tracked separately. Neither dependency is accepted/merged. Fresh PR #13 CI is
+not polled. Before the next push inspect `b64b68ea` and pending dependencies,
+including failed-job logs. This is submission, not CI acceptance or M8 closure.
+
 SDK memory guide (local) now separates application RW, complete launch pool,
 serialized package and whole-system peak. It documents admission/ceiling fields,
 Aplet footprint, transient replacement costs and measurement limits. The guide
