@@ -20,12 +20,23 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
-Prepared parent reconciliation for #13: this local candidate merges accepted
-main 5eb1b25c into df3a30a4, preserving both roadmap histories. Runtime,
-platform, SDK build configuration, workflows and native harness files are
-unchanged from df3a30a4. Its ongoing remote CI is not superseded by this local
-preparation; the candidate has not been pushed or remotely accepted. All prior
-pending-run descriptions below are historical checkpoints, not current status.
+CI transport follow-up (local candidate, not yet accepted): accepted main
+5eb1b25c is reconciled with #13. Both failures at df3a30a4 are pre-entry Kermit
+stalls: HP39gs immediate job 121174393854 at window 4, and HP40gs Runtime job
+121174393846 at window 17. Retry pacing now retains SEND PAUSE before resending;
+PTY regressions cover idle/recovery/CRC, byte-exact decoding and delayed retries.
+Three fresh HP39gs immediate runs pass with exact CI application/assets and
+patched Kermit. Corrected HP40gs Runtime execution passes application keyboard
+checks and settled return using exact CI application and Aplet assets; full
+run-family validation also passes with all 52 keyboard progress captures and
+settled return (queue 47051 exited zero).
+The earlier mixed-asset HP40gs replay is explicitly invalid and excluded.
+An Aplet/launcher identity preflight now rejects that mismatch before transport;
+three unit tests, six real asset identities and a full-harness negative pass.
+Runtime/platform/application sources are unchanged from df3a30a4. Evidence:
+/work/oct26-allocation-transport and research/oct26-allocation-identity-prepare.json.
+These local results do not establish universal transport reliability or remote
+acceptance. All earlier pending-run descriptions below are historical checkpoints.
 
 Deadline fixture delivery: all six Direct and all six Stock cases now pass with
 settled return; masked-IRQ negative still fails with zero IRQs after the allowed
