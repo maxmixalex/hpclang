@@ -9,6 +9,7 @@
 
 #include <fsystem.h>
 #include <hpstdio.h>
+#include <hpkeyb49.h>
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
 #include <hpclang/power.h>
@@ -1012,6 +1013,15 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     uint32_t replacement = storage_replacement_test();
     if (replacement)
         return replacement;
+    /* Leave genuine keyboard activity pending for Stock, as interactive file
+     * applications do. Without this stimulus the unsafe reset can appear safe. */
+    hpclang_e2e_result = UINT32_C(0x4b500123);
+    uint64_t key_start = hpclang_time_monotonic_us();
+    while (hpclang_e2e_result != UINT32_C(0x4b510123))
+        if (hpclang_time_monotonic_us() - key_start > 2000000u)
+            return 0xfcu;
+    if (keyb_getkey(1) != 5 || keyb_isAnyKeyPressed())
+        return 0xfdu;
     /* Keep a mounted card while exercising the actual Stock reset boundary.
      * Its SWI dispatcher must not run Stock IRQ handlers in native mappings,
      * including when the application owns an economy clock profile. */
