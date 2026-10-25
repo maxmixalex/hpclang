@@ -2497,7 +2497,7 @@ static int stage_read_word(void *context, uint32_t address, unsigned width, uint
 static void test_immediate_return_relocation(void)
 {
     const struct hpclang_stage_stack_io stage = {NULL, stage_read_word, NULL};
-    for (uint32_t instruction = 0x10; instruction <= 0x30; instruction += 0x10) {
+    for (uint32_t instruction = 0; instruction <= 0x30; instruction += 0x10) {
         for (uint32_t cursor = 0; cursor < 8; ++cursor) {
             for (int fail = 0; fail < 2; ++fail) {
                 struct hpclang_rpl_mutation_io io = setup_catalog_growth();
@@ -2530,6 +2530,41 @@ static void test_immediate_return_relocation(void)
     }
 }
 
+static void test_conditional_return_relocation(void)
+{
+    const struct hpclang_stage_stack_io stage = {NULL, stage_read_word, NULL};
+    for (unsigned carry = 0; carry < 2; ++carry)
+        for (unsigned cursor = 0; cursor < 8; ++cursor)
+            for (unsigned fail = 0; fail < 2; ++fail) {
+                struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+                uint32_t pc = 0x82400, stack[8], *roots[9] = {&pc};
+                for (unsigned i = 0; i < 8; ++i)
+                    stack[i] = 0x82555;
+                stack[(cursor + 7) & 7] = 0x82520;
+                put_word(pc, 2, carry ? 0x20 : 0x30);
+                put_word(0x82520, 3, carry ? 4 : 5);
+                assert(hpclang_stage_return_roots(&stage, pc, stack, cursor, roots + 1) == 2);
+                assert(roots[1] == stack + ((cursor + 7) & 7));
+                assert(roots[2] == stack + ((cursor + 6) & 7));
+                io.native_roots = roots;
+                io.native_root_count = 3;
+                if (fail)
+                    rejected_read = 0x90000;
+                int result = hpclang_rpl_mutation_catalog_grow(&io, 0x82013);
+                assert(fail ? result < 0 : result == 0);
+                unsigned delta = fail ? 0 : 16;
+                assert(pc == 0x82400 + delta);
+                assert(stack[(cursor + 7) & 7] == 0x82520 + delta);
+                for (unsigned i = 0; i < 8; ++i)
+                    if (i != ((cursor + 7) & 7))
+                        assert(stack[i] == 0x82555 + (i == ((cursor + 6) & 7) ? delta : 0));
+                assert(get_word(pc, 2) == (carry ? 0x20u : 0x30u));
+                assert(get_word(stack[(cursor + 7) & 7], 3) == (carry ? 4u : 5u));
+                if (fail)
+                    assert(!writes);
+            }
+}
+
 static void test_return_chain_relocation(void)
 {
     const struct hpclang_stage_stack_io stage = {NULL, stage_read_word, NULL};
@@ -2545,7 +2580,7 @@ static void test_return_chain_relocation(void)
                 for (unsigned depth = 0; depth < length; ++depth) {
                     stack[(cursor + 7 - depth) & 7] = 0x82500 + depth * 0x20;
                     put_word(0x82500 + depth * 0x20, 2,
-                             depth + 1 < length ? 0x10 * (1 + depth % 3) : 0xab);
+                             depth + 1 < length ? 0x10 * (depth % 4) : 0xab);
                 }
                 memcpy(before, stack, sizeof stack);
                 unsigned count = hpclang_stage_return_roots(&stage, pc, stack, cursor, roots + 1);
@@ -2571,7 +2606,7 @@ static void test_return_chain_relocation(void)
                 uint32_t next = pc;
                 for (unsigned depth = 0; depth < length; ++depth) {
                     uint32_t opcode = get_word(next, 2);
-                    assert(opcode == 0x10 || opcode == 0x20 || opcode == 0x30);
+                    assert(opcode == 0 || opcode == 0x10 || opcode == 0x20 || opcode == 0x30);
                     next = stack[(cursor + 7 - depth) & 7];
                 }
                 assert(get_word(next, 2) == 0xab);
@@ -2980,6 +3015,7 @@ int main(void)
 #endif
     test_catalog_merged_repairs();
     test_immediate_return_relocation();
+    test_conditional_return_relocation();
     test_return_chain_relocation();
     test_catalog_growth();
     test_catalog_switch_growth();

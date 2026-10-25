@@ -20,6 +20,22 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+M8.0 return-root delivery: RTNSXM and proven-carry GOC/GONC/RTNC/RTNNC
+extend the existing bounded interpreter. Initial carry remains unknown, and
+unsupported instructions still stop discovery. Original stack-cell ownership,
+generated-call exclusion and the 64-instruction budget are preserved. This
+does not establish complete execution-reference coverage or enable reclamation.
+Source 52237881 has local ASan/UBSan stage/catalog-movement validation, all 8192
+conditional combinations, ARM analysis, six launcher builds and relocated SDK
+validation (229 reproducible outputs). Ten native call/root cases pass on
+HP49g+/HP50g; independent saved-state replay and sixteen corrupted-evidence
+controls pass. Reports: /work/oct26-conditional/audit-hp50g-hp49gplus.json and
+research/oct26-conditional-source-audit.json. This delivery isolates the six
+implementation/test files onto accepted main 5eb1b25c; its build/identity checks
+remain required before submission. Trusted installation/activation/retirement
+evidence from accepted #6/#7 is retained; opaque/banked reference coverage,
+safe pre-recovery startup, authority reuse and reclamation remain open in M8.
+
 Original HPGCC3 graphics gate (local, 2026-10-26): three pinned documentation
 programs build/package using one relocated installed SDK. Explicit migration
 diffs replace only the umbrella include; observed native builds retain original

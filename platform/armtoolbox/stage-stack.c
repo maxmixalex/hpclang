@@ -25,7 +25,8 @@ uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_i
         return NULL;
     uint8_t instruction;
     if (!read_byte(io, continuation, &instruction) ||
-        (instruction != 0x10u && instruction != 0x20u && instruction != 0x30u))
+        (instruction != 0x00u && instruction != 0x10u && instruction != 0x20u &&
+         instruction != 0x30u))
         return NULL;
     uint32_t *root = &machine_stack[(cursor + 7u) & 7u];
     return *root < RPL_MAIN_END ? root : NULL;
@@ -41,10 +42,39 @@ unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uin
     for (unsigned i = 0; i < 8u; ++i)
         stack[i] = machine_stack[i];
     unsigned original = 255u;
+    int carry = -1; /* Initial interpreter flags have not been established. */
     /* Track call-generated continuations separately: a push overwrites that
      * cell's original value, which must never be reported as a consumed root. */
     for (unsigned steps = 0; count < 8u && steps < 64u; ++steps) {
+        uint8_t opcode;
+        if (continuation > RPL_MAIN_END - 2u || !read_byte(io, continuation, &opcode))
+            break;
         uint32_t *root = hpclang_stage_immediate_return_root(io, continuation, stack, cursor);
+        if (root) {
+            if (opcode == 0x20u)
+                carry = 1;
+            else if (opcode == 0x30u)
+                carry = 0;
+        } else if ((opcode & 15u) == 4u || (opcode & 15u) == 5u) {
+            uint32_t displacement;
+            if (carry < 0 || continuation > RPL_MAIN_END - 3u ||
+                !io->read(io->context, continuation + 1u, 2, &displacement) || displacement > 255u)
+                break;
+            if (carry != ((opcode & 15u) == 4u)) {
+                continuation = (continuation + 3u) & 0xfffffu;
+                continue;
+            }
+            if (displacement) {
+                int32_t offset =
+                    displacement < 128u ? (int32_t)displacement : (int32_t)displacement - 256;
+                continuation = (uint32_t)((int32_t)continuation + 1 + offset) & 0xfffffu;
+                continue;
+            }
+            /* RTNC/RTNNC consume the top only on the established taken path. */
+            root = &stack[(cursor + 7u) & 7u];
+            if (*root >= RPL_MAIN_END)
+                break;
+        }
         if (root) {
             cursor = (cursor + 7u) & 7u;
             if (original & (1u << cursor)) {
@@ -54,9 +84,6 @@ unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uin
             continuation = *root;
             continue;
         }
-        uint8_t opcode;
-        if (continuation > RPL_MAIN_END - 2u || !read_byte(io, continuation, &opcode))
-            break;
         unsigned prefix, width, call;
         if ((opcode & 15u) == 6u || (opcode & 15u) == 7u) {
             prefix = 1;

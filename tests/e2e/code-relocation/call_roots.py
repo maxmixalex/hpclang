@@ -7,6 +7,8 @@ from fixtures import word
 
 CASES = {
     "gosub": bytes([0x27, 0, 0x10, 0x10]),
+    "gosub-rtnsxm": bytes([0x27, 0, 0x10, 0x00]),
+    "gosub-rtnnc": bytes([0x37, 0, 0x05, 0, 0x03]),
     "gosubl": bytes([0xE8, 2, 0, 0x10, 0x10]),
     "gosbvl": bytes([0xF8, 0, 0, 0, 1, 1]),
 }
@@ -65,7 +67,9 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if read(obj) != 0x2A2C or read(obj + 5) != 5 + 2 * len(expected):
             raise ValueError("Call fixture object changed")
         actual = bytes(read(obj + 10 + 2 * i, 2) for i in range(len(expected)))
-        if name == "gosbvl":
+        if name == "gosub-rtnnc":
+            valid = actual == expected
+        elif name == "gosbvl":
             valid = (
                 actual[:9] == expected[:9]
                 and read(obj + 28) == obj + 35
@@ -74,7 +78,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                 and read(obj + 37, 1) == 0
             )
         else:
-            tail = 10 if name == "gosub" else 11
+            tail = 10 if name in ("gosub", "gosub-rtnsxm") else 11
             valid = (
                 actual[:tail] == expected[:tail]
                 and actual[tail] in (0x10, 0x20, 0x30)
