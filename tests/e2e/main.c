@@ -1009,7 +1009,30 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     int restored = hpclang_power_set_profile(HPCLANG_POWER_HOST);
     if (historical || restored)
         return 0xf1u;
-    return storage_replacement_test();
+    uint32_t replacement = storage_replacement_test();
+    if (replacement)
+        return replacement;
+    /* Keep a mounted card while exercising the actual Stock reset boundary.
+     * Its SWI dispatcher must not run Stock IRQ handlers in native mappings,
+     * including when the application owns an economy clock profile. */
+    if (hpclang_power_set_profile(HPCLANG_POWER_ECONOMY))
+        return 0xf2u;
+    static const uintptr_t registers[] = {
+        0x07200004u, 0x07200010u, 0x07200014u, 0x07600000u,
+        0x07600004u, 0x07600008u, 0x0760000cu, 0x07300000u,
+    };
+    uint32_t before[sizeof registers / sizeof registers[0]];
+    for (unsigned i = 0; i < sizeof registers / sizeof registers[0]; ++i)
+        before[i] = *(volatile uint32_t *)registers[i];
+    extern void hpclang_storage_shutdown(void);
+    hpclang_storage_shutdown();
+    for (unsigned i = 0; i < sizeof registers / sizeof registers[0]; ++i) {
+        /* LCDCON1's current scanline is live/read-only, not configuration. */
+        uint32_t mask = i == 7 ? UINT32_C(0x3ffff) : UINT32_MAX;
+        if ((*(volatile uint32_t *)registers[i] & mask) != (before[i] & mask))
+            return 0xf3u + i;
+    }
+    return hpclang_power_set_profile(HPCLANG_POWER_HOST) ? 0xfbu : 0u;
 }
 #endif
 

@@ -16,13 +16,14 @@
 #include "storage-namespace-lease.h"
 #include "storage-namespace.h"
 #include "storage-volumes.h"
+#include "../core/irq.h"
 
 enum
 {
     KOS_SYSCALL_RESET_SD = 19u
 };
 
-uint32_t hpclang_kos_swi3(uint32_t index, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+uint32_t hpclang_kos_sync3(uint32_t index, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
 #define FAT_ATTRIBUTE_VOLUME UINT8_C(0x08)
 
@@ -156,7 +157,13 @@ static int lease_direct_release(void *context)
 static int lease_stock_reinit(void *context)
 {
     (void)context;
-    (void)hpclang_kos_swi3(KOS_SYSCALL_RESET_SD, 0u, 0u, 0u);
+    /* ResetSD polls the controller. The ordinary SWI dispatcher enables IRQ/FIQ;
+     * do not let Stock handlers run in the application's temporary mappings or
+     * change its borrowed clock/timer state while reconciling the card. Retain
+     * pending sources for Stock and restore the caller's interrupt state. */
+    uint32_t irq = hpclang_irq_save_disable();
+    (void)hpclang_kos_sync3(KOS_SYSCALL_RESET_SD, 0u, 0u, 0u);
+    hpclang_irq_restore(irq);
     return 0;
 }
 
