@@ -1840,6 +1840,49 @@ static void test_port1_library_append(void)
     }
 }
 
+static void test_port1_append_publication_failures(void)
+{
+    const char *encodings[] = {"26b20130008005f42545a55425f48041620900003210119200f9e3",
+                               "04b2062000108510b7000000000000000000000d5c2"};
+    for (unsigned library = 0; library < 2; ++library) {
+        uint32_t span = (uint32_t)strlen(encodings[library]);
+        uint32_t prefix = (uint32_t)strlen(encodings[!library]);
+        uint8_t packed[27] = {0};
+        for (uint32_t i = 0; i < span; ++i) {
+            char ch = encodings[library][i];
+            packed[i / 2] |= (uint8_t)(ch <= '9' ? ch - '0' : ch - 'a' + 10) << (4 * (i & 1));
+        }
+        for (uint32_t fail = 0; fail <= span + 6; ++fail) {
+            struct hpclang_rpl_mutation_io io = setup(1);
+            for (uint32_t i = 0; i < prefix; ++i) {
+                char ch = encodings[!library][i];
+                memory[i] = (uint8_t)(ch <= '9' ? ch - '0' : ch - 'a' + 10);
+            }
+            uint8_t saved[54];
+            memcpy(saved, memory, prefix);
+            uint32_t limit = prefix + span + 6;
+            memory[limit] = 11;
+            rejected_write = fail;
+            int result = library ? hpclang_rpl_port1_create_library(&io, limit, packed, span)
+                                 : hpclang_rpl_port1_create_backup(&io, limit, packed, span);
+            assert(writes == fail && memory[limit] == 11);
+            assert(!memcmp(saved, memory, prefix));
+            if (fail < span + 1) {
+                assert(result == HPCLANG_RPL_MUTATION_IO);
+                assert(get_word(prefix, 5) == 0); /* Old chain still terminates here. */
+            } else if (fail < span + 6) {
+                assert(result == HPCLANG_RPL_MUTATION_INCOMPLETE);
+            } else {
+                assert(result == HPCLANG_RPL_MUTATION_OK);
+                for (uint32_t i = 0; i < span; ++i)
+                    assert(memory[prefix + i] == ((packed[i / 2] >> (4 * (i & 1))) & 15));
+                for (uint32_t i = 0; i < 6; ++i)
+                    assert(memory[prefix + span + i] == 0);
+            }
+        }
+    }
+}
+
 struct port1_guard_fixture
 {
     uint32_t start, end, calls;
@@ -3223,6 +3266,7 @@ int main(void)
     test_attachment_relocation();
     test_port1_append_respects_native_pool();
     test_port1_library_append();
+    test_port1_append_publication_failures();
     test_port1_edit_owned_suffix();
     test_port0_create_library();
     test_library_table_reference_preservation();

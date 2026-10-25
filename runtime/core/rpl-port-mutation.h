@@ -4,7 +4,12 @@
 #include "rpl-mutation.h"
 
 /* Append to the ERAM chain without moving any existing record. limit is the
- * launcher-proven exclusive nibble boundary before its physical page pool. */
+ * launcher-proven exclusive nibble boundary before its physical page pool.
+ * Body/next-terminator write failure is IO: the old zero prologue still hides
+ * the append, although unused bytes may have changed. Once prologue publication
+ * is attempted, write failure is INCOMPLETE: retain ownership and do not resume
+ * Stock or retry a possibly partially published record. Stable production RAM
+ * callbacks must not fail after successful preflight. */
 int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
                                     const uint8_t *packed, uint32_t span);
 /* Same ownership/append contract for a library. Does not register or attach it;

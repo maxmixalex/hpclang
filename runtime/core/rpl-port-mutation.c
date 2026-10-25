@@ -79,7 +79,7 @@ static int port1_append(const struct hpclang_rpl_mutation_io *io, uint32_t limit
     for (uint32_t i = 0; i < 5; ++i) {
         uint8_t nibble = (packed[i / 2u] >> (4u * (i & 1u))) & 15u;
         if (!io->write_nibble(io->context, start + i, nibble))
-            return HPCLANG_RPL_MUTATION_IO;
+            return HPCLANG_RPL_MUTATION_INCOMPLETE;
     }
     return HPCLANG_RPL_MUTATION_OK;
 }
