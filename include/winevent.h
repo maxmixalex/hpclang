@@ -14,8 +14,8 @@ extern "C"
      * and 32 timers. Exhaustion reports ENOSPC, never silently drops a registration.
      * System IDs 0..7 are reserved; user event registration starts at 8. Physical
      * key events 1/2, typed/modifier events 3..6 (winkeys.h), and repaint 7
-     * are generated. Custom components use winwidget.h/wincore.h; concrete
-     * controls and the complete win.h umbrella remain unfinished.
+     * are generated. Custom components use winwidget.h/wincore.h; win.h includes
+     * the concrete controls and grouping adapters.
      */
     void win_init(void);
     int win_register_event(void);

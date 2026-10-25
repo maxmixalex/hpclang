@@ -13,6 +13,23 @@ PROFILES = [json.loads(path.read_text()) for path in (ROOT / "tests/e2e/targets"
 
 
 class RuntimePlanTests(unittest.TestCase):
+    def test_window_split_preserves_all_model_and_context_coverage(self):
+        suites = json.loads((ROOT / "tests/e2e/runtime-suites.json").read_text())
+        names = {"hpgcc-window", "hpgcc-window-dialogs"}
+        selected = [suite for suite in suites if suite["mode"] in names]
+        self.assertEqual({suite["mode"] for suite in selected}, names)
+        result = MODULE.plan(selected, PROFILES)
+        self.assertEqual(len(result["builds"]), 2)
+        for name in names:
+            direct = [job for job in result["direct"] if job["suite"]["mode"] == name]
+            stock = [job for job in result["stock"] if job["suite"]["mode"] == name]
+            self.assertEqual({job["family"] for job in direct}, {"hp39", "hp48", "hp4950"})
+            self.assertEqual(
+                {job["model"]["target"] for job in stock},
+                {profile["target"] for profile in PROFILES},
+            )
+            self.assertTrue(all(job["suite"]["verifier"] for job in direct + stock))
+
     def test_existing_universal_coverage(self):
         result = MODULE.plan([{"mode": "runtime", "keyboard": True}], PROFILES)
         self.assertEqual(len(result["builds"]), 1)

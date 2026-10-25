@@ -14,6 +14,11 @@
 #include <winprogress.h>
 #include <wintext.h>
 #include <winimg.h>
+#include <winsoftmenu.h>
+#include <wincheckbox.h>
+#include <winchoose.h>
+#include <winbox.h>
+#include <hpclang/device.h>
 #include <winkeys.h>
 #include "hpgcc-keyboard.h"
 #define HPCLANG_HPCONIO_NO_AUTOINIT
@@ -229,7 +234,14 @@ static struct hpclang_surface *pages[2];
 static unsigned page_count, back, published, flips, ended;
 static int mode_failure;
 static int present_failure, publish_failure;
-static unsigned display_height = 6;
+static unsigned display_height = 6, display_width = 8;
+const struct hpclang_device_info *hpclang_device_info(void)
+{
+    static struct hpclang_device_info info;
+    info.display_width = display_width;
+    info.display_height = display_height;
+    return &info;
+}
 static int configure(unsigned levels, unsigned count)
 {
     if (mode_failure) {
@@ -238,10 +250,11 @@ static int configure(unsigned levels, unsigned count)
     }
     for (unsigned i = 0; i < 2; ++i) {
         hpclang_surface_destroy(pages[i]);
-        pages[i] = i < count ? hpclang_surface_create(9, display_height, levels) : NULL;
+        pages[i] =
+            i < count ? hpclang_surface_create(display_width + 1, display_height, levels) : NULL;
         assert(i >= count || pages[i]);
         if (pages[i])
-            pages[i]->width = 8;
+            pages[i]->width = display_width;
     }
     page_count = count;
     back = count - 1;
@@ -275,7 +288,7 @@ int hpclang_display_indicator_set(unsigned segment, uint8_t color)
     assert(segment < 6 && page_count);
     struct hpclang_surface view = *pages[back];
     ++view.width;
-    hpclang_surface_set_pixel(&view, 8, (int)segment, color);
+    hpclang_surface_set_pixel(&view, (int)display_width, (int)segment, color);
     return 0;
 }
 int hpclang_display_present(uint32_t timeout)
@@ -1047,6 +1060,284 @@ static void image_widget_pixels(void)
     hpg_cleanup();
 }
 
+static void menu_widget_pixels(void)
+{
+    struct hpclang_surface *saved = display;
+    display_width = 131;
+    for (display_height = 64; display_height <= 80; display_height += 16) {
+        display = hpclang_surface_create_mono(132, display_height);
+        assert(display);
+        display->width = 131;
+        for (int buffered = 0; buffered < 2; ++buffered) {
+            assert(!hpclang_win_reset());
+            hpg_set_mode_gray16(buffered);
+            char glyphs[256 * 6] = {0};
+            for (unsigned row = 0; row < 4; ++row)
+                glyphs['A' * 6 + row] = (char)(1u << row);
+            hpg_font_t *font = hpg_alloc_font(glyphs, 256, 6, 4);
+            win_widget_t *menu = win_softmenu_new();
+            assert(menu && font);
+            win_widget_set_font(menu, font);
+            for (int i = 0; i < 7; ++i)
+                win_softmenu_set_item(menu, i, "A", -1, NULL);
+            win_softmenu_set_disable_colors(menu, 1, 51, 102);
+            win_softmenu_set_enabled(menu, 1, 0);
+            win_softmenu_set_colors(menu, 6, 17, 238);
+            win_add_widget(menu);
+            for (int page = 0; page < 2; ++page) {
+                hpg_clip_reset(NULL);
+                hpg_clear();
+                assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+                for (int y = 0; y < (int)display_height; ++y)
+                    for (int x = 0; x < 131; ++x) {
+                        int cell = x / 22, local = x % 22;
+                        int row = y - ((int)display_height - 6);
+                        int expected = 0;
+                        if (y >= (int)display_height - 7 && local <= 20 && (!page || cell == 0)) {
+                            expected = page ? 238 : cell == 1 ? 102 : 255;
+                            if (row >= 0 && row < 4 && local == 9 + row)
+                                expected = page ? 17 : cell == 1 ? 51 : 0;
+                        }
+                        assert(hpg_get_pixel(NULL, x, y) == expected);
+                    }
+                win_keytyped_t key = {KB_L, 0, 0, 0, 0};
+                assert(win_post_event(WIN_KEY_TYPED, &key) == 1);
+            }
+            win_remove_widget(menu);
+            win_widget_destroy(menu);
+            hpg_free_font(font);
+            assert(!hpclang_win_error() && !hpclang_win_reset());
+            hpg_cleanup();
+        }
+        hpclang_surface_destroy(display);
+    }
+    display = saved;
+    display_width = 8;
+    display_height = 6;
+}
+
+static void checkbox_widget_pixels(void)
+{
+    struct hpclang_surface *saved = display;
+    display_width = 32;
+    display_height = 16;
+    display = hpclang_surface_create_mono(33, 16);
+    assert(display);
+    display->width = 32;
+    const unsigned char checked[] = {0, 0x20, 0x30, 0x1a, 0x0e, 4, 0x3e, 0};
+    const unsigned char empty[] = {0, 0, 0, 0, 0, 0, 0x3e, 0};
+    for (int buffered = 0; buffered < 2; ++buffered) {
+        assert(!hpclang_win_reset());
+        hpg_set_mode_gray16(buffered);
+        char glyphs[256 * 3] = {0};
+        glyphs['A' * 3] = 1;
+        glyphs['A' * 3 + 1] = 2;
+        glyphs['A' * 3 + 2] = 4;
+        hpg_font_t *font = hpg_alloc_font(glyphs, 256, 3, 3);
+        win_widget_t *boxes[] = {win_checkbox_new("A"), win_checkbox_new("")};
+        assert(font && boxes[0] && boxes[1]);
+        for (unsigned i = 0; i < 2; ++i) {
+            win_widget_set_font(boxes[i], font);
+            win_widget_set_location(boxes[i], i ? 20 : 3, 2);
+            win_widget_set_size(boxes[i], 12, 9);
+            win_add_widget(boxes[i]);
+        }
+        for (int focus = 0; focus < 2; ++focus) {
+            assert(win_widget_has_focus(boxes[focus]));
+            for (int selected = 0; selected < 2; ++selected) {
+                win_checkbox_set_selected(boxes[0], selected);
+                hpg_clip_reset(NULL);
+                hpg_clear();
+                assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+                for (int y = 0; y < 16; ++y)
+                    for (int x = 0; x < 32; ++x) {
+                        int expected = 0;
+                        for (int i = 0; i < 2; ++i) {
+                            int local_x = x - (i ? 20 : 3), row = y - 2;
+                            if (local_x < 0 || local_x >= 12 || row < 0 || row >= 9)
+                                continue;
+                            if (focus == i && local_x <= 6)
+                                expected = 255;
+                            const unsigned char *pattern = !i && selected ? checked : empty;
+                            if (local_x <= 8 && (pattern[row % 8] & (1u << (local_x % 8))))
+                                expected = focus == i ? 0 : 255;
+                            if (!i && row >= 1 && row <= 3 && local_x == 8 + row - 1)
+                                expected = 255;
+                        }
+                        assert(hpg_get_pixel(NULL, x, y) == expected);
+                    }
+            }
+            win_focus_next();
+        }
+        for (unsigned i = 2; i; --i) {
+            win_remove_widget(boxes[i - 1]);
+            win_widget_destroy(boxes[i - 1]);
+        }
+        hpg_free_font(font);
+        assert(!hpclang_win_error() && !hpclang_win_reset());
+        hpg_cleanup();
+    }
+    hpclang_surface_destroy(display);
+    display = saved;
+    display_width = 8;
+    display_height = 6;
+}
+
+static void choose_widget_pixels(void)
+{
+    struct hpclang_surface *saved = display;
+    display_width = 131;
+    for (display_height = 64; display_height <= 80; display_height += 16) {
+        display = hpclang_surface_create_mono(132, display_height);
+        assert(display);
+        display->width = 131;
+        for (int buffered = 0; buffered < 2; ++buffered) {
+            assert(!hpclang_win_reset());
+            hpg_set_mode_gray16(buffered);
+            char glyphs[256 * 3] = {0};
+            glyphs['A' * 3] = 1;
+            glyphs['A' * 3 + 1] = 2;
+            glyphs['A' * 3 + 2] = 4;
+            glyphs['B' * 3] = 4;
+            glyphs['B' * 3 + 1] = 2;
+            glyphs['B' * 3 + 2] = 1;
+            hpg_font_t *font = hpg_alloc_font(glyphs, 256, 3, 3);
+            win_widget_t *menu = win_softmenu_new(), *chooser = win_choose_new();
+            assert(font && menu && chooser);
+            win_widget_set_font(chooser, font);
+            win_widget_set_location(chooser, 1, 1);
+            win_widget_set_size(chooser, 5, 5);
+            win_choose_set_menu(chooser, menu, 0);
+            for (int i = 0; i < 40; ++i)
+                win_choose_add_with_label(chooser, i % 2 ? "B" : "A", "A");
+            win_add_widget(menu);
+            win_add_widget(chooser);
+            for (int selected = 0; selected < 40; selected += 39) {
+                win_choose_set_index(chooser, selected);
+                win_keytyped_t key = {KB_A, 0, 0, 0, 0};
+                assert(win_post_event(WIN_KEY_TYPED, &key) == 1);
+                hpg_clip_reset(NULL);
+                hpg_clear();
+                assert(win_post_event(WIN_REPAINT_EVENT, NULL) == 1);
+                /* Fixed expected panel geometry: 13 rows at y=0 on 64 lines,
+                 * 17 rows at y=0 on 80 lines. Last selection scrolls to bottom. */
+                int rows = display_height == 64 ? 13 : 17;
+                int first = selected ? 40 - rows : 0;
+                int bottom = rows * 4 + 3;
+                for (int y = 0; y <= bottom + 1; ++y)
+                    for (int x = 15; x <= 115; ++x) {
+                        int expected = 0;
+                        if (x <= 114 && y <= bottom &&
+                            (y == 0 || y == bottom || x == 15 || x == 114))
+                            expected = 255;
+                        int row = (y - 2) / 4;
+                        int local_y = (y - 2) % 4;
+                        if (y >= 2 && row < rows && x >= 17 && x <= 112) {
+                            int chosen = first + row == selected;
+                            expected = chosen ? 255 : 0;
+                            int glyph_x = (first + row) % 2 ? 2 - (local_y - 1) : local_y - 1;
+                            if (local_y >= 1 && x == 18 + glyph_x)
+                                expected = chosen ? 0 : 255;
+                        }
+                        if (hpg_get_pixel(NULL, x, y) != expected)
+                            fprintf(
+                                stderr,
+                                "choose pixel %d,%d height=%u selected=%d actual=%d expected=%d\n",
+                                x, y, display_height, selected, hpg_get_pixel(NULL, x, y),
+                                expected);
+                        assert(hpg_get_pixel(NULL, x, y) == expected);
+                    }
+                /* Painting the modal must preserve the ordinary label outside it. */
+                assert(hpg_get_pixel(NULL, 2, 2) == 0);
+                assert(hpg_get_pixel(NULL, 3, 2) == 255);
+                assert(hpg_get_pixel(NULL, 0, display_height - 7) == 0);
+                assert(hpg_get_pixel(NULL, 88, display_height - 7) == 255);
+                assert(hpg_get_pixel(NULL, 110, display_height - 7) == 255);
+                key.keycode = KB_E;
+                assert(win_post_event(WIN_KEY_TYPED, &key) == 1);
+                assert(win_choose_get_index(chooser) == selected);
+            }
+            win_remove_widget(chooser);
+            win_remove_widget(menu);
+            win_widget_destroy(chooser);
+            win_widget_destroy(menu);
+            hpg_free_font(font);
+            assert(!hpclang_win_error() && !hpclang_win_reset());
+            hpg_cleanup();
+        }
+        hpclang_surface_destroy(display);
+    }
+    display = saved;
+    display_width = 8;
+    display_height = 6;
+}
+
+static void box_widget_pixels(void)
+{
+    struct hpclang_surface *saved = display;
+    display_width = 48;
+    display_height = 32;
+    display = hpclang_surface_create_mono(49, 32);
+    assert(display);
+    display->width = 48;
+    for (int buffered = 0; buffered < 2; ++buffered) {
+        assert(!hpclang_win_reset());
+        hpg_set_mode_gray16(buffered);
+        char glyphs[256 * 3] = {0};
+        glyphs['A' * 3] = 1;
+        glyphs['A' * 3 + 1] = 2;
+        glyphs['A' * 3 + 2] = 4;
+        char bits[] = {0x55, (char)0xaa};
+        hpg_font_t *font = hpg_alloc_font(glyphs, 256, 3, 3);
+        hpg_pattern_t *pattern = hpg_alloc_pattern(bits, 2, 0);
+        win_widget_t *root = win_box_new(), *grid = win_box_new_padding(2, 0);
+        win_widget_t *picture = win_img_new(pattern, NULL), *label = win_text_new_label("A");
+        assert(font && pattern && root && grid && picture && label);
+        win_widget_set_font(label, font);
+        win_box_add_with(grid, picture, 0, 0, 1, 1, 8, 8, WIN_BOX_FILL, WIN_BOX_FILL);
+        win_box_add_with(grid, label, 0, 1, 1, 1, 4, 4, WIN_BOX_TRAILING, WIN_BOX_CENTER);
+        win_box_add_with(root, grid, 0, 0, 1, 1, -1, -1, WIN_BOX_FILL, WIN_BOX_FILL);
+        win_widget_set_location(root, 5, 15);
+        win_widget_set_size(root, 30, 10);
+        win_box_layout(root);
+        win_box_layout(grid);
+        for (int cycle = 0; cycle < 2; ++cycle) {
+            win_add_widget(root);
+            hpg_clip_reset(NULL);
+            hpg_clear();
+            assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+            for (int y = 0; y < 32; ++y)
+                for (int x = 0; x < 48; ++x) {
+                    int expected = 0;
+                    if (5 <= x && x < 21 && 15 <= y && y < 25 && ((x - 5 + y - 15) % 2 == 0))
+                        expected = 255;
+                    if (19 <= y && y <= 21 && x == 32 + y - 19)
+                        expected = 255;
+                    assert(hpg_get_pixel(NULL, x, y) == expected);
+                }
+            win_remove_widget(root);
+            hpg_clip_reset(NULL);
+            hpg_clear();
+            assert(!win_post_event(WIN_REPAINT_EVENT, NULL));
+            for (int y = 0; y < 32; ++y)
+                for (int x = 0; x < 48; ++x)
+                    assert(!hpg_get_pixel(NULL, x, y));
+        }
+        win_widget_destroy(root);
+        win_widget_destroy(grid);
+        win_widget_destroy(picture);
+        win_widget_destroy(label);
+        hpg_free_pattern(pattern);
+        hpg_free_font(font);
+        assert(!hpclang_win_error() && !hpclang_win_reset());
+        hpg_cleanup();
+    }
+    hpclang_surface_destroy(display);
+    display = saved;
+    display_width = 8;
+    display_height = 6;
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -1147,6 +1438,10 @@ int main(void)
     progress_widgets();
     text_widget_pixels();
     image_widget_pixels();
+    menu_widget_pixels();
+    checkbox_widget_pixels();
+    choose_widget_pixels();
+    box_widget_pixels();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

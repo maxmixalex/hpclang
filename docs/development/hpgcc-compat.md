@@ -4,6 +4,122 @@ This page records the M7 source-compatibility inventory. Historical names are in
 
 ## Sources and method
 
+### Original window application gate
+
+`win.h` supplies the historical control umbrella. Run
+`ATFE=/path/to/atfe python3 tests/compat/check-win-simple.py /path/to/archives --work /new/output/path`
+to extract HPGCC 1.1's `examples/win/simple.c`, remove its unused `hpgcc49.h`
+include, and retain a migration diff and SHA256 report. No application logic is
+rewritten. The original member SHA256 is
+`db0b138ac6bc76abfea0d6b0eeac8cf5e141d3b32fdd3a1d8c6e6fcdfe260b23`.
+
+The ASan/UBSan host harness runs the production event loop through A/B/CLEAR,
+checkbox menu selection, all four slider orientations and EXIT. Its renderer
+is stubbed and its external cleanup handles the original process-exit-only
+ownership. Nested IDLE change notifications are ignored by the scripted input
+driver, matching the progress control's documented default event. The gate also
+installs and relocates the SDK, compiles the application for ARM and checks all
+six launcher envelopes. `/work/oct24-simple-gate-final/report.json` records a
+passing run; earlier harness reentrancy failures remain in adjacent logs.
+
+The default gate preserves the original fourth slider at y=65, including its
+64-line clipping. `--layout responsive` makes exactly three additional source
+changes: the two vertical slider heights become display height minus 40, and
+the bottom slider y becomes display height minus 15. This preserves the original
+80-line geometry and fits 64-line displays. Both versions pass host interaction
+and geometry checks at both heights, plus relocated SDK compilation/packaging.
+The generated `application` directory is a standalone SDK CMake project; the
+source, migration diff and SHA256 report remain in the requested output path.
+This application is from 1.1 only; it is absent from the supplied 2.0 archive.
+
+Add `--native` to also build `native-artifact` with the ordinary E2E artifact
+layout. External instrumentation wraps the original event loop and adds GPIO
+observations; the original application callbacks and control flow remain in
+place. Thirty GPIO changes exercise A/B/CLEAR, focus navigation, the checkbox
+menu, all four slider directions and EXIT. The final EXIT release occurs after
+the event loop stops (29 edges observed in that loop). External teardown cleans
+the original process-exit-only widget ownership before returning to Stock.
+
+All six Direct models pass 15 application-frame captures, independent initial/
+final slider geometry and fill checks, checkbox pixels and settled return.
+Native font glyphs are excluded from exact pixel comparisons; label/menu ink
+presence is checked and HP39g+/HP50g screenshots were visually inspected. The
+unmigrated original app runs successfully but is rejected by the 64-line pixel
+gate at (21,43), proving that the layout check detects the old geometry.
+Both instrumented ARM translation units pass analysis. Evidence is retained in
+`/work/oct24-simple-{original-both,responsive,original-native}` and
+`/work/oct24-simple-{direct,stock}-*`. All six Stock models also pass
+(2266 exit 0). Broader M8 application/release and CI acceptance remain open.
+
+### Current window validation follow-up
+
+Box dimension guard `b57503fd` makes the nonempty grid allocation invariant
+explicit. Three sanitizer tests and both 48,816-line original-source comparisons
+pass; the full 373-source analysis now passes. The preceding box implementation
+also completes all 153 sanitizer tests in 1408.86 seconds. These are local gates.
+
+The monolithic window payload exhausted HP39g+ Stock heap when requesting
+16-level double buffering. A diagnostic run records `ENOMEM` (12), mailbox
+`0x4641782c`, 36 KiB boot RW, and frames 100..122 before failure. The failed
+request preserves the preceding single-buffer mode, so correct content pixels
+alone did not prove double buffering. Logs and snapshots are preserved in
+`/work/oct24-mode-diag-*`; this is distinct from the earlier final errno check.
+
+The maintained native fixture now checks the actual surface levels and whether
+`hpg_flip()` exchanges the back page after every mode request. CI splits the
+same checks into two universal applications: `hpgcc-window` covers keyboard,
+progress, text, image, menu and checkbox; `hpgcc-window-dialogs` covers chooser
+and nested box/grouping. Both retain final event/timer rendering and settled
+return checks. Both run on all six models in Direct and Stock contexts. CMake
+group 0 retains the monolithic diagnostic build (`verify.py --suite all`).
+
+Payloads are 63,648 and 65,488 bytes (16 code pages each), compared with the
+72,048-byte monolith. The build rejects either fixture above 16 code pages;
+this is a fixture budget, not a general application memory guarantee. All six
+Direct models pass for both groups. HPC files and all six raw launchers match
+the maintained builds byte-for-byte. Eight planning tests, both ARM analysis
+configurations, verifier dispatch and missing-frame rejection pass. Both Stock
+processes 51945/76541 exit 0 with all six models passing for each group.
+Integrated SDK validation also passes (517 byte-identical outputs), including
+the C widget client using `win.h` and `wincore.h`. These are local results;
+CI acceptance remains open.
+
+The earlier component snapshots below retain their original validation stage.
+
+Box acceptance follow-up compares all seven public APIs and the original
+preferred-size helper from both unchanged 1.1/2.0 releases: 144 dense,
+positive-weight grid/alignment/padding cases across surplus/deficit sizes match
+48,816 trace lines (SHA256
+`5b9a06f2d72d31a27c0cee044026699e31d69bc76b57c0213289fac6d19f57f7`).
+The original zero-weight/NULL-child/lifecycle defects are excluded from parity
+and covered by independent repair tests. Wrong padding is rejected. Eleven
+related sanitizer targets pass, including production HPG nested layout and
+group removal pixels in both buffers. Six Direct models pass 40 added GPIO
+edges/model, nested focus/menu controls, dynamic membership, modal removal,
+full-frame pattern/text layout/removal and settled return. Missing label pixels
+are rejected. Process 74185 continues Stock; full 153-test regression 37870 and
+whole analysis 18338 run. Logs `/work/oct24-box-*`; CI acceptance remains open.
+
+Local box adapter follow-up supplies all seven `winbox.h` functions, explicit
+grid layout and nested grouping. Children are borrowed with one parent; cycles
+and bound-child destruction are rejected. Group installation is iterative and
+rolls back on failure, removal uses reverse order, and destroying a detached
+box releases bindings without destroying children. Dynamic membership changes
+on installed boxes take effect immediately. Layout validates all geometry before
+publication, preserving existing positions on failure. Placeholder entries have
+no lifecycle, fixing the original infinite loop. Ten related sanitizer targets,
+ARM compile/analysis and the full relocated SDK pass (69480 exit 0, 517 outputs).
+Historical source-equivalence and native group/pixel acceptance remain open.
+
+Box follow-up source review (2026-10-24): the original grid layout divides by
+the remaining weight even when it is zero and fails to advance past NULL
+placeholder children. The local internal axis helper handles zero weights,
+padding deficits, checked coordinate arithmetic and allocation rollback; its
+four alignment modes retain historical behavior. Negative-space distribution
+retains the original `(share + 0.5)` truncation, including a possible one-pixel
+overhang. Focused sanitizer tests and ARM compile/analysis pass. Container
+ownership, grouped lifecycle, public APIs and native acceptance remain pending.
+
 Primary function-level evidence comes from complete historical distributions:
 
 - HPGCC 1.0.3 beta;
@@ -591,7 +707,7 @@ The HPGCC 1.1/2.0 widget family remains a retained **M8.4 adapter requirement**.
 | `winevent.h`, `wintimer.h`, `winkeys.h` | Bounded foreground event/timer/key service over native input, time and HPG | Adapter implemented locally; see exact validation below | M8.4, CI pending |
 | `winwidget.h`, `wincore.h` | Custom component lifecycle, focus, geometry and base painting | Local sanitizer/pixel and relocated SDK checks pass; native acceptance pending | M8.4 |
 | `winprogress.h` | Four-orientation progress/slider, focus, repeat and blinking cursor | Local host/SDK/reference and six-model Direct checks pass; Stock pending | M8.4 |
-| Concrete `win*` controls and `win.h` | Declarative UI with retained compatibility ownership/focus/layout | Required adapters remain open | M8.4 |
+| Concrete `win*` controls and `win.h` | Persistent compatibility controls over input/time/HPG services | Implemented locally; source, SDK and native gates detailed in the current application/component sections | M8.4, CI acceptance open |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
 
 ## Historical window adapter feasibility
@@ -601,8 +717,10 @@ The 2026-10-24 review reads the retained HPGCC 1.1/39g distribution's
 then compares all four original release archives. This is static source
 evidence, separate from the subsequent implementation and runtime checks below.
 The installed `winevent.h`, `wintimer.h` and `winkeys.h` now expose working
-event/timer/key adapters. `winwidget.h`/`wincore.h` now add custom components;
-concrete controls and the full `win.h` umbrella remain open.
+event/timer/key adapters. `winwidget.h`/`wincore.h` add custom components;
+text, image, progress, menu, checkbox, chooser and box controls are exposed
+together through `win.h`. The implementation and validation follow-ups are
+recorded separately from this original static feasibility review.
 
 | Release | Source/header files scanned | Window-family evidence |
 | --- | ---: | --- |
@@ -620,6 +738,26 @@ python tools/audit-hpgcc-windows.py /path/to/original-archives > window-audit.js
 The tool reads caller-supplied archives without extracting their paths or
 redistributing source. Its report contains archive SHA-256 identities, the
 scanned file counts, reference filenames and exact normalized comparisons.
+Version 2 also lists lexical function declarations/definitions with their source
+paths. Both 1.1 and 2.0 have 75 distinct implementation names and 75 declaration
+names, with the same discrepancies: two checkbox getters exist only under their
+correct names in source; the header declares nonexistent `win_text_is_selected`;
+and the disabled-color source mistakenly defines `win_softmenu_set_colors`
+again instead of declared `win_softmenu_set_disable_colors`. hpclang provides
+the real checkbox names and the intended disabled-color setter.
+
+The installed SDK export gate derives 76 names from that source inventory plus
+the repaired disabled-color declaration, then forces every function reference
+into C and C++ ARM links and checks the resulting ELF symbols:
+
+```sh
+ATFE=/path/to/atfe python3 tests/compat/check-win-exports.py /path/to/original-archives \
+  --sdk /path/to/installed-sdk --work /new/output/path
+```
+
+This checks availability and linkage, not behavior or historical binary ABI.
+The gate passes against the relocated SDK in `/work/oct24-window-exports`.
+Behavioral comparisons and native acceptance are recorded separately above.
 The reviewed archives are:
 
 ```text
@@ -642,7 +780,7 @@ a984795493f2e4cf79001e0f95824b9c76f20df6d38a071eb8f9deb7a650165d
 | `text/win_text_new.c` maintains editable byte text, cursor state and a blink timer; `win_text_set_text.c` copies replacement text. `checkbox` owns selection and updates menu bindings. | Labels, controlled `hpclang_ui_text_input` and `hpclang_ui_toggle` provide rendering/input foundations. A bridge must accept proposals into its own state before redeclaration, translate legacy byte text explicitly and preserve getter lifetimes. Direct aliases would change who owns the model. |
 | `choose/win_choose_set_choice.c` uses a past-end selection for NULL or an unmatched choice; `win_choose_get_choice.c` then returns NULL. `winsoftmenu.h` provides up to 30 entries with enabled states and associated events. | Compose selection/menu views from existing controls while retaining no-selection, dynamic option identity, menu paging and model-specific function-key routing. A fixed six-button view is insufficient. |
 | `progress/win_progress_set_value.c` clamps a double to its range. `win_progress_new.c` implements four orientations, slider key-repeat, focus changes at limits and change events. | The canvas callback can render a progress view, but the compatibility layer must retain numeric state, orientation, repeat timing and focus behavior. A painted rectangle alone is not a slider adapter. |
-| `winbox.h` exposes positioned/spanning children and alignment; `winimg.h` combines an HPG pattern and image. | Compare legacy layout results with row/column/scroll composition, and preserve borrowed image lifetimes and clipping through the canvas/surface backend. Do not silently discard positioning or spans. |
+| `winbox.h` exposes row/column placement, weights, preferred sizes and alignment; `winimg.h` combines an HPG pattern and image. | Compare legacy layout results with row/column/scroll composition, and preserve borrowed image lifetimes and clipping through the canvas/surface backend. Preserve those grid parameters; the original API has no row/column span parameter. |
 
 Header/source discrepancies also need explicit treatment: this distribution's
 `wincheckbox.h` names `win_text_get_text` and `win_text_is_selected` in its
@@ -1514,5 +1652,148 @@ so the existing text-only Stock run keeps its original binary and evidence.
 All six Direct models pass (1287 exit 0). Image Stock process 82374 runs in
 that separate directory. Full 143-test control regression passes (63047 exit 0,
 1553.33 seconds), as does whole host/ARM analysis (89153 exit 0, 357 sources).
-Stock completion and CI remain open. The earlier analysis setup failure is
+All six Stock models also pass; text/image are submitted in PR #11, with CI
+acceptance pending. The earlier analysis setup failure is
 preserved; no source analyzer ran until the missing Git metadata was corrected.
+
+### Soft menu adapter (independent menu batch)
+
+`winsoftmenu.h` implements 30 copied five-byte labels, six visible items,
+forward/back paging, enabled states, active/disabled colors, insertion, deletion
+with bounded packing and synchronous events carrying borrowed extra data and
+shift states. Alpha and right-shift NXT fall through. Full add returns -1;
+invalid indices and null labels use the window error latch. Construction reads
+model geometry without acquiring a display; rendering anchors at the active
+64- or 80-line screen bottom.
+
+This intentionally repairs original defects: unsigned backward-page underflow,
+the duplicate ordinary-color symbol in the disabled-color source, and deletion
+packing that retained a destination occupancy bit when moving an empty slot.
+The normal 80-line layout retains six 22-pixel cells and five-byte labels.
+Host ASan/UBSan tests cover every entry, five pages, wraparound, modifiers,
+disabling, copied/truncated labels, gaps, insert/delete shifts, full capacity,
+removal and 64/80-line placement calls. ARMv4T compile/analysis pass. Logs:
+`/work/oct24-menu-sanitizer-{build,tests}.log`. This is isolated on
+`m8-menu-controls` using `/work/oct24-menu-src`; original-source comparison,
+production pixels, installed SDK and native acceptance remain open.
+
+Soft-menu follow-up verification passes production HPG pixels on both 64/80-line
+screens and both buffering modes: six cells, copied labels, disabled colors and
+page-two contents. Three sanitizer targets (state, original-source harness,
+production pixels) pass. The optional original-source comparison covers all eight
+entry points, counts 1..30, forward pages, safe backward traversal, modifiers,
+enabling, colors and full-list insert/delete. Both HPGCC 1.1/2.0 match 6,840 lines
+(SHA256 `ff26b00eaaf70e25d0df2f9b42ed9e1d4bd9d87bd061e2177529cb1d97ba3632`).
+Only the duplicate disabled-color symbol and external alloca declaration are
+adapted to link on the host; original executable behavior is retained. The
+initial external-alloca link failure is preserved. Backward underflow and sparse
+packing repairs remain separate tests. The wrong four-byte truncation negative
+is rejected. Logs: `/work/oct24-menu-{reference,negative}.log` and
+`/work/oct24-menu-reference-tests.log`.
+
+Installed SDK acceptance passes (74007 exit 0): C/C++ menu clients, six model
+launchers, three HP39 Aplet variants, notebooks and 517 byte-identical outputs,
+log `/work/oct24-menu-sdk.log`. Native menu acceptance remains open.
+
+The native menu phase uses 56 physical GPIO edges and ten selection callbacks
+per model across both buffering modes, checking first/last visible options,
+forward/back paging including the repaired wrap, disabled-item suppression and
+payload shift states. Recreated menus use a known font for independent complete
+page/disabled-color/glyph checks at checkpoints 900/901/1000/1001. The retained
+text, image, progress, keyboard and settled-return gates all pass on six Direct
+models (32162 exit 0). A wrong disabled-color pixel is rejected. Stock process
+86659 runs in `/work/oct24-menu-src`, artifact `/work/oct24-menu-native-arm`;
+Stock completion and CI acceptance remain open.
+
+### Checkbox adapter (independent following batch)
+
+`wincheckbox.h` supplies six actual exported checkbox functions, correcting the
+historical header's unrelated text-function declarations. Labels are borrowed;
+selection setters normalize booleans without implicit repaint/repack. Plain W
+toggles, arrows transfer focus, and a borrowed soft menu exposes a CHK action
+while focused. Unbind before destroying the menu. Focused rebinding immediately
+moves that action; invalid indices/types/null labels use the window error latch.
+
+Each installation allocates its toggle event afresh so removed descriptors can
+survive a window reset without reusing stale global event IDs. Initial gained
+notifications precede installation; menu publication waits until handlers exist.
+An explicit bound flag distinguishes a lost binding from the next control's new
+binding during removal. Singleton removal also clears its action. The renderer
+retains the historical selected/unselected pattern and uses checked preferred
+sizes and saturated off-clip offsets.
+
+Focused ASan/UBSan tests pass borrowed labels, multiline sizes, normalized state,
+modifier suppression, first-install menu activation, two-control focus/removal,
+focused rebinding/unbinding, reset/reinstall with event-number reuse, singleton
+cleanup and invalid inputs. ARMv4T compilation and analysis pass. Logs use
+`/work/oct24-checkbox-{build,tests}.log`. Work is isolated on
+`m8-checkbox-controls` with `/work/oct24-checkbox-src`; original-source
+comparison, production pixels, SDK and native acceptance remain open.
+
+Checkbox follow-up tests pass production HPG pixels for selected/unselected and
+focused/unfocused states, label glyphs, clipping and both buffer modes. The
+original-source comparison compiles all six unchanged 1.1/2.0 checkbox functions
+over the shared widget/event/soft-menu foundation, adding only the historical
+ULONGLONG type alias to host libc shims. Both match 7,218 trace lines (SHA256
+`c13bbed5c0d2925615957b2ad755cd5a9f21b5193980f625fbc82f8feaa4843e`).
+Six multiline/empty label cases, preferred sizes, boolean setters, keyboard
+modifiers, focus and established menu bindings are covered. Lifecycle repairs
+remain separately tested, not claimed identical to original bugs. The wrong
+checkmark-pattern negative is rejected. Three sanitizer targets pass; logs are
+`/work/oct24-checkbox-{reference,negative}.log` and
+`/work/oct24-checkbox-reference-tests.log`.
+
+Installed SDK gate passes (60235 exit 0), including all six checkbox symbols in
+C/C++, six-model launchers, three HP39 Aplet variants, notebooks and 517
+byte-identical outputs (`/work/oct24-checkbox-sdk.log`). Native checkbox
+acceptance remains open.
+
+Native checkbox checks pass all six Direct models (25391 exit 0), with 32 GPIO
+edges per model across both buffers: W toggle, arrows, CHK selection, removal
+preserving successor bindings, focused rebinding and unbinding. Independent
+whole-frame captures check selected/unselected patterns, focus and labels in
+both buffering modes. A wrong focus pixel is rejected. Previous menu/image/text/
+progress/key/settled-return gates still pass. Stock process 73812 runs separately
+in `/work/oct24-checkbox-src` using `/work/oct24-checkbox-native-arm`; Stock
+completion and CI acceptance remain open.
+
+### Selection control (independent local batch)
+
+`winchoose.h` provides all nine chooser functions. Options and labels are
+borrowed, paired descriptors; removal retains historical numeric selection
+while shifting both strings together. Allocation failure preserves state.
+Negative or out-of-range indices represent no choice; appending can make a
+past-end index valid. Setters do not imply packing or ordinary repaint.
+
+Plain W cycles choices; a focused CHOOS menu action opens a modal list. Up/down
+wrap, F5 cancels and F6 commits. The popup adapts to 64/80-line displays and
+scrolls long lists. It overlays the installed application menu and consumes
+keyboard events instead of removing/reinstalling widgets from lifecycle
+callbacks. Focus loss, successful list mutations, setters, rebinding and removal
+close it. Bound menus and strings must outlive their references. Each installation
+allocates a fresh event number; first-focus publication waits until installation.
+
+Three focused ASan/UBSan targets pass: paired state/allocation rollback,
+production event/focus/lifecycle interaction, and production HPG pixels for
+40-item lists on both display heights and buffering modes. ARM compile/analysis
+pass. Logs: `/work/oct24-choose-{adapter,pixels}-*.log`; initial pixel expectation
+failure is retained separately. Installed SDK 38518 exits 0: 517 reproducible outputs, C/C++, six launchers,
+three Aplet variants and notebooks pass (`/work/oct24-choose-sdk.log`).
+
+All nine unchanged original 1.1/2.0 functions compare over the same production
+window foundation: 1,337 matching state/keyboard lines, SHA256
+`f419ec0019d7557102368b019f38802113552eef0d63215cd0b26ab73cf86580`.
+Host shims provide libc aliases and declarations, without executable patches.
+Cases cover empty/duplicate options, label sizes, numeric/no-choice setters,
+borrowed results, W modifiers, established menu binding and removal selection.
+Original stale labels and first-focus/modal lifecycle defects are not required
+behavior; repaired rendering/lifecycle have independent tests. A wrong returned
+index is rejected by this comparison. Four focused sanitizer targets pass.
+
+Six-model Direct acceptance passes (67716 exit 0): 104 GPIO edges/model exercise
+confirm/cancel, empty lists, wrap, focus/removal/rebinding and 40-option scrolling.
+Independent content/status pixels and footer edges pass in both buffer modes;
+footer native-font glyphs are outside this checker. A wrong selected-row pixel
+is rejected. Every saved return record passes. Stock 51380 uses the same fixed
+artifact; full 150-test regression 29287 and analysis 29830 run. Logs use
+`/work/oct24-choose-*`. Stock and CI acceptance remain open.

@@ -15,6 +15,9 @@ extern "C"
      * latched window error. Lifecycle callback mutation of the focus ring reports
      * EBUSY; destroying from any lifecycle/event/timer callback also reports EBUSY.
      * Invalid arguments and allocation errors use the window error latch.
+     * A box-bound child must be unbound before destruction. Adding/removing a
+     * box walks its borrowed subtree outside lifecycle callbacks; failed group
+     * installation rolls back. Destroying a detached box releases its bindings.
      */
     void win_widget_destroy(win_widget_t *);
     void win_add_widget(win_widget_t *);

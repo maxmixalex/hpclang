@@ -17,14 +17,42 @@ Do not put historical include directories before the installed headers.
 | KOS filesystem handles or raw SD/controller calls | Move file operations to standard C streams and the services in `hpclang/storage.h`. Preserve operation failures and removable-media handling. |
 | Raw Saturn addresses, `sat_peek`-style traversal or retained pointers into native objects | Use independent snapshots from `hpclang/object.h` and logical handles from `hpclang/object-store.h`; use `hpclang/port.h` for native port objects. |
 | Direct LCD addresses, packed framebuffer writes, MMU changes or interrupt handlers | Express drawing through `hpclang/display.h` surfaces and fonts, and timing through `hpclang/time.h` / `timer.h`. A raw hardware algorithm requires a separate design review. |
-| `win*` widgets | Port the view and event logic to the [declarative UI](declarative-ui.md); compatibility adapters remain in development. Preserve synchronous event delivery, callback lifetimes and widget-owned state; the [source review](../development/hpgcc-compat.md#historical-window-adapter-feasibility) explains the required bridge. |
-| Window events and timers | `winevent.h` / `wintimer.h` provide the event/timer subset; start from `examples/hpgcc-window`. Intervals are positive milliseconds. Check `hpclang_win_error()` for latched errors, including fixed-pool exhaustion; reset only after callbacks unwind. This does not supply typed-key/modifier semantics or widgets. |
-| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags; modes and both KOS-entry exit paths pass locally on all six Direct/Stock models. CI acceptance remains pending. A true completion query can still mean a nonwaiting tone is playing. See the [mode contract](../development/hpgcc-compat.md). |
+| `win*` widgets | Include `win.h` or individual control headers for the HPGCC 1.1/2.0 event, focus, text, image, progress, menu, checkbox, chooser and box adapters. Preserve synchronous callbacks and borrowed resources. For a new application, the [declarative UI](declarative-ui.md) provides a separate canonical view contract. |
+| Window events and timers | `winevent.h`, `wintimer.h` and `winkeys.h` provide events, timers, typed keys and modifiers; start from `examples/hpgcc-window`. Intervals are positive milliseconds. Check `hpclang_win_error()` for latched errors, including fixed-pool exhaustion; reset only after callbacks unwind. |
+| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags; modes and both KOS-entry exit paths pass locally on all six Direct/Stock models. CI acceptance remains pending. A true completion query can still mean a nonwaiting tone is playing; use the flag and polling contracts in the installed header. |
 
 Compile with the normal SDK target options and resolve diagnostics one family
 at a time. Do not suppress undeclared functions or cast away mismatched pointer
 types to get a link: historical structure layouts and raw address lifetimes are
 not an ABI contract. The headers are the authoritative list of supported calls.
+
+## Preserve window ownership and adapt geometry
+
+Window controls are persistent allocations. Remove installed controls before
+destroying them. A box borrows its children; destroy or detach the box before
+destroying those children. Image patterns, chooser strings and bound menus are
+also borrowed and must outlive their users. Call `win_box_layout` explicitly,
+including on nested boxes when their geometry changes. Setters do not all
+imply layout or repaint; follow each control header's contract.
+
+Events are synchronous. A progress control's default change event is IDLE, so
+an application IDLE handler may be called during a slider update. Account for
+reentry when driving a state machine. Keep callback data alive through dispatch,
+and defer operations that the headers prohibit during lifecycle callbacks.
+
+Use `hpg_get_height(NULL)` for 64/80-line layouts. The original HPGCC 1.1
+`examples/win/simple.c` places its bottom slider at y=65. Its minimal migration
+uses height minus 15 for that y coordinate and height minus 40 for the two
+vertical slider heights. The 80-line layout is unchanged; all controls fit on
+64-line displays. This changes geometry, not the original menu or event logic.
+
+From a source checkout, `tests/compat/check-win-simple.py` extracts the supplied
+1.1 archive and records the source hash and exact migration diff. Its default
+preserves original geometry; `--layout responsive` applies those three edits.
+`--native` additionally builds an instrumented artifact for the Direct/Stock
+harnesses. The output `application` directory builds with the installed SDK.
+The headers and local gates establish implementation; broader release and
+original-application acceptance remain tracked separately.
 
 ## Preserve numbers and text deliberately
 
