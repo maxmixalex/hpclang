@@ -20,6 +20,32 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Filesystem gate parent synchronization: PR #19 now includes parent #15 at
+ca1baf2b. The only conflicts were competing documentation additions; both
+filesystem and accepted HPGCC3 graphics evidence are retained. All runtime
+files match #15 and all four filesystem gate sources match the previously
+Quality-passed 74da9cf3. The merge remains dependent on #15 and its own CI;
+older local/submission checkpoints below are historical. M8 stays open.
+
+Original HPGCC2 filesystem delivery (local): pinned example2/example3 sources
+build through one relocated installed SDK, with explicit migration diffs and
+all-six-model launcher packaging. HP49g+/HP50g Direct and Stock runs pass file
+operations, real blocking input, settled return and independent raw FAT checks.
+Stock five-frame and Direct six-frame ROM/package-derived console pixel checks
+pass on both models, with nine corruption/missing/font negatives rejected.
+This gate depends on the protected SD Reset boundary in PR #15 (179b6c23).
+Other models have packaging evidence only; multiple volumes and physical-device
+acceptance remain open. Caller-supplied original archives/ROMs are not shipped.
+Evidence: /work/oct26-fsystem-fixed{,-runs} and oct26-fsystem-console-*.json.
+
+Before submission, reviewed previous #18: checks queued; #13/#14 pending, #15
+incomplete. #17 has newly failed system-services Direct jobs: retained result
+artifacts show 0x46417b03 on HP40gs/HP48gII/HP49g+ and 0x46417b8e on HP50g.
+Those match old fixture failure paths but do not independently prove the root
+cause; #17 lacks the deadline/diagnostic correction submitted in #13/#14.
+Logs and JSON are retained under research/oct26-format-ci-failures and
+research/oct26-ci-121*.log. Remote acceptance of these branches remains open.
+
 SD reset CI checkpoint: exact head 179b6c23 completes with 351 successful
 checks and one skipped check. Updating this branch with accepted main 5eb1b25c
 resolves only competing roadmap additions, retaining both histories. The three

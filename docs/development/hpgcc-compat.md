@@ -4,6 +4,146 @@ This page records the M7 source-compatibility inventory. Historical names are in
 
 ## Sources and method
 
+### Original HPGCC 2.0 filesystem programs
+
+`tests/compat/check-fsystem-examples.py` extracts the pinned original
+`sources/fsystem/examples/example2.c` (volume/directory enumeration) and
+`example3.c` (directory creation, file write/append/modify/delete and rename)
+from the caller's HPGCC 2.0 SP2 archive. It retains source hashes, complete
+original/adapted files and migration diffs. Run against the same installed SDK:
+
+```sh
+ATFE=/path/to/atfe python3 tests/compat/check-fsystem-examples.py \
+  /path/to/hpgcc-2.0-SP2-Linux.tar.bz2 \
+  --sdk /path/to/installed-sdk --work /new/filesystem-evidence
+```
+
+There are four explicit migration rules:
+
+- Replace the historical umbrella with `hpconio.h`, `hpkeyb49.h` and `string.h`.
+- Use `_clear_screen` for the historical console clear operation.
+- Remove the explicit `FSShutdown` call and its success/error message. The
+  hpclang runtime owns final filesystem shutdown at application exit; this
+  migration does not provide an equivalent earlier checked shutdown operation.
+- In example3, replace the out-of-bounds 17-byte read from `"Appended string"`
+  with the literal's actual non-NUL length, used for both write and comparison.
+
+All remaining application statements stay unchanged, including the four-volume
+loop, interactive waits and original error handling. The rename operation needs
+an existing `My own text document.txt` in the test directory; a future native
+gate must supply that fixture or explicitly test its absence. These programs
+are not robust error-recovery examples and must run on disposable test media.
+
+Both compile/link and package all six targets against the relocated SDK in
+`/work/oct26-fsystem-original`; compiler commands contain no repository source
+or include paths. Two ARM analyses, exact reversal of the listed migration edits,
+and changed-source rejection for each member pass. This is build evidence only.
+SD runtime support remains HP49g+/HP50g; six-model packaging does not imply
+filesystem availability elsewhere. Original-source file-content, input/output,
+media and Stock-return validation remain open; the earlier clean-service
+behavioral ports do not close these checks.
+
+Add `--native` to build a combined `native-artifact` with the two original
+entry points renamed and an external observer. This fixture deliberately uses
+one disposable FAT volume (slot zero) and checks missing slots 1–3; it does not
+establish multi-volume execution. It seeds directory entries and the rename
+source, then calls both original programs. Wrapped blocking keyboard functions
+schedule physical F1 press/release and still call the real blocking APIs.
+The observer checks pagination, each write, reopened content after close,
+modified bytes before deletion, the moved file and deleted entries. It captures
+console frames. The Stock text layout now has an independent ROM-derived pixel
+gate; Direct text uses the packaged fallback font and its own directory fixture.
+
+Stock harness preparation uses the generated `e2e.stock-media.json`; after a
+successful run, independently inspect the saved raw image:
+
+```sh
+python3 tests/compat/verify-fsystem-examples.py /path/to/hp50g-stock-media.img
+```
+
+Check the saved Stock console frames separately:
+
+```sh
+python3 tests/compat/verify-fsystem-console.py /path/to/stock-hp50g \
+  --model hp50g --rom /path/to/full-nor.bin --report console.json
+```
+
+This gate targets the generated single-volume Stock fixture with `KEEP.TXT`,
+six seed files and `Test Dir`. It locates a unique mini-font atlas in the
+caller-provided packed ROM using reviewed ASCII shape anchors, then compares
+all visible console cells in frames 2300–2304 to expected original-program
+output. It checks directory pagination, counts/bytes, three successful opens,
+rename and both exit screens. The capacity line must decode to sensible numeric
+values; unused visible pixels must be blank. Capture padding is excluded.
+No ROM bytes are redistributed or extracted from the observed screenshots.
+
+HP49g+ and HP50g saved Stock frames pass locally; reports are
+`/work/oct26-fsystem-console-hp49gplus.json` and
+`/work/oct26-fsystem-console-hp50g.json`. Changed result pixels, substituted exit
+screen, blank console, missing frame and wrong-ROM negatives are rejected in
+`/work/oct26-fsystem-console-negatives.json`. This is local Stock screen evidence,
+not multi-volume, physical-hardware or remote acceptance.
+
+
+For the standard Direct directory-backed card fixture, use:
+
+```sh
+python3 tests/compat/verify-fsystem-console.py /path/to/direct-hp50g \
+  --model hp50g --mode direct --report direct-console.json
+```
+
+Direct uses the checked-in `newrpl_font6_menus.S` glyphs, with an optional
+`--font` override for a matching SDK source. The verifier checks six frames
+2300–2305, including both pagination stops, ten files/82 bytes, file operations
+and both exits. This fixture includes `HPCLANG.OUT`, `HPCLANG.TST` and `ZZHPDIR`
+instead of Stock's `KEEP.TXT`; its full-width capacity line also produces an
+extra wrap. The expected layouts are explicit for these fixtures, rather than
+inferred from the screenshots. Reports fingerprint the font/ROM and every frame.
+
+Both Direct models pass in `/work/oct26-fsystem-console-direct-hp49gplus.json`
+and `/work/oct26-fsystem-console-direct-hp50g.json`. Corrupted counts, replaced
+exit screen, missing page and incomplete-font controls reject in
+`/work/oct26-fsystem-console-direct-negatives.json`; both Stock positive cases
+and all five Stock negatives still pass. These checks reuse preserved native
+captures and do not claim new hardware runs or general directory-layout coverage.
+
+
+HP50g and HP49g+ Stock pass original statements, real blocking input, raw-card
+output and settled return locally in `/work/oct26-fsystem-native-stock`.
+The independent verifier additionally checks long-name rename, deletion,
+intermediate modified contents and retained seed files. Corrupting either
+content witness or resurrecting the deleted file is rejected. Queue 44357
+completed with exit zero; independent raw-card checks pass for both models. Native ARM analysis and a canonical rebuild match the tested
+artifact exactly; diagnostic code is excluded (`native-provenance.json`).
+
+Before the repair below, HP50g Direct reached application PASS but failed the
+return clock-state check; that run was **not accepted**. Explicit-shutdown diagnostic checkpoint 2381 records
+CLKSLOW 0x30 → 0, TCFG0 0x2c16 → 0x2c8e, changed LCD clock bits and an unmasked
+EINT3 after namespace shutdown. A diagnostic-only CLKSLOW restoration advances
+to a timer-state failure, proving a one-register patch insufficient. Evidence
+is retained in `/work/oct26-fsystem-{native-runs,clock-diagnostic,clock-control,state-diagnostic}`.
+The runtime still invokes Stock ResetSD after releasing the direct controller;
+its return-state contract and active-card path need further investigation.
+That failure is superseded locally by the ResetSD boundary fix: the namespace
+now uses `hpclang_kos_sync3` with the caller's IRQ/FIQ state saved and restored.
+The stock SWI dispatcher enables interrupts; the protected boundary retains
+pending sources for Stock instead of running its handlers in native mappings.
+Both original applications now pass HP49g+/HP50g Direct and Stock, with settled
+return and independent raw-card checks (`/work/oct26-fsystem-fixed-runs`).
+
+The maintained Storage suite additionally leaves genuine F1 activity pending
+and resets a mounted card while an economy clock profile is owned. Without the
+key stimulus, an unsafe-call negative can pass; with it, forcing syscall 19
+through the ordinary SWI bridge fails the CLKSLOW assertion with 0x464100f4.
+The production fix does not write back clocks to conceal side effects. Three
+storage sanitizer targets cover the protected call and both caller interrupt
+states; changed runtime/observer ARM analyses pass. The strengthened Storage
+Direct/Stock matrix passes all four cases in `/work/oct26-reset-storage-v2-runs`
+(14959 exit zero), with independent result rechecks and ARM analysis; formal CI
+acceptance, multi-volume original-app execution and independent console pixels
+remain separate open work.
+
+
 ### Original HPGCC3 graphics documentation programs
 
 `tests/compat/check-hpgcc3-graphics.py` extracts the three self-contained
