@@ -143,7 +143,7 @@ unsigned hpclang_e2e_watchdog_test(void)
     irq_finished = irq_error = 0;
     irq_stack[0] = 0x51ac7ead;
     register_writes = 0;
-    if (hpclang_time_read_us_masked(&irq_last_time) || irq_last_time > UINT64_MAX - 100000) {
+    if (hpclang_time_read_us_masked(&irq_last_time) || irq_last_time > UINT64_MAX - 1100000) {
         hpclang_irq_restore(cpsr);
         return 7;
     }
@@ -169,9 +169,22 @@ unsigned hpclang_e2e_watchdog_test(void)
     }
     errno = EDOM;
     hpclang_irq_restore((cpsr | 0x40u) & ~0x80u);
-    /* Keep the existing interrupt-only completion test unchanged. */
-    for (volatile unsigned i = 0; i < 20000000 && !irq_finished; ++i)
-        __asm__ volatile("nop");
+    /* Instruction counts are not elapsed time: CI can exhaust the old loop
+     * before the 100 ms deadline. Only IRQ dispatch may advance the session.
+     * Sample the clock between busy batches, allowing one second of delivery
+     * margin. The batch limit also bounds a broken/nonadvancing clock. */
+    for (unsigned batch = 0; batch < 200000 && !irq_finished; ++batch) {
+        for (volatile unsigned i = 0; i < 1024; ++i)
+            __asm__ volatile("nop");
+        uint32_t wait_cpsr = hpclang_irq_save_disable();
+        uint64_t now = 0;
+        int saved_errno = errno;
+        int clock_error = hpclang_time_read_us_masked(&now);
+        errno = saved_errno;
+        hpclang_irq_restore(wait_cpsr);
+        if (clock_error || now >= irq_deadline + 1000000)
+            break;
+    }
     hpclang_irq_save_disable();
     int wait_result = !irq_finished;
     int wait_errno = errno;
