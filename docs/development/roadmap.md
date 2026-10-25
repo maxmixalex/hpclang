@@ -20,6 +20,12 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Format Quality follow-up: the host analyzer detected unchecked rewind errors
+in the stream fixture. Checked fseek calls now retain positioning validation;
+the focused sanitizer test and analyzer checks pass. Runtime code is unchanged.
+The complete host analysis rerun and remaining native Stock cases are pending;
+this branch has not been pushed. Evidence: /work/oct26-format-host-analysis.
+
 M8.4 decimal formatting delivery (local, remote acceptance pending): explicit
 HPCLANG_HPGCC_LEGACY_FORMAT=1 enables historical call aliases; omitted/zero
 preserves standard formatting. Bounded parser/stdio adapters, mixed C/C++ SDK
@@ -43,7 +49,8 @@ artifacts, partial failures, input fingerprints and settled-return requirements.
 Exact glyph identity, every circle boundary, external XPM and application
 allocation-failure handling remain outside this gate; broader M8 requirements
 remain open. Caller-supplied archives are not redistributed. Runtime code is
-unchanged; this gate has local evidence, not remote CI acceptance.
+unchanged. Quality push 40181363058 and PR 40181388086 pass; PR #16
+was accepted and merged as 5eb1b25c. Broader M8 acceptance remains open.
 
 Pre-submission CI review: #13 at 424fc0eb has successful Quality, Core, Objects,
 Storage and Gallery, with Runtime queued; #14 at 80ccf586 has successful Quality,

@@ -43,7 +43,7 @@ int main(void)
     assert(fprintf(file, "/%c/", 0) == 3);
     assert(fprintf(file, "%130d", 7) == 130);
     assert(!ferror(file));
-    rewind(file);
+    assert(fseek(file, 0, SEEK_SET) == 0);
     char buffer[256];
     assert(fread(buffer, 1, 155, file) == 155);
     assert(!memcmp(buffer, "00000-1,25/-123/x/1,25/\0/", 25));
@@ -70,7 +70,7 @@ int main(void)
     assert(dup2(saved, STDOUT_FILENO) >= 0);
     close(saved);
     assert(first == 4 && second == 6);
-    rewind(file);
+    assert(fseek(file, 0, SEEK_SET) == 0);
     assert(fread(buffer, 1, 10, file) == 10 && !memcmp(buffer, "1,25/-1,25", 10));
     assert(fclose(file) == 0);
     return 0;
