@@ -1354,6 +1354,73 @@ application execution. Each rejection must return with the caller registers,
 interrupt state and mappings intact and leave the entire temporary pool
 unchanged. Normal payload PASS, pixels and Stock return are still required.
 
+### Opt-in lifecycle SRAM observation
+
+The local Stock frontend supports `HPCLANG_X50NG_RESOURCE_SNAPSHOT=/new/path/prefix`.
+When set, named sequence captures, installation completion, application PASS and
+settled return write `prefix-PHASE.sram` and `prefix-PHASE.json`. The sidecar records
+model, emulated time, PC/CPSR, base address and exact SRAM length (256 KiB on
+HP48gII, 512 KiB otherwise). No guest memory or register is written. Unset/empty
+configuration performs no resource reads and preserves ordinary execution.
+
+Use a fresh prefix per emulator invocation, especially for repeated application
+launches. Outputs are exclusive: existing evidence is never overwritten, malformed
+phase/model selections and read failures reject capture, and partial new outputs
+are removed after write failure. The frontend treats capture failure as an E2E
+failure. The snapshot helper has six passing host tests; the observation frontend
+builds with the existing headless configuration. The initial HP50g run in
+`/work/oct26-resource-snapshots` fails the watchdog assertion on a reused older
+emulator; its 19 snapshots validate structurally but are not a successful run.
+The clean pinned-source build passes HP50g Stock transfer, application execution
+and settled return in `/work/oct26-resource-snapshots-clean`. All 20 captured
+stages have valid metadata/lengths and complete validated allocator free lists.
+Heap 0x100 free usable bytes are 105,116 before USB, 104,072 during USB, 105,116
+before launch, 19,080 at application PASS and 105,116 after settled return.
+The 86,036-byte application interval difference is consistent with the earlier
+86,016-byte usable native block plus 20 bytes of metadata; ownership attribution
+still requires the block/pool evidence. These sampled values are not peak bounds.
+Remaining-model validation runs in `/work/oct26-resource-snapshot-matrix`. Named screenshot phases identify capture events, not necessarily
+stable allocator states; an independent allocator/ownership analysis must validate
+and interpret each snapshot before using it for admission or peak-memory claims.
+
+The maintained verifier accepts a completed run directory containing
+`MODEL-stock.json`, `MODEL-PHASE.{json,sram}` and `state/flash`:
+
+```sh
+python3 tests/e2e/harness/verify-resource-snapshots.py /path/to/run \
+  --model hp50g --report /new/path/verified-lifecycle.json
+```
+
+Use `--rom` when the matching packed ROM is stored elsewhere. It rejects an
+unreviewed allocator implementation, mismatched model/length/schema, malformed
+lists, orphan sidecars, missing PASS/return captures, invalid lifecycle order or
+an unsettled/failed execution. It requires an earlier snapshot before PASS; it
+does not infer that every possible intermediate phase or transient peak was
+captured. Reports fingerprint the ROM, status and each SRAM image and preserve
+phase/time and both heaps' free totals/largest blocks. Report creation is
+exclusive so a prior result cannot silently be overwritten.
+
+The HP50g 20-snapshot run passes. Thirteen observer/verifier host tests pass;
+real-capture negatives reject missing return SRAM, wrong model, reordered phases,
+truncated SRAM and unsettled execution. Evidence is in
+`/work/oct26-resource-snapshots-clean/verified-lifecycle.json` and
+`/work/oct26-resource-verifier-negatives.json`.
+
+HP39g+ also passes Stock execution and all nine captured phases through the
+maintained verifier. Heap 0x100 usable bytes are 13,212 before transfer,
+12,168 during USB, 13,212 after fetch, 7,048 at application PASS and 13,212
+after settled return. Each sample has two free blocks and an empty heap 0x200;
+the largest free block is 1,024 bytes smaller than the usable total. The
+6,164-byte application interval difference does not by itself identify an
+allocation owner. Evidence:
+`/work/oct26-resource-snapshot-matrix/hp39gplus/verified-lifecycle.json`.
+HP39gs passes eight captures with usable bytes 12,540 before transfer, 11,496
+during transfer, 12,540 after fetch, 6,376 at PASS and 12,540 after return.
+Its independent report is
+`/work/oct26-resource-snapshot-matrix/hp39gs/verified-lifecycle.json`.
+The other three models remain in validation; these successful sampled runs
+do not establish a transient peak bound.
+
 ### UI resource measurements
 
 The UI E2E application limits its mapped writable arena to 36 KiB. Its test-only
@@ -1402,67 +1469,3 @@ device/capability facts
 ```
 
 M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. M7.2 byte-stream storage is complete with Storage #53 / Core #254. M7.3a–j object services, including directories, composite objects, Aplet-owned persistence/Reset and native catalogs, are accepted, as are M7.4 common system services and M7.5 display/runtime services. Text/numeric/console behavior and media-change services are accepted, including four SD volumes and stable card identity on `7303a3d6`. Overall M7 is accepted at functional head `2988e1de`, including the capability ledger, timed historical client, owned CPU power policy and ordinary application termination. See [final acceptance](validation.md#m7-final-acceptance). The individually approved native Port 0/1/2, whole-calculator reset and reliable serial-number follow-ups remain on the [roadmap](roadmap.md).
-
-### Opt-in lifecycle SRAM observation
-
-The local Stock frontend supports `HPCLANG_X50NG_RESOURCE_SNAPSHOT=/new/path/prefix`.
-When set, named sequence captures, installation completion, application PASS and
-settled return write `prefix-PHASE.sram` and `prefix-PHASE.json`. The sidecar records
-model, emulated time, PC/CPSR, base address and exact SRAM length (256 KiB on
-HP48gII, 512 KiB otherwise). No guest memory or register is written. Unset/empty
-configuration performs no resource reads and preserves ordinary execution.
-
-Use a fresh prefix per emulator invocation, especially for repeated application
-launches. Outputs are exclusive: existing evidence is never overwritten, malformed
-phase/model selections and read failures reject capture, and partial new outputs
-are removed after write failure. The frontend treats capture failure as an E2E
-failure. The snapshot helper has six passing host tests; the observation frontend
-builds with the existing headless configuration. The initial HP50g run in
-`/work/oct26-resource-snapshots` fails the watchdog assertion on a reused older
-emulator; its 19 snapshots validate structurally but are not a successful run.
-The clean pinned-source build passes HP50g Stock transfer, application execution
-and settled return in `/work/oct26-resource-snapshots-clean`. All 20 captured
-stages have valid metadata/lengths and complete validated allocator free lists.
-Heap 0x100 free usable bytes are 105,116 before USB, 104,072 during USB, 105,116
-before launch, 19,080 at application PASS and 105,116 after settled return.
-The 86,036-byte application interval difference is consistent with the earlier
-86,016-byte usable native block plus 20 bytes of metadata; ownership attribution
-still requires the block/pool evidence. These sampled values are not peak bounds.
-Remaining-model validation runs in `/work/oct26-resource-snapshot-matrix`. Named screenshot phases identify capture events, not necessarily
-stable allocator states; an independent allocator/ownership analysis must validate
-and interpret each snapshot before using it for admission or peak-memory claims.
-
-The maintained verifier accepts a completed run directory containing
-`MODEL-stock.json`, `MODEL-PHASE.{json,sram}` and `state/flash`:
-
-```sh
-python3 tests/e2e/harness/verify-resource-snapshots.py /path/to/run \
-  --model hp50g --report /new/path/verified-lifecycle.json
-```
-
-Use `--rom` when the matching packed ROM is stored elsewhere. It rejects an
-unreviewed allocator implementation, mismatched model/length/schema, malformed
-lists, orphan sidecars, missing PASS/return captures, invalid lifecycle order or
-an unsettled/failed execution. It requires an earlier snapshot before PASS; it
-does not infer that every possible intermediate phase or transient peak was
-captured. Reports fingerprint the ROM, status and each SRAM image and preserve
-phase/time and both heaps' free totals/largest blocks. Report creation is
-exclusive so a prior result cannot silently be overwritten.
-
-The HP50g 20-snapshot run passes. Eleven observer/verifier host tests pass;
-real-capture negatives reject missing return SRAM, wrong model, reordered phases,
-truncated SRAM and unsettled execution. Evidence is in
-`/work/oct26-resource-snapshots-clean/verified-lifecycle.json` and
-`/work/oct26-resource-verifier-negatives.json`.
-
-HP39g+ also passes Stock execution and all nine captured phases through the
-maintained verifier. Heap 0x100 usable bytes are 13,212 before transfer,
-12,168 during USB, 13,212 after fetch, 7,048 at application PASS and 13,212
-after settled return. Each sample has two free blocks and an empty heap 0x200;
-the largest free block is 1,024 bytes smaller than the usable total. The
-6,164-byte application interval difference does not by itself identify an
-allocation owner. Evidence:
-`/work/oct26-resource-snapshot-matrix/hp39gplus/verified-lifecycle.json`.
-The other four models remain in validation; neither successful sampled run
-establishes a transient peak bound.
-
