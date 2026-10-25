@@ -20,6 +20,15 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+SD reset CI checkpoint: exact head 179b6c23 completes with 351 successful
+checks and one skipped check. Updating this branch with accepted main 5eb1b25c
+resolves only competing roadmap additions, retaining both histories. The three
+SD reset runtime/regression files remain byte-identical to the CI-passed head;
+all other implementation changes come from already accepted main. This merge
+head still requires its own CI acceptance before merging PR #15. Previous-push
+#17 at 743e36a8 has 15 queued checks; no new failures. Review:
+research/oct26-resource-preflight-ci.json. M8 remains open.
+
 SD reset boundary repair (local 575fcdd2 / regression 20906c69): the ordinary
 Stock SWI dispatcher re-enables interrupts. Protecting ResetSD with the existing
 synchronous KOS bridge plus saved caller IRQ/FIQ state fixes the original-app
@@ -43,6 +52,27 @@ Core passes, Storage runs and Runtime queues. At 80ccf586, Quality pairs and one
 pass; one Core runs and other listed checks queue. No new failure is listed at
 either head. PR #13/#14 remain unaccepted; this does not resolve their earlier
 watchdog/transport investigations or permit marking M8 complete.
+
+Original HPGCC3 graphics gate (local, 2026-10-26): three pinned documentation
+programs build/package using one relocated installed SDK. Explicit migration
+diffs replace only the umbrella include; observed native builds retain original
+drawing code and exercise physical ON input. All 18 Direct and 18 Stock cases
+pass on six models; Stock queue 82103 exits zero. Independent result/pixel
+rechecks pass for all 36 cases, with fingerprints in
+/work/oct26-hpgcc3-final-audit.json. Changed-header and corrupted-frame negatives,
+three ARM analyses and replay controls pass. The maintained runner preserves
+artifacts, partial failures, input fingerprints and settled-return requirements.
+Exact glyph identity, every circle boundary, external XPM and application
+allocation-failure handling remain outside this gate; broader M8 requirements
+remain open. Caller-supplied archives are not redistributed. Runtime code is
+unchanged; this gate has local evidence, not remote CI acceptance.
+
+Pre-submission CI review: #13 at 424fc0eb has successful Quality, Core, Objects,
+Storage and Gallery, with Runtime queued; #14 at 80ccf586 has successful Quality,
+one Core and one Objects, with other jobs queued. Previous push #15 at 179b6c23
+is queued. No new failed run is listed; none of these branches is accepted or
+merged. Earlier watchdog/transport investigations remain unresolved. Review
+saved as research/oct26-original-gates-prepush-ci.json.
 
 Window export inventory follow-up (local): audit report v2 records 75 distinct
 original implementation names and the header/source discrepancies in both 1.1

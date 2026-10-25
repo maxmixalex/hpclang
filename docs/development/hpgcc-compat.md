@@ -4,6 +4,92 @@ This page records the M7 source-compatibility inventory. Historical names are in
 
 ## Sources and method
 
+### Original HPGCC3 graphics documentation programs
+
+`tests/compat/check-hpgcc3-graphics.py` extracts the three self-contained
+programs from `libs_workspace/headers/hpgraphics.h` in the caller-supplied
+HPGCC3 R004.revA archive. It pins the original header SHA-256 and records each
+extracted/adapted source hash and migration diff. The only application-source
+change replaces `hpgcc3.h` with `hpkeyb49.h`; all drawing statements, original
+geometry and ON-key busy waits remain. These are original documentation
+programs, not the earlier clean-service behavioral ports.
+
+After [installing the SDK](../sdk/getting-started.md), run:
+
+```sh
+ATFE=/path/to/atfe python3 tests/compat/check-hpgcc3-graphics.py \
+  /path/to/hpgcc3_R004.revA.tar.gz \
+  --sdk /path/to/installed-sdk --work /new/evidence/path
+```
+
+The output `application` directory is a standalone CMake SDK project. The gate
+builds the text, gray16 double-buffer and mixed-font/geometry programs, and
+checks their HPC1 images and all six raw/wrapped launcher envelopes. One existing
+SDK installation serves every program; the gate does not create SDK copies.
+
+Local validation on 2026-10-25 passes using a relocated SDK, with no repository
+source/include paths in the compiler commands. All three ARM source analyses
+pass; a changed-header negative is rejected before building. Evidence is in
+`/work/oct25-hpgcc3-graphics/report.json`, its source diffs and `analysis.log`.
+Add `--native` to generate separate `hello-native-artifact`,
+`gray-native-artifact` and `shapes-native-artifact` directories. External
+instrumentation renames the entry point and wraps `keyb_isON`; drawing statements
+remain unchanged. It captures frame 2200, injects the physical ON GPIO using
+`HPCLANG_KEYBOARD_ON`, checks the real key reader, releases ON, and performs
+external HPG cleanup before process return. A failed key check produces failure,
+even though the wrapper lets the application exit its wait loop.
+
+Run each artifact with `tests/e2e/harness/run-direct.sh`, or prepare assets with
+`prepare-stock-assets.sh` and use `run-stock.sh`. Check the captured frame with:
+
+```sh
+python3 tests/compat/verify-hpgcc3-graphics.py /path/to/frame-2200.pgm shapes
+```
+
+For a complete serial matrix, use the maintained runner (Linux E2E prerequisites
+and emulator setup are the same as for the ordinary harness):
+
+```sh
+python3 tests/compat/run-hpgcc3-graphics.py /path/to/native-build \
+  --mode direct --work /new/direct-evidence
+python3 tests/compat/run-hpgcc3-graphics.py /path/to/native-build \
+  --mode stock --work /new/stock-evidence
+```
+
+The input is the work directory created by the build gate with `--native`.
+`--models hp50g` selects a smaller diagnostic run; the default covers all six
+models and all three programs. `--harness-root` selects an already prepared
+checkout. Run only one native suite at a time per harness checkout because
+its model state directories are shared. The runner requires a new output
+directory, fingerprints input artifacts, prepares Stock assets once per program,
+retains per-case logs/results/frames, and requires successful execution, settled
+return and independent pixels before recording a pass. It rejects missing
+results even when an older result exists in the build directory. A partial
+report remains failed if execution stops. Replay controls in
+`/work/oct25-hpgcc3-runner-check` cover both orchestration paths and reject
+missing results, failed status, unsettled return, bad pixels and nonzero exit;
+these controls are not additional native or Stock acceptance.
+
+The final argument selects `hello`, `gray` or `shapes`. All 18 Direct cases
+(three programs on six models) pass physical input checks, independent pixels
+and settled return in `/work/oct25-hpgcc3-direct-v2`. Changed color/geometry
+negatives for all three programs are rejected. Instrumented ARM analysis passes.
+The initial Direct attempt used an incorrect ON scan code in the test wrapper;
+its failure is retained separately and corrected using the public physical-key
+constant. The Stock queue (82103) now exits zero with all 18 cases passing in
+`/work/oct25-hpgcc3-stock`. Independent result and pixel rechecks of all 36
+Direct/Stock cases pass; result/frame fingerprints are recorded in
+`/work/oct26-hpgcc3-final-audit.json`. These are local results; remote CI
+acceptance remains separate.
+
+The pixel gate checks text presence/colors and original geometry, not exact
+historical font glyph identity or every circle boundary pixel. The fourth
+example needs an external `monalisa.xpm` asset and is not included. No source
+application is silently resized for 64-line displays; offscreen geometry is
+clipped. The original programs do not check allocation failures, and this gate
+does not establish memory-exhaustion handling or whole-system resource bounds.
+
+
 ### Original window application gate
 
 `win.h` supplies the historical control umbrella. Run
