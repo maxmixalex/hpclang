@@ -878,7 +878,8 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
             return HPCLANG_RPL_MUTATION_MALFORMED;
     }
     if (position < RPL_AVMEM + 5 || (repairs && ((repairs->edit_count && !repairs->edits) ||
-                                                 (repairs->guard_count && !repairs->guards))))
+                                                 (repairs->guard_count && !repairs->guards) ||
+                                                 (repairs->register_count && !repairs->registers))))
         return HPCLANG_RPL_MUTATION_MALFORMED;
     size_t capacity = 4;
     struct pointer_scan_request request = {
@@ -891,6 +892,10 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
         extra > SIZE_MAX / sizeof(struct catalog_edit) - capacity)
         return HPCLANG_RPL_MUTATION_NOMEM;
     capacity += extra;
+    size_t register_count = repairs ? repairs->register_count : 0;
+    if (register_count > SIZE_MAX / sizeof(struct catalog_edit) - capacity)
+        return HPCLANG_RPL_MUTATION_NOMEM;
+    capacity += register_count;
     struct catalog_edits plan = {malloc(capacity * sizeof(struct catalog_edit)), 0, capacity,
                                  position, rstk};
     if (!plan.items)
@@ -922,6 +927,21 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
         }
         const struct catalog_edit edit = {source->field, source->expected, source->value,
                                           source->width, NULL};
+        result = catalog_add_edit(&plan, &edit);
+        if (result)
+            goto done;
+    }
+    for (size_t i = 0; i < register_count; ++i) {
+        const struct hpclang_rpl_register_repair *source = &repairs->registers[i];
+        if (!source->word || (uintptr_t)source->word % _Alignof(uint32_t)) {
+            result = HPCLANG_RPL_MUTATION_MALFORMED;
+            goto done;
+        }
+        uint32_t address = source->expected & 0xfffffu;
+        uint32_t replacement = source->expected;
+        if (address >= position && address < rstk)
+            replacement = (source->expected & 0xfff00000u) | (address + 16u);
+        const struct catalog_edit edit = {0, source->expected, replacement, 5, source->word};
         result = catalog_add_edit(&plan, &edit);
         if (result)
             goto done;

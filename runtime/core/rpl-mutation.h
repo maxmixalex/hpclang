@@ -266,6 +266,16 @@ extern "C"
 
     struct hpclang_rpl_reference_edit;
     struct hpclang_rpl_reference_guard;
+    /* Caller-proven Saturn address in the low 20 bits of an owned ARM word.
+     * expected guards the entire word. The other 12 bits are preserved; a
+     * register's separate high word is never accessed. This is not provenance
+     * discovery: scalar registers and runtime-owned workspace are not roots. */
+    struct hpclang_rpl_register_repair
+    {
+        uint32_t *word;
+        uint32_t expected;
+    };
+
     struct hpclang_rpl_catalog_repairs
     {
         uint32_t main_mapping;
@@ -273,6 +283,8 @@ extern "C"
         uint32_t edit_count;
         const struct hpclang_rpl_reference_guard *guards;
         uint32_t guard_count;
+        const struct hpclang_rpl_register_repair *registers;
+        uint32_t register_count;
     };
 
     /* Same geometry/ownership contract as catalog_grow. Merge caller-proven
@@ -281,6 +293,10 @@ extern "C"
      * writes, including conflicts with unchanged roots. Fields are ORIGINAL
      * pre-move addresses, wholly in main RAM; normalized mappings must equal
      * main_mapping. Other physical banks require separate transaction work.
+     * Register words must be aligned, owned ARM storage outside moved memory
+     * and input arrays. Their low 20 bits use the same main-RAM address mapping;
+     * the caller proves that mapping and the continuation's address use. Exact
+     * aliases with native roots coalesce only when full-word repairs agree.
      * Guards describe unchanged preconditions, not permissions to relocate.
      * Keep input arrays, ARM roots, mappings and memory stable throughout.
      * Allocates temporary ARM heap storage; allocation/preflight failure makes

@@ -20,6 +20,23 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+M8.0 register-provenance delivery is prepared on physical-mapping branch #23.
+Guarded caller-proven register repairs relocate only the low 20 bits, preserve
+flags and reject stale/conflicting repairs before writes. The private decoder
+frames 80B26 and describes bounded plain register field assignments; descriptors
+do not infer address provenance or authorize public mutation.
+
+The isolated candidate passes four ASan/UBSan suites (object store, code,
+reference and mutation), the ARM code-relocation build, three changed-source
+ARM analyses, formatting, and installed SDK C/C++ and six-model launcher builds
+with 229 byte-identical release outputs. SDK Aplet packaging was not exercised
+in this run. Evidence: /work/oct26-register-flow/delivery-*.log.
+The identical implementation also retains 2,136 original-ROM interpreter
+assignment comparisons in native.json. These are isolated local results;
+complete external-reference coverage, public registration, full Stock startup
+and remote CI acceptance remain open. Prior push #13 at 4a4b36bd was reviewed
+before delivery; all twelve workflows were queued, so it is not accepted.
+
 M8.0 physical-mapping delivery is prepared on return-root branch #22. The
 resolver qualifies contiguous Saturn spans by absolute physical nibble address;
 main-RAM capture now rejects the physical SRAM overrun formerly admitted by

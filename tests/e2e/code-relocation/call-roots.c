@@ -157,7 +157,8 @@ static int probe_register(void)
     result = 8;
     if (hpclang_rpl_reference_edits_validate(&mapped, p->edits, p->builder.count))
         goto done;
-    const struct hpclang_rpl_catalog_repairs repairs = {1, p->edits, p->builder.count, NULL, 0};
+    const struct hpclang_rpl_catalog_repairs repairs = {1,    p->edits, p->builder.count, NULL, 0,
+                                                        NULL, 0};
     /* After this boundary an error must halt the test, never return Stock. */
     if (hpclang_rpl_mutation_catalog_grow_repaired(&io, insertion.slot, &repairs) ||
         probe_write_word(&io, insertion.slot, 123, 3) ||

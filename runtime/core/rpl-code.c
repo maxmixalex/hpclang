@@ -117,8 +117,8 @@ static int instruction_size(struct instruction_cursor *cursor, unsigned *size)
         return 0;
     }
     if (op[2] == 11) {
-        /* Saturn+ facts: Eric Rechlin's newopcodes.txt. Deliberately support
-         * documented families, not guessed lengths for every 80B selector. */
+        /* Saturn+ facts: Eric Rechlin's newopcodes.txt and the pinned ROM
+         * 80B26 wrapper described below. Unknown selectors remain unsupported. */
         result = instruction_take(cursor, 5);
         if (result)
             return result;
@@ -151,6 +151,11 @@ static int instruction_size(struct instruction_cursor *cursor, unsigned *size)
         case 0x16:
         case 0x21:
         case 0x23:
+        /* HP49g+/HP50g: service table 0x41440, native selector 0x62,
+         * wrapper 0x30ee4. Receives PC+5, saves that continuation separately
+         * from helper 0x306a0's data arguments, and returns it unchanged.
+         * This proves framing only, not helper effects or relocation safety. */
+        case 0x26:
         case 0x31:
         case 0x33:
         case 0x41:
@@ -251,6 +256,75 @@ int hpclang_rpl_code_visit(const struct hpclang_rpl_reader *reader, uint32_t fir
         first += size;
         length -= size;
     }
+    return 0;
+}
+
+int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
+                                        uint32_t instruction, uint32_t limit, unsigned p,
+                                        struct hpclang_rpl_code_assignment *assignment)
+{
+    if (!reader || !reader->read_nibble || !assignment)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || !limit || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (p > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct instruction_cursor cursor = {.reader = reader, .at = instruction, .limit = limit};
+    unsigned size;
+    int result = instruction_size(&cursor, &size);
+    if (result || (result = instruction_take(&cursor, size)))
+        return result;
+    const uint8_t *op = cursor.code;
+    struct hpclang_rpl_code_assignment next = {.instruction = instruction, .length = size};
+    unsigned field = 7;
+    if (op[0] == 2) {
+        next.source = HPCLANG_RPL_CODE_CONSTANT;
+        next.destination = HPCLANG_RPL_CODE_P;
+        next.constant = op[1];
+        next.nibbles = 1;
+    } else if (op[0] == 8 && op[1] == 0 && (op[2] == 12 || op[2] == 13)) {
+        next.source = op[2] == 12 ? HPCLANG_RPL_CODE_P : HPCLANG_RPL_CODE_C;
+        next.destination = op[2] == 12 ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_P;
+        next.source_first = op[2] == 13 ? op[3] : 0;
+        next.destination_first = op[2] == 12 ? op[3] : 0;
+        next.nibbles = 1;
+    } else if ((op[0] == 1 && op[1] < 2) ||
+               (op[0] == 8 && op[1] == 1 && op[2] == 10 && op[4] < 2)) {
+        unsigned selector = op[0] == 1 ? op[2] : op[5];
+        unsigned from_saved = op[0] == 1 ? op[1] : op[4];
+        enum hpclang_rpl_code_register working =
+            selector < 8 ? HPCLANG_RPL_CODE_A : HPCLANG_RPL_CODE_C;
+        enum hpclang_rpl_code_register saved = HPCLANG_RPL_CODE_R0 + (selector & 7);
+        next.source = from_saved ? saved : working;
+        next.destination = from_saved ? working : saved;
+        field = op[0] == 1 ? 7 : op[3];
+    } else if (op[0] == 13 || (op[0] == 10 && op[1] >= 8)) {
+        unsigned selector = op[0] == 13 ? op[1] : op[2];
+        if (selector >= 12)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        field = op[0] == 13 ? 15 : op[1] - 8;
+        if (selector < 4) {
+            next.source = HPCLANG_RPL_CODE_CONSTANT;
+            next.destination = (enum hpclang_rpl_code_register)selector;
+        } else {
+            static const uint8_t destinations[] = {0, 1, 2, 3, 1, 2, 0, 2};
+            static const uint8_t sources[] = {1, 2, 0, 2, 0, 1, 2, 3};
+            next.source = (enum hpclang_rpl_code_register)sources[selector - 4];
+            next.destination = (enum hpclang_rpl_code_register)destinations[selector - 4];
+        }
+    } else {
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    if (!next.nibbles) {
+        static const unsigned first[] = {0, 0, 2, 0, 15, 3, 0, 0};
+        static const unsigned width[] = {1, 1, 1, 3, 1, 12, 2, 16};
+        if (field >= 8 && field != 15)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        next.destination_first = field == 15 ? 0 : field == 0 ? p : first[field];
+        next.source_first = next.source == HPCLANG_RPL_CODE_CONSTANT ? 0 : next.destination_first;
+        next.nibbles = field == 15 ? 5 : field == 1 ? p + 1 : width[field];
+    }
+    *assignment = next;
     return 0;
 }
 
