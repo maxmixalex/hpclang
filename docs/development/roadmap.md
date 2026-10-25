@@ -20,6 +20,18 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+PR #24 follow-up prepares the maintained offline original-ROM GETPTR/dispatch
+gate on this isolated delivery branch. Paired-model baseline/move and omission
+checks pass locally; changed-ROM/missing-trace inputs reject and remove stale
+reports. The test compiles this branch's C mover and fingerprints all inputs.
+Private ROM/state/trace inputs and a Linux Python Unicorn environment are
+required; it is not an automatic CI job or full Stock registration acceptance.
+The E2E guide documents invocation and limits. Runtime code is unchanged by
+this follow-up. Previous head e6b2db8f is reviewed before push; eight workflows
+remain queued, so the draft and its #23 dependency remain unaccepted.
+
+## M8 follow-up evidence history
+
 M8.0 register-provenance delivery is prepared on physical-mapping branch #23.
 Guarded caller-proven register repairs relocate only the low 20 bits, preserve
 flags and reject stale/conflicting repairs before writes. The private decoder

@@ -657,3 +657,33 @@ observations. A blank repaint interval resets stability instead of becoming an
 immediate `stock-resume` failure. The existing return deadline still bounds a
 screen that never recovers. Gallery artifacts retain each shard's result and
 before/PASS/return images so later shards cannot hide the failing screen.
+
+### Offline original-ROM threaded return check
+
+`tests/e2e/code-relocation/threaded_return.py` checks the reviewed HP49g+/HP50g
+command-4 GETPTR/dispatch suffix independently of the Stock transfer harness.
+Run on Linux with a host C compiler and Python `unicorn==2.1.4` in a virtual
+environment. Supply a complete saved `sram`/`flash` pair and the corresponding
+normal-return register trace from the diagnostic emulator; these private inputs
+are not distributed with the repository.
+
+```sh
+python tests/e2e/code-relocation/threaded_return.py \
+  --model hp50g --state /path/to/before-registration \
+  --trace /path/to/normal-register-trace.log --output /tmp/threaded-return
+```
+
+The gate checks the reviewed instruction/entry layout and ordered trace evidence,
+compiles the current C catalog mover, and runs all eight return-stack cursor
+positions with baseline, moved, stale saved-IP and omitted-return-repair cases.
+It writes `getptr-move.json` with source/input hashes only after all checks pass;
+a rerun removes a prior report before validation. Python optimization is refused
+because assertions are part of the verifier. Output also contains the locally
+built `geometry.so`; use a separate output directory for each concurrent run.
+
+The saved IP is reconstructed from the trace, and CPU/return-stack state is
+controlled. CODE, SEMI and ROM contents remain original. This verifies catalog
+geometry and the return suffix; it does not publish a catalog record, prove
+whole ARMJUMP reachability, or replace full Stock registration/startup acceptance.
+A different ROM or cached-program layout requires review before extending this
+gate. This optional offline check is not automatically included in CI.
