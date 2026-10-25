@@ -110,6 +110,48 @@ def verify_controls(prefix):
     print(f"PASS {prefix}: four progress orientations in both buffer modes")
 
 
+def verify_text(prefix):
+    for phase in (500, 600):
+        path = Path(f"{prefix}-{phase}.pgm")
+        width, height, pixels = read_pgm(path)
+        if width != 132 or height not in (64, 80):
+            raise AssertionError(f"{path}: unsupported text frame geometry")
+        expected = bytearray([255]) * (width * height)
+        # Three-pixel advance: multiline label at (6,16)/(6,19),
+        # adjacent entry glyphs at (26,16)/(29,16), including one-pixel inset.
+        for x, y, rows in (
+            (6, 16, (1, 2, 4)),
+            (6, 19, (7, 5, 7)),
+            (26, 16, (1, 2, 4)),
+            (29, 16, (7, 5, 7)),
+        ):
+            for dy, row in enumerate(rows):
+                for dx in range(3):
+                    if row & (1 << dx):
+                        expected[(y + dy) * width + x + dx] = 0
+        if bytes(pixels) != bytes(expected):
+            raise AssertionError(f"{path}: unexpected label/entry pixels")
+    print(f"PASS {prefix}: multiline label and entry in both buffer modes")
+
+
+def verify_image(prefix):
+    for phase in (700, 800):
+        path = Path(f"{prefix}-{phase}.pgm")
+        width, height, pixels = read_pgm(path)
+        if width != 132 or height not in (64, 80):
+            raise AssertionError(f"{path}: unsupported image frame geometry")
+        for y in range(height):
+            for x in range(width):
+                expected = 255
+                if 5 <= x < 14 and 15 <= y < 21:
+                    expected = 0 if (x - 5 + y - 15) % 2 == 0 else 255
+                if 5 <= x < 7 and 15 <= y < 17:
+                    expected = 136 if (x, y) == (5, 15) else 0 if (x, y) == (6, 16) else 255
+                if pixels[y * width + x] != expected:
+                    raise AssertionError(f"{path}: unexpected image/pattern pixel at {x},{y}")
+    print(f"PASS {prefix}: image/pattern composition in both buffer modes")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -122,6 +164,8 @@ def main():
         verify(Path(f"build/{target}-pass.pgm"))
         verify_keys(Path(f"build/{target}-frame"))
         verify_controls(Path(f"build/{target}-frame"))
+        verify_text(Path(f"build/{target}-frame"))
+        verify_image(Path(f"build/{target}-frame"))
 
 
 if __name__ == "__main__":
