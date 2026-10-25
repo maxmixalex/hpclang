@@ -20,6 +20,30 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+SD reset boundary repair (local 575fcdd2 / regression 20906c69): the ordinary
+Stock SWI dispatcher re-enables interrupts. Protecting ResetSD with the existing
+synchronous KOS bridge plus saved caller IRQ/FIQ state fixes the original-app
+HP50g Direct return failure without writing back observed clock registers.
+HP49g+/HP50g original apps now pass Direct/Stock and independent FAT checks.
+Three sanitizer targets, changed runtime/observer ARM analysis and a 139-source
+installed-SDK-to-delivery audit pass. The maintained Storage regression keeps a
+card mounted under economy mode and adds real F1 activity. Its unsafe-call
+negative rejects with 0x464100f4; the earlier no-key negative passed and was
+insufficient. Final positive matrix passes all four HP49g+/HP50g Direct/Stock cases at
+/work/oct26-reset-storage-v2-runs (14959 exit zero), with independent result
+rechecks and ARM analysis of the maintained regression. Earlier Storage positives passed both models Direct/Stock;
+research orchestration first omitted SD transport, then expected a USB result
+filename; both errors were corrected without counting them as runtime passes.
+Evidence: /work/oct26-reset-sync-check, /work/oct26-fsystem-fixed-runs and
+/work/oct26-reset-storage-v2-negative. Delivery branch m8-storage-reset contains
+only the reset fix and maintained regressions on accepted main 67b8e26d.
+
+Pre-delivery CI review: at 424fc0eb, Quality/Objects pairs and Font Gallery pass;
+Core runs and Runtime/Storage queue. At 80ccf586, Quality pairs and one Objects
+pass; one Core runs and other listed checks queue. No new failure is listed at
+either head. PR #13/#14 remain unaccepted; this does not resolve their earlier
+watchdog/transport investigations or permit marking M8 complete.
+
 Window export inventory follow-up (local): audit report v2 records 75 distinct
 original implementation names and the header/source discrepancies in both 1.1
 and 2.0. `check-win-exports.py` derives all 76 original/repaired names and forces
