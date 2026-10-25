@@ -687,3 +687,35 @@ geometry and the return suffix; it does not publish a catalog record, prove
 whole ARMJUMP reachability, or replace full Stock registration/startup acceptance.
 A different ROM or cached-program layout requires review before extending this
 gate. This optional offline check is not automatically included in CI.
+
+### Offline ACCESSRAM return check
+
+`tests/e2e/code-relocation/accessram_return.py` checks four reviewed command-4
+ACCESSRAM1 call sites and their subsequent SAT2ARM conversion, using the same
+Linux/Unicorn environment and caller-supplied saved `sram`/`flash` inputs as the
+threaded return check:
+
+```sh
+python tests/e2e/code-relocation/accessram_return.py \
+  --state /path/to/hp50g-before-registration --model hp50g \
+  --output /tmp/accessram-hp50g
+```
+
+Run separately with `--model hp49gplus` and its saved state. Each run checks all
+eight return-stack cursors at four call sites: the ROM service must return to
+the original continuation without writing R4, and six subsequent main-RAM
+conversions must produce the expected physical byte addresses. It records input
+and driver fingerprints, executed paths and changed mapping words. The P=8
+call additionally walks one and two controlled library records and rejects an
+overflowing extent. These inputs are placed through the mapping established by
+the original CONFIG sequence; exact returned free space, carry, and traversal
+counts are checked. Each model runs 56 service cases and 336 conversions. Input guards
+reject changed reviewed call encodings and remove any stale report on that failure.
+
+The entry registers and mappings are controlled. P=8 coverage tests the ROM
+size walk, not validation of library bodies, arbitrary contents or every service
+branch. Other bank configurations remain outside this gate.
+ACCESSRAM1 can change non-main mappings: only the main read mapping and the
+observed R4 lifetime are checked. This gate does not authorize general bank
+lifetimes, public registration, or complete launcher relocation, and requires
+private inputs rather than running automatically in CI.
