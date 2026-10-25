@@ -5,6 +5,27 @@
 #include "rpl-stock-memory.h"
 #include "launch-services.h"
 
+int hpclang_rpl_stock_resolve_span(const uint32_t read_map[256], uint32_t address, uint32_t span,
+                                   uint32_t *physical)
+{
+    if (!read_map || !physical)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!span || address >= 0x100000u || span > 0x100000u - address)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t first = address >> 12, last = (address + span - 1u) >> 12;
+    uint32_t base = read_map[first];
+    for (uint32_t i = first; i <= last; ++i) {
+        uint32_t page = read_map[i];
+        if ((page & 0x7ffu) ||
+            !(page <= 0x200000u - 0x800u || (page >= 0x08000000u && page <= 0x08080000u - 0x800u)))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (page != base + (i - first) * 0x800u)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    *physical = base * 2u + (address & 0xfffu);
+    return 0;
+}
+
 static int port1_read(void *context, uint32_t address, uint8_t *value)
 {
     if (!context || !value || address >= HPCLANG_RPL_PORT1_NIBBLES)
@@ -97,9 +118,11 @@ int hpclang_rpl_stock_memory_capture(struct hpclang_rpl_stock_memory *memory,
     if ((ram_section & UINT32_C(0xfff00c03)) != UINT32_C(0x08000c02))
         return 0;
     for (uint32_t i = 0u; i < HPCLANG_RPL_MAIN_PAGES; ++i) {
-        uint32_t base = read_map[128u + i];
-        if ((base & UINT32_C(0xfff007ff)) != UINT32_C(0x08000000))
+        uint32_t physical;
+        if (hpclang_rpl_stock_resolve_span(read_map, 0x80000u + i * 0x1000u, 0x1000u, &physical) ||
+            physical < 0x10000000u)
             return 0;
+        uint32_t base = physical / 2u;
         for (uint32_t j = 0u; j < i; ++j)
             if (memory->pages[j] == (uintptr_t)base)
                 return 0;

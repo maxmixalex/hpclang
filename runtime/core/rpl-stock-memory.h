@@ -22,6 +22,19 @@ int hpclang_rpl_stock_port1_capture(struct hpclang_rpl_reader *reader,
 int hpclang_rpl_stock_port1_reader(struct hpclang_rpl_reader *reader);
 int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint32_t *limit);
 
+/* Resolve a nonempty Saturn span through a caller-owned, stable 256-entry
+ * HP49g+/50g Read[] map. Return its absolute physical NIBBLE address only when
+ * every touched 2-KiB page is aligned, belongs to the 2-MiB Flash or 512-KiB
+ * SRAM region, and the entire span is physically contiguous. Aliases therefore
+ * compare equal, while distinct banks remain distinct. Discontinuous spans
+ * must be split by the caller, not approximated by their first page.
+ * No target memory is read. The caller must independently establish the map's
+ * provenance, ARM identity mappings and exclusive lifetime; this proves neither
+ * pointer type nor complete roots, and never authorizes reads or mutation.
+ * Zero is success; negative span errors leave physical unchanged. */
+int hpclang_rpl_stock_resolve_span(const uint32_t read_map[256], uint32_t address, uint32_t span,
+                                   uint32_t *physical);
+
 /* Invocation-local copy of the Stock main-RAM mapping. No Stock calls or
  * interrupt re-enabling may occur between preparation and mutation return. */
 struct hpclang_rpl_stock_memory

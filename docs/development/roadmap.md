@@ -20,6 +20,16 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+M8.0 physical-mapping delivery is prepared on return-root branch #22. The
+resolver qualifies contiguous Saturn spans by absolute physical nibble address;
+main-RAM capture now rejects the physical SRAM overrun formerly admitted by
+its section-sized mask. Primary-source sanitizer tests, ten saved-map replays,
+ARM analysis, SDK/229-output checks and 4077-input fingerprint audit pass.
+Fresh native HP50g five-case replay and eight corrupted-evidence controls pass;
+HP49g+ remains running. Isolated-build checks and complete native acceptance
+are still required before submission. This neither completes execution-root
+coverage nor enables public Port1 edits, library movement or reclamation.
+
 M8.0 return-root delivery: RTNSXM and proven-carry GOC/GONC/RTNC/RTNNC
 extend the existing bounded interpreter. Initial carry remains unknown, and
 unsupported instructions still stop discovery. Original stack-cell ownership,
