@@ -15,6 +15,44 @@ CASES = {
 MARKER = 0xC173A
 
 
+def catalog_records(read):
+    return [
+        tuple(
+            read(0x86120 + 16 * i + offset, width)
+            for offset, width in ((0, 3), (3, 5), (8, 5), (13, 3))
+        )
+        for i in range(read(0x8611D, 3))
+    ]
+
+
+def verify_bindings(before, read):
+    """Check complete records and independently locate the fixture in Port 0."""
+    records = catalog_records(read)
+    if [record for record in records if record[0] != 123] != before:
+        raise ValueError("Native call changed an existing catalog binding")
+    at = read(0x80716)
+    matches = []
+    while 0x80000 <= at <= 0xFFFFB:
+        prologue = read(at)
+        if not prologue:
+            break
+        span = 5 + read(at + 5)
+        if prologue not in (0x2B40, 0x2B62) or span < 24 or at + span > 0x100000:
+            raise ValueError("Invalid native Port 0 object")
+        if prologue == 0x2B40:
+            length = read(at + 10, 2)
+            binding = at + 14 + 2 * length
+            if span < 41 + 2 * length or read(binding - 2, 2) != length:
+                raise ValueError("Invalid native library title")
+            if read(binding, 3) == 123:
+                matches.append((123, binding, 0, 0))
+        at += span
+    else:
+        raise ValueError("Missing native Port 0 terminator")
+    if len(matches) != 1 or [record for record in records if record[0] == 123] != matches:
+        raise ValueError("Catalog binding does not identify the Port 0 fixture")
+
+
 def package(launcher, name):
     if launcher[:8] != b"HPHP49-C":
         raise ValueError("Expected a native HP49 launcher")
@@ -36,6 +74,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
     original_flash = (source / "flash").read_bytes()
     before = native_words((source / "sram").read_bytes(), original_flash)
     original_ids = [before(0x86120 + 16 * i, 3) for i in range(before(0x8611D, 3))]
+    original_records = catalog_records(before)
     if 123 in original_ids:
         raise ValueError("Call-root fixture requires an unregistered library 123")
     results = []
@@ -89,6 +128,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         ids = [read(0x86120 + 16 * i, 3) for i in range(read(0x8611D, 3))]
         if ids != sorted(original_ids + [123]) or len(ids) != len(set(ids)):
             raise ValueError("Native call did not preserve the catalog and add library 123")
+        verify_bindings(original_records, read)
         results.append(dict(case=name, returned=True, flash_unchanged=True))
         print(f"PASS: {args.model}: native {name} roots and catalog growth", flush=True)
     (output / "result.json").write_text(json.dumps(results, indent=2) + "\n")
