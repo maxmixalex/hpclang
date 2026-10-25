@@ -20,6 +20,18 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Delivery preparation (2026-10-25): Port owner branch merges allocation delivery;
+its incremental change is exactly eight owner/example/documentation/test files.
+All 4,619 source files are audited against the host worktree. Relative to the
+native-validated source, only workflow diagnostics, the watchdog diagnostic
+fixture and roadmap differ (line endings normalized). Full format/lint,
+actionlint and strict docs pass. Evidence: `/work/oct25-port-delivery-check.log`
+and `/work/oct25-port-delivery-source.json`. Runtime 40090614391/40090621638 and
+both failed-job logs were reviewed again before the next batched push; the same
+watchdog and transport failures remain unresolved. The local main worktree is
+fast-forwarded to accepted `67b8e26d`; no unaccepted code is merged into main.
+This prepares CI submission, not remote acceptance or M8 closure.
+
 2026-10-25 acceptance: PR #11 (`9683fd6a`) is merged as `69c2b831`.
 Its PR Runtime passes 117 jobs with one conditional skip; other PR/push gates
 pass except the cancelled duplicate push Runtime, which is not called a pass.
