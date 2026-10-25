@@ -23,8 +23,15 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 Format Quality follow-up: the host analyzer detected unchecked rewind errors
 in the stream fixture. Checked fseek calls now retain positioning validation;
 the focused sanitizer test and analyzer checks pass. Runtime code is unchanged.
-The complete host analysis rerun and remaining native Stock cases are pending;
-this branch has not been pushed. Evidence: /work/oct26-format-host-analysis.
+Complete host analysis passes seven sources and 26 configurations. All six
+Direct and six Stock cases pass with settled return; session 72910 exits zero.
+Evidence: /work/oct26-format-host-analysis and
+/work/oct26-format-scientific-native/final-audit.json. The 272-input audit finds
+only the independently pending SD reset source difference; rebuilding without
+it preserves the HPC, all 42 launcher files and the result symbol. The ELF is
+not byte-identical. See /work/oct26-format-scientific-sdk/delivery-isolation.json.
+Remote acceptance remains pending; the previous push CI was reviewed before
+submission, preserving queued jobs and unresolved watchdog/transport failures.
 
 M8.4 decimal formatting delivery (local, remote acceptance pending): explicit
 HPCLANG_HPGCC_LEGACY_FORMAT=1 enables historical call aliases; omitted/zero
@@ -34,7 +41,7 @@ The expanded gate passes 5,208 exact outputs plus 92 reviewed historical-defect
 corrections; old scaling is rejected. Nine targeted sanitizer tests, the 32,784
 finite-value sweep, ARM analysis and relocated SDK packaging pass. Full 162-test
 host regression passed at the preceding boundary checkpoint. Latest six Direct
-cases pass; Stock matrix /work/oct26-format-scientific-native remains running.
+and six Stock cases pass in /work/oct26-format-scientific-native.
 This does not close M8.4 or the broader M8 milestone.
 
 Original HPGCC3 graphics gate (local, 2026-10-26): three pinned documentation

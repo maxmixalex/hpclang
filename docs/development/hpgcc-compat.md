@@ -1401,11 +1401,12 @@ also prevent large finite values from becoming infinity during rounding; a
 native regression. Full host integration passes all 162 tests at the boundary
 checkpoint; the later scientific scaling change passes nine targeted sanitizer
 tests, two ARM analyses and installed SDK packaging. Its updated native suite
-adds scientific rounding/carry regressions; the full Direct/Stock matrix runs
-in `/work/oct26-format-scientific-native`. The earlier pre-boundary matrix
+adds scientific rounding/carry regressions; all six Direct and six Stock cases
+pass with settled return in `/work/oct26-format-scientific-native`. The earlier pre-boundary matrix
 completed all 12 cases, but does not validate the latest numerical fixes.
-Latest native and remote acceptance remain pending. Default standard printf
-is unchanged.
+Host Clang analysis passes seven sources and 26 configurations after the stream
+fixture replaced unchecked rewind calls with checked fseek. Remote acceptance
+remains pending. Default standard printf is unchanged.
 
 Historical 1.1/2.0 digit/separator behavior and HPGCC3 formatting must be reviewed
 separately rather than treated as one shared contract.
