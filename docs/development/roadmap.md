@@ -20,6 +20,25 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Original HPGCC2 filesystem delivery (local): pinned example2/example3 sources
+build through one relocated installed SDK, with explicit migration diffs and
+all-six-model launcher packaging. HP49g+/HP50g Direct and Stock runs pass file
+operations, real blocking input, settled return and independent raw FAT checks.
+Stock five-frame and Direct six-frame ROM/package-derived console pixel checks
+pass on both models, with nine corruption/missing/font negatives rejected.
+This gate depends on the protected SD Reset boundary in PR #15 (179b6c23).
+Other models have packaging evidence only; multiple volumes and physical-device
+acceptance remain open. Caller-supplied original archives/ROMs are not shipped.
+Evidence: /work/oct26-fsystem-fixed{,-runs} and oct26-fsystem-console-*.json.
+
+Before submission, reviewed previous #18: checks queued; #13/#14 pending, #15
+incomplete. #17 has newly failed system-services Direct jobs: retained result
+artifacts show 0x46417b03 on HP40gs/HP48gII/HP49g+ and 0x46417b8e on HP50g.
+Those match old fixture failure paths but do not independently prove the root
+cause; #17 lacks the deadline/diagnostic correction submitted in #13/#14.
+Logs and JSON are retained under research/oct26-format-ci-failures and
+research/oct26-ci-121*.log. Remote acceptance of these branches remains open.
+
 SD reset boundary repair (local 575fcdd2 / regression 20906c69): the ordinary
 Stock SWI dispatcher re-enables interrupts. Protecting ResetSD with the existing
 synchronous KOS bridge plus saved caller IRQ/FIQ state fixes the original-app
