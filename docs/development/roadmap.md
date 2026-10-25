@@ -20,6 +20,15 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+System-service fixture follow-up (local, not yet submitted): import the exact
+first-failure diagnostic and elapsed-time watchdog fixture already tested on
+six Direct/six Stock models in #13. #17 CI retained old loop behavior and reports
+0x46417b03 on HP40gs/HP48gII/HP49g+ and 0x46417b8e on HP50g. The old register
+check can overwrite delivery failure with 14; these result codes alone cannot
+prove this run's root cause. Preserve the failed artifacts and validate the
+corrected fixture against this formatting branch before claiming acceptance.
+Production runtime and formatting implementation are unchanged.
+
 Format Quality follow-up: the host analyzer detected unchecked rewind errors
 in the stream fixture. Checked fseek calls now retain positioning validation;
 the focused sanitizer test and analyzer checks pass. Runtime code is unchanged.
