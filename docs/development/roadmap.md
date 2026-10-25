@@ -20,6 +20,17 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+M8.4 decimal formatting delivery (local, remote acceptance pending): explicit
+HPCLANG_HPGCC_LEGACY_FORMAT=1 enables historical call aliases; omitted/zero
+preserves standard formatting. Bounded parser/stdio adapters, mixed C/C++ SDK
+probe and maintained runtime suite accompany pinned original-source comparisons.
+The expanded gate passes 5,208 exact outputs plus 92 reviewed historical-defect
+corrections; old scaling is rejected. Nine targeted sanitizer tests, the 32,784
+finite-value sweep, ARM analysis and relocated SDK packaging pass. Full 162-test
+host regression passed at the preceding boundary checkpoint. Latest six Direct
+cases pass; Stock matrix /work/oct26-format-scientific-native remains running.
+This does not close M8.4 or the broader M8 milestone.
+
 Original HPGCC3 graphics gate (local, 2026-10-26): three pinned documentation
 programs build/package using one relocated installed SDK. Explicit migration
 diffs replace only the umbrella include; observed native builds retain original

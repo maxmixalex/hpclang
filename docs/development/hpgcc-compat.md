@@ -1308,8 +1308,109 @@ immediately at the final column, including scrolling after the last screen cell.
 Single-buffer output publishes immediately; HPG double-buffer modes still need
 `hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
 cleanup restores the borrowed display. Historical `gets/_gets` spellings use
-the bounded adapters described below; decimal-format policy remains
-M8 work. Host sanitizers, ARM analysis, all six Direct targets and HP39g+,
+the bounded adapters described below. Legacy decimal formatting requires an
+explicit compatibility switch, as selected by the user. Including
+compatibility headers alone does not enable it; standard C formatting remains
+the default. Define `HPCLANG_HPGCC_LEGACY_FORMAT=1` before the first `hpstdio.h`,
+`hpconio.h` or `hpclang/hpgcc-format.h` include in an application translation
+unit. Omitted or zero leaves all standard calls unchanged. For example:
+
+```c
+#define HPCLANG_HPGCC_LEGACY_FORMAT 1
+#include <hpstdio.h>
+
+int main(void)
+{
+    char text[32];
+    set_decimal_digits(2);
+    set_decimal_separator(',');
+    snprintf(text, sizeof(text), "%f", 1.25); /* text is "1,25" */
+    return 0;
+}
+```
+
+The switch aliases unqualified calls to printf/fprintf/sprintf/snprintf and
+all four va_list variants. Named `hpclang_hpgcc_*` entry points remain available
+without the switch. Function addresses and parenthesized names remain standard;
+C++ can use `(std::snprintf)(...)` for standard formatting in an opted-in unit.
+Include the compatibility header after any application configuration of this
+switch. `sprintf` retains standard C's destination-capacity obligation; use
+`snprintf` for bounded output. Stream variants write through the supplied FILE
+(or stdout) without replacing its binding, and propagate write errors without
+clearing stream error flags.
+The caller-supplied original-source probe can be reproduced on a POSIX host:
+
+```sh
+python3 tests/compat/check-decimal-reference.py /path/to/archives --candidate --report decimal-reference.json
+python3 tests/compat/check-decimal-reference.py /path/to/archives --candidate --sweep --report decimal-sweep.json
+```
+
+It hash-checks the 1.1/2.0 formatter sources and asserts 20 traces per version
+under ASan/UBSan. Explicit precision restores the global setting; legacy `%g`
+counts fractional places and uses a three-digit exponent when selected.
+The trace also records historical defects (including a zero return count).
+These observations do not require copying defects into the safe adapter.
+The expanded sweep checks 5,300 cases: 5,208 outputs match exactly and 92
+explicitly pinned cases correct historical zero-precision or fractional-carry
+defects. Examples are `12e+001` corrected to `1e+001` at zero precision and
+`0.100e+002` corrected to `1.00e+002` after carry. Return counts are corrected
+throughout. Scientific scaling preserves the original multiplication order;
+the gate rejects the former division-based implementation's rounding differences.
+Host integer/power/libm shims mean ARM numerical edge cases remain unverified.
+The internal bounded conversion core is implemented locally in
+`runtime/core/hpgcc-format.c`; its host sanitizer and ARM compile/analysis checks
+pass. It formats one f/e/E/g value without changing standard stdio. The core
+uses two-stage half-away rounding, caps settings/precision at 15, rejects
+negative settings and NUL separators, and returns the required character count
+with snprintf-style truncation. Nonfinite values produce `inf`, `-inf` or `nan`.
+The internal bounded parser now matches these original traces, including mixed
+arguments and padding, with corrected return lengths. It accepts the historical
+s/c/d/i/u/x/X/p/b/U/L/f/e/E/g/percent conversions, numeric width/precision and
+-/0 rules. As in the original, string alignment reverses numeric alignment,
+string/integer precision is ignored, and numeric zeros precede the sign.
+Unsupported grammar (including standard length modifiers, dynamic widths and
+`%n`) returns `EINVAL`; count/width overflow returns `EOVERFLOW`. Errors retain
+terminated partial output. Host sanitizers, ARM compile/analysis and a mutated
+alignment negative pass locally. Public aliases and stream wrappers additionally
+pass six C/C++ default/off/on sanitizer targets and file/stdout/embedded-NUL/
+padding/write-error coverage. Active C/C++ calls compile for ARMv4T; stream
+runtime analysis passes. The installed SDK probe now builds four mixed C/C++
+translation units and all six launcher packages using only installed headers and
+runtime sources:
+
+```sh
+ATFE=/path/to/atfe python3 tests/compat/check-hpgcc-format-sdk.py \
+  --sdk /path/to/installed-sdk --work /new/format-evidence
+```
+
+Its `artifact` directory works with the ordinary Direct/Stock harness. The
+maintained `hpgcc-format` runtime suite checks default and opted-in calls,
+precision, bounds, standard-stream binding, embedded NUL, stderr errors and
+recovery. All six Direct models pass locally with settled return, including the repaired
+finite-overflow boundary; all six Stock cases also pass in
+`/work/oct26-format-boundary-native` (71812). The earlier queue 66389 completed all six Direct and six Stock models
+with the pre-boundary artifact and remains separate evidence. Six ARM analyses, suite
+planning and maintained builds pass. Final formatted source rebuilds match the
+native ELF/HPC byte-for-byte. Target validation found that the selected picolibc
+`fwrite` fails to set the stream error flag on callback failure; using `fputc`
+preserves both error reporting and `ferror`. A display marker supplies the
+existing return verifier's required application-to-Stock transition. Earlier
+failures remain recorded in the roadmap. Strict multiplication-boundary guards
+also prevent large finite values from becoming infinity during rounding; a
+32,784-finite-case host sweep passes, and the old SDK is rejected by the new
+native regression. Full host integration passes all 162 tests at the boundary
+checkpoint; the later scientific scaling change passes nine targeted sanitizer
+tests, two ARM analyses and installed SDK packaging. Its updated native suite
+adds scientific rounding/carry regressions; the full Direct/Stock matrix runs
+in `/work/oct26-format-scientific-native`. The earlier pre-boundary matrix
+completed all 12 cases, but does not validate the latest numerical fixes.
+Latest native and remote acceptance remain pending. Default standard printf
+is unchanged.
+
+Historical 1.1/2.0 digit/separator behavior and HPGCC3 formatting must be reviewed
+separately rather than treated as one shared contract.
+
+Console validation: host sanitizers, ARM analysis, all six Direct targets and HP39g+,
 HP48gII, HP49g+ and HP50g Stock pass locally. The installed mixed C/C++ console
 example also passes relocation, six-model launchers and three HP39 Aplet
 packaging families. HP39gs/40gs Stock also pass; CI acceptance is pending.

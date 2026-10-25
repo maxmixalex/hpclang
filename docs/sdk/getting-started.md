@@ -103,8 +103,13 @@ cancellation. `hpstdio.h` provides `readint/readdouble` and the unsigned,
 hexadecimal and 64-bit integer variants. These use a 31-byte edited line and
 report conversion/input errors through `errno` and stream flags. They accept
 numeric prefixes; use the clean text-input parsers for whole-line validation.
-Old unbounded `gets` aliases and historical decimal-format controls remain
-separate work.
+Historical `gets/_gets` call aliases accept fixed `char` arrays in C and C++;
+use `hpclang_hpgcc_gets(buffer, capacity)` for pointers or dynamic buffers.
+Legacy decimal formatting is explicitly selected per application translation
+unit with `HPCLANG_HPGCC_LEGACY_FORMAT=1` before the compatibility include.
+Omitted/zero preserves standard formatting. See the [migration guide](migration.md)
+for the distinct legacy grammar, shared settings and bounded output entry points.
+The formatting addition is locally validated; remote acceptance remains pending.
 
 An application CMake file uses:
 
