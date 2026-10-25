@@ -20,6 +20,21 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Watchdog fixture deadline repair (local): three failed CI SRAM reports from
+40175265882/40175265704/40175276034 record one IRQ and foreground time still
+1.4-2.4 ms before the 100 ms deadline when the fixed instruction loop ends.
+The fixture now samples monotonic time between busy batches, retaining IRQ-only
+session advancement, a one-second delivery margin and a finite batch fallback.
+All six Direct cases and a masked-IRQ negative pass; the negative records zero
+IRQs and failure 0x46417b83 after the deadline plus margin. ARM analysis passes
+with the repository's standard fixed-MMIO checker exclusion. Stock queue 43170
+runs /work/oct26-watchdog-deadline/artifact; results are in
+/work/oct26-watchdog-deadline-stock. Initial runner 71720 omitted RUNNER_TEMP
+and stopped before HP50g execution; its six Direct/negative results are retained.
+This is a test timing correction, not proof all runtime/transport issues are
+resolved. HP39gs notebook fails separately after 90 seconds without acknowledged
+Kermit payload progress (window 26, three NAKs, five resends). No new push.
+
 Delivery preparation (2026-10-25): Port owner branch merges allocation delivery;
 its incremental change is exactly eight owner/example/documentation/test files.
 All 4,619 source files are audited against the host worktree. Relative to the
