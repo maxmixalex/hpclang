@@ -20,6 +20,36 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+2026-10-25 acceptance: PR #11 (`9683fd6a`) is merged as `69c2b831`.
+Its PR Runtime passes 117 jobs with one conditional skip; other PR/push gates
+pass except the cancelled duplicate push Runtime, which is not called a pass.
+Merged main has the exact accepted source tree. PR #12 (`ab91e43a`) passes all
+12 push/PR workflows and is merged as `67b8e26d`; retargeting to main introduced
+no tree difference because #11's merge equals its accepted head. Main's resulting
+tree equals #12's tested head. Primary branch merges accepted main, resolving
+roadmap-only tracking conflicts; its remaining difference is tracking text.
+Fresh merge/retarget CI is not polled. PR #13 is now based on main, still open.
+
+PR #13 exact head `b64b68ea` has ten successful runs, but Runtime push
+40090614391 and PR 40090621638 fail. Push HP39g+ system-services-immediate and
+PR HP50g system-services both report `0x46417b8e`: watchdog fixture result 14
+(register restoration comparison), not the earlier audio result 10. The check
+can overwrite an earlier fixture failure, so this alone does not prove root
+cause. PR HP40gs UI fails during host transfer before application verification.
+Failed logs and application artifacts are saved under `research/oct25-pr13-*`
+and `research/oct25-ci-watchdog-*`. No SRAM snapshot was retained in those
+service artifacts. These failures remain unresolved; #13 is not accepted.
+
+Port C++ owner `e181fe7c`: rebuilt Object Basics, all six launchers and Stock
+assets pass. All six Direct models pass. Fresh ASan/UBSan real-service Port
+fixture, ARM C++ static analysis, formatting and strict docs pass after disk
+recovery. Local Stock queue 71073 is live on HP39g+ (x50ng PID 1234 observed),
+then proceeds through the other five models; do not restart it for quiet output.
+Evidence uses `/work/oct25-port-cpp-{artifact,stock-assets,native,quality.log}`.
+The existing validated source mirror is reused; new artifact/assets total under
+5 MiB. SDK acceptance 33637 remains valid. Stock and remote owner acceptance
+are pending; no new push or M8 closure.
+
 Second container cleanup (user requested): removed 1,008 obsolete CMakeFiles
 folders, 18 commit-free temporary Git stores, 10 obsolete SDK installations and
 small Python/Ruff caches (7.30 GiB). Preserved 1,008 build diagnostic files in
