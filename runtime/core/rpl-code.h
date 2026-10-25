@@ -56,6 +56,25 @@ enum hpclang_rpl_code_register
     HPCLANG_RPL_CODE_CONSTANT
 };
 
+struct hpclang_rpl_code_literal
+{
+    uint32_t instruction, length, field;
+    enum hpclang_rpl_code_register destination;
+    unsigned nibbles;
+    uint64_t mask, value;
+};
+
+/* Decode LC/LA at a caller-proven instruction boundary with the proven P value.
+ * The loaded nibbles wrap modulo 16 from P; other register bits survive.
+ * next_register = (old_register & ~mask) | value. field is the first encoded
+ * literal nibble, not a pointer field. Constants do not establish address
+ * provenance, mapping identity or permission to relocate. Preserve guards on
+ * the full instruction and P dependency before using this in data-flow analysis.
+ * No writes; invalid/unsupported input leaves output untouched. */
+int hpclang_rpl_code_literal_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                     uint32_t limit, unsigned p,
+                                     struct hpclang_rpl_code_literal *literal);
+
 struct hpclang_rpl_code_assignment
 {
     uint32_t instruction, length;

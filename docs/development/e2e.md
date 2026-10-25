@@ -693,7 +693,7 @@ gate. This optional offline check is not automatically included in CI.
 `tests/e2e/code-relocation/accessram_return.py` checks four reviewed command-4
 ACCESSRAM1 call sites and their subsequent SAT2ARM conversion, using the same
 Linux/Unicorn environment and caller-supplied saved `sram`/`flash` inputs as the
-threaded return check:
+threaded return check (a host C compiler is also required):
 
 ```sh
 python tests/e2e/code-relocation/accessram_return.py \
@@ -712,7 +712,14 @@ the original CONFIG sequence; exact returned free space, carry, and traversal
 counts are checked. Each model runs 56 service cases and 336 conversions. Input guards
 reject changed reviewed call encodings and remove any stale report on that failure.
 
-The entry registers and mappings are controlled. P=8 coverage tests the ROM
+The gate compiles the current C literal/assignment inspectors and compares
+their register predictions with execution of the original LC→R4 initialization
+pair, after establishing P=0 through its original instruction. R4 is then
+preserved across the service and conversion checks. Decoder source fingerprints
+are retained; changed initialization/call encodings reject stale reports.
+This is a controlled entry, not execution of all preceding launcher branches.
+
+The other entry registers and mappings are controlled. P=8 coverage tests the ROM
 size walk, not validation of library bodies, arbitrary contents or every service
 branch. Other bank configurations remain outside this gate.
 ACCESSRAM1 can change non-main mappings: only the main read mapping and the

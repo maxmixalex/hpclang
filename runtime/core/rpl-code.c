@@ -259,6 +259,47 @@ int hpclang_rpl_code_visit(const struct hpclang_rpl_reader *reader, uint32_t fir
     return 0;
 }
 
+int hpclang_rpl_code_literal_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                     uint32_t limit, unsigned p,
+                                     struct hpclang_rpl_code_literal *literal)
+{
+    if (!reader || !reader->read_nibble || !literal)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || !limit || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (p > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct instruction_cursor cursor = {.reader = reader, .at = instruction, .limit = limit};
+    unsigned size;
+    int result = instruction_size(&cursor, &size);
+    if (result || (result = instruction_take(&cursor, size)))
+        return result;
+    const uint8_t *op = cursor.code;
+    unsigned prefix;
+    enum hpclang_rpl_code_register destination;
+    if (op[0] == 3) {
+        prefix = 2;
+        destination = HPCLANG_RPL_CODE_C;
+    } else if (op[0] == 8 && op[1] == 0 && op[2] == 8 && op[3] == 2) {
+        prefix = 5;
+        destination = HPCLANG_RPL_CODE_A;
+    } else {
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    struct hpclang_rpl_code_literal next = {.instruction = instruction,
+                                            .length = size,
+                                            .field = instruction + prefix,
+                                            .destination = destination,
+                                            .nibbles = size - prefix};
+    for (unsigned i = 0; i < next.nibbles; ++i) {
+        unsigned shift = 4 * ((p + i) & 15);
+        next.mask |= UINT64_C(15) << shift;
+        next.value |= (uint64_t)op[prefix + i] << shift;
+    }
+    *literal = next;
+    return 0;
+}
+
 int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
                                         uint32_t instruction, uint32_t limit, unsigned p,
                                         struct hpclang_rpl_code_assignment *assignment)

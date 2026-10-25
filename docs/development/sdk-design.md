@@ -1119,6 +1119,14 @@ body, but neither reverse instruction matching nor a matching boundary proves
 that a saved scalar was produced by that call. The platform still owes the
 suspended caller's provenance contract before publishing relocation roots.
 
+The internal `rpl-code` literal inspector describes LC/LA register writes at
+proven instruction boundaries. A caller-proven P value determines a 64-bit
+write mask and positioned value, including nibble wrap; untouched register bits
+survive. The encoded literal location is retained for guards, not declared to
+be a pointer field. Numeric constants alone never establish address provenance
+or mapping identity. A later register copy may propagate an independently
+proven address fact, but these primitives do not authorize relocation.
+
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
 A/C bit-test instruction boundaries. Its relocation planner

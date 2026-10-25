@@ -11,12 +11,15 @@ from pathlib import Path
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE, UC_HOOK_MEM_WRITE
 from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
 import argparse
+import ctypes as c
+import subprocess
 from itertools import product
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--state", type=Path, required=True)
 parser.add_argument("--model", choices=("hp50g", "hp49gplus"), required=True)
 parser.add_argument("--output", type=Path, required=True)
+parser.add_argument("--cc", default="cc")
 args = parser.parse_args()
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "port-recovery"))
 native_words = importlib.import_module("verify").native_words
@@ -27,6 +30,68 @@ STOP = 0x70000
 rows = []
 inputs = {}
 (OUT / "accessram-return.json").unlink(missing_ok=True)
+Read = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.POINTER(c.c_uint8))
+
+
+class Reader(c.Structure):
+    _fields_ = [("read", Read), ("context", c.c_void_p)]
+
+
+class Literal(c.Structure):
+    _fields_ = [
+        (name, c.c_uint32) for name in ("instruction", "length", "field", "destination", "nibbles")
+    ]
+    _fields_ += [("mask", c.c_uint64), ("value", c.c_uint64)]
+
+
+class Assignment(c.Structure):
+    _fields_ = [
+        (name, c.c_uint32)
+        for name in (
+            "instruction",
+            "length",
+            "source",
+            "destination",
+            "source_first",
+            "destination_first",
+            "nibbles",
+            "constant",
+        )
+    ]
+
+
+base = Path(__file__).resolve().parents[3] / "runtime/core"
+subprocess.run(
+    [
+        args.cc,
+        "-shared",
+        "-fPIC",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        str(base / "rpl-code.c"),
+        "-o",
+        str(OUT / "code.so"),
+    ],
+    check=True,
+)
+code = c.CDLL(str(OUT / "code.so"))
+code.hpclang_rpl_code_literal_inspect.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.c_uint,
+    c.POINTER(Literal),
+]
+code.hpclang_rpl_code_assignment_inspect.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.c_uint,
+    c.POINTER(Assignment),
+]
+
 for model in (args.model,):
     state = args.state
     flash, ram = (state / "flash").read_bytes(), (state / "sram").read_bytes()
@@ -48,6 +113,31 @@ for model in (args.model,):
     assert encoding(0x26C37, 7) == "8d12c32"
     for pc, p in ((0x889F7, 0), (0x88B30, 1), (0x889EE, 8), (0x88AB4, 1)):
         assert encoding(pc, 9) == "2" + format(p, "x") + "8f73c62"
+
+    @Read
+    def read_code(_, at, value):
+        if not start + 0xCA <= at < start + 0xD7:
+            return 0
+        value[0] = mapping(at, 1)
+        return 1
+
+    reader = Reader(read_code, None)
+    literal, assignment = Literal(), Assignment()
+    assert (
+        code.hpclang_rpl_code_literal_inspect(
+            c.byref(reader), start + 0xCA, 13, 0, c.byref(literal)
+        )
+        == 0
+    )
+    assert literal.destination == 2 and literal.length == 7
+    assert (
+        code.hpclang_rpl_code_assignment_inspect(
+            c.byref(reader), start + 0xD1, 6, 0, c.byref(assignment)
+        )
+        == 0
+    )
+    assert assignment.source == 2 and assignment.destination == 8 and assignment.length == 6
+
     for address, entry, stop in (
         (0, 0x889F7, 0x88A00),
         (1, 0x88B30, 0x88B39),
@@ -70,7 +160,7 @@ for model in (args.model,):
                 uc.mem_write(
                     cpu + 0x90C + 8 * i, struct.pack("<Q", 0x1234567800000000 + 0x111111 * i)
                 )
-            uc.mem_write(cpu + 0x94C, struct.pack("<Q", 0xDEADBEEFABC26C30))
+            uc.mem_write(cpu + 0x94C, struct.pack("<Q", 0xDEADBEEFABC01234))
             uc.mem_write(cpu + 0xC24, bytes(4))
             uc.mem_write(cpu + 0x998, struct.pack("<I", cursor))
             for i in range(8):
@@ -82,6 +172,7 @@ for model in (args.model,):
             writes = []
             injected = None
             expected_free = None
+            initializing = True
             uc.reg_write(UC_ARM_REG_R4, cpu)
             uc.reg_write(UC_ARM_REG_R5, 0xFFFFF)
             uc.reg_write(UC_ARM_REG_R7, entry)
@@ -130,11 +221,47 @@ for model in (args.model,):
                     or 0x300000 <= at
                     and at + size <= 0x310000
                 ), (hex(at), size)
-                assert not (at < cpu + 0x954 and at + size > cpu + 0x94C), "R4 clobber"
+                assert initializing or not (at < cpu + 0x954 and at + size > cpu + 0x94C), (
+                    "R4 clobber"
+                )
                 writes.append((at, size))
 
             uc.hook_add(UC_HOOK_CODE, hook)
             uc.hook_add(UC_HOOK_MEM_WRITE, write)
+            # Establish P=0 through its original opcode, then execute the actual
+            # LC(5)/R4=C.A pair. The C descriptors predict all register writes.
+            stop = 0x889F9
+            uc.reg_write(UC_ARM_REG_R7, 0x889F7)
+            uc.emu_start(0x28828, 0x400000, count=30000)
+            assert trace == [0x889F7, stop]
+            assert int.from_bytes(uc.mem_read(cpu + 0x95C, 4), "little") == 0
+            expected = [
+                int.from_bytes(uc.mem_read(cpu + 0x90C + 8 * i, 8), "little") for i in range(9)
+            ]
+            expected[literal.destination] = (
+                expected[literal.destination] & ~literal.mask
+            ) | literal.value
+            mask = (1 << (4 * assignment.nibbles)) - 1
+            bits = (expected[assignment.source] >> (4 * assignment.source_first)) & mask
+            shift = 4 * assignment.destination_first
+            expected[assignment.destination] = (
+                expected[assignment.destination] & ~(mask << shift)
+            ) | (bits << shift)
+            stop = start + 0xD7
+            trace = []
+            uc.reg_write(UC_ARM_REG_R7, start + 0xCA)
+            uc.emu_start(0x28828, 0x400000, count=30000)
+            assert trace == [start + 0xCA, start + 0xD1, stop]
+            actual = [
+                int.from_bytes(uc.mem_read(cpu + 0x90C + 8 * i, 8), "little") for i in range(9)
+            ]
+            assert actual == expected and actual[8] == 0xDEADBEEFABC26C30
+            assert bytes(uc.mem_read(cpu, 0x900)) == tables
+            assert int.from_bytes(uc.mem_read(cpu + 0x998, 4), "little") == cursor
+            initializing = False
+            stop = service_stop
+            trace = []
+            uc.reg_write(UC_ARM_REG_R7, entry)
             uc.emu_start(0x28828, 0x400000, count=1000000)
             assert trace[-1] == stop and 0x26C37 in trace and len(trace) < 2000
             assert bytes(uc.mem_read(cpu + 0x94C, 8)) == struct.pack("<Q", 0xDEADBEEFABC26C30)
@@ -179,6 +306,7 @@ for model in (args.model,):
                     entry=hex(entry),
                     cursor=cursor,
                     layout=layout,
+                    initialization_matches_c_descriptors=True,
                     injected=injected,
                     expected_free=expected_free,
                     trace=[hex(x) for x in service_trace],
@@ -189,8 +317,12 @@ for model in (args.model,):
 report = dict(
     cases=rows,
     inputs=inputs,
+    decoder_sha256={
+        name: hashlib.sha256((base / name).read_bytes()).hexdigest()
+        for name in ("rpl-code.c", "rpl-code.h")
+    },
     driver_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-    scope="Four real command-4 ACCESSRAM1 call sites, original ROM and pinned saved mappings; controlled R4 entry and caller registers. P=8 covers saved contents, one/two controlled size-delimited library records and an overflowing extent. This does not validate arbitrary object contents, all bank configurations or full launcher closure.",
+    scope="Four real command-4 ACCESSRAM1 call sites, original ROM and pinned saved mappings; R4 initialization parsed by C descriptors and executed by the original interpreter, with controlled P=0 and other caller registers. P=8 covers saved contents, one/two controlled size-delimited library records and an overflowing extent. This does not validate arbitrary object contents, all bank configurations or full launcher closure.",
     implication="R4 is never written by the observed ROM service paths. All main-RAM read mappings remain stable and six subsequent SAT2ARM conversions retain correct physical byte addresses.",
 )
 (OUT / "accessram-return.json").write_text(json.dumps(report, indent=2) + "\n")
