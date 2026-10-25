@@ -20,6 +20,13 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Prepared parent reconciliation for #13: this local candidate merges accepted
+main 5eb1b25c into df3a30a4, preserving both roadmap histories. Runtime,
+platform, SDK build configuration, workflows and native harness files are
+unchanged from df3a30a4. Its ongoing remote CI is not superseded by this local
+preparation; the candidate has not been pushed or remotely accepted. All prior
+pending-run descriptions below are historical checkpoints, not current status.
+
 Deadline fixture delivery: all six Direct and all six Stock cases now pass with
 settled return; masked-IRQ negative still fails with zero IRQs after the allowed
 interval. Stock summary /work/oct26-watchdog-deadline-stock/summary.json was
@@ -289,6 +296,27 @@ headless asset-copy links and RUNNER_TEMP) were corrected before guest execution
 The frontend was explicitly rebuilt after modifying its optional observer header.
 Raw neighborhood values must be checked against live allocator behavior and
 model firmware before deriving block sizes, overhead or alignment losses.
+
+Original HPGCC3 graphics gate (local, 2026-10-26): three pinned documentation
+programs build/package using one relocated installed SDK. Explicit migration
+diffs replace only the umbrella include; observed native builds retain original
+drawing code and exercise physical ON input. All 18 Direct and 18 Stock cases
+pass on six models; Stock queue 82103 exits zero. Independent result/pixel
+rechecks pass for all 36 cases, with fingerprints in
+/work/oct26-hpgcc3-final-audit.json. Changed-header and corrupted-frame negatives,
+three ARM analyses and replay controls pass. The maintained runner preserves
+artifacts, partial failures, input fingerprints and settled-return requirements.
+Exact glyph identity, every circle boundary, external XPM and application
+allocation-failure handling remain outside this gate; broader M8 requirements
+remain open. Caller-supplied archives are not redistributed. Runtime code is
+unchanged; this gate has local evidence, not remote CI acceptance.
+
+Pre-submission CI review: #13 at 424fc0eb has successful Quality, Core, Objects,
+Storage and Gallery, with Runtime queued; #14 at 80ccf586 has successful Quality,
+one Core and one Objects, with other jobs queued. Previous push #15 at 179b6c23
+is queued. No new failed run is listed; none of these branches is accepted or
+merged. Earlier watchdog/transport investigations remain unresolved. Review
+saved as research/oct26-original-gates-prepush-ci.json.
 
 Window export inventory follow-up (local): audit report v2 records 75 distinct
 original implementation names and the header/source discrepancies in both 1.1
