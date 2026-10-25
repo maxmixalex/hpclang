@@ -20,6 +20,19 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Deadline fixture delivery: all six Direct and all six Stock cases now pass with
+settled return; masked-IRQ negative still fails with zero IRQs after the allowed
+interval. Stock summary /work/oct26-watchdog-deadline-stock/summary.json was
+independently checked for six unique models (the runner's final console label
+is incorrect). These Stock runs used system Kermit and do not validate the
+separate transport patch. Before submission, reviewed #13/#14 completed CI:
+334 successful checks each; #13 has two watchdog failures, #14 two watchdog
+failures plus notebook transport failure. Saved review:
+research/oct26-deadline-prepush-ci.json. Previous push #17 has 25 successful,
+five running and 183 queued checks; #15 remains incomplete with no failure
+listed. No branch is accepted based on these pending checks. This batch submits
+the elapsed-time fixture correction only; transport investigation remains open.
+
 Watchdog fixture deadline repair (local): three failed CI SRAM reports from
 40175265882/40175265704/40175276034 record one IRQ and foreground time still
 1.4-2.4 ms before the 100 ms deadline when the fixed instruction loop ends.
