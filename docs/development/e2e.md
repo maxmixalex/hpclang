@@ -723,10 +723,16 @@ logical address through C=RSTK, and follows both ST-controlled paths to `88AA0`.
 For the alignment path, the C exchange inspector predicts both ACEX W swaps;
 the independent arithmetic expectation rounds the logical address to an 0x2000
 boundary modulo 20 bits. All nine working/saved registers, D0, P, ST, the
-return-stack cursor, unaffected ring slots and mappings are checked. The skip
-path preserves D0. The maximum-address case wraps to zero; matching original
-arithmetic does not establish a usable address. Saved logical addresses are
-explicit caller inputs, and ring-cursor coverage does not prove stack capacity.
+return-stack cursor and mappings are checked. Every ring slot starts with a
+distinct nonzero sentinel: both nested-call slots and the consumed caller slot
+must end cleared, while the other five slots must retain their exact values.
+Native cursor writes independently measure a peak depth increase of two, a
+minimum of minus one and a final delta of minus one. Thus this path requires
+an independently established initial live depth of 1–6 to avoid ring overflow
+or underflow; the cursor and stale slot values cannot establish that depth.
+The skip path preserves D0. The maximum-address case wraps to zero; matching
+original arithmetic does not establish a usable address. Saved logical
+addresses are explicit caller inputs.
 Decoder and driver fingerprints must remain stable throughout the run.
 This is a controlled entry, not execution of all preceding launcher branches.
 

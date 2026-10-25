@@ -204,6 +204,7 @@ for model in (args.model,):
             injected = None
             expected_free = None
             initializing = True
+            stack_steps = None
             uc.reg_write(UC_ARM_REG_R4, cpu)
             uc.reg_write(UC_ARM_REG_R5, 0xFFFFF)
             uc.reg_write(UC_ARM_REG_R7, entry)
@@ -255,6 +256,12 @@ for model in (args.model,):
                 assert initializing or not (at < cpu + 0x954 and at + size > cpu + 0x94C), (
                     "R4 clobber"
                 )
+                if stack_steps is not None and at == cpu + 0x998:
+                    assert size == 4 and value < 8
+                    previous = int.from_bytes(uc.mem_read(at, size), "little")
+                    delta = (value - previous) & 7
+                    assert delta in (1, 7), (previous, value)
+                    stack_steps.append(1 if delta == 1 else -1)
                 writes.append((at, size))
 
             uc.hook_add(UC_HOOK_CODE, hook)
@@ -337,6 +344,10 @@ for model in (args.model,):
                 for skip_alignment in (False, True):
                     uc.mem_write(cpu, service_state)
                     uc.mem_write(cpu + 0x91C, struct.pack("<Q", logical))
+                    for slot in range(8):
+                        uc.mem_write(
+                            cpu + 0x978 + 4 * slot, struct.pack("<I", 0xA1000 + 0x101 * slot)
+                        )
                     uc.mem_write(cpu + 0x978 + 4 * ((cursor - 1) & 7), struct.pack("<I", logical))
                     flags = int.from_bytes(uc.mem_read(cpu + 0x968, 4), "little")
                     uc.mem_write(cpu + 0x968, struct.pack("<I", (flags & ~1) | skip_alignment))
@@ -348,6 +359,7 @@ for model in (args.model,):
                     before_stack = bytes(uc.mem_read(cpu + 0x978, 32))
                     stop = 0x88AA0
                     trace = []
+                    stack_steps = []
                     uc.reg_write(UC_ARM_REG_R7, 0x88A82)
                     uc.reg_write(UC_ARM_REG_SP, 0x308000)
                     uc.emu_start(0x28828, 0x400000, count=30000)
@@ -397,11 +409,22 @@ for model in (args.model,):
                     assert int.from_bytes(uc.mem_read(cpu + 0x998, 4), "little") == (
                         (cursor - 1) & 7
                     )
-                    # Calls may reuse the free slot and consumed caller slot.
-                    # All other ring slots must survive; this is not a depth proof.
+                    # Observe every native cursor transition, independently of
+                    # instruction classification. Two nested calls need two free
+                    # slots; C=RSTK consumes one caller slot. A known initial
+                    # live depth of 1..6 is therefore sufficient and necessary
+                    # for this path to avoid ring underflow/overwrite.
+                    depth = low = high = 0
+                    for delta in stack_steps:
+                        depth += delta
+                        low, high = min(low, depth), max(high, depth)
+                    assert (depth, low, high) == (-1, -1, 2), stack_steps
+                    stack_steps = None
                     after_stack = bytes(uc.mem_read(cpu + 0x978, 32))
                     for slot in range(8):
-                        if slot not in (cursor, (cursor - 1) & 7):
+                        if slot in (cursor, (cursor + 1) & 7, (cursor - 1) & 7):
+                            assert after_stack[4 * slot : 4 * slot + 4] == bytes(4)
+                        else:
                             assert (
                                 after_stack[4 * slot : 4 * slot + 4]
                                 == before_stack[4 * slot : 4 * slot + 4]
@@ -411,6 +434,9 @@ for model in (args.model,):
                         dict(
                             logical=hex(logical),
                             skip_alignment=skip_alignment,
+                            stack_depth_delta=depth,
+                            stack_depth_minimum=low,
+                            stack_depth_maximum=high,
                             d0=hex(before_d0 if skip_alignment else aligned),
                             physical=hex(actual[0]),
                             restored=hex(actual[2]),
@@ -442,7 +468,7 @@ report = dict(
     inputs=inputs,
     decoder_sha256=decoder_hashes,
     driver_sha256=driver_hash,
-    scope="Four real command-4 ACCESSRAM1 call sites, original ROM and pinned saved mappings; R4 initialization parsed by C descriptors and executed by the original interpreter, with controlled P=0 and other caller registers. The original SAT2ARM call and both ST-controlled alignment continuations also run with an explicitly seeded saved logical address; this does not establish return-stack capacity or provenance of arbitrary caller inputs. P=8 covers saved contents, one/two controlled size-delimited library records and an overflowing extent. This does not validate arbitrary object contents, all bank configurations or full launcher closure.",
+    scope="Four real command-4 ACCESSRAM1 call sites, original ROM and pinned saved mappings; R4 initialization parsed by C descriptors and executed by the original interpreter, with controlled P=0 and other caller registers. The original SAT2ARM call and both ST-controlled alignment continuations also run with an explicitly seeded saved logical address; the measured stack budget requires an independently known initial live depth of 1..6, which cannot be inferred from the ring cursor or stale slot values. This does not establish provenance of arbitrary caller inputs. P=8 covers saved contents, one/two controlled size-delimited library records and an overflowing extent. This does not validate arbitrary object contents, all bank configurations or full launcher closure.",
     implication="R4 is never written by the observed ROM service paths. All main-RAM read mappings remain stable and six subsequent SAT2ARM conversions retain correct physical byte addresses. Both ST-controlled original caller continuations preserve physical A while restoring or aligning the saved logical address in C; arithmetic can wrap at 20 bits and is not relocation authorization.",
 )
 (OUT / "accessram-return.json").write_text(json.dumps(report, indent=2) + "\n")
