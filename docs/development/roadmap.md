@@ -20,6 +20,19 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+System-service fixture validation completed locally: exact c5b88cab sources
+(411 audited build inputs) pass 18 Direct cases across normal/exit/_Exit and
+all six _Exit Stock cases using the original CI portable tools. Queue 43314
+exits zero. Independent final audit checks all 24 unique variant/model pairs,
+saved result identity and settled return; clang-format 22 passes. Evidence:
+/work/oct26-format-watchdog/final-audit.json and summary.json. Runtime and
+decimal-format code are unchanged. This validates the diagnostic/deadline
+fixture correction locally, not remote acceptance or every old CI root cause.
+Previous-push #19 has two queued checks; #18 has two running/18 queued;
+#13/#14/#15 remain incomplete. The four existing #17 failed jobs/logs remain
+retained. Review: research/oct26-next-delivery-ci-review.json. Submit this
+follow-up without polling its newly triggered CI; M8 remains open.
+
 System-service fixture follow-up (local, not yet submitted): import the exact
 first-failure diagnostic and elapsed-time watchdog fixture already tested on
 six Direct/six Stock models in #13. #17 CI retained old loop behavior and reports
