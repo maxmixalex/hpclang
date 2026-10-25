@@ -20,6 +20,23 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Pacing-branch CI follow-up (local): failed job 121168675610 at fb7dd394
+reports Direct HP39gs watchdog result 0x46417b03. Its saved log and artifact
+12600331275 retain the failure; that compound assertion alone does not prove
+a unique cause. Commit 6074ccaf carries the existing deadline-aware wait and
+first-failure diagnostics from c5b88cab. Runtime and Kermit code are unchanged.
+All 18 Direct normal/exit/_Exit and six Stock immediate-exit cases pass on all
+six models; queue 55984 exits zero. Independent replay checks all 24 unique
+saved results, exact summary identity, settled return and payload hashes.
+Evidence: /work/oct26-kermit-watchdog/final-audit.json. The reused build mirror
+matches all 4031 audited inputs, including the materialized font archive's LFS
+SHA-256. Pinned formatting passes. This is local validation, not remote acceptance.
+Before this follow-up push, previous #21 has four queued checks; #18 retains
+the same failed job alongside incomplete jobs. #13/#14/#15/#17/#20 remain
+incomplete; #19's two checks pass but its base conflicts. Review:
+research/oct26-conditional-prepush-ci.json. Do not poll newly triggered CI;
+M8 remains open.
+
 M8 transfer reliability delivery (local acceptance): Kermit retransmissions now
 honor configured SEND PAUSE before sampling the RTT timestamp. A real PTY
 regression rejects the previous bundled server and passes with the patch,
