@@ -39,7 +39,7 @@ Evidence: /work/oct26-reset-sync-check, /work/oct26-fsystem-fixed-runs and
 only the reset fix and maintained regressions on accepted main 67b8e26d.
 
 Pre-delivery CI review: at 424fc0eb, Quality/Objects pairs and Font Gallery pass;
-Core runs and Runtime/Storage queue. At 80ccf586, Quality pairs and one Objects
+Core passes, Storage runs and Runtime queues. At 80ccf586, Quality pairs and one Objects
 pass; one Core runs and other listed checks queue. No new failure is listed at
 either head. PR #13/#14 remain unaccepted; this does not resolve their earlier
 watchdog/transport investigations or permit marking M8 complete.
