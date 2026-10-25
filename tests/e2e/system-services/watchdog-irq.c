@@ -10,6 +10,38 @@
 #define REG(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
 volatile uint32_t hpclang_e2e_watchdog_hits;
+/* Retained in failed SRAM together with the exact ELF. Capture before cleanup;
+ * a later restoration mismatch must not hide a delivery/ownership failure. */
+volatile struct
+{
+    uint32_t version, before[3], after[3], mismatch_mask;
+    uint32_t hits, finished, error, alarm_owned, tone_owned, session_state;
+    uint64_t last_time, deadline;
+    uint32_t first_failure, wait_result, wait_errno, reserved;
+    uint64_t foreground_time;
+} hpclang_e2e_watchdog_observation;
+_Static_assert(sizeof(hpclang_e2e_watchdog_observation) == 96, "diagnostic word layout");
+extern volatile uint32_t hpclang_e2e_result;
+static void report_failure(void)
+{
+    static uint32_t report[26];
+    report[0] = 0x7b00;
+    report[1] = 24;
+    uint8_t *destination = (uint8_t *)(report + 2);
+    volatile const uint8_t *source = (volatile const uint8_t *)&hpclang_e2e_watchdog_observation;
+    for (unsigned i = 0; i < sizeof(hpclang_e2e_watchdog_observation); ++i)
+        destination[i] = source[i];
+    uint32_t offset = (uint32_t)(uintptr_t)report - 0x01100000u;
+    uint64_t start, now;
+    if (hpclang_time_read_us_masked(&start))
+        return;
+    hpclang_e2e_result = 0x4d100000u | offset;
+    while (hpclang_e2e_result != (0x4d200000u | offset)) {
+        if (hpclang_time_read_us_masked(&now) || now - start > 2000000u)
+            break; // Preserve the original failure even if capture cannot complete.
+    }
+}
+
 static volatile unsigned irq_finished, irq_error;
 static uint64_t irq_deadline, irq_last_time;
 static struct hpclang_sound_session session;
@@ -104,6 +136,9 @@ unsigned hpclang_e2e_watchdog_test(void)
     for (unsigned i = 0; i < 7; ++i)
         audio_before[i] = REG(audio_addresses[i]);
     unsigned failure = 0;
+    hpclang_e2e_watchdog_observation.version = 2;
+    for (unsigned i = 0; i < 3; ++i)
+        hpclang_e2e_watchdog_observation.before[i] = watchdog_before[i];
     hpclang_e2e_watchdog_hits = 0;
     irq_finished = irq_error = 0;
     irq_stack[0] = 0x51ac7ead;
@@ -124,7 +159,7 @@ unsigned hpclang_e2e_watchdog_test(void)
     if (session.irq.bank.stack != before.stack || session.irq.bank.link != before.link ||
         session.irq.bank.status != before.status)
         failure = 2;
-    if ((REG(0x07600008) & 0xf000) != 0x9000 || (REG(0x07a00010) & 0x30) != 0x20)
+    if (!failure && ((REG(0x07600008) & 0xf000) != 0x9000 || (REG(0x07a00010) & 0x30) != 0x20))
         failure = 9;
     /* Force an intermediate expiry; only the owned dispatch can complete. */
     if (hpclang_watchdog_advance(&bus, &session.alarm, irq_last_time, irq_last_time + 1000)) {
@@ -134,16 +169,40 @@ unsigned hpclang_e2e_watchdog_test(void)
     }
     errno = EDOM;
     hpclang_irq_restore((cpsr | 0x40u) & ~0x80u);
-    /* A bounded busy loop: delivery cannot depend on SDK service calls. */
+    /* Keep the existing interrupt-only completion test unchanged. */
     for (volatile unsigned i = 0; i < 20000000 && !irq_finished; ++i)
         __asm__ volatile("nop");
     hpclang_irq_save_disable();
-    if (hpclang_e2e_watchdog_hits < 2 || !irq_finished || irq_error ||
-        irq_last_time < irq_deadline || session.alarm.owned || session.tone.owned || errno != EDOM)
+    int wait_result = !irq_finished;
+    int wait_errno = errno;
+    uint64_t foreground_time = 0;
+    (void)hpclang_time_read_us_masked(&foreground_time);
+    hpclang_e2e_watchdog_observation.wait_result = (uint32_t)wait_result;
+    hpclang_e2e_watchdog_observation.wait_errno = (uint32_t)wait_errno;
+    hpclang_e2e_watchdog_observation.foreground_time = foreground_time;
+    errno = wait_errno;
+    hpclang_e2e_watchdog_observation.hits = hpclang_e2e_watchdog_hits;
+    hpclang_e2e_watchdog_observation.finished = irq_finished;
+    hpclang_e2e_watchdog_observation.error = irq_error;
+    hpclang_e2e_watchdog_observation.alarm_owned = session.alarm.owned;
+    hpclang_e2e_watchdog_observation.tone_owned = session.tone.owned;
+    hpclang_e2e_watchdog_observation.session_state = session.state;
+    hpclang_e2e_watchdog_observation.last_time = irq_last_time;
+    hpclang_e2e_watchdog_observation.deadline = irq_deadline;
+    hpclang_e2e_watchdog_observation.mismatch_mask = 0;
+    if (!failure && (wait_result || hpclang_e2e_watchdog_hits < 2 || !irq_finished || irq_error ||
+                     irq_last_time < irq_deadline || session.alarm.owned || session.tone.owned ||
+                     errno != EDOM))
         failure = 3;
-    for (unsigned i = 0; i < 3; ++i)
-        if (REG(addresses[i]) != watchdog_before[i])
-            failure = 14;
+    for (unsigned i = 0; i < 3; ++i) {
+        uint32_t observed = REG(addresses[i]);
+        hpclang_e2e_watchdog_observation.after[i] = observed;
+        if (observed != watchdog_before[i]) {
+            hpclang_e2e_watchdog_observation.mismatch_mask |= 1u << i;
+            if (!failure)
+                failure = 0x40u + i;
+        }
+    }
     /* Preserve an earlier delivery/ownership failure; otherwise identify the
      * exact audio register before foreground cleanup could repair it. */
     for (unsigned i = 0; i < 7; ++i)
@@ -152,13 +211,17 @@ unsigned hpclang_e2e_watchdog_test(void)
     stop();
     /* Release runs only on the foreground stack, after stopping the source. */
     hpclang_e2e_irq_snapshot(&after);
-    if (before.stack != after.stack || before.link != after.link || before.status != after.status)
+    if (!failure &&
+        (before.stack != after.stack || before.link != after.link || before.status != after.status))
         failure = 4;
-    if (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi)
+    if (!failure && (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi))
         failure = 5;
-    if ((REG(0x07100000) & source) != source || REG(0x07100004) != mode ||
-        REG(0x07100008) != mask || REG(0x08000018) != vector)
+    if (!failure && ((REG(0x07100000) & source) != source || REG(0x07100004) != mode ||
+                     REG(0x07100008) != mask || REG(0x08000018) != vector))
         failure = 6;
+    hpclang_e2e_watchdog_observation.first_failure = failure;
+    if (failure)
+        report_failure();
     hpclang_irq_restore(cpsr);
     return failure;
 }
