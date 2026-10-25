@@ -20,6 +20,17 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Lifecycle observer isolated delivery preparation (local, not submitted): opt-in
+Stock SRAM/metadata capture, independent sampled-capacity verifier and 13 host
+tests. Clean pinned emulator builds; HP50g, HP39g+ and HP39gs Stock runs and
+their 20/9/8 captures pass independent verification. The remaining three models
+continue in queue 55768. This branch copies only the six observer/tool/test
+files and related documentation from the primary worktree onto accepted main.
+It does not establish whole-flow peak admission or complete M8. Local evidence:
+/work/oct26-resource-snapshots-clean and /work/oct26-resource-snapshot-matrix.
+No new SDK, emulator or source-tree copy is created. Submission waits for the
+remaining model results and review of previous-push #17 CI.
+
 Original HPGCC3 graphics gate (local, 2026-10-26): three pinned documentation
 programs build/package using one relocated installed SDK. Explicit migration
 diffs replace only the umbrella include; observed native builds retain original
