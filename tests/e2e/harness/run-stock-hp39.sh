@@ -15,6 +15,10 @@ export TARGET
 source "$ROOT/tests/e2e/harness/stock-lifecycle-env.sh"
 
 TRANSFER="$ASSETS_DIR/$TARGET-stock-transfer"
+# The installed Aplet carries the executable; APP_DIR supplies result addresses.
+# Reject mixed application assets before deleting evidence or starting transport.
+python3 "$ROOT/tools/verify-hp39-aplet.py" \
+    "$APP_DIR/launchers/$TARGET.hp" "$TRANSFER/HPGCC000.000"
 KERMIT_LOG="$ROOT/build/$TARGET-kermit-debug.log"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
 TRANSPORT="${HPCLANG_E2E_STOCK_TRANSPORT:-uart}"
