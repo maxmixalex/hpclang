@@ -58,8 +58,10 @@ IRQs, unfinished session, both owners retained and register mismatch mask 7;
 the mailbox contains all 24 version-2 observation words. It proves diagnostic
 capture, not a runtime fix. Final source keeps the original interrupt-only wait.
 Evidence: `/work/oct25-watchdog-{ci-direct,ci-stock,final-check.log,final-negative}`.
-HP39g+ immediate Stock remains live in session 80581 (x50ng PID 11065 observed);
-do not restart it. Runtime CI acceptance remains unresolved and no push occurred.
+HP39g+ immediate Stock also passes; session 80581 exits 0 and both Stock results
+confirm settled return. Runtime CI acceptance remains unresolved. The two final
+diagnostic-ordering edits retain the original completion predicate; final ARM
+analysis, HP50g Direct and masked-IRQ HP39gs negative pass separately.
 Earlier probes used the old one-tick-per-callback emulator; those failures do
 not establish this CI cause. The speculative elapsed-wait change was withdrawn.
 
@@ -68,6 +70,7 @@ fetch succeeds, then the payload receives no acknowledged progress for 90s
 (send-window 15, last NAK 15, three NAKs/four resends). The host gate aborts before
 application execution. Full evidence is in `research/oct25-ci-ui-hp40gs`;
 no UI/native-allocation root cause or transport fix is claimed.
+
 Further user-requested cleanup reclaims about 1.9 GiB: three reproducible font
 trees, old object files, pip cache and verified temporary duplicates; three source
 archives are gzip-compressed with decompressed SHA-256 verification. `/work`
@@ -77,6 +80,7 @@ window-delivery and allocation-delivery container mirrors need regeneration
 before reuse. Current Port validation and original ROM/SRAM evidence are intact.
 
 ### Earlier follow-up checkpoints
+
 Second container cleanup (user requested): removed 1,008 obsolete CMakeFiles
 folders, 18 commit-free temporary Git stores, 10 obsolete SDK installations and
 small Python/Ruff caches (7.30 GiB). Preserved 1,008 build diagnostic files in
