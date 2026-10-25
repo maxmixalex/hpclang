@@ -20,6 +20,22 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Lifecycle observer six-model validation completed locally: HP39g+/HP39gs/
+HP40gs/HP48gII/HP49g+/HP50g pass Stock execution and settled return, with
+9/8/8/14/20/20 snapshots (79 total). Independent re-verification exactly matches
+all saved reports; final audit records report, payload and emulator hashes.
+Queue 55768 exits zero. All 28 prepared observer source inputs match this
+branch; 13 host tests and strict docs pass. Evidence:
+/work/oct26-resource-snapshot-matrix/final-audit.json and
+research/oct26-resource-source-audit.json. Earlier partial checkpoints follow.
+
+Whole UI is a separate workload: its HP50g run passes pixels, memory, 94-page
+pool and lifecycle checks; remaining models run in queue 7318. Sampled native
+capacity remains distinct from whole-flow peaks and stored-object ownership.
+Before delivery, previous #15 ca1baf2b has nine queued checks, #17 has 15 queued;
+#13/#14/#18/#19 remain incomplete, with no new failures in
+research/oct26-resource-delivery-ci-review.json. Fresh delivery CI is not polled.
+
 Lifecycle observer isolated delivery preparation (local, not submitted): opt-in
 Stock SRAM/metadata capture, independent sampled-capacity verifier and 13 host
 tests. Clean pinned emulator builds; HP50g, HP39g+ and HP39gs Stock runs and

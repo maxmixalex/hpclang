@@ -1418,8 +1418,10 @@ HP39gs passes eight captures with usable bytes 12,540 before transfer, 11,496
 during transfer, 12,540 after fetch, 6,376 at PASS and 12,540 after return.
 Its independent report is
 `/work/oct26-resource-snapshot-matrix/hp39gs/verified-lifecycle.json`.
-The other three models remain in validation; these successful sampled runs
-do not establish a transient peak bound.
+All six models now pass: HP40gs adds eight snapshots, HP48gII 14, and HP49g+
+20. Independent replay verifies all 79 captured stages and their saved reports;
+`/work/oct26-resource-snapshot-matrix/final-audit.json` fingerprints the evidence.
+These successful sampled runs do not establish a transient peak bound.
 
 ### UI resource measurements
 
