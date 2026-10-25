@@ -1126,6 +1126,13 @@ survive. The encoded literal location is retained for guards, not declared to
 be a pointer field. Numeric constants alone never establish address provenance
 or mapping identity. A later register copy may propagate an independently
 proven address fact, but these primitives do not authorize relocation.
+The exchange inspector describes simultaneous standard-field swaps between
+A/B/C/D pairs or A/C and R0..R4, including the launcher's `ACEX W` instructions.
+Both fields must be read from the pre-instruction state before either is
+replaced; bits outside the selected field survive. P/WP fields require the
+proven current P. Data-address register exchanges, P exchanges and custom
+fields remain unsupported. This is a data-flow building block, not a complete
+launcher analysis or permission to treat arbitrary register values as roots.
 
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and

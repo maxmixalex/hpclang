@@ -97,6 +97,25 @@ int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
                                         uint32_t instruction, uint32_t limit, unsigned p,
                                         struct hpclang_rpl_code_assignment *assignment);
 
+struct hpclang_rpl_code_exchange
+{
+    uint32_t instruction, length;
+    enum hpclang_rpl_code_register left, right;
+    unsigned first, nibbles;
+};
+
+/* Describe a simultaneous exchange of the same field in two registers. Both
+ * sources are the pre-instruction values; preserve all nibbles outside the field.
+ * Supports A/B/C/D pairs and A/C with R0..R4, standard fields (0..7,F).
+ * Data-address registers, P exchanges and custom fields remain unsupported.
+ * p is the proven P value at this instruction. This transfers caller-proven
+ * provenance only; it does not establish addresses or authorize relocation.
+ * No writes; errors leave output untouched. Guard the instruction and P before
+ * using the result, as for assignment_inspect. */
+int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                      uint32_t limit, unsigned p,
+                                      struct hpclang_rpl_code_exchange *exchange);
+
 /* Resolve PC=A, PC=C, PC=(A), PC=(C) at a proven instruction boundary.
  * a_low/c_low must describe the registers AT that instruction, not merely an
  * earlier suspended snapshot. Only the low 20 bits are consumed. The separate

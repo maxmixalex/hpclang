@@ -369,6 +369,51 @@ int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
     return 0;
 }
 
+int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                      uint32_t limit, unsigned p,
+                                      struct hpclang_rpl_code_exchange *exchange)
+{
+    if (!reader || !reader->read_nibble || !exchange)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || !limit || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (p > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct instruction_cursor cursor = {.reader = reader, .at = instruction, .limit = limit};
+    unsigned size;
+    int result = instruction_size(&cursor, &size);
+    if (result || (result = instruction_take(&cursor, size)))
+        return result;
+    const uint8_t *op = cursor.code;
+    struct hpclang_rpl_code_exchange next = {.instruction = instruction, .length = size};
+    unsigned field;
+    if ((op[0] == 1 && op[1] == 2) || (op[0] == 8 && op[1] == 1 && op[2] == 10 && op[4] == 2)) {
+        unsigned selector = op[0] == 1 ? op[2] : op[5];
+        next.left = selector < 8 ? HPCLANG_RPL_CODE_A : HPCLANG_RPL_CODE_C;
+        next.right = HPCLANG_RPL_CODE_R0 + (selector & 7);
+        field = op[0] == 1 ? 7 : op[3];
+    } else if (op[0] == 13 || (op[0] == 10 && op[1] >= 8)) {
+        unsigned selector = op[0] == 13 ? op[1] : op[2];
+        if (selector < 12)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        static const uint8_t left[] = {0, 1, 0, 2};
+        static const uint8_t right[] = {1, 2, 2, 3};
+        next.left = (enum hpclang_rpl_code_register)left[selector - 12];
+        next.right = (enum hpclang_rpl_code_register)right[selector - 12];
+        field = op[0] == 13 ? 15 : op[1] - 8;
+    } else {
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    static const unsigned first[] = {0, 0, 2, 0, 15, 3, 0, 0};
+    static const unsigned width[] = {1, 1, 1, 3, 1, 12, 2, 16};
+    if (field >= 8 && field != 15)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    next.first = field == 15 ? 0 : field == 0 ? p : first[field];
+    next.nibbles = field == 15 ? 5 : field == 1 ? p + 1 : width[field];
+    *exchange = next;
+    return 0;
+}
+
 static int read_word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned width,
                      uint32_t *value)
 {
