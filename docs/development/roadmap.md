@@ -40,16 +40,32 @@ Failed logs and application artifacts are saved under `research/oct25-pr13-*`
 and `research/oct25-ci-watchdog-*`. No SRAM snapshot was retained in those
 service artifacts. These failures remain unresolved; #13 is not accepted.
 
-Port C++ owner `e181fe7c`: rebuilt Object Basics, all six launchers and Stock
-assets pass. All six Direct models pass. Fresh ASan/UBSan real-service Port
-fixture, ARM C++ static analysis, formatting and strict docs pass after disk
-recovery. Local Stock queue 71073 is live on HP39g+ (x50ng PID 1234 observed),
-then proceeds through the other five models; do not restart it for quiet output.
-Evidence uses `/work/oct25-port-cpp-{artifact,stock-assets,native,quality.log}`.
-The existing validated source mirror is reused; new artifact/assets total under
-5 MiB. SDK acceptance 33637 remains valid. Stock and remote owner acceptance
-are pending; no new push or M8 closure.
+Port C++ owner `e181fe7c` (M8.5, local acceptance): queue 71073 exits 0;
+all six Direct and all six original-Stock models pass. Each Stock result confirms
+PASS, returned=true and return_settled=true. This supersedes the pending native
+status below. Fresh ASan/UBSan real-service Port tests, ARM C++ analysis,
+formatting, strict docs and installed/relocated SDK acceptance also pass.
+Evidence: `/work/oct25-port-cpp-{artifact,stock-assets,native,quality.log}` and
+`/work/oct24-port-cpp-sdk.log`. Remote acceptance remains open; no new push.
 
+PR #13 diagnostics correction: earlier local watchdog probes used the old
+one-tick-per-callback emulator, not CI's elapsed-counter model. Their failures
+do not establish the CI cause; the speculative elapsed-wait fixture change was
+withdrawn. The exact emulator artifact from run 40090614391 is now retained at
+`research/oct25-ci-watchdog-emulator`. A diagnostic-only fixture preserves the
+first failure and captures ownership/registers via the memory mailbox; workflow
+changes retain failed service state and ELF. ARM build/analysis and actionlint
+pass; exact-emulator runtime checks are in progress. No runtime fix is claimed.
+
+Further user-requested cleanup reclaims about 1.9 GiB: three reproducible font
+trees, old object files, pip cache and verified temporary duplicates; three source
+archives are gzip-compressed with decompressed SHA-256 verification. `/work`
+is 28.5 GiB after cleanup. Manifest: `research/oct25-extra-cleanup.json` and
+`research/oct25-temp-cleanup.json`. Generated fonts in the window-release,
+window-delivery and allocation-delivery container mirrors need regeneration
+before reuse. Current Port validation and original ROM/SRAM evidence are intact.
+
+### Earlier follow-up checkpoints
 Second container cleanup (user requested): removed 1,008 obsolete CMakeFiles
 folders, 18 commit-free temporary Git stores, 10 obsolete SDK installations and
 small Python/Ruff caches (7.30 GiB). Preserved 1,008 build diagnostic files in
