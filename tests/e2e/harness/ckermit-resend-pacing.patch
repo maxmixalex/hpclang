@@ -1,0 +1,12 @@
+--- a/ckcfn2.c
++++ b/ckcfn2.c
+@@ -2099,6 +2099,9 @@
+     /* Everything ok, send the packet */
++    /* A NAK also requires the peer to switch from sending to receiving.
++     * Honor SET SEND PAUSE on retries, just as spack does on new packets. */
++    if (pktpaus) msleep(pktpaus);
+ #ifdef CK_TIMERS
+     if (timint > 0)
+       srttbl[n] = rttclock();		/* Update the timer */
+ #endif /* CK_TIMERS */
+     x = ttol(s_pkt[j].pk_adr,s_pkt[j].pk_len);
