@@ -31,8 +31,15 @@ validation (229 reproducible outputs). Ten native call/root cases pass on
 HP49g+/HP50g; independent saved-state replay and sixteen corrupted-evidence
 controls pass. Reports: /work/oct26-conditional/audit-hp50g-hp49gplus.json and
 research/oct26-conditional-source-audit.json. This delivery isolates the six
-implementation/test files onto accepted main 5eb1b25c; its build/identity checks
-remain required before submission. Trusted installation/activation/retirement
+implementation/test files onto accepted main 5eb1b25c. Independent branch
+ASan/UBSan stage/catalog tests, relocated SDK (229 reproducible outputs) and
+strict documentation build pass. Its application payload, result address and
+all six packaged launchers are byte-identical to the ten-case native run;
+code-relocation, recovery and target verifier sources are unchanged. Evidence:
+/work/oct26-return-roots/{unit.log,sdk.log,docs.log,identity.json}. Obsolete
+tracked source files were removed from the reused mirror before validation.
+Previous push #18 at 439339b1 was checked before this delivery (15 queued);
+remote acceptance of this batch remains pending. Trusted installation/activation/retirement
 evidence from accepted #6/#7 is retained; opaque/banked reference coverage,
 safe pre-recovery startup, authority reuse and reclamation remain open in M8.
 
