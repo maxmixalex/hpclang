@@ -152,6 +152,26 @@ int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_
                                 uint32_t end, uint32_t header, uint32_t number, uint32_t command,
                                 uint32_t *target);
 
+struct hpclang_rpl_library_attachment_targets
+{
+    uint32_t present; /* Bits 0/1 distinguish present hash/messages, even at address zero. */
+    uint32_t hash;
+    uint32_t messages;
+};
+
+/* Resolve hash/message table coordinates from an identity-checked library ID
+ * header in a caller-selected stable mapping. first/end bound that mapping;
+ * targets are not dereferenced or validated as executable/table bodies.
+ * Return 1 after reading both offsets, negative on malformed/unreadable input;
+ * output changes only on 1. Zero relative offsets mean absent fields.
+ * These are bank-local coordinates, NOT ready-to-publish HOME fields: banked
+ * libraries require separately owned DOACPTR wrappers carrying the bank switch.
+ * A direct-mapped table may itself be a DOACPTR; do not unwrap it implicitly.
+ * This neither switches banks nor authorizes registration/attachment. */
+int hpclang_rpl_library_attachment_resolve(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                           uint32_t end, uint32_t header, uint32_t number,
+                                           struct hpclang_rpl_library_attachment_targets *targets);
+
 /* Resolve a library's configuration entry through its ID header. As with
  * command lookup, the caller supplies a stable selected mapping and bounds.
  * Zero offset means no callback. The result is a bank-local address, not proof

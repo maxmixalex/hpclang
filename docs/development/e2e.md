@@ -731,6 +731,27 @@ compact synthetic prologues are excluded and opaque contents remain unresolved.
 The unit regression changes each observed field and requires stale-plan rejection,
 and checks callback failures, read faults, invalid nibbles and guard capacity.
 
+### Offline HOME attachment table check
+
+`tests/e2e/code-relocation/attachment_tables.py` compiles the current C library
+header resolver, executes each attached library's original bank-switch routine
+when needed, and compares its hash/message coordinates with the complete HOME
+attachment fields. Banked fields must point to DOACPTR wrappers with exactly the
+resolved target and catalog switch identity; direct fields must retain the table
+pointer, including tables that are themselves DOACPTR objects. Absent fields must
+be zero. Each header's 13 ID/offset nibbles is separately corrupted and must be
+rejected or disagree with the independently captured HOME record.
+
+```sh
+python tests/e2e/code-relocation/attachment_tables.py \
+  --state hp50g:/path/to/hp50g-state \
+  --state hp49gplus:/path/to/hp49gplus-state --output /tmp/attachment-tables
+```
+
+This read-only private-state check records input/source hashes. It does not
+allocate wrappers, mutate attachments, prove arbitrary table bodies safe or
+establish complete public registration and execution-reference coverage.
+
 ### Offline original-ROM bank-switch check
 
 `tests/e2e/code-relocation/bank_switch.py` accepts repeatable
@@ -949,6 +970,20 @@ stage0/application body. It uses isolated user/exception scratch stacks and
 simulates the subsequent payload return; it does not run pool cleanup or prove
 whole-launch lifetime safety. Reports distinguish this stage0 boundary from the
 default pre-helper boundary and record service requests and the resulting pool.
+
+`--reject-stage0-pool 0`, `1` or `257` enables the real helper and then injects
+an invalid page count at stage0 entry. The packaged stage0 executes its actual
+preflight rejection, calls the original ROM free service with the helper's
+allocation pointer exactly once, and returns through the original interpreter
+continuation to `03130`. Unlike the other modes, this return is not simulated.
+The check preserves the pool descriptors and SVC vector, restores ARM SP and
+user mode/interrupt masks, and retains the existing Saturn register, stack-bound
+and unused-return-slot checks. No application mapping is installed: that region
+is deliberately unmapped in this driver, so an attempted access fails.
+Reports record the injected count, release instruction/pointer and real-return
+flag. An omitted free instruction must fail even if the return itself succeeds.
+This covers preflight rejection and its cleanup, not normal application exit or
+whole-heap leak freedom. It cannot be combined with application-side relocation.
 
 With `--relocate`, the gate compiles the current C catalog mover and production
 return-root collector, grows the catalog by 16 nibbles at the selected boundary,

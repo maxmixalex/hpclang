@@ -318,6 +318,41 @@ int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_
     return 1;
 }
 
+int hpclang_rpl_library_attachment_resolve(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                           uint32_t end, uint32_t header, uint32_t number,
+                                           struct hpclang_rpl_library_attachment_targets *targets)
+{
+    if (!reader || !reader->read_nibble || !targets)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (end > 0x100000u || first >= end || header < first || header > end || end - header < 23u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t id;
+    int result = word(reader, header, 3, &id);
+    if (result)
+        return result;
+    if (id != number)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_library_attachment_targets next = {0};
+    uint32_t *values[2] = {&next.hash, &next.messages};
+    for (unsigned i = 0; i < 2; ++i) {
+        uint32_t field = header + 3 + 5 * i, relative;
+        result = word(reader, field, 5, &relative);
+        if (result)
+            return result;
+        if (!relative)
+            continue;
+        uint32_t target = (field + relative) & 0xfffffu;
+        if (target < first || target >= end)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        next.present |= 1u << i;
+        *values[i] = target;
+    }
+    *targets = next;
+    return 1;
+}
+
 int hpclang_rpl_library_configuration(const struct hpclang_rpl_reader *reader, uint32_t first,
                                       uint32_t end, uint32_t header, uint32_t number,
                                       uint32_t *target)

@@ -21,6 +21,7 @@ from unicorn import (
 )
 from unicorn.arm_const import (
     UC_ARM_REG_R0,
+    UC_ARM_REG_R1,
     UC_ARM_REG_R4,
     UC_ARM_REG_R5,
     UC_ARM_REG_R7,
@@ -45,7 +46,17 @@ parser.add_argument(
     help="Execute the ROM allocation helper and real SVC handler up to stage0",
 )
 parser.add_argument("--cc", default="cc")
+parser.add_argument(
+    "--reject-stage0-pool",
+    type=int,
+    choices=(0, 1, 257),
+    help="Execute stage0 rejection/free/return with an injected invalid page count",
+)
 args = parser.parse_args()
+if args.reject_stage0_pool is not None:
+    if args.relocate:
+        parser.error("Stage0 rejection cannot perform an application-side relocation")
+    args.execute_helper = True
 root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(root / "tests/e2e/port-recovery"))
 native_words = importlib.import_module("verify").native_words
@@ -147,6 +158,8 @@ for cursor in range(8):
     uc.mem_write(0x08000000, ram)
     uc.mem_map(0x300000, 0x10000)
     syscalls = []
+    release_calls = []
+    rejection_active = False
 
     def interrupt(_, number, user):
         # Model ARM SVC exception entry only; execute the original vector,
@@ -154,7 +167,14 @@ for cursor in range(8):
         assert args.execute_helper and number == 2
         cpsr = uc.reg_read(UC_ARM_REG_CPSR)
         pc = uc.reg_read(UC_ARM_REG_PC)
-        assert cpsr & 0x1F == 0x10 and pc == 0x159888
+        assert cpsr & 0x1F == 0x10
+        if rejection_active:
+            assert stage0 <= pc - 4 < stage0 + len(launcher) - 20
+            assert uc.reg_read(UC_ARM_REG_R0) == 101
+            assert uc.reg_read(UC_ARM_REG_R1) == allocation
+            release_calls.append(dict(instruction=hex(pc - 4), allocation=hex(allocation)))
+        else:
+            assert pc == 0x159888
         syscalls.append(uc.reg_read(UC_ARM_REG_R0))
         uc.reg_write(UC_ARM_REG_CPSR, (cpsr & ~0x3F) | 0x93)
         uc.reg_write(UC_ARM_REG_SPSR, cpsr)
@@ -337,8 +357,29 @@ for cursor in range(8):
             uc.emu_stop()
 
     uc.hook_add(UC_HOOK_CODE, stop)
-    uc.reg_write(UC_ARM_REG_R7, resume)
-    uc.emu_start(0x28828, 0x400000, count=300000)
+    rejection_trace = []
+    if args.reject_stage0_pool is not None:
+        rejection_active = True
+        uc.mem_write(cpu + 0x914, struct.pack("<I", args.reject_stage0_pool))
+        pool_before_rejection = bytes(uc.mem_read(table, (pages + 1) * 4))
+        vector_before_rejection = bytes(uc.mem_read(0x08000008, 4))
+
+        def rejection_hook(_, at, size, user):
+            rejection_trace.append(at)
+
+        uc.hook_add(UC_HOOK_CODE, rejection_hook)
+        # Continue the real stage0, ROM free handler and interpreter return.
+        # Neither the return PC nor the allocation result is manufactured.
+        uc.emu_start(stage0, 0x400000, count=300000)
+        assert len(release_calls) == 1 and syscalls[-1] == 101
+        assert all(at in rejection_trace for at in (8, vector_entry, 0x3F568, 0x2A928))
+        assert bytes(uc.mem_read(table, (pages + 1) * 4)) == pool_before_rejection
+        assert bytes(uc.mem_read(0x08000008, 4)) == vector_before_rejection
+        assert uc.reg_read(UC_ARM_REG_SP) == old_sp
+        assert uc.reg_read(UC_ARM_REG_CPSR) & 0xDF == 0xD0
+    else:
+        uc.reg_write(UC_ARM_REG_R7, resume)
+        uc.emu_start(0x28828, 0x400000, count=300000)
     assert trace[-1] == 0x3130, trace[-12:]
     assert not accesses and bytes(uc.mem_read(cpu + 0x92C, 40)) == saved
     assert (depth, peak, minimum) == (0, 4, 0)
@@ -361,6 +402,11 @@ for cursor in range(8):
             svc_requests=syscalls,
             svc_vector_entry=hex(vector_entry) if vector_entry is not None else None,
             allocation_pool=pool,
+            rejected_pool_pages=args.reject_stage0_pool,
+            stage0_rejection_executed=args.reject_stage0_pool is not None,
+            kernel_release_calls=release_calls,
+            rejection_instruction_count=len(rejection_trace),
+            return_simulated=args.reject_stage0_pool is None,
             application_executed=False,
             original_resume=hex(original_resume),
             resume=hex(resume),
@@ -397,5 +443,7 @@ print(
     "PASS eight PrRUN cursors; real allocation helper"
     if args.execute_helper
     else "PASS eight PrRUN prefix cursors; helper skipped",
-    "; application return simulated",
+    "; stage0 rejection/free/return executed"
+    if args.reject_stage0_pool is not None
+    else "; application return simulated",
 )

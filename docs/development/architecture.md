@@ -132,6 +132,15 @@ ownership must be retained, with no retry or Stock return. This is not yet a
 public unload service: detachment, execution-reference coverage and payload
 deletion remain separate obligations.
 
+`hpclang_rpl_library_attachment_resolve` checks the library ID and resolves its
+hash/message offsets within a caller-selected stable mapping. It publishes both
+coordinates together, distinguishing absent fields from present address zero.
+These coordinates are not ready-to-publish HOME fields: banked libraries use
+separately owned DOACPTR wrappers containing the target and switch identity.
+Direct-mapped table pointers are retained even when the table itself is a
+DOACPTR. Wrapper allocation/lifetime and transactional registration remain
+caller obligations; the resolver does not dereference table bodies or run code.
+
 The internal `hpclang_rpl_mutation_home_attach` appends a HOME attachment using
 two caller-proven native pointer fields. It validates the complete existing
 prefix before rejecting a duplicate ID, checks count capacity and free-space
