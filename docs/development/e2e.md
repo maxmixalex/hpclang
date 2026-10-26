@@ -661,7 +661,8 @@ before/PASS/return images so later shards cannot hide the failing screen.
 ### Native launcher observation in call-root cases
 
 `tests/e2e/code-relocation/call_roots.py` creates a fixed 128-byte `ENTRYOBS`
-string before launching each of its five controlled call-root cases. The native
+string before launching its original-return case and five controlled call-root
+cases. The native
 payload fills that string after bootstrap, before creating its test library or
 rewriting the suspended return path. It captures the native page-pool count and
 table, saved Saturn PC/IP/caller, machine-stack cursor, hidden launcher root,
@@ -676,6 +677,15 @@ payload reached its observation point through Stock; it is not a trace of every
 instruction before entry, nor proof of arbitrary live-register/banked safety.
 Existing complete catalog bindings, fixture operands, final return marker and
 unchanged Flash checks remain required after the observation.
+
+The `native` case uses only the `HPCSCALL` marker string, with no encoded call.
+After validating that exact string, the payload preserves the original suspended
+PC and launcher-collected return roots, grows the catalog and resumes Stock.
+The marker string must remain byte-identical, the real caller must reach the
+post-launch marker, all existing catalog bindings must survive, and library 123
+must resolve to its new Port0 record. This covers the unmodified launcher return
+in the controlled clean-state fixture; it does not establish complete opaque
+object or banked-reference safety for arbitrary applications.
 
 ### Offline original-ROM threaded return check
 

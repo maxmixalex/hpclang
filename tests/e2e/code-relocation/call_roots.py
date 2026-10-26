@@ -9,6 +9,7 @@ from fixtures import word
 
 
 CASES = {
+    "native": b"",
     "gosub": bytes([0x27, 0, 0x10, 0x10]),
     "gosub-rtnsxm": bytes([0x27, 0, 0x10, 0x00]),
     "gosub-rtnnc": bytes([0x37, 0, 0x05, 0, 0x03]),
@@ -165,7 +166,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if read(obj) != 0x2A2C or read(obj + 5) != 5 + 2 * len(expected):
             raise ValueError("Call fixture object changed")
         actual = bytes(read(obj + 10 + 2 * i, 2) for i in range(len(expected)))
-        if name == "gosub-rtnnc":
+        if name in ("native", "gosub-rtnnc"):
             valid = actual == expected
         elif name == "gosbvl":
             valid = (
@@ -188,6 +189,13 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if ids != sorted(original_ids + [123]) or len(ids) != len(set(ids)):
             raise ValueError("Native call did not preserve the catalog and add library 123")
         verify_bindings(original_records, read)
-        results.append(dict(case=name, returned=True, flash_unchanged=True))
+        results.append(
+            dict(
+                case=name,
+                returned=True,
+                flash_unchanged=True,
+                rewritten_return=name != "native",
+            )
+        )
         print(f"PASS: {args.model}: native {name} roots and catalog growth", flush=True)
     (output / "result.json").write_text(json.dumps(results, indent=2) + "\n")

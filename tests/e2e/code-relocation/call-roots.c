@@ -191,6 +191,10 @@ static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots)
     for (unsigned i = 0; i < 8; ++i)
         if (probe_read_word(io, object + 10 + 2 * i, 2, &encoded) || encoded != magic[i])
             return -1;
+    /* The magic-only fixture keeps the real launcher's suspended PC and
+     * original return roots. Do not manufacture a call or rewrite its payload. */
+    if (length == 21)
+        return 0;
     if (probe_read_word(io, object + 26, 2, &encoded))
         return -1;
     unsigned conditional = encoded == 0x37;
