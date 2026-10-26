@@ -389,7 +389,7 @@ jobs:
         run: |
           args=(stock "$FAMILY")
           if [[ "$SUITE" == ui ]]; then
-            args+=(--pool)
+            args+=(--pool --artifact "build/e2e/$APPLICATION")
           fi
           python3 "$VERIFIER" "${args[@]}"
 

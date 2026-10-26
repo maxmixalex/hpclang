@@ -1,5 +1,7 @@
 import importlib.util
+import copy
 import json
+import struct
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,6 +13,86 @@ SPEC.loader.exec_module(VERIFY)
 
 
 class UiMemoryTests(unittest.TestCase):
+    def test_pool_budget_is_bound_to_linked_image_and_arena(self):
+        artifact = self.prefix.parent / "artifact"
+        (artifact / "launchers").mkdir(parents=True)
+        payload = struct.pack("<4sIII", b"HPC1", 4097, 0, 1656) + bytes(4097)
+        (artifact / "e2e.hpc").write_bytes(payload)
+        layout = dict(
+            version=1,
+            page_bytes=4096,
+            pool_capacity_pages=256,
+            application=dict(
+                image_bytes=4097,
+                code_pages=2,
+                static_bytes=1656,
+                boot_pages=1,
+                stack_bytes=8192,
+                required_rw_bytes=36864,
+                rw_ceiling_bytes=36864,
+            ),
+            launcher=dict(
+                stage_extent_bytes=4096,
+                stage_and_prefix_pages=1,
+                stage_stack_pages=1,
+                mmu_workspace_pages=1,
+            ),
+            models=dict(
+                hp50g=dict(
+                    stock_native_workspace_pages=0,
+                    minimum_stock_pool_pages=14,
+                    stock_pool_pages_for_rw_ceiling=14,
+                )
+            ),
+        )
+        layout_path = artifact / "launchers/memory.json"
+        layout_path.write_text(json.dumps(layout))
+        self.check(self.report)
+        for checkpoint in (1, 2):
+            Path(f"{self.prefix}-pool-{checkpoint}.json").write_text(
+                json.dumps(
+                    dict(
+                        version=1,
+                        id=checkpoint,
+                        model=6,
+                        rw_bytes=36864,
+                        stage_pool_pages=30,
+                        native_workspace_pages=0,
+                        native_os_block=0,
+                        pool_l2_physical=0x08000000,
+                        physical_pages=[0x08000000 + i * 4096 for i in range(30)],
+                    )
+                )
+            )
+        report = VERIFY.verify_budget(self.prefix, "hp50g", artifact)
+        self.assertEqual(report["pool_required_bytes"], 14 * 4096)
+        self.assertEqual(report["pool_excess_bytes"], 16 * 4096)
+        self.assertEqual(report["arena_other_bytes"], 0)
+        for section, key, value in (
+            ("application", "image_bytes", 4096),
+            ("application", "static_bytes", 0),
+            ("application", "code_pages", 1),
+            ("application", "rw_ceiling_bytes", 40960),
+            ("launcher", "stage_and_prefix_pages", True),
+            ("launcher", "stage_extent_bytes", 4097),
+        ):
+            bad = copy.deepcopy(layout)
+            bad[section][key] = value
+            layout_path.write_text(json.dumps(bad))
+            with self.subTest(key=key), self.assertRaises(AssertionError):
+                VERIFY.verify_budget(self.prefix, "hp50g", artifact)
+            self.assertFalse(Path(f"{self.prefix}-budget.json").exists())
+        layout_path.write_text(json.dumps(layout))
+        (artifact / "e2e.hpc").write_bytes(payload[:-1])
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_budget(self.prefix, "hp50g", artifact)
+        (artifact / "e2e.hpc").write_bytes(payload)
+        bad = dict(self.report, words=self.report["words"].copy())
+        bad["words"][6] += 8
+        self.path.write_text(json.dumps(bad))
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_budget(self.prefix, "hp50g", artifact)
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
