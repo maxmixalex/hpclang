@@ -205,3 +205,35 @@ int hpclang_stage_stack_restore(const struct hpclang_stage_stack_io *io,
         return 0;
     return io->write(io->context, RPL_DSKTOP, slot);
 }
+
+int hpclang_stage_main_page(const uint32_t *read_map, uint32_t physical_page,
+                            uint32_t *saturn_start)
+{
+    if (!read_map || !saturn_start || (physical_page & 0xfffu))
+        return -1;
+    uint32_t first = 0u;
+    unsigned overlaps = 0u;
+    for (uint32_t page = 128u; page < 256u; ++page) {
+        uint32_t base = read_map[page];
+        if (base == 0u)
+            continue;
+        if (!((base >= physical_page && base - physical_page < 4096u) ||
+              (base < physical_page && physical_page - base < 2048u)))
+            continue;
+        ++overlaps;
+        if (base == physical_page) {
+            if (first != 0u || page == 255u || read_map[page + 1u] != physical_page + 2048u)
+                return -1;
+            first = page;
+        } else if (base != physical_page + 2048u || page == 128u ||
+                   read_map[page - 1u] != physical_page) {
+            return -1;
+        }
+    }
+    if (!overlaps)
+        return 0;
+    if (overlaps != 2u || !first)
+        return -1;
+    *saturn_start = first << 12;
+    return 1;
+}

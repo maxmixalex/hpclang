@@ -419,8 +419,69 @@ static void test_conditional_paths(void)
     assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 1);
 }
 
+static void test_main_page(void)
+{
+    uint32_t map[256] = {0};
+    const uint32_t physical = 0x08040000u;
+    uint32_t output = 0x12345u;
+    assert(hpclang_stage_main_page(NULL, physical, &output) == -1);
+    assert(hpclang_stage_main_page(map, physical, NULL) == -1);
+    assert(hpclang_stage_main_page(map, physical + 1, &output) == -1);
+    assert(hpclang_stage_main_page(map, physical, &output) == 0);
+    assert(output == 0x12345u);
+    /* Every possible full-page placement, including odd Saturn pages. */
+    for (unsigned first = 128; first < 255; ++first) {
+        memset(map, 0, sizeof map);
+        map[first] = physical;
+        map[first + 1] = physical + 2048;
+        assert(hpclang_stage_main_page(map, physical, &output) == 1);
+        assert(output == first * 4096u);
+        output = 0x12345u;
+        map[first + 1] = physical + 4096;
+        assert(hpclang_stage_main_page(map, physical, &output) == -1);
+        assert(output == 0x12345u);
+        map[first] = 0;
+        map[first + 1] = physical + 2048;
+        assert(hpclang_stage_main_page(map, physical, &output) == -1);
+        assert(output == 0x12345u);
+    }
+    memset(map, 0, sizeof map);
+    map[128] = physical;
+    map[129] = physical + 2048;
+    /* A second full alias is ambiguous even when each pair is contiguous. */
+    map[200] = physical;
+    map[201] = physical + 2048;
+    assert(hpclang_stage_main_page(map, physical, &output) == -1);
+    map[201] = 0;
+    /* Interior/straddling aliases cannot escape a start-address-only scan. */
+    for (unsigned offset = 1; offset < 4096; ++offset) {
+        map[200] = physical + offset;
+        assert(hpclang_stage_main_page(map, physical, &output) == -1);
+        assert(output == 0x12345u);
+    }
+    for (unsigned offset = 1; offset < 2048; ++offset) {
+        map[200] = physical - offset;
+        assert(hpclang_stage_main_page(map, physical, &output) == -1);
+        assert(output == 0x12345u);
+    }
+    map[200] = physical - 2048;
+    assert(hpclang_stage_main_page(map, physical, &output) == 1);
+    memset(map, 0, sizeof map);
+    map[255] = physical;
+    assert(hpclang_stage_main_page(map, physical, &output) == -1);
+    map[255] = 0;
+    map[128] = physical + 2048;
+    assert(hpclang_stage_main_page(map, physical, &output) == -1);
+    memset(map, 0, sizeof map);
+    map[254] = 0xfffff000u;
+    map[255] = 0xfffff800u;
+    assert(hpclang_stage_main_page(map, 0xfffff000u, &output) == 1);
+    assert(output == 0xfe000u);
+}
+
 int main(void)
 {
+    test_main_page();
     test_conditional_paths();
     test_call_return_chain();
     test_jump_return_chain();

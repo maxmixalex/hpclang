@@ -78,6 +78,13 @@ continues to accept `RPL2` for main-RAM services but requires `RPL3` for Port 1
 creation. These records remain launcher-private; rebuild applications and
 their packaged launcher together when updating the SDK.
 
+Classic-RPL main-RAM mutation fences invert each native pool page through the
+Stock Read map. A 4 KiB physical page must have exactly one complete consecutive
+pair of 2 KiB main-RAM mappings. A missing half, duplicate alias or overlapping
+partial mapping disables publication of mutation bounds; absence from main RAM
+is distinct from an invalid partial mapping. This proof covers main-RAM aliases
+only, not arbitrary banked aliases or future mapping changes.
+
 ## Platform families and model profiles
 
 The platform family is the implementation unit for launch and low-level integration:
