@@ -1376,8 +1376,8 @@ static int stage_rpl_memory_bounds(const void *saturn_state, volatile const uint
 
     for (uint32_t i = 0u; i < pool_pages; ++i) {
         uint32_t sat_start = 0u;
-        int mapped = hpclang_stage_main_page(read_map, pool_l2[i] & UINT32_C(0xfffff000),
-                                              &sat_start);
+        int mapped =
+            hpclang_stage_main_page(read_map, pool_l2[i] & UINT32_C(0xfffff000), &sat_start);
         /* A partial or aliased page cannot safely define a mutation fence. */
         if (mapped < 0)
             return 0;
