@@ -1,4 +1,4 @@
-"""Original PrRUN prefix through its first ROM helper, with a simulated return."""
+"""Original PrRUN prefix, optional real ROM allocation helper, simulated payload return."""
 
 import argparse
 import ctypes as c
@@ -14,11 +14,22 @@ from unicorn import (
     UC_ARCH_ARM,
     UC_MODE_ARM,
     UC_HOOK_CODE,
+    UC_HOOK_INTR,
     UC_HOOK_MEM_READ,
     UC_HOOK_MEM_WRITE,
     UC_MEM_READ,
 )
-from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
+from unicorn.arm_const import (
+    UC_ARM_REG_R0,
+    UC_ARM_REG_R4,
+    UC_ARM_REG_R5,
+    UC_ARM_REG_R7,
+    UC_ARM_REG_SP,
+    UC_ARM_REG_LR,
+    UC_ARM_REG_PC,
+    UC_ARM_REG_CPSR,
+    UC_ARM_REG_SPSR,
+)
 
 if not __debug__:
     raise RuntimeError("Assertions required")
@@ -28,6 +39,11 @@ parser.add_argument("--state", type=Path, required=True)
 parser.add_argument("--launcher", type=Path, required=True)
 parser.add_argument("--output", type=Path, required=True)
 parser.add_argument("--relocate", action="store_true")
+parser.add_argument(
+    "--execute-helper",
+    action="store_true",
+    help="Execute the ROM allocation helper and real SVC handler up to stage0",
+)
 parser.add_argument("--cc", default="cc")
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[3]
@@ -41,6 +57,20 @@ flash = (args.state / "flash").read_bytes()
 ram = (args.state / "sram").read_bytes()
 if len(flash) != 0x200000 or len(ram) != 0x80000:
     raise ValueError("Expected complete SRAM/Flash")
+vector_entry = None
+if args.execute_helper:
+    if hashlib.sha256(flash[0x1596FC:0x159894]).hexdigest() != (
+        "5b86773a66d1ea9b69b9662eed37f47d181b0283c22d79d263af3e2a582d0256"
+    ):
+        raise ValueError("Allocation helper differs from reviewed ROM code")
+    vector = int.from_bytes(flash[8:12], "little")
+    assert vector >> 24 == 0xEA
+    offset = vector & 0xFFFFFF
+    if offset & 0x800000:
+        offset -= 0x1000000
+    vector_entry = 16 + 4 * offset
+    assert 0 <= vector_entry < len(flash)
+    assert int.from_bytes(ram[8:12], "little") == 0x3F568
 sources = {}
 if args.relocate:
     base = root / "runtime/core"
@@ -109,11 +139,31 @@ cpu = 0x08000000 + (mapping.table - 128) * 4
 rows = []
 for cursor in range(8):
     uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
+    if args.execute_helper:
+        uc.reg_write(UC_ARM_REG_CPSR, 0xD0)  # User mode, IRQ/FIQ initially masked.
     uc.mem_map(0, len(flash))
     uc.mem_write(0, flash)
     uc.mem_map(0x08000000, len(ram))
     uc.mem_write(0x08000000, ram)
     uc.mem_map(0x300000, 0x10000)
+    syscalls = []
+
+    def interrupt(_, number, user):
+        # Model ARM SVC exception entry only; execute the original vector,
+        # kernel dispatch and allocator. Never substitute an allocation result.
+        assert args.execute_helper and number == 2
+        cpsr = uc.reg_read(UC_ARM_REG_CPSR)
+        pc = uc.reg_read(UC_ARM_REG_PC)
+        assert cpsr & 0x1F == 0x10 and pc == 0x159888
+        syscalls.append(uc.reg_read(UC_ARM_REG_R0))
+        uc.reg_write(UC_ARM_REG_CPSR, (cpsr & ~0x3F) | 0x93)
+        uc.reg_write(UC_ARM_REG_SPSR, cpsr)
+        uc.reg_write(UC_ARM_REG_SP, 0x307000)  # Isolated exception scratch stack.
+        uc.reg_write(UC_ARM_REG_LR, pc)
+        uc.reg_write(UC_ARM_REG_PC, 8)
+
+    if args.execute_helper:
+        uc.hook_add(UC_HOOK_INTR, interrupt)
 
     def put(at, value):
         for i in range(5):
@@ -195,6 +245,53 @@ for cursor in range(8):
     uc.emu_start(0x28898, 0x400000, count=1000)
     assert dispatch[-1] == helper and 0x30214 in dispatch
     uc.hook_del(dispatch_handle)
+    helper_path = []
+    pool = None
+    if args.execute_helper:
+        stage0 = mapping.physical(0x90018)
+        assert int.from_bytes(uc.mem_read(cpu + 0x910, 4), "little") == stage0
+        # This launcher uses the helper's direct tail-call branch. Its MMU
+        # branch and the stage0/application body are outside this check.
+        assert int.from_bytes(uc.mem_read(cpu + 0x90C, 4), "little") == 0x1C00000
+        old_sp = uc.reg_read(UC_ARM_REG_SP)
+        old_lr = uc.reg_read(UC_ARM_REG_LR)
+        old_r0 = uc.reg_read(UC_ARM_REG_R0)
+        initial_bytes = int.from_bytes(uc.mem_read(cpu + 0x914, 4), "little")
+        assert initial_bytes % 4 == 0 and initial_bytes < 1024
+        initial_table = bytes(uc.mem_read(0x08021000, initial_bytes))
+
+        def helper_hook(_, at, size, user):
+            helper_path.append(at)
+            if at == stage0:
+                uc.emu_stop()
+
+        handle = uc.hook_add(UC_HOOK_CODE, helper_hook)
+        uc.emu_start(helper, 0x400000, count=200000)
+        uc.hook_del(handle)
+        assert helper_path[-1] == stage0
+        assert all(at in helper_path for at in (8, vector_entry, 0x3F568, 0x1597B0, 0x159738))
+        assert syscalls == [0xC9, 0xC9, 0xC9, 0xC9, 0x65, 0xC9]
+        assert uc.reg_read(UC_ARM_REG_SP) == old_sp
+        assert uc.reg_read(UC_ARM_REG_LR) == old_lr == 0x2A928
+        assert uc.reg_read(UC_ARM_REG_R0) == old_r0 == trace[-1] + 5
+        assert uc.reg_read(UC_ARM_REG_CPSR) & 0x1F == 0x10
+        pages, allocation, _, table = struct.unpack("<4I", uc.mem_read(cpu + 0x914, 16))
+        assert 0 < pages <= 256 and allocation and table == 0x08021000
+        descriptors = list(struct.unpack("<" + "I" * pages, uc.mem_read(table, 4 * pages)))
+        assert all(value & 0xFFF == 0xFFE for value in descriptors)
+        assert bytes(uc.mem_read(table, initial_bytes)) == initial_table
+        added = descriptors[initial_bytes // 4 :]
+        assert added and added[0] == ((allocation + 4095) & ~4095) | 0xFFE
+        assert all(b == a + 4096 for a, b in zip(added, added[1:]))
+        assert len(set(descriptors)) == len(descriptors)
+        assert int.from_bytes(uc.mem_read(table + 4 * pages, 4), "little") == 0
+        pool = dict(
+            pages=pages,
+            initial_pages=initial_bytes // 4,
+            allocation=hex(allocation),
+            table=hex(table),
+            descriptors=[hex(value) for value in descriptors],
+        )
     uc.hook_add(UC_HOOK_CODE, hook)
     resume = trace[-1] + 5
     writes = c.c_uint32()
@@ -254,10 +351,16 @@ for cursor in range(8):
     rows.append(
         dict(
             cursor=cursor,
-            boundary="first-rom-helper-before-body",
+            boundary="stage0-before-body"
+            if args.execute_helper
+            else "first-rom-helper-before-body",
             helper_target=hex(helper),
             arm_dispatch=[hex(at) for at in dispatch],
-            helper_body_executed=False,
+            helper_body_executed=args.execute_helper,
+            helper_instruction_count=len(helper_path),
+            svc_requests=syscalls,
+            svc_vector_entry=hex(vector_entry) if vector_entry is not None else None,
+            allocation_pool=pool,
             application_executed=False,
             original_resume=hex(original_resume),
             resume=hex(resume),
@@ -291,5 +394,8 @@ report.write_text(
 )
 print(
     args.model,
-    "PASS eight PrRUN prefix/first-ROM-helper simulated-return cursors; helper and application skipped",
+    "PASS eight PrRUN cursors; real allocation helper"
+    if args.execute_helper
+    else "PASS eight PrRUN prefix cursors; helper skipped",
+    "; application return simulated",
 )

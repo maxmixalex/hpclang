@@ -912,12 +912,11 @@ during arbitrary application execution or complete public-registration safety.
 PrRUN prefix from a controlled valid data-stack input without resetting CPU
 state. At the first encountered ARMSYS it follows the original ARM dispatch
 and requires the ROM helper target `0x1596fc`. **This is not the application
-entry.** The helper body is skipped; the check simulates its return and stops
+entry.** By default the helper body is skipped; the check simulates its return and stops
 at the first ROM SEMI dispatch `03130`.
 
 Earlier descriptions overstated this gate as complete GC/link/MMU preparation
-and an application return. Those claims are withdrawn: the helper body invokes
-Stock services and has not been executed by this gate. Complete startup, actual
+and an application return. Those claims are withdrawn. Complete startup, actual
 application entry/execution and subsequent Stock behavior remain unverified.
 The separate segmented MMU gate and full native Stock tests retain their own
 explicit boundaries and evidence.
@@ -928,11 +927,26 @@ bounds, no R0–R4 access in that continuation and unchanged saved registers.
 Observed peak extra depth is four; four unused sentinels survive and four used
 slots clear. This is only the prefix's depth budget, not a whole-launch budget.
 `prrun.json` records input hashes, entry/dispatch/continuation traces, helper
-identity and explicit false flags for helper-body/application execution. Failed
+identity and explicit execution flags for the helper and application. Failed
 guards remove stale reports.
 
+With `--execute-helper`, the driver enters ARM user mode and models SVC exception
+entry into the original ROM vector. The ROM handler, allocator and free routine
+execute without substituted service results. The controlled fixtures require
+five allocation requests and one free request, preserve the existing 78-page
+table prefix, append 20 pages and reach the packaged stage0 address. The driver
+checks the appended descriptors, unique pages, zero terminator and restored ARM
+SP/LR/R0. Each model's vector branch target is decoded from its ROM; the helper
+bytes and SRAM handler pointer are checked against reviewed inputs.
+
+This executes the helper's direct tail-call branch, not its MMU branch or the
+stage0/application body. It uses isolated user/exception scratch stacks and
+simulates the subsequent payload return; it does not run pool cleanup or prove
+whole-launch lifetime safety. Reports distinguish this stage0 boundary from the
+default pre-helper boundary and record service requests and the resulting pool.
+
 With `--relocate`, the gate compiles the current C catalog mover and production
-return-root collector, grows the catalog by 16 nibbles at this helper boundary,
+return-root collector, grows the catalog by 16 nibbles at the selected boundary,
 and checks the repaired caller, PC and saved IP during the simulated return.
 It records source hashes and write counts. This is bounded synthetic mutation
 coverage; it does not prove mutation during an actual application or authorize
