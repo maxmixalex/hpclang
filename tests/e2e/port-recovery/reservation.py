@@ -28,7 +28,10 @@ from verify import (
 LIBRARY_ID = 1701
 RESERVE_POWER = 15
 RESERVE_BYTES = 1 << RESERVE_POWER
-USER_ELEMENTS = 24000
+# Each native real occupies eight bytes. Keep admission-copy headroom as the
+# linked runtime grows; the measured checks below still require the full recovery
+# copy to exceed free RAM in both the guarded and observed fixtures.
+USER_ELEMENTS = 23900
 NAME = b"HPCRES"
 MARKER = b"RCDONE"
 
