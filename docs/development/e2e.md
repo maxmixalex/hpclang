@@ -732,6 +732,51 @@ Flash. This verifies storage/attachment/reclamation in the controlled fixture;
 it does not execute a ROM table lookup through the new wrappers or run library
 configuration, and does not establish arbitrary opaque-reference coverage.
 
+The `native-cache-lookup` case (selector four) retains the new wrappers when
+returning to Stock. A separate USB server session then parses a program containing
+`PrRUN` and stores it as `CACHELOOK`, without executing that command. C-Kermit
+numeric escapes transmit the actual Stock program delimiters (bytes 171/187);
+ASCII `<< >>` is not a substitute. The checker requires the complete 31-nibble
+Stock program encoding, including its two compiler markers and ROMPTR library
+275/command zero. It also requires distinct new adjacent DOACPTR addresses,
+matching target/switch identities, intact catalog/other attachments, original
+return marker and unchanged Flash. An unmodified Stock parse provides the
+independent full-encoding control. In the HP50g negative saved-state control,
+clearing only HOME's hash pointer makes the parser emit the unresolved global
+name `PrRUN` instead of the library ROMPTR; Flash remains unchanged. Individual
+program-nibble corruptions must also be rejected. This case covers hash-table
+name resolution only.
+
+The `native-cache-message` case uses the same retained-wrapper selector four,
+then a separate Stock session executes
+`IFERR #11301h DOERR THEN ERRM 'CACHEMSG' STO END`. The captured library-275
+message one must be exactly `Invalid user RAM block`, independently present in
+the original ROM table and returned by the unmodified Stock control. It retains
+the same wrapper identity, attachment, catalog, return and Flash checks. Corrupt
+message-object header/content nibbles must reject. This is a compatibility check,
+not proof that DOERR/ERRM dereferences the new HOME message wrapper: in the HP50g
+control, clearing that HOME field still returns the same library message, with
+the zero field and Flash preserved. Redirecting it to library 227's existing
+same-bank string array (whose first message is `Starting Solver`) also leaves
+DOERR/ERRM's library-275 result unchanged. The message lookup source path remains
+unproven. Configuration execution, complete lifetime/transaction integration and
+public library ownership remain open.
+
+The Port0 library-123 fixture now contains one packed string-array message,
+`hpclang library message`, with a relative message-table offset and a valid
+library CRC. The `native-new-message` case retains its new catalog record;
+`native-missing-message` removes that record before returning. Both retain the
+same library object in Port0 and add no HOME attachment for 123. A subsequent
+Stock session executes `IFERR #7B01h DOERR THEN ERRM 'NEWMSG' STO END`; only the
+registered case may return the fixture message. Host checks retain exact catalog
+bindings, original Stock return, Flash and HOME attachment checks.
+
+When insertion is retained, reviewed original HOME cache pointers must advance
+by 16 nibbles; zero and direct-ROM pointers stay fixed. The verifier rejects
+main-RAM attachment fields outside the original complete-wrapper cache bounds.
+Requiring the old numeric pointers after a retained insertion would incorrectly
+reject the successful repair. Removal cases still require the original values.
+
 Before catalog edits, all original-return cases also attempt removal of the
 fixture's genuinely HOME-attached library 275. A rejecting writer counts any
 write attempt. The payload requires `BUSY`, zero write attempts and unchanged

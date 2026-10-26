@@ -272,7 +272,7 @@ static int probe_cache_move(struct hpclang_rpl_mutation_io *io, uint32_t positio
     return result;
 }
 
-static int probe_cache_roundtrip(struct hpclang_rpl_mutation_io *io)
+static int probe_cache_roundtrip(struct hpclang_rpl_mutation_io *io, int keep)
 {
     uint32_t home, count, bottom, end, fields[2] = {0}, targets[2], banks[2];
     const uint32_t boundaries[] = {0x806e9, 0x806ee, 0x806f3, 0x80711, 0x80e9b};
@@ -338,6 +338,10 @@ static int probe_cache_roundtrip(struct hpclang_rpl_mutation_io *io)
                                                     banks[i], NULL) != HPCLANG_RPL_MUTATION_BUSY ||
             probe.writes)
             goto done;
+    }
+    if (keep) {
+        result = 0;
+        goto done;
     }
     if (hpclang_rpl_mutation_home_detach(io, 275) ||
         probe_cache_move(io, bottom + 15, targets[1], banks[1], 1) ||
@@ -475,7 +479,7 @@ static int probe_register(void)
         if (probe_detach(&io, remove >= 3))
             goto failed_roundtrip;
     }
-    if (remove == 4 && probe_cache_roundtrip(&io))
+    if (remove >= 4 && probe_cache_roundtrip(&io, remove == 5))
         goto failed_roundtrip;
     result = 0;
 done:
@@ -510,7 +514,7 @@ static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots, in
      * original return roots. Do not manufacture a call or rewrite its payload. */
     if (length == 21)
         return 0;
-    if (length == 23 && !probe_read_word(io, object + 26, 2, &encoded) && encoded <= 3) {
+    if (length == 23 && !probe_read_word(io, object + 26, 2, &encoded) && encoded <= 4) {
         *remove = 1 + encoded;
         return 0;
     }
@@ -565,7 +569,10 @@ static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots, in
     return 0;
 }
 
-static const char library_encoding[] = "04b2062000108510b7000000000000000000000d5c2";
+/* Library 123, title X, one packed string-array message; relative tables and CRC. */
+static const char library_encoding[] =
+    "04b2027000108510b7000000f000000000000008e92074000c2a20100001000033000860736c616e67602c69626271"
+    "6279702d6563737167656f17d";
 static int library_nibble(void *context, uint32_t at, uint8_t *out)
 {
     (void)context;

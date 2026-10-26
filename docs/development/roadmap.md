@@ -20,15 +20,20 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
-PR #24 follow-up prepares the maintained offline original-ROM GETPTR/dispatch
-gate on this isolated delivery branch. Paired-model baseline/move and omission
-checks pass locally; changed-ROM/missing-trace inputs reject and remove stale
-reports. The test compiles this branch's C mover and fingerprints all inputs.
-Private ROM/state/trace inputs and a Linux Python Unicorn environment are
-required; it is not an automatic CI job or full Stock registration acceptance.
-The E2E guide documents invocation and limits. Runtime code is unchanged by
-this follow-up. Previous head e6b2db8f is reviewed before push; eight workflows
-remain queued, so the draft and its #23 dependency remain unaccepted.
+M8.0 delivery adds actual Stock command-name lookup through newly allocated
+HOME hash wrappers and catalog-dependent messages from a new Port0 library.
+The candidate image and both launchers match the four verified HP49g+/HP50g
+registered/unregistered message cases; 476 source corruptions reject.
+The new image also passes native command-name lookup through retained new
+wrappers on both models, including original Stock return and reference checks.
+ARM analysis, Python lint and strict documentation checks pass locally.
+Built-in message compatibility does not prove HOME message-wrapper routing:
+clearing or redirecting that field still returns the original message.
+Public registration, configuration, complete reference/lifetime coverage and
+parent/full CI acceptance remain open. Maintained procedures and boundaries
+are in the E2E guide; prior artifact evidence remains separately identified.
+The preceding c9dba0c2 head has ten inspected workflows and all jobs reviewed:
+three workflows pass and seven are queued, with no reported failures.
 
 ## M8 follow-up evidence history
 

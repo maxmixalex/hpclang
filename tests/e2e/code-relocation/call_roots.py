@@ -3,17 +3,21 @@
 import json
 import struct
 
-from verify import home_string
+from verify import home_string, home_object
 
 from fixtures import word
 
 
 CASES = {
     "native": b"",
+    "native-new-message": b"",
+    "native-missing-message": b"\0",
     "native-remove": b"\0",
     "native-detach": b"\1",
     "native-reattach": b"\2",
     "native-cache": b"\3",
+    "native-cache-lookup": b"\4",
+    "native-cache-message": b"\4",
     "gosub": bytes([0x27, 0, 0x10, 0x10]),
     "gosub-rtnsxm": bytes([0x27, 0, 0x10, 0x00]),
     "gosub-rtnnc": bytes([0x37, 0, 0x05, 0, 0x03]),
@@ -119,6 +123,30 @@ def verify_entry(observation, stage0):
     return words
 
 
+def verify_cache_lookup_program(read):
+    lookup = home_object(read, b"CACHELOOK")
+    expected = (
+        word(0x2D9D)
+        + word(0x389B9)
+        + word(0x2E92)
+        + word(275, 3)
+        + word(0, 3)
+        + word(0x389D4)
+        + word(0x312B)
+    )
+    actual = "".join(format(read(lookup + i, 1), "x") for i in range(len(expected)))
+    if actual != expected:
+        raise ValueError("ROM did not resolve PrRUN to the original Stock program encoding")
+    return actual
+
+
+def verify_cache_message(read):
+    message = home_string(read, b"CACHEMSG")
+    if message != b"Invalid user RAM block":
+        raise ValueError("ROM did not resolve library 275 message one")
+    return message
+
+
 def verify_calls(args, build, source, output, *, transfer, native_words):
     original_flash = (source / "flash").read_bytes()
     before = native_words((source / "sram").read_bytes(), original_flash)
@@ -149,6 +177,34 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             ],
         )
         state = case / "run/state"
+        if name in ("native-new-message", "native-missing-message"):
+            transfer(
+                args,
+                case / "message-run",
+                state,
+                package_dir,
+                "CALLROOT",
+                installed=True,
+                execute=False,
+                remote_commands=["IFERR #7B01h DOERR THEN ERRM 'NEWMSG' STO END"],
+            )
+            state = case / "message-run/state"
+        if name in ("native-cache-lookup", "native-cache-message"):
+            transfer(
+                args,
+                case / "lookup-run",
+                state,
+                package_dir,
+                "CALLROOT",
+                installed=True,
+                execute=False,
+                remote_commands=[
+                    r"\{171} PrRUN \{187} 'CACHELOOK' STO"
+                    if name == "native-cache-lookup"
+                    else "IFERR #11301h DOERR THEN ERRM 'CACHEMSG' STO END"
+                ],
+            )
+            state = case / "lookup-run/state"
         flash = (state / "flash").read_bytes()
         if flash != original_flash:
             raise ValueError("Call-root fixture changed Flash")
@@ -189,10 +245,14 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         actual = bytes(read(obj + 10 + 2 * i, 2) for i in range(len(expected)))
         if name in (
             "native",
+            "native-new-message",
+            "native-missing-message",
             "native-remove",
             "native-detach",
             "native-reattach",
             "native-cache",
+            "native-cache-lookup",
+            "native-cache-message",
             "gosub-rtnnc",
         ):
             valid = actual == expected
@@ -214,7 +274,15 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if not valid:
             raise ValueError("Native call operands/return payload changed")
         ids = [read(0x86120 + 16 * i, 3) for i in range(read(0x8611D, 3))]
-        removed = name in ("native-remove", "native-detach", "native-reattach", "native-cache")
+        removed = name in (
+            "native-remove",
+            "native-missing-message",
+            "native-detach",
+            "native-reattach",
+            "native-cache",
+            "native-cache-lookup",
+            "native-cache-message",
+        )
         expected_ids = original_ids if removed else sorted(original_ids + [123])
         if ids != expected_ids or len(ids) != len(set(ids)):
             raise ValueError("Native call did not produce the expected catalog")
@@ -222,12 +290,66 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         expected_attachments = [
             record
             for record in original_attachments
-            if name not in ("native-detach", "native-reattach", "native-cache") or record[0] != 275
+            if name
+            not in (
+                "native-detach",
+                "native-reattach",
+                "native-cache",
+                "native-cache-lookup",
+                "native-cache-message",
+            )
+            or record[0] != 275
         ]
-        if name in ("native-reattach", "native-cache"):
+        if not removed:
+            cache_start = 0x86120 + 16 * len(original_ids)
+            cache_end = before(0x806E9)
+
+            def relocated(field):
+                if not field or field < 0x80000:
+                    return field
+                if not cache_start <= field <= cache_end - 15:
+                    raise ValueError("Fixture HOME field is outside reviewed cache storage")
+                return field + 16
+
+            expected_attachments = [
+                (number, relocated(first), relocated(second))
+                for number, first, second in expected_attachments
+            ]
+        if name in (
+            "native-reattach",
+            "native-cache",
+            "native-cache-lookup",
+            "native-cache-message",
+        ):
             expected_attachments += [record for record in original_attachments if record[0] == 275]
+        if name in ("native-cache-lookup", "native-cache-message"):
+            original = next(r for r in original_attachments if r[0] == 275)
+            current = next(r for r in attachment_records(read) if r[0] == 275)
+            bottom = read(0x806E9)
+            if current[2] != current[1] + 15:
+                raise ValueError("New wrappers must remain adjacent")
+            for old, new in zip(original[1:], current[1:]):
+                if new == old or not 0x80000 <= new <= bottom - 15:
+                    raise ValueError("Missing newly owned wrapper")
+                if (
+                    read(new) != 0x2BAA
+                    or read(new + 5) != before(old + 5)
+                    or read(new + 10) != before(old + 10)
+                ):
+                    raise ValueError("New wrapper differs from original table/switch identity")
+            expected_attachments[-1] = current
+            if name == "native-cache-lookup":
+                verify_cache_lookup_program(read)
+            else:
+                verify_cache_message(read)
         if attachment_records(read) != expected_attachments:
             raise ValueError("Native call did not preserve the expected HOME attachments")
+        if name in ("native-new-message", "native-missing-message"):
+            message = home_string(read, b"NEWMSG")
+            if name == "native-new-message" and message != b"hpclang library message":
+                raise ValueError("Newly registered library message was not resolved")
+            if name == "native-missing-message" and message == b"hpclang library message":
+                raise ValueError("Unregistered library message unexpectedly resolved")
         results.append(
             dict(
                 case=name,
@@ -236,15 +358,29 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                 rewritten_return=name
                 not in (
                     "native",
+                    "native-new-message",
+                    "native-missing-message",
                     "native-remove",
                     "native-detach",
                     "native-reattach",
                     "native-cache",
+                    "native-cache-lookup",
+                    "native-cache-message",
                 ),
                 catalog_removed=removed,
+                new_library_message=name == "native-new-message",
+                missing_library_message=name == "native-missing-message",
                 home_detached=name == "native-detach",
                 cache_roundtrip=name == "native-cache",
-                home_reattached=name in ("native-reattach", "native-cache"),
+                cache_lookup=name == "native-cache-lookup",
+                cache_message=name == "native-cache-message",
+                home_reattached=name
+                in (
+                    "native-reattach",
+                    "native-cache",
+                    "native-cache-lookup",
+                    "native-cache-message",
+                ),
             )
         )
         print(f"PASS: {args.model}: native {name} roots and catalog checks", flush=True)
