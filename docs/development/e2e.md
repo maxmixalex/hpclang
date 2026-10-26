@@ -708,7 +708,17 @@ attachment records, including both pointer fields, in their original order.
 This tests internal HOME detachment in the controlled fixture, not public unload
 or arbitrary execution-reference safety.
 
-Before catalog edits, all three original-return cases also attempt removal of the
+The `native-reattach` case uses selector byte two. It saves library 275's two
+genuine attachment fields, requiring both to lie below the moving USEROB prefix
+in this fixture, then performs detachment followed by attachment. HOME, its count
+and Port0 return to their original values, and the full directory body remains
+byte-identical. The host requires the original attachment records with library
+275 moved to the last position, preserving both fields and all other records'
+order. After reattachment, another removal probe must reject the attached library
+with BUSY and zero write attempts. These operations still do not execute library
+configuration or establish general-purpose public registration safety.
+
+Before catalog edits, all four original-return cases also attempt removal of the
 fixture's genuinely HOME-attached library 275. A rejecting writer counts any
 write attempt. The payload requires `BUSY`, zero write attempts and unchanged
 native roots; it never edits the attachment table to manufacture that result.

@@ -252,6 +252,18 @@ extern "C"
     int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_io *io,
                                                  uint32_t position, int32_t delta);
 
+    /* Internal HOME attachment: append a 13-nibble record, moving the earlier
+     * HOME/stack prefix downward while leaving directory objects fixed. Both
+     * pointer fields are caller-proven native references in the current mapping
+     * (zero is allowed), translated if their target moves. Caller proves library
+     * identity, field semantics and relocation safety, retaining mapping/IRQ
+     * ownership. This does not register a library or run configuration code.
+     * Existing IDs return EXISTS after reading the complete attachment prefix.
+     * Publish count last; preflight errors make no writes; commit failure is
+     * INCOMPLETE and forbids retry or Stock return, as with detachment below. */
+    int hpclang_rpl_mutation_home_attach(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                         uint32_t first, uint32_t second);
+
     /* Internal HOME detachment: remove exactly one matching 13-nibble attachment
      * and publish its count last. Following directory objects keep their addresses;
      * HOME, stack cells and the earlier attachment prefix move upward by 13.

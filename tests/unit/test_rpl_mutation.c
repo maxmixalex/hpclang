@@ -2627,6 +2627,83 @@ static struct hpclang_rpl_mutation_io setup_home_attachments(unsigned count)
     return io;
 }
 
+static void test_home_attach(void)
+{
+    uint32_t successful_writes = 0;
+    for (unsigned count = 0; count <= 3; ++count) {
+        struct hpclang_rpl_mutation_io io = setup_home_attachments(count);
+        uint32_t body = 0x90048 + 13 * count, port = get_word(0x80716, 5);
+        uint32_t old_free = get_word(AVMEM, 5);
+        uint8_t before[160];
+        assert(port - 0x90000 < sizeof before);
+        memcpy(before, memory + 0x90000, port - 0x90000);
+        uint32_t second = count ? 0x93000 : 0;
+        assert(hpclang_rpl_mutation_home_attach(&io, 123, 0x90040, second) == 0);
+        assert(get_word(USEROB, 5) == 0x90033 && get_word(CONTEXT, 5) == 0x90033);
+        assert(get_word(0x90038, 3) == count + 1 && get_word(DSKTOP, 5) == 0x8fff3);
+        assert(get_word(0x8fff3, 5) == body + 16 && get_word(AVMEM, 5) == old_free - 3);
+        assert(get_word(0x80716, 5) == port);
+        assert(!memcmp(before + body - 0x90000, memory + body, port - body));
+        for (unsigned i = 0; i <= count; ++i) {
+            uint32_t at = 0x9003b + 13 * i;
+            assert(get_word(at, 3) == (i == count ? 123 : 10 * (i + 1)));
+            assert(get_word(at + 3, 5) == 0x90033);
+            assert(get_word(at + 8, 5) == (i == count ? second : 0x93000));
+        }
+        assert(write_trace[writes - 3] == 0x90038 && write_trace[writes - 1] == 0x9003a);
+        if (count == 3)
+            successful_writes = writes;
+        assert(hpclang_rpl_mutation_home_detach(&io, 123) == 0);
+        assert(get_word(USEROB, 5) == 0x90040 && get_word(CONTEXT, 5) == 0x90040);
+        assert(get_word(DSKTOP, 5) == 0x90000 && get_word(AVMEM, 5) == old_free);
+        assert(!memcmp(before, memory + 0x90000, port - 0x90000));
+    }
+    for (unsigned scenario = 0; scenario < 8; ++scenario) {
+        struct hpclang_rpl_mutation_io io = setup_home_attachments(3);
+        uint32_t number = 123, first = 0x90040, second = 0x93000;
+        int expected = HPCLANG_RPL_MUTATION_MALFORMED;
+        if (scenario == 0)
+            number = 0x1000;
+        if (scenario == 1)
+            first = NIBBLES;
+        if (scenario == 2)
+            second = NIBBLES;
+        if (scenario == 3) {
+            number = 10;
+            expected = HPCLANG_RPL_MUTATION_EXISTS;
+        }
+        if (scenario == 4 || scenario == 5) {
+            number = scenario == 4 ? 10 : 123;
+            rejected_read = scenario == 4 ? 0x9006e : 0x90020;
+            expected = HPCLANG_RPL_MUTATION_IO;
+        }
+        if (scenario == 6) {
+            io.user_limit = 0x90000;
+            expected = HPCLANG_RPL_MUTATION_NOSPACE;
+        }
+        if (scenario == 7) {
+            put_word(0x90045, 3, 0xfff);
+            expected = HPCLANG_RPL_MUTATION_NOSPACE;
+        }
+        uint8_t before[NIBBLES];
+        memcpy(before, memory, sizeof before);
+        assert(hpclang_rpl_mutation_home_attach(&io, number, first, second) == expected);
+        assert(!writes && !memcmp(before, memory, sizeof before));
+    }
+    for (uint32_t cut = 0; cut < successful_writes; ++cut) {
+        struct hpclang_rpl_mutation_io io = setup_home_attachments(3);
+        rejected_write = cut;
+        assert(hpclang_rpl_mutation_home_attach(&io, 123, 0x90040, 0x93000) ==
+               HPCLANG_RPL_MUTATION_INCOMPLETE);
+        assert(writes == cut);
+    }
+    struct hpclang_rpl_mutation_io io = setup_home_attachments(3);
+    rejected_commit_read = 0x90020;
+    assert(hpclang_rpl_mutation_home_attach(&io, 123, 0x90040, 0x93000) ==
+           HPCLANG_RPL_MUTATION_INCOMPLETE);
+    assert(writes);
+}
+
 static void test_home_detach(void)
 {
     uint32_t successful_writes = 0;
@@ -3670,6 +3747,7 @@ int main(void)
     test_catalog_insert_commit();
     test_catalog_remove_commit();
     test_catalog_attached_rejection();
+    test_home_attach();
     test_home_detach();
     test_catalog_switch_growth();
     test_temp_allocation_visit();

@@ -185,7 +185,7 @@ static int probe_attached_rejection(const struct hpclang_rpl_mutation_io *io)
     return 0;
 }
 
-static int probe_detach(struct hpclang_rpl_mutation_io *io)
+static int probe_detach(struct hpclang_rpl_mutation_io *io, int reattach)
 {
     uint32_t home, count, port;
     if (probe_read_word(io, 0x80711, 5, &home) || probe_read_word(io, home + 5, 3, &count) ||
@@ -194,6 +194,26 @@ static int probe_detach(struct hpclang_rpl_mutation_io *io)
     uint32_t body = home + 8 + 13 * count;
     if (!count || body >= port || port > 0x100000)
         return -1;
+    uint32_t first = 0, second = 0, matches = 0;
+    if (reattach) {
+        for (uint32_t i = 0; i < count; ++i) {
+            uint32_t at = home + 8 + 13 * i, id;
+            if (probe_read_word(io, at, 3, &id))
+                return -1;
+            if (id == 275) {
+                ++matches;
+                if (probe_read_word(io, at + 3, 5, &first) ||
+                    probe_read_word(io, at + 8, 5, &second))
+                    return -1;
+            }
+        }
+        /* This controlled fixture's two library fields are below the moving
+         * USEROB prefix. Do not assume arbitrary references stay fixed. */
+        uint32_t stack;
+        if (matches != 1 || probe_read_word(io, 0x806f8, 5, &stack) || first >= stack ||
+            second >= stack)
+            return -1;
+    }
     uint8_t *snapshot = malloc(port - body);
     if (!snapshot)
         return -1;
@@ -207,6 +227,12 @@ static int probe_detach(struct hpclang_rpl_mutation_io *io)
     if (probe_read_word(io, 0x80711, 5, &value) || value != home + 13 ||
         probe_read_word(io, value + 5, 3, &value) || value != count - 1 ||
         probe_read_word(io, 0x80716, 5, &value) || value != port)
+        goto done;
+    if (reattach &&
+        (hpclang_rpl_mutation_home_attach(io, 275, first, second) ||
+         probe_read_word(io, 0x80711, 5, &value) || value != home ||
+         probe_read_word(io, value + 5, 3, &value) || value != count ||
+         probe_read_word(io, 0x80716, 5, &value) || value != port || probe_attached_rejection(io)))
         goto done;
     for (uint32_t i = 0; i < port - body; ++i) {
         uint8_t actual;
@@ -323,14 +349,14 @@ static int probe_register(void)
                 goto failed_roundtrip;
         }
     }
-    if (remove == 2) {
+    if (remove >= 2) {
         /* The relocation plan and round-trip snapshot are no longer live.
          * Release them before taking the separate HOME-body snapshot. */
         free(snapshot);
         snapshot = NULL;
         free(p);
         p = NULL;
-        if (probe_detach(&io))
+        if (probe_detach(&io, remove == 3))
             goto failed_roundtrip;
     }
     result = 0;
@@ -366,7 +392,7 @@ static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots, in
      * original return roots. Do not manufacture a call or rewrite its payload. */
     if (length == 21)
         return 0;
-    if (length == 23 && !probe_read_word(io, object + 26, 2, &encoded) && encoded <= 1) {
+    if (length == 23 && !probe_read_word(io, object + 26, 2, &encoded) && encoded <= 2) {
         *remove = 1 + encoded;
         return 0;
     }

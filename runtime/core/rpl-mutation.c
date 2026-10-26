@@ -1577,6 +1577,72 @@ int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_i
     return commit_userob_shift(io, &geometry, &directory_plan);
 }
 
+int hpclang_rpl_mutation_home_attach(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                     uint32_t first, uint32_t second)
+{
+    if (!io_ready(io))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (number > 0xfffu || first >= RPL_MAIN_END || second >= RPL_MAIN_END)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    uint32_t home, count;
+    int result = hpclang_rpl_store_home_object(&reader, &home);
+    if (result)
+        return store_result_to_mutation(result);
+    if (home > RPL_MAIN_END - 8)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = read_word(io, home + 5, 3, &count);
+    if (result)
+        return result;
+    if (count > (RPL_MAIN_END - home - 8) / 13)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    int exists = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t at = home + 8 + 13 * i, id, ignored;
+        result = read_word(io, at, 3, &id);
+        if (!result)
+            result = read_word(io, at + 3, 5, &ignored);
+        if (!result)
+            result = read_word(io, at + 8, 5, &ignored);
+        if (result)
+            return result;
+        exists |= id == number;
+    }
+    if (exists)
+        return HPCLANG_RPL_MUTATION_EXISTS;
+    if (count == 0xfffu)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    uint32_t body = home + 8 + 13 * count;
+    struct userob_shift_geometry geometry;
+    struct directory_patch_plan directories;
+    result = plan_userob_shift(io, body, 13, &geometry, &directories, NULL, 0);
+    if (!result)
+        result = map_structural_address(&geometry, first, 1, &first);
+    if (!result)
+        result = map_structural_address(&geometry, second, 1, &second);
+    if (result)
+        return result;
+    /* Prove all source nibbles readable before the first write, including
+     * stack padding not visited by structural/root scans. */
+    for (uint32_t at = geometry.old_dstk; at < body; ++at) {
+        uint8_t nibble;
+        if (!io->read_nibble(io->context, at, &nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (nibble > 15)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+    result = commit_userob_shift(io, &geometry, &directories);
+    if (!result)
+        result = write_word(io, body - 13, 3, number);
+    if (!result)
+        result = write_word(io, body - 10, 5, first);
+    if (!result)
+        result = write_word(io, body - 5, 5, second);
+    if (!result)
+        result = write_word(io, home - 13 + 5, 3, count + 1);
+    return result ? HPCLANG_RPL_MUTATION_INCOMPLETE : HPCLANG_RPL_MUTATION_OK;
+}
+
 int hpclang_rpl_mutation_home_detach(const struct hpclang_rpl_mutation_io *io, uint32_t number)
 {
     if (!io_ready(io))

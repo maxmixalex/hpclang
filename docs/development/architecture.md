@@ -132,6 +132,17 @@ ownership must be retained, with no retry or Stock return. This is not yet a
 public unload service: detachment, execution-reference coverage and payload
 deletion remain separate obligations.
 
+The internal `hpclang_rpl_mutation_home_attach` appends a HOME attachment using
+two caller-proven native pointer fields. It validates the complete existing
+prefix before rejecting a duplicate ID, checks count capacity and free-space
+fences, then moves the lower stack/HOME prefix down by 13 nibbles. Existing and
+new pointer targets in that prefix are repaired; directory objects remain fixed.
+The new record is written before publishing the increased count. Zero pointer
+fields are preserved. Preflight faults make no writes, while commit faults
+return INCOMPLETE and require retaining ownership without retry or Stock return.
+The caller must establish library identity, field semantics and relocation
+safety; this primitive does not run library configuration or register a binding.
+
 The internal `hpclang_rpl_mutation_home_detach` removes a matching HOME attachment
 without unregistering or freeing the library. It validates the entire attachment
 prefix and directory geometry, moves the stack/HOME prefix upward by 13 nibbles,
