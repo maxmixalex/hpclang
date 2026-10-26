@@ -441,7 +441,9 @@ line-editor limitations.
 
 `hpclang_hpgcc_gets(buffer, capacity)` edits a bounded calculator-byte line,
 including backspace, scroll undo and ON cancellation. Capacity includes NUL;
-the old unbounded `gets/_gets` aliases are not supplied. `hpstdio.h` supplies
+`gets/_gets` call aliases in `hpconio.h` infer fixed `char` array capacity in C
+and C++; pointer/VLA inputs require the explicit-capacity entry point.
+`hpstdio.h` supplies
 `readint/readuint/readhex/readlonglong/readulonglong/readdouble` over this editor
 with 32-byte internal buffers. Integer syntax follows the documented historical
 prefix/sign rules; floating conversion uses C `strtod`. No conversion reports
@@ -449,6 +451,16 @@ prefix/sign rules; floating conversion uses C `strtod`. No conversion reports
 accept a numeric prefix. The clean text-input parsers remain the interface for
 whole-line validation and separate status/output. Including `hpstdio.h` alone
 does not select a default console; calling the input adapters does.
+
+`hpclang/hpgcc-format.h` supplies decimal digit/separator settings and eight
+named `hpclang_hpgcc_*printf` functions, including bounded and `va_list` forms.
+Define `HPCLANG_HPGCC_LEGACY_FORMAT=1` before the first compatibility include
+to redirect printf-family call expressions in an application translation unit.
+Omitted/zero keeps standard formatting. The legacy parser has its own grammar,
+15-place precision cap and corrected return counts; see the
+[migration guide](../sdk/migration.md). Function addresses and parenthesized
+standard calls bypass the aliases. Stream output retains ordinary binding and
+error flags. This addition is locally validated; remote acceptance is pending.
 
 ## Display and surfaces
 
@@ -838,7 +850,7 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | owned directory iteration | ✅ independent iterators, UTF-8 LFN, preserved stored case |
 | unsupported stream access on HP39/40 and HP48 | ✅ clean `ENOSYS` |
 | HPGCC2/3 `FS*` adapter | ✅ bounded useful subset over clean FatFs core |
-| HPGCC `hpstdio.h` adapter | Standard libc, `fdelete()`, and bounded `readint/readuint/readhex/readlonglong/readulonglong/readdouble`; historical decimal-format controls remain open |
+| HPGCC `hpstdio.h` adapter | Standard libc, `fdelete()`, and bounded `readint/readuint/readhex/readlonglong/readulonglong/readdouble`; explicit-opt-in decimal settings/printf adapters implemented locally, remote acceptance pending |
 | HPGCC `fsystem.h` useful subset | ✅ implemented and exercised in Storage #53 |
 | public raw KOS file API | ✕; raw KOS stays Migration/Internal, while real KOS remains host coordination only |
 
