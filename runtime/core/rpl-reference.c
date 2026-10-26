@@ -884,6 +884,20 @@ int hpclang_rpl_reference_visit_guarded_nested(const struct hpclang_rpl_reader *
     return scan.error ? scan.error : result;
 }
 
+int hpclang_rpl_dispatch_reference_visit_guarded(
+    const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_dispatch_descriptor *descriptor, hpclang_rpl_reference_visit_fn visit,
+    hpclang_rpl_reference_dependency_fn dependency, void *context)
+{
+    if (!reader || !reader->read_nibble || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct guarded_reference_scan scan = {reader, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {guarded_reference_read, &scan};
+    int result =
+        hpclang_rpl_dispatch_reference_visit(&observed, address, limit, descriptor, visit, context);
+    return scan.error ? scan.error : result;
+}
+
 struct catalog_plan_state
 {
     const struct hpclang_rpl_catalog_move *move;

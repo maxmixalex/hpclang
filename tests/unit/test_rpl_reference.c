@@ -1696,6 +1696,71 @@ static void begin_guarded_edges(struct guarded_edges *state)
     assert(!hpclang_rpl_reference_guards_begin(&state->builder, state->guards, 32));
 }
 
+static void guarded_dispatch_references(void)
+{
+    for (unsigned schema = 0; schema < 2; ++schema) {
+        struct image image = {.size = 20, .fail = UINT32_MAX};
+        put(&image, 0, 80, 5);
+        put(&image, 5, 0x81234, 5); /* Scalar type bits must not become a pointer. */
+        const struct image original = image;
+        const struct hpclang_rpl_reader reader = {read_nibble, &image};
+        const struct hpclang_rpl_reference_reader mapped = {guarded_mapped_read, &image};
+        const struct hpclang_rpl_dispatch_descriptor descriptor = {80, schema};
+        const unsigned consumed = schema ? 10 : 6;
+        struct guarded_edges state;
+        begin_guarded_edges(&state);
+        assert(!hpclang_rpl_dispatch_reference_visit_guarded(
+            &reader, 0, image.size, &descriptor, guarded_edge, observe_reference, &state));
+        assert(state.observations == consumed && state.edges.count == (schema ? 1u : 2u));
+        assert(state.edges.items[0].kind == HPCLANG_RPL_REFERENCE_EXECUTION);
+        assert(state.edges.items[0].target == 80);
+        if (!schema)
+            assert(state.edges.items[1].kind == HPCLANG_RPL_REFERENCE_EMBEDDED_ENTRY);
+        assert(!memcmp(&image, &original, sizeof image));
+        assert(!hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count));
+        for (unsigned i = 0; i < image.size; ++i) {
+            assert(state.seen[i] == (i < consumed));
+            image.data[i] ^= 1;
+            int result =
+                hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count);
+            assert(result == (i < consumed ? HPCLANG_RPL_SPAN_MALFORMED : 0));
+            image.data[i] ^= 1;
+        }
+        for (unsigned i = 0; i < consumed; ++i) {
+            begin_guarded_edges(&state);
+            state.stop_at = i + 1;
+            assert(hpclang_rpl_dispatch_reference_visit_guarded(&reader, 0, image.size, &descriptor,
+                                                                guarded_edge, observe_reference,
+                                                                &state) == 73);
+            assert(state.observations == i + 1 && !state.edges.count);
+            begin_guarded_edges(&state);
+            image.fail = i;
+            assert(hpclang_rpl_dispatch_reference_visit_guarded(
+                       &reader, 0, image.size, &descriptor, guarded_edge, observe_reference,
+                       &state) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(!state.seen[i] && !state.edges.count);
+            image.fail = UINT32_MAX;
+            begin_guarded_edges(&state);
+            image.data[i] = 16;
+            assert(hpclang_rpl_dispatch_reference_visit_guarded(
+                &reader, 0, image.size, &descriptor, guarded_edge, observe_reference, &state));
+            assert(!state.seen[i] && !state.edges.count);
+            image = original;
+        }
+        begin_guarded_edges(&state);
+        state.edges.stop = 81;
+        assert(hpclang_rpl_dispatch_reference_visit_guarded(&reader, 0, image.size, &descriptor,
+                                                            guarded_edge, observe_reference,
+                                                            &state) == 81);
+        assert(state.edges.count == 1);
+        begin_guarded_edges(&state);
+        assert(hpclang_rpl_dispatch_reference_visit_guarded(&reader, 0, image.size, &descriptor,
+                                                            guarded_edge, NULL, &state) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!state.observations && !state.edges.count);
+    }
+}
+
 static void guarded_nested_references(void)
 {
     struct image image = {.size = 45, .fail = UINT32_MAX};
@@ -1788,6 +1853,7 @@ static void guarded_nested_references(void)
 
 int main(void)
 {
+    guarded_dispatch_references();
     guarded_nested_references();
     mixed_width_metadata();
     code_operand_replay();

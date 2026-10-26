@@ -113,9 +113,7 @@ if args.relocate:
             )
         ],
     ]
-    sources = {
-        str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files
-    }
+    sources = {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files}
     subprocess.run(
         [
             args.cc,
@@ -195,15 +193,11 @@ for cursor in range(8):
             assert stage0 <= pc - 4 < stage0 + len(launcher) - 20
             assert uc.reg_read(UC_ARM_REG_R0) == 101
             assert uc.reg_read(UC_ARM_REG_R1) == allocation
-            release_calls.append(
-                dict(instruction=hex(pc - 4), allocation=hex(allocation))
-            )
+            release_calls.append(dict(instruction=hex(pc - 4), allocation=hex(allocation)))
         elif stage0_active:
             handler = int.from_bytes(uc.mem_read(0x08000008, 4), "little")
             assert stage0 <= handler < stage0 + launcher.index(stage1_image) - 20
-            stage0_svcs.append(
-                dict(instruction=hex(pc - 4), handler=hex(handler), cpsr=cpsr)
-            )
+            stage0_svcs.append(dict(instruction=hex(pc - 4), handler=hex(handler), cpsr=cpsr))
         else:
             assert pc == 0x159888
         syscalls.append(uc.reg_read(UC_ARM_REG_R0))
@@ -221,14 +215,11 @@ for cursor in range(8):
             p = mapping.physical(at + i)
             shift = 4 * ((at + i) & 1)
             old = uc.mem_read(p, 1)[0]
-            uc.mem_write(
-                p, bytes([(old & ~(15 << shift)) | ((value >> (4 * i) & 15) << shift)])
-            )
+            uc.mem_write(p, bytes([(old & ~(15 << shift)) | ((value >> (4 * i) & 15) << shift)]))
 
     def word(at):
         return sum(
-            ((uc.mem_read(mapping.physical(at + i), 1)[0] >> (4 * ((at + i) & 1))) & 15)
-            << (4 * i)
+            ((uc.mem_read(mapping.physical(at + i), 1)[0] >> (4 * ((at + i) & 1))) & 15) << (4 * i)
             for i in range(5)
         )
 
@@ -323,9 +314,7 @@ for cursor in range(8):
         uc.emu_start(helper, 0x400000, count=200000)
         uc.hook_del(handle)
         assert helper_path[-1] == stage0
-        assert all(
-            at in helper_path for at in (8, vector_entry, 0x3F568, 0x1597B0, 0x159738)
-        )
+        assert all(at in helper_path for at in (8, vector_entry, 0x3F568, 0x1597B0, 0x159738))
         assert syscalls == [0xC9, 0xC9, 0xC9, 0xC9, 0x65, 0xC9]
         assert uc.reg_read(UC_ARM_REG_SP) == old_sp
         assert uc.reg_read(UC_ARM_REG_LR) == old_lr == 0x2A928
@@ -333,9 +322,7 @@ for cursor in range(8):
         assert uc.reg_read(UC_ARM_REG_CPSR) & 0x1F == 0x10
         pages, allocation, _, table = struct.unpack("<4I", uc.mem_read(cpu + 0x914, 16))
         assert 0 < pages <= 256 and allocation and table == 0x08021000
-        descriptors = list(
-            struct.unpack("<" + "I" * pages, uc.mem_read(table, 4 * pages))
-        )
+        descriptors = list(struct.unpack("<" + "I" * pages, uc.mem_read(table, 4 * pages)))
         assert all(value & 0xFFF == 0xFFE for value in descriptors)
         assert bytes(uc.mem_read(table, initial_bytes)) == initial_table
         added = descriptors[initial_bytes // 4 :]
@@ -395,13 +382,9 @@ for cursor in range(8):
         extent = uc.reg_read(UC_ARM_REG_R2)
         assert len(stage1_image) <= extent <= pages * 4096 - 0x400 - 4096
         assert bytes(uc.mem_read(0x01300400, len(stage1_image))) == stage1_image
-        assert all(stage_written[0x400 : 0x400 + extent]), (
-            "Stage1 copy/clear writes omitted"
-        )
+        assert all(stage_written[0x400 : 0x400 + extent]), "Stage1 copy/clear writes omitted"
         tail = extent - len(stage1_image)
-        assert not tail or bytes(
-            uc.mem_read(0x01300400 + len(stage1_image), tail)
-        ) == bytes(tail)
+        assert not tail or bytes(uc.mem_read(0x01300400 + len(stage1_image), tail)) == bytes(tail)
         stack = uc.reg_read(UC_ARM_REG_SP)
         assert stack == 0x01300000 + pages * 4096 - 40
         parameters = struct.unpack("<7I", uc.mem_read(stack, 28))
@@ -415,13 +398,8 @@ for cursor in range(8):
         )
         hpc = uc.reg_read(UC_ARM_REG_R1)
         offset = hpc - stage0 + 20
-        assert (
-            20 <= offset < len(launcher) and 0 < parameters[6] <= len(launcher) - offset
-        )
-        assert (
-            bytes(uc.mem_read(hpc, parameters[6]))
-            == launcher[offset : offset + parameters[6]]
-        )
+        assert 20 <= offset < len(launcher) and 0 < parameters[6] <= len(launcher) - offset
+        assert bytes(uc.mem_read(hpc, parameters[6])) == launcher[offset : offset + parameters[6]]
         rows.append(
             dict(
                 cursor=cursor,
@@ -478,10 +456,7 @@ for cursor in range(8):
             first = (page - 128) * 4096
             uc.mem_write(
                 mapping.physical(page << 12),
-                bytes(
-                    nibbles[i] | nibbles[i + 1] << 4
-                    for i in range(first, first + 4096, 2)
-                ),
+                bytes(nibbles[i] | nibbles[i + 1] << 4 for i in range(first, first + 4096, 2)),
             )
         uc.mem_write(caller_at, struct.pack("<I", caller.value))
         assert word(0x8076B) == original_ip + 16
@@ -569,9 +544,7 @@ report.write_text(
                 "flash": hashlib.sha256(flash).hexdigest(),
                 "launcher": hashlib.sha256(launcher).hexdigest(),
                 "driver": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                "stage1": hashlib.sha256(stage1_image).hexdigest()
-                if stage1_image
-                else None,
+                "stage1": hashlib.sha256(stage1_image).hexdigest() if stage1_image else None,
             },
             rows=rows,
         ),

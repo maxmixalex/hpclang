@@ -184,6 +184,16 @@ int hpclang_rpl_dispatch_reference_visit(const struct hpclang_rpl_reader *reader
                                          const struct hpclang_rpl_dispatch_descriptor *descriptor,
                                          hpclang_rpl_reference_visit_fn visit, void *context);
 
+/* Observe each successful native read used to decode a caller-proven dispatch,
+ * including the scalar type operand or first embedded-entry nibble. Callback
+ * errors propagate unchanged; discard partial edges/guards after any error.
+ * The descriptor and mappings must remain stable. This does not authenticate
+ * the descriptor, inspect the handler or bound the embedded executable body. */
+int hpclang_rpl_dispatch_reference_visit_guarded(
+    const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_dispatch_descriptor *descriptor, hpclang_rpl_reference_visit_fn visit,
+    hpclang_rpl_reference_dependency_fn dependency, void *context);
+
 struct hpclang_rpl_reference_patch
 {
     uint32_t field; /* Old address: apply before moving the containing bytes. */

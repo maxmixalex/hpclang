@@ -190,6 +190,19 @@ target I/O, then preserves the ordinary expected-or-replacement retry rules.
 Resolvers must prove contiguity and stable mappings across the entire batch;
 this adds no permission to write ROM or move objects with unresolved roots.
 
+`hpclang_rpl_dispatch_reference_visit_guarded` records the native reads used
+by the two caller-proven dispatch schemas. These include the dispatch word and
+the scalar type operand or first embedded-entry nibble. Dependency callback
+failures survive parser error conversion; partial output must be discarded.
+Type identifiers remain scalars, while execution and embedded-entry events
+retain their unresolved code obligations. The descriptor's identity and stable
+mapping are caller preconditions; observing bytes does not authenticate code.
+Host regressions check changed dependencies, every read/observer fault, invalid
+nibbles, callback errors and untouched trailing payloads. Offline checks against
+retained HP49g+/HP50g predicate fixtures cover 42 dispatch entries and 332
+observer interruptions; they do not execute a new application or close full
+execution-reference coverage.
+
 The public port adapter treats `HPCLANG_RPL_MUTATION_INCOMPLETE` as terminal.
 `hpclang_runtime_stop` masks IRQ/FIQ and retains the current mappings/ownership
 without destructors, service cleanup or Stock return. Ordinary `exit`/`_Exit`
