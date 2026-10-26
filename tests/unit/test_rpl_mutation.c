@@ -2571,6 +2571,77 @@ static struct hpclang_rpl_mutation_io setup_catalog_growth(void)
     return io;
 }
 
+struct object_guard_state
+{
+    struct hpclang_rpl_reference_guard_builder builder;
+    unsigned edges;
+};
+
+static int catalog_object_edge(void *context, const struct hpclang_rpl_reference *edge)
+{
+    struct object_guard_state *state = context;
+    assert(edge->kind == HPCLANG_RPL_REFERENCE_INLINE || edge->kind == HPCLANG_RPL_REFERENCE_ACPTR);
+    ++state->edges;
+    return 0;
+}
+
+static int catalog_object_dependency(void *context, uint32_t address, uint8_t value)
+{
+    struct object_guard_state *state = context;
+    return hpclang_rpl_reference_guards_observe(&state->builder, 7, address, value);
+}
+
+static void test_catalog_observed_guards(void)
+{
+    uint8_t *before = malloc(sizeof memory);
+    assert(before);
+    /* Reject a changed field or a failed guard read at every observed nibble.
+     * The object lives outside the catalog/root metadata, so those independent
+     * preflights cannot substitute for validating the parser's observations. */
+    for (unsigned fault = 0; fault <= 50; ++fault) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t native = 0x82500, *roots[] = {&native};
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        put_word(0x82500, 5, 0x2a74);
+        put_word(0x82505, 5, 0x2baa);
+        put_word(0x8250a, 5, 0x12345);
+        put_word(0x8250f, 5, 0);
+        put_word(0x82514, 5, 0x312b);
+        struct hpclang_rpl_reference_guard guards[8];
+        struct object_guard_state state = {0};
+        assert(!hpclang_rpl_reference_guards_begin(&state.builder, guards, 8));
+        const struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        const struct hpclang_rpl_reference_node object = {0x82500, 25, 0};
+        struct hpclang_rpl_reference_node work[1];
+        assert(!hpclang_rpl_reference_visit_guarded_nested(
+            &reader, &object, work, 1, 2, catalog_object_edge, catalog_object_dependency, &state));
+        assert(state.edges == 2 && state.builder.count == 5);
+        struct hpclang_rpl_catalog_insertion insertion;
+        assert(hpclang_rpl_catalog_plan_insert(&reader, io.library_table,
+                                               0x100000 - io.library_table, 15, &insertion) == 1);
+        const struct hpclang_rpl_library_binding binding = {0x83022, 0, 0};
+        const struct hpclang_rpl_catalog_repairs repairs = {
+            7, NULL, 0, guards, state.builder.count, NULL, 0};
+        if (fault < 25)
+            memory[0x82500 + fault] ^= 1;
+        else if (fault < 50)
+            rejected_read = 0x82500 + fault - 25;
+        memcpy(before, memory, sizeof memory);
+        int result = hpclang_rpl_catalog_insert_repaired(&io, 15, &binding, &insertion, &repairs);
+        if (fault < 50) {
+            assert(result ==
+                   (fault < 25 ? HPCLANG_RPL_MUTATION_MALFORMED : HPCLANG_RPL_MUTATION_IO));
+            assert(!writes && native == 0x82500 && !memcmp(before, memory, sizeof memory));
+        } else {
+            assert(!result && writes && native == 0x82510);
+            assert(get_word(io.library_table, 3) == 3 && get_word(insertion.slot, 3) == 15);
+            assert(!memcmp(memory + 0x82510, before + 0x82500, 25));
+        }
+    }
+    free(before);
+}
+
 static void test_catalog_insert_commit(void)
 {
     const struct hpclang_rpl_library_binding binding = {0x83022, 0x26c30, 7};
@@ -3257,6 +3328,7 @@ int main(void)
     test_conditional_return_relocation();
     test_return_chain_relocation();
     test_catalog_growth();
+    test_catalog_observed_guards();
     test_catalog_insert_commit();
     test_catalog_switch_growth();
     test_temp_allocation_visit();
