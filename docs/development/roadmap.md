@@ -20,14 +20,15 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
-M8.0 local follow-up `7d34babd` extends terminal commit-failure handling to
+M8.0 follow-up extends terminal commit-failure handling to
 Port0 backup create/replace/remove and library creation, including ARM-root
 changes before the first Saturn write. Four operation fault matrices and four
 public adapter terminal-path cases pass; allocation/preflight controls retain
 unchanged state. Candidate sanitizer tests pass in 45.09 seconds; ARM analysis
 and strict docs pass. Its 62,088-byte image matches the primary build.
-Both HP49g+ registered/unregistered message cases pass; independent validation
-rejects 238 source corruptions. HP50g verification is running. This follow-up is not pushed or CI-accepted.
+All four HP49g+/HP50g registered/unregistered message cases pass; independent
+validation rejects 476 source corruptions. Payload, both launchers and verifier
+inputs match the tested artifacts. Full CI and parent acceptance remain open.
 All eleven preceding-head workflows and every job were inspected: queued or
 pending, with no failures. Parent #22 still has running/queued jobs.
 Complete references, public library management, Port1 edits and Port2 recovery,
