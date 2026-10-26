@@ -27,6 +27,7 @@ parser.add_argument("--output", type=Path, required=True)
 parser.add_argument("--cc", default="cc")
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
+(args.output / "bank-execution.json").unlink(missing_ok=True)
 states = []
 for item in args.state:
     model, path = item.split(":", 1)
@@ -45,6 +46,17 @@ subprocess.run(
         "-I" + str(root / "include"),
         "-I" + str(root / "runtime/core"),
         str(root / "runtime/core/rpl-stock-memory.c"),
+        *[
+            str(root / "runtime/core" / name)
+            for name in (
+                "rpl-reference.c",
+                "rpl-code.c",
+                "rpl-backup.c",
+                "rpl-port.c",
+                "rpl-object-store.c",
+                "rpl-object-span.c",
+            )
+        ],
         str(root / "tests/unit/test_rpl_stock_memory.c"),
         "-o",
         str(shared),
@@ -53,6 +65,30 @@ subprocess.run(
 )
 rows = []
 lib = c.CDLL(str(shared.resolve()))
+
+
+class Edge(c.Structure):
+    _fields_ = [(name, c.c_uint32) for name in ("kind", "field", "target", "extent", "auxiliary")]
+
+
+class Mappings(c.Structure):
+    _fields_ = [(name, c.c_uint32) for name in ("field", "target", "moving")]
+
+
+class Patch(c.Structure):
+    _fields_ = [(name, c.c_uint32) for name in ("field", "value")]
+
+
+lib.hpclang_rpl_reference_plan_offset_shift.argtypes = [
+    c.POINTER(Edge),
+    c.POINTER(Mappings),
+    c.c_int32,
+    c.c_int32,
+    c.c_uint32,
+    c.c_uint32,
+    c.c_int32,
+    c.POINTER(Patch),
+]
 lib.hpclang_rpl_stock_resolve_span.argtypes = [
     c.POINTER(c.c_uint32),
     c.c_uint32,
@@ -179,6 +215,39 @@ for (model, state), cursor in itertools.product(states, range(8)):
         )
         comparisons += 2
     rows[-1]["executed_map_comparisons"] = comparisons
+    # Hypothetical shift only: these ROM ranges are not writable allocations.
+    # Derive the translation from the executed maps, then verify the native
+    # patched address resolves to the canonical destination's physical nibble.
+    target_offset = 2 * (views[0][1] - views[1][1])
+    assert target_offset == -0x30000
+    for offset in (0, 1, 0xFFE, 0xFFF, 0xFEFF):
+        edge = Edge(3, 0x80000, 0x70000 + offset, 0, entries[0][1])
+        mappings = Mappings(2, 1, 1)
+        patch = Patch(0xDEAD, 0xBEEF)
+        assert (
+            lib.hpclang_rpl_reference_plan_offset_shift(
+                c.byref(edge),
+                c.byref(mappings),
+                0,
+                target_offset,
+                0x40000,
+                0x4FF00,
+                16,
+                c.byref(patch),
+            )
+            == 1
+        )
+        assert patch.field == edge.field and patch.value == edge.target + 16
+        native, canonical = c.c_uint32(), c.c_uint32()
+        assert lib.hpclang_rpl_stock_resolve_span(views[0][0], patch.value, 1, c.byref(native)) == 0
+        assert (
+            lib.hpclang_rpl_stock_resolve_span(
+                views[1][0], 0x40000 + offset + 16, 1, c.byref(canonical)
+            )
+            == 0
+        )
+        assert native.value == canonical.value
+    rows[-1]["offset_plan_checks"] = 5
     print(
         "PASS",
         model,

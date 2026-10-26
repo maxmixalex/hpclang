@@ -604,6 +604,84 @@ static void dispatch_schemas(void)
            HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+static void offset_relocation(void)
+{
+    const struct hpclang_rpl_reference_patch unchanged = {0xabcde, 0x12345};
+    struct hpclang_rpl_reference_patch patch = unchanged;
+    struct hpclang_rpl_reference_mappings maps = {2, 1, 1};
+    struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_ACPTR, 0x80000, 0x70011, 0, 123};
+    /* Bank 0's 70011 aliases bank 1's 40011; keep the original encoding. */
+    assert(hpclang_rpl_reference_plan_offset_shift(&edge, &maps, 0, -0x30000, 0x40000, 0x40100, 16,
+                                                   &patch) == 1);
+    assert(patch.field == edge.field && patch.value == 0x70021);
+    /* An equal-looking address in a proven-disjoint mapping does not move. */
+    maps.target = 3;
+    patch = unchanged;
+    assert(!hpclang_rpl_reference_plan_offset_shift(&edge, &maps, 0, -0x30000, 0x40000, 0x40100, 16,
+                                                    &patch));
+    assert(!memcmp(&patch, &unchanged, sizeof patch));
+    /* Independently translated relative endpoints; compare actual encoded
+     * subtraction, including cases where one or both endpoints move. */
+    for (unsigned field_moves = 0; field_moves < 2; ++field_moves) {
+        for (unsigned target_moves = 0; target_moves < 2; ++target_moves) {
+            for (int delta = -32; delta <= 32; delta += 64) {
+                maps = (struct hpclang_rpl_reference_mappings){1, 1, 1};
+                edge = (struct hpclang_rpl_reference){HPCLANG_RPL_REFERENCE_DIRECT, 0x70000,
+                                                      0x60000, 0, 1};
+                int32_t field_offset = field_moves ? -0x2fff0 : -0x30020;
+                int32_t target_offset = target_moves ? -0x1ffe0 : -0x1ff00;
+                uint32_t before = (edge.target - edge.field) & 0xfffff;
+                uint32_t expected =
+                    (uint32_t)((int64_t)edge.target + (int64_t)target_moves * delta - edge.field -
+                               (int64_t)field_moves * delta) &
+                    0xfffff;
+                patch = unchanged;
+                int result = hpclang_rpl_reference_plan_offset_shift(
+                    &edge, &maps, field_offset, target_offset, 0x40000, 0x40100, delta, &patch);
+                assert(result == (expected != before));
+                if (result)
+                    assert(patch.field == edge.field && patch.value == expected);
+                else
+                    assert(!memcmp(&patch, &unchanged, sizeof patch));
+            }
+        }
+    }
+    edge = (struct hpclang_rpl_reference){HPCLANG_RPL_REFERENCE_DIRECT, 0x70000, 0x60000, 0, 0};
+    /* Every split through the five-nibble field is rejected in translated coordinates. */
+    for (int split = 1; split < 5; ++split) {
+        patch = unchanged;
+        assert(hpclang_rpl_reference_plan_offset_shift(&edge, &maps, -0x30000 - split, 0, 0x40000,
+                                                       0x40100, 16,
+                                                       &patch) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(hpclang_rpl_reference_plan_offset_shift(&edge, &maps, -0x2ff00 - split, 0, 0x40000,
+                                                       0x40100, 16,
+                                                       &patch) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&patch, &unchanged, sizeof patch));
+    }
+    /* Normalized destinations fit, but native encoding may still overflow. */
+    for (unsigned endpoint = 0; endpoint < 2; ++endpoint) {
+        for (unsigned high = 0; high < 2; ++high) {
+            edge.field = endpoint ? 0x80000 : (high ? 0xffffb : 0);
+            edge.target = endpoint ? (high ? 0xfffff : 0) : 0x80000;
+            int32_t field_offset = endpoint ? 0 : 0x40010 - (int32_t)edge.field;
+            int32_t target_offset = endpoint ? 0x40010 - (int32_t)edge.target : 0;
+            patch = unchanged;
+            assert(hpclang_rpl_reference_plan_offset_shift(
+                       &edge, &maps, field_offset, target_offset, 0x40000, 0x40100, high ? 16 : -32,
+                       &patch) == HPCLANG_RPL_SPAN_BOUNDS);
+            assert(!memcmp(&patch, &unchanged, sizeof patch));
+        }
+    }
+    edge = (struct hpclang_rpl_reference){HPCLANG_RPL_REFERENCE_DIRECT, 0x70000, 0x60000, 0, 0};
+    assert(!hpclang_rpl_reference_plan_offset_shift(&edge, &maps, INT32_MIN, INT32_MAX, 0x40000,
+                                                    0x40100, 16, &patch));
+    edge.kind = HPCLANG_RPL_REFERENCE_EXECUTION;
+    assert(hpclang_rpl_reference_plan_offset_shift(&edge, &maps, 0, 0, 0x40000, 0x40100, 16,
+                                                   &patch) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_reference_plan_offset_shift(&edge, NULL, 0, 0, 0x40000, 0x40100, 16,
+                                                   &patch) == HPCLANG_RPL_SPAN_MALFORMED);
+}
+
 static void qualified_relocation(void)
 {
     struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_ACPTR, 0x100, 0x120, 0, 0x23456};
@@ -1089,6 +1167,67 @@ static void execution_address_planning(void)
     assert(!memcmp(&patch, &unchanged, sizeof patch));
 }
 
+static int catalog_alias_locations(void *context, const struct hpclang_rpl_library_binding *binding,
+                                   struct hpclang_rpl_catalog_locations *locations)
+{
+    (void)binding;
+    *locations = *(const struct hpclang_rpl_catalog_locations *)context;
+    return 0;
+}
+
+static void catalog_offset_plans(void)
+{
+    struct mapped_images images = {.banks = {{.size = 19, .fail = UINT32_MAX}}};
+    struct image *image = &images.banks[0];
+    put(image, 0, 1, 3);
+    put(image, 3, 275, 3);
+    put(image, 6, 0x70020, 5);
+    put(image, 11, 0x60030, 5);
+    put(image, 16, 7, 3);
+    const struct hpclang_rpl_reader reader = {read_nibble, image};
+    const struct hpclang_rpl_reference_reader mapped = {mapped_read, &images};
+    struct hpclang_rpl_reference_edit edits[2];
+    struct hpclang_rpl_reference_guard guards[3];
+    struct hpclang_rpl_catalog_reference_plan plan = {edits, 2, 0, guards, 3, 0};
+    struct hpclang_rpl_catalog_locations locations = {{1, 1}, -0x30000, -0x20000};
+    struct hpclang_rpl_catalog_move move = {0, 1, 0x40000, 0x40100, 16};
+    assert(!hpclang_rpl_catalog_plan_relocation_offsets(
+        &reader, 0, 19, &move, 0, catalog_alias_locations, &locations, &plan));
+    assert(plan.edit_count == 2 && plan.guard_count == 3);
+    assert(edits[0].field == 6 && edits[0].expected == 0x70020 && edits[0].value == 0x70030);
+    assert(edits[1].field == 11 && edits[1].expected == 0x60030 && edits[1].value == 0x60040);
+    assert(!hpclang_rpl_reference_edits_validate(&mapped, edits, 2));
+    assert(!hpclang_rpl_reference_guards_validate(&mapped, guards, 3));
+    for (unsigned nibble = 0; nibble < 19; ++nibble) {
+        image->data[nibble] ^= 1;
+        assert(hpclang_rpl_reference_edits_validate(&mapped, edits, 2) ||
+               hpclang_rpl_reference_guards_validate(&mapped, guards, 3));
+        image->data[nibble] ^= 1;
+    }
+    /* Partial translated field, missing resolver and changed function sentinel
+     * invalidate all output counts, including already prepared payload edits. */
+    move.catalog_mapping = 1;
+    assert(hpclang_rpl_catalog_plan_relocation_offsets(&reader, 0, 19, &move, 0x3fff8,
+                                                       catalog_alias_locations, &locations,
+                                                       &plan) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!plan.edit_count && !plan.guard_count);
+    move.catalog_mapping = 0;
+    assert(hpclang_rpl_catalog_plan_relocation_offsets(&reader, 0, 19, &move, 0, NULL, &locations,
+                                                       &plan) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!plan.edit_count && !plan.guard_count);
+    put(image, 11, 16, 5);
+    locations.bank_switch_offset = 0x40000;
+    move.delta = -16;
+    assert(hpclang_rpl_catalog_plan_relocation_offsets(&reader, 0, 19, &move, 0,
+                                                       catalog_alias_locations, &locations,
+                                                       &plan) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!plan.edit_count && !plan.guard_count);
+    put(image, 11, 0, 5);
+    assert(!hpclang_rpl_catalog_plan_relocation_offsets(
+        &reader, 0, 19, &move, 0, catalog_alias_locations, &locations, &plan));
+    assert(!edits[1].expected && !edits[1].value);
+}
+
 static void catalog_executable_switches(void)
 {
     struct image image = {.size = 19, .fail = UINT32_MAX};
@@ -1540,6 +1679,7 @@ int main(void)
     compact_guard_observations();
     catalog_relocation_plan();
     catalog_executable_switches();
+    catalog_offset_plans();
     execution_address_planning();
     rebuilt_catalog_replay();
     for (unsigned first = 1; first <= 5; ++first)
@@ -1548,6 +1688,7 @@ int main(void)
     metadata_guards();
     batch_preflight();
     qualified_relocation();
+    offset_relocation();
     dispatch_schemas();
     execution_entries();
     relocation_patches();

@@ -103,6 +103,16 @@ address offsets. Unused
 bank 14/15 entries select unaligned placeholder pages, which these helpers
 reject. The offline `bank_switch.py` check executes the original switches;
 it does not establish arbitrary bank lifetimes or authorize movement.
+For proven affine aliases, `hpclang_rpl_reference_plan_offset_shift` tests
+membership in the moving range using independent field/target offsets, while
+preserving native patch addresses and relative encodings. The caller must
+establish that each translation and delta applies across all old/new ranges.
+The planner rejects split fields and native encoding overflow; it does not
+resolve discontinuous mappings or bypass executable-reference obligations.
+`hpclang_rpl_catalog_plan_relocation_offsets` applies those translations to
+catalog payloads and switch-function targets independently. Its edits/guards
+keep original catalog addresses for the existing preflight/commit path; zero
+switches stay zero and nonzero function targets cannot become zero.
 
 ## Platform families and model profiles
 

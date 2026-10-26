@@ -723,6 +723,19 @@ The comparisons include these aliases, opposite-parity non-aliases, every
 pair of selected windows and rejection of bank 14/15's unaligned placeholders.
 The caller must normalize physical identity and address offsets before using
 qualified reference plans; unequal bank indices alone cannot prove disjointness.
+The offset planner additionally passes 160 hypothetical alias repairs using
+translations derived from these executed maps. Resolving each patched native
+address must yield the canonical destination's physical nibble. This does not
+write ROM or treat the aliased tail as a writable allocation. Unit regressions
+cover independent relative endpoints, split fields, native encoding overflow
+and unchanged output on rejection. The checker removes stale reports on entry.
+Catalog-plan integration checks payload and switch offsets independently,
+including sentinel preservation and invalidation of partial output. A controlled
+alias catalog feeds its generated edits/guards into actual catalog insertion:
+19 changed nibbles and 19 read failures reject with no native/ARM-root writes
+and an unchanged memory snapshot; the unchanged case repairs the encoded alias,
+moves the catalog/root and completes insertion. This synthetic mapping test
+does not establish complete live roots for public library operations.
 This is a reviewed firmware-profile check, not general ROM discovery,
 allocation/liveness proof, hardware acceptance or permission to relocate.
 

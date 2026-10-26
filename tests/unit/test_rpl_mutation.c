@@ -2591,6 +2591,63 @@ static int catalog_object_dependency(void *context, uint32_t address, uint8_t va
     return hpclang_rpl_reference_guards_observe(&state->builder, 7, address, value);
 }
 
+static int alias_catalog_location(void *context, const struct hpclang_rpl_library_binding *binding,
+                                  struct hpclang_rpl_catalog_locations *locations)
+{
+    (void)context;
+    (void)binding;
+    *locations = (struct hpclang_rpl_catalog_locations){{7, 9}, 0x12580, 0};
+    return 0;
+}
+
+static void test_catalog_alias_repairs(void)
+{
+    uint8_t *before = malloc(sizeof memory);
+    assert(before);
+    for (unsigned fault = 0; fault <= 38; ++fault) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t native = 0x82500, *roots[] = {&native};
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        /* Controlled independent catalog: its native target encoding aliases
+         * 82580 in the moving region. No actual ROM bank is written. */
+        put_word(0x82500, 3, 1);
+        put_word(0x82503, 3, 275);
+        put_word(0x82506, 5, 0x70000);
+        put_word(0x8250b, 5, 0);
+        put_word(0x82510, 3, 7);
+        const struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        const struct hpclang_rpl_catalog_move move = {7, 7, 0x82013, 0x83005, 16};
+        struct hpclang_rpl_reference_edit edits[2];
+        struct hpclang_rpl_reference_guard guards[3];
+        struct hpclang_rpl_catalog_reference_plan refs = {edits, 2, 0, guards, 3, 0};
+        assert(!hpclang_rpl_catalog_plan_relocation_offsets(&reader, 0x82500, 19, &move, 0,
+                                                            alias_catalog_location, NULL, &refs));
+        struct hpclang_rpl_catalog_insertion insertion;
+        assert(hpclang_rpl_catalog_plan_insert(&reader, io.library_table,
+                                               0x100000 - io.library_table, 15, &insertion) == 1);
+        const struct hpclang_rpl_library_binding binding = {0x83022, 0, 0};
+        const struct hpclang_rpl_catalog_repairs repairs = {
+            7, edits, refs.edit_count, guards, refs.guard_count, NULL, 0};
+        if (fault < 19)
+            memory[0x82500 + fault] ^= 1;
+        else if (fault < 38)
+            rejected_read = 0x82500 + fault - 19;
+        memcpy(before, memory, sizeof memory);
+        int result = hpclang_rpl_catalog_insert_repaired(&io, 15, &binding, &insertion, &repairs);
+        if (fault < 38) {
+            assert(result ==
+                   (fault < 19 ? HPCLANG_RPL_MUTATION_MALFORMED : HPCLANG_RPL_MUTATION_IO));
+            assert(!writes && native == 0x82500 && !memcmp(before, memory, sizeof memory));
+        } else {
+            assert(!result && writes && native == 0x82510);
+            assert(get_word(0x82516, 5) == 0x70010 && get_word(0x8251b, 5) == 0);
+            assert(get_word(io.library_table, 3) == 3);
+        }
+    }
+    free(before);
+}
+
 static void test_catalog_observed_guards(void)
 {
     uint8_t *before = malloc(sizeof memory);
@@ -3329,6 +3386,7 @@ int main(void)
     test_return_chain_relocation();
     test_catalog_growth();
     test_catalog_observed_guards();
+    test_catalog_alias_repairs();
     test_catalog_insert_commit();
     test_catalog_switch_growth();
     test_temp_allocation_visit();

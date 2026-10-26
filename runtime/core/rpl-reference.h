@@ -202,8 +202,10 @@ int hpclang_rpl_reference_plan_shift(const struct hpclang_rpl_reference *referen
                                      struct hpclang_rpl_reference_patch *patch);
 
 /* Identities of resolved physical mappings, assigned by the caller. The field
- * and target must each be qualified separately; identical Saturn addresses in
- * different banks do not alias. These are not raw bank-switch entry addresses.
+ * and target must each be qualified separately; bank indices alone cannot
+ * establish disjointness. Equal identities require common address coordinates
+ * in plan_qualified_shift; translated aliases need plan_offset_shift below.
+ * These are not raw bank-switch entry addresses.
  * Resolve ACPTR switches and catalog bindings before supplying these identities.
  * Keep mappings stable throughout planning and commit. */
 struct hpclang_rpl_reference_mappings
@@ -220,6 +222,23 @@ int hpclang_rpl_reference_plan_qualified_shift(
     const struct hpclang_rpl_reference *reference,
     const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
     int32_t delta, struct hpclang_rpl_reference_patch *patch);
+
+/* As qualified_shift, but field+field_offset and target+target_offset locate
+ * each address in the moving region's coordinates. Offsets affect membership
+ * only: patches retain the old source field and native encoded addresses.
+ * Relative encodings account for movement of either endpoint independently.
+ * Caller must prove these affine translations and the same delta remain valid
+ * across the entire relevant old/new ranges; aliases spanning discontinuities
+ * require separate resolution. Distinct mapping identities mean proven physical
+ * disjointness, not merely unequal bank numbers. Out-of-range native encodings
+ * or partially moved five-nibble fields reject without changing output.
+ * No map discovery, switch changes, code inspection or write authorization.
+ * EXECUTION remains unsupported; its code obligations are not bypassed. */
+int hpclang_rpl_reference_plan_offset_shift(const struct hpclang_rpl_reference *reference,
+                                            const struct hpclang_rpl_reference_mappings *mappings,
+                                            int32_t field_offset, int32_t target_offset,
+                                            uint32_t first, uint32_t end, int32_t delta,
+                                            struct hpclang_rpl_reference_patch *patch);
 
 /* Explicitly plan the stored five-nibble address of an EXECUTION event after
  * independently resolving its field and target mappings. Accept only that event
@@ -338,6 +357,31 @@ int hpclang_rpl_catalog_plan_relocation(const struct hpclang_rpl_reader *reader,
                                         uint32_t limit, const struct hpclang_rpl_catalog_move *move,
                                         hpclang_rpl_catalog_mapping_fn resolve, void *context,
                                         struct hpclang_rpl_catalog_reference_plan *plan);
+
+struct hpclang_rpl_catalog_locations
+{
+    struct hpclang_rpl_catalog_mappings mappings;
+    int32_t payload_offset, bank_switch_offset;
+};
+typedef int (*hpclang_rpl_catalog_location_fn)(void *context,
+                                               const struct hpclang_rpl_library_binding *binding,
+                                               struct hpclang_rpl_catalog_locations *locations);
+
+/* Catalog plan with independently proven affine translations into the moving
+ * region's coordinates. catalog_offset applies to catalog fields; the resolver
+ * supplies payload and executable-switch offsets independently. Same proofs and
+ * old/native-address output contract as plan_offset_shift. Guards and edits
+ * retain catalog_mapping and original catalog addresses for validation/commit.
+ * Offsets never alter zero switch sentinels or permit a function target to become
+ * zero. Execution-code inspection and complete roots remain separate obligations.
+ * Same capacities, zero counts on error and stable-input requirements as above. */
+int hpclang_rpl_catalog_plan_relocation_offsets(const struct hpclang_rpl_reader *reader,
+                                                uint32_t address, uint32_t limit,
+                                                const struct hpclang_rpl_catalog_move *move,
+                                                int32_t catalog_offset,
+                                                hpclang_rpl_catalog_location_fn resolve,
+                                                void *context,
+                                                struct hpclang_rpl_catalog_reference_plan *plan);
 
 int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_reader *reader,
                                           const struct hpclang_rpl_reference_guard *guards,
