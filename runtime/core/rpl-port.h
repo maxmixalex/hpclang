@@ -96,6 +96,25 @@ int hpclang_rpl_catalog_plan_insert(const struct hpclang_rpl_reader *reader, uin
                                     uint32_t limit, uint32_t number,
                                     struct hpclang_rpl_catalog_insertion *plan);
 
+struct hpclang_rpl_catalog_removal
+{
+    uint32_t slot;
+    uint32_t end;
+    uint32_t count;
+    struct hpclang_rpl_library_binding binding;
+};
+
+/* Plan removal from the strictly ID-ordered catalog. Validate the entire table,
+ * including entries after the match, before publishing its slot and binding.
+ * Returns 1 found, 0 absent, or a negative span result; output changes only on
+ * 1. This read-only plan does not prove that the library is detached or unused.
+ * The caller must prove those conditions, revalidate the plan under stable
+ * ownership, repair references and compact memory before publishing a removal.
+ * The binding retains its native bank coordinates; no payload is dereferenced. */
+int hpclang_rpl_catalog_plan_remove(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                    uint32_t limit, uint32_t number,
+                                    struct hpclang_rpl_catalog_removal *plan);
+
 /* Enumerate every catalog entry, including banked and duplicate-ID records.
  * The record address identifies the catalog cell, not the library payload.
  * The binding is callback-local; copy it if needed. No target is dereferenced.

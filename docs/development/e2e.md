@@ -661,7 +661,7 @@ before/PASS/return images so later shards cannot hide the failing screen.
 ### Native launcher observation in call-root cases
 
 `tests/e2e/code-relocation/call_roots.py` creates a fixed 128-byte `ENTRYOBS`
-string before launching its original-return case and five controlled call-root
+string before launching its two original-return cases and five controlled call-root
 cases. The native
 payload fills that string after bootstrap, before creating its test library or
 rewriting the suspended return path. It captures the native page-pool count and
@@ -686,6 +686,16 @@ post-launch marker, all existing catalog bindings must survive, and library 123
 must resolve to its new Port0 record. This covers the unmodified launcher return
 in the controlled clean-state fixture; it does not establish complete opaque
 object or banked-reference safety for arbitrary applications.
+
+The `native-remove` case adds a zero-byte selector to that marker. It inserts
+the fixture binding, independently rescans the resulting roots and objects,
+then removes the binding using a negative relocation delta. Before returning,
+the payload compares every nibble from the original catalog through the original
+return-stack end against its pre-insertion snapshot, and checks native roots,
+TEMP boundaries, HOME and AVMEM. The host requires the original catalog exactly,
+the still-stored Port0 library, unchanged Flash and the real caller's marker.
+This exercises internal registration/unregistration geometry without deleting
+the payload or proving general-purpose detachment and execution liveness.
 
 Catalog-growth fixtures record native nibble dependencies from both root scans
 and nested object traversal, coalesce them into a bounded guard array and pass

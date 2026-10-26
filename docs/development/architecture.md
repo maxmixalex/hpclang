@@ -113,6 +113,21 @@ resolve discontinuous mappings or bypass executable-reference obligations.
 catalog payloads and switch-function targets independently. Its edits/guards
 keep original catalog addresses for the existing preflight/commit path; zero
 switches stay zero and nonzero function targets cannot become zero.
+`hpclang_rpl_catalog_plan_remove` validates the complete ordered catalog before
+returning a removal slot, original count/end and native library binding. Missing
+IDs and malformed or unreadable tables leave the output unchanged. This is a
+read-only prerequisite for unloading: callers must still prove detachment and
+reference liveness, revalidate under ownership, and repair references while
+compacting the table. It neither unregisters nor deletes a library record.
+The internal `hpclang_rpl_catalog_remove_repaired` commit revalidates that plan
+and its binding, contracts the catalog/metadata/TEMP/return-stack suffix by
+16 nibbles, applies caller-proven repairs and publishes the count last. Roots
+into the removed catalog cell prevent contraction. Supplied fields in that
+cell are rejected; surviving native/register roots and embedded fields retain
+their normal preflight checks. A commit read/write failure is `INCOMPLETE`:
+ownership must be retained, with no retry or Stock return. This is not yet a
+public unload service: detachment, execution-reference coverage and payload
+deletion remain separate obligations.
 `hpclang_rpl_reference_edits_check_aliases` resolves complete fields before
 checking physical overlap, including different IDs/coordinates and repeated
 pages within one map. The mapped RAM replay entry performs this check before

@@ -10,6 +10,7 @@ from fixtures import word
 
 CASES = {
     "native": b"",
+    "native-remove": b"\0",
     "gosub": bytes([0x27, 0, 0x10, 0x10]),
     "gosub-rtnsxm": bytes([0x27, 0, 0x10, 0x00]),
     "gosub-rtnnc": bytes([0x37, 0, 0x05, 0, 0x03]),
@@ -29,7 +30,7 @@ def catalog_records(read):
     ]
 
 
-def verify_bindings(before, read):
+def verify_bindings(before, read, *, removed=False):
     """Check complete records and independently locate the fixture in Port 0."""
     records = catalog_records(read)
     if [record for record in records if record[0] != 123] != before:
@@ -53,7 +54,8 @@ def verify_bindings(before, read):
         at += span
     else:
         raise ValueError("Missing native Port 0 terminator")
-    if len(matches) != 1 or [record for record in records if record[0] == 123] != matches:
+    expected = [] if removed else matches
+    if len(matches) != 1 or [record for record in records if record[0] == 123] != expected:
         raise ValueError("Catalog binding does not identify the Port 0 fixture")
 
 
@@ -166,7 +168,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if read(obj) != 0x2A2C or read(obj + 5) != 5 + 2 * len(expected):
             raise ValueError("Call fixture object changed")
         actual = bytes(read(obj + 10 + 2 * i, 2) for i in range(len(expected)))
-        if name in ("native", "gosub-rtnnc"):
+        if name in ("native", "native-remove", "gosub-rtnnc"):
             valid = actual == expected
         elif name == "gosbvl":
             valid = (
@@ -186,16 +188,19 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if not valid:
             raise ValueError("Native call operands/return payload changed")
         ids = [read(0x86120 + 16 * i, 3) for i in range(read(0x8611D, 3))]
-        if ids != sorted(original_ids + [123]) or len(ids) != len(set(ids)):
-            raise ValueError("Native call did not preserve the catalog and add library 123")
-        verify_bindings(original_records, read)
+        removed = name == "native-remove"
+        expected_ids = original_ids if removed else sorted(original_ids + [123])
+        if ids != expected_ids or len(ids) != len(set(ids)):
+            raise ValueError("Native call did not produce the expected catalog")
+        verify_bindings(original_records, read, removed=removed)
         results.append(
             dict(
                 case=name,
                 returned=True,
                 flash_unchanged=True,
-                rewritten_return=name != "native",
+                rewritten_return=name not in ("native", "native-remove"),
+                catalog_removed=removed,
             )
         )
-        print(f"PASS: {args.model}: native {name} roots and catalog growth", flush=True)
+        print(f"PASS: {args.model}: native {name} roots and catalog checks", flush=True)
     (output / "result.json").write_text(json.dumps(results, indent=2) + "\n")

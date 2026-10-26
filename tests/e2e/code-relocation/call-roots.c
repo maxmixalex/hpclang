@@ -10,7 +10,7 @@
 #include "rpl-port.h"
 #include "rpl-port-mutation.h"
 extern volatile uint32_t hpclang_e2e_result;
-static int prepare_call(struct hpclang_rpl_mutation_io *, uint32_t **);
+static int prepare_call(struct hpclang_rpl_mutation_io *, uint32_t **, int *);
 
 /* Controlled Stock fixture only: the clean test catalog and fixture programs
  * supply the input provenance. Opaque execution coverage stays unresolved;
@@ -19,6 +19,7 @@ struct live_probe
 {
     struct hpclang_rpl_mutation_io *io;
     uint32_t first, end, roots[2048], root_count;
+    int32_t delta;
     struct hpclang_rpl_reference_edit_builder builder;
     struct hpclang_rpl_reference_edit edits[4096];
     struct hpclang_rpl_reference_guard_builder guard_builder;
@@ -80,7 +81,7 @@ static int probe_edge(void *context, const struct hpclang_rpl_reference *edge)
     struct hpclang_rpl_reference_mappings maps = {1, target, 1};
     struct hpclang_rpl_reference_patch patch;
     int result =
-        hpclang_rpl_reference_plan_qualified_shift(edge, &maps, p->first, p->end, 16, &patch);
+        hpclang_rpl_reference_plan_qualified_shift(edge, &maps, p->first, p->end, p->delta, &patch);
     if (result <= 0)
         return result;
     uint32_t old;
@@ -107,6 +108,39 @@ static int probe_node(struct live_probe *p, struct hpclang_rpl_reader *reader, u
     return hpclang_rpl_reference_visit_guarded_nested(reader, &node, p->work, 512, 10000,
                                                       probe_edge, probe_dependency, p);
 }
+static int probe_collect(struct live_probe *p, struct hpclang_rpl_reader *reader, uint32_t home,
+                         uint32_t bottom, uint32_t top)
+{
+    hpclang_rpl_reference_edits_begin(&p->builder, p->edits, 4096);
+    hpclang_rpl_reference_guards_begin(&p->guard_builder, p->guards, 4096);
+    int result = 6;
+    if (hpclang_rpl_mutation_visit_guarded_roots(p->io, probe_root, probe_dependency, p))
+        return result;
+    result = 7;
+    if (probe_node(p, reader, home, 0x100000 - home))
+        return result;
+    uint32_t at = top;
+    while (at > bottom + 5) {
+        uint32_t size;
+        if (probe_read_word(p->io, at - 5, 5, &size) || size < 11 || size > at - bottom - 5)
+            return result;
+        uint32_t object = at - size + 1, stop = at - 5;
+        while (object < stop) {
+            uint32_t span;
+            if (hpclang_rpl_object_span(reader, object, stop - object, &span) || !span ||
+                probe_node(p, reader, object, span))
+                return result;
+            object += span;
+        }
+        at -= size;
+    }
+    const struct hpclang_rpl_reference_reader mapped = {probe_mapped_read, p->io};
+    result = 8;
+    if (hpclang_rpl_reference_edits_validate(&mapped, p->edits, p->builder.count))
+        return result;
+    return 0;
+}
+
 static int probe_register(void)
 {
     struct hpclang_rpl_stock_memory memory;
@@ -114,7 +148,8 @@ static int probe_register(void)
     if (!hpclang_rpl_stock_mutation_io(&io, &memory))
         return 1;
     uint32_t *roots[10];
-    if (prepare_call(&io, roots))
+    int remove = 0;
+    if (prepare_call(&io, roots, &remove))
         return 61;
     struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
     struct hpclang_rpl_catalog_insertion insertion;
@@ -138,35 +173,30 @@ static int probe_register(void)
     struct live_probe *p = calloc(1, sizeof *p);
     if (!p)
         return 5;
+    uint32_t snapshot_size = end - io.library_table;
+    uint8_t *snapshot = remove ? malloc(snapshot_size) : NULL;
+    uint32_t native_before[3], avmem_before;
+    if (remove) {
+        if (!snapshot || probe_read_word(&io, 0x80e9b, 5, &avmem_before)) {
+            free(snapshot);
+            free(p);
+            return 9;
+        }
+        for (uint32_t i = 0; i < snapshot_size; ++i)
+            if (!io.read_nibble(io.context, io.library_table + i, snapshot + i)) {
+                free(snapshot);
+                free(p);
+                return 9;
+            }
+        for (unsigned i = 0; i < 3; ++i)
+            native_before[i] = *io.native_roots[i];
+    }
     p->io = &io;
     p->first = insertion.slot;
     p->end = end;
-    hpclang_rpl_reference_edits_begin(&p->builder, p->edits, 4096);
-    hpclang_rpl_reference_guards_begin(&p->guard_builder, p->guards, 4096);
-    int result = 6;
-    if (hpclang_rpl_mutation_visit_guarded_roots(&io, probe_root, probe_dependency, p))
-        goto done;
-    result = 7;
-    if (probe_node(p, &reader, home, 0x100000 - home))
-        goto done;
-    uint32_t at = top;
-    while (at > bottom + 5) {
-        uint32_t size;
-        if (probe_read_word(&io, at - 5, 5, &size) || size < 11 || size > at - bottom - 5)
-            goto done;
-        uint32_t object = at - size + 1, stop = at - 5;
-        while (object < stop) {
-            uint32_t span;
-            if (hpclang_rpl_object_span(&reader, object, stop - object, &span) || !span ||
-                probe_node(p, &reader, object, span))
-                goto done;
-            object += span;
-        }
-        at -= size;
-    }
-    const struct hpclang_rpl_reference_reader mapped = {probe_mapped_read, &io};
-    result = 8;
-    if (hpclang_rpl_reference_edits_validate(&mapped, p->edits, p->builder.count))
+    p->delta = 16;
+    int result = probe_collect(p, &reader, home, bottom, top);
+    if (result)
         goto done;
     const struct hpclang_rpl_catalog_repairs repairs = {
         1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0};
@@ -177,10 +207,48 @@ static int probe_register(void)
         for (;;)
             __asm__ volatile("nop");
     }
+    if (remove) {
+        struct hpclang_rpl_catalog_removal removal;
+        memset(p, 0, sizeof *p);
+        p->io = &io;
+        p->first = insertion.slot + 16;
+        p->end = end + 16;
+        p->delta = -16;
+        uint32_t current_home;
+        if (probe_read_word(&io, 0x80711, 5, &current_home) ||
+            probe_collect(p, &reader, current_home, bottom + 16, top + 16) ||
+            hpclang_rpl_catalog_plan_remove(&reader, io.library_table, 0x100000 - io.library_table,
+                                            123, &removal) != 1)
+            goto failed_roundtrip;
+        const struct hpclang_rpl_catalog_repairs undo = {
+            1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0};
+        if (hpclang_rpl_catalog_remove_repaired(&io, 123, &removal, &undo))
+            goto failed_roundtrip;
+        for (uint32_t i = 0; i < snapshot_size; ++i) {
+            uint8_t value;
+            if (!io.read_nibble(io.context, io.library_table + i, &value) || value != snapshot[i])
+                goto failed_roundtrip;
+        }
+        for (unsigned i = 0; i < 3; ++i)
+            if (*io.native_roots[i] != native_before[i])
+                goto failed_roundtrip;
+        const uint32_t fields[] = {0x806e9, 0x806ee, 0x806f3, 0x80711, 0x80e9b};
+        const uint32_t values[] = {bottom, top, end, home, avmem_before};
+        for (unsigned i = 0; i < 5; ++i) {
+            uint32_t value;
+            if (probe_read_word(&io, fields[i], 5, &value) || value != values[i])
+                goto failed_roundtrip;
+        }
+    }
     result = 0;
 done:
+    free(snapshot);
     free(p);
     return result;
+failed_roundtrip:
+    hpclang_e2e_result = 0x46410ffd;
+    for (;;)
+        __asm__ volatile("nop");
 }
 
 static int stage_word(void *context, uint32_t at, unsigned width, uint32_t *value)
@@ -188,7 +256,7 @@ static int stage_word(void *context, uint32_t at, unsigned width, uint32_t *valu
     return !probe_read_word(context, at, width, value);
 }
 
-static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots)
+static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots, int *remove)
 {
     if (io->native_root_count != 3 || !io->native_roots[1])
         return -1;
@@ -205,6 +273,10 @@ static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots)
      * original return roots. Do not manufacture a call or rewrite its payload. */
     if (length == 21)
         return 0;
+    if (length == 23 && !probe_read_word(io, object + 26, 2, &encoded) && !encoded) {
+        *remove = 1;
+        return 0;
+    }
     if (probe_read_word(io, object + 26, 2, &encoded))
         return -1;
     unsigned conditional = encoded == 0x37;

@@ -365,6 +365,71 @@ static void test_catalog_insertion(void)
     assert(plan.slot == 8 && plan.end == 8 && plan.count == 0);
 }
 
+static void test_catalog_removal(void)
+{
+    struct image image = {.count = 56, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    const uint32_t ids[] = {0, 161, 4095};
+    put_word(&image, 5, 3, 3);
+    for (unsigned i = 0; i < 3; ++i) {
+        uint32_t record = 8 + 16 * i;
+        put_word(&image, record, ids[i], 3);
+        put_word(&image, record + 3, 0x70000 + i, 5);
+        put_word(&image, record + 8, 0x12345 + i, 5);
+        put_word(&image, record + 13, 0xabc + i, 3);
+    }
+    const struct hpclang_rpl_catalog_removal sentinel = {17, 18, 19, {20, 21, 22}};
+    struct hpclang_rpl_catalog_removal plan = sentinel;
+    for (unsigned i = 0; i < 3; ++i) {
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, ids[i], &plan) == 1);
+        assert(plan.slot == 8 + 16 * i && plan.end == 56 && plan.count == 3);
+        assert(plan.binding.address == 0x70000 + i);
+        assert(plan.binding.bank_switch == 0x12345 + i && plan.binding.flags == 0xabc + i);
+    }
+    plan = sentinel;
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 160, &plan) == 0);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    /* A first-record match must not hide any later read failure or bad nibble. */
+    for (uint32_t at = 5; at < 56; ++at) {
+        image.fail_at = at;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 0, &plan) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+        image.fail_at = UINT32_MAX;
+        uint8_t saved = image.data[at];
+        image.data[at] = 16;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 0, &plan) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+        image.data[at] = saved;
+    }
+    for (unsigned id = 160; id <= 161; ++id) {
+        put_word(&image, 40, id, 3);
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 0, &plan) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+    }
+    put_word(&image, 40, 4095, 3);
+    for (uint32_t limit = 0; limit < 51; ++limit) {
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, limit, 0, &plan) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+    }
+    assert(hpclang_rpl_catalog_plan_remove(NULL, 5, 51, 0, &plan) < 0);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 0, NULL) < 0);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, UINT32_MAX, 51, 0, &plan) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 4096, &plan) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    put_word(&image, 5, 0, 3);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 3, 0, &plan) == 0);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    /* Removing the sole entry has no following records to compact. */
+    put_word(&image, 5, 1, 3);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 19, 0, &plan) == 1);
+    assert(plan.slot == 8 && plan.end == 24 && plan.count == 1);
+}
+
 static void test_library_catalog_lookup(void)
 {
     struct image image = {.count = 35, .fail_at = UINT32_MAX};
@@ -902,6 +967,7 @@ int main(void)
 {
     test_catalog_rebind();
     test_catalog_insertion();
+    test_catalog_removal();
     test_acptr_resolution();
     test_flashptr_resolution();
     test_flashptr_bank();

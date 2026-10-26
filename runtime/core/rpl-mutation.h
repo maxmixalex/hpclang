@@ -309,6 +309,18 @@ extern "C"
                                                uint32_t position,
                                                const struct hpclang_rpl_catalog_repairs *repairs);
 
+    /* Remove one catalog cell and shift the following metadata, TEMP and return
+     * stack down by 16 nibbles. Same caller-proven repairs/ownership and failure
+     * contract as growth. Native roots or register repairs targeting the removed
+     * cell return BUSY; supplied edit fields in that cell are invalid. Caller
+     * proves detachment and absence of live library uses, validates the catalog,
+     * then publishes the decremented count before restoring execution. This
+     * does not free the library payload or discover its execution references. */
+    int
+    hpclang_rpl_mutation_catalog_shrink_repaired(const struct hpclang_rpl_mutation_io *io,
+                                                 uint32_t position,
+                                                 const struct hpclang_rpl_catalog_repairs *repairs);
+
 #ifdef __cplusplus
 }
 #endif

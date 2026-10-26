@@ -150,6 +150,48 @@ int hpclang_rpl_catalog_plan_insert(const struct hpclang_rpl_reader *reader, uin
     return 1;
 }
 
+struct catalog_removal_search
+{
+    struct hpclang_rpl_catalog_removal plan;
+    uint32_t number;
+    uint32_t previous;
+    int found;
+};
+
+static int catalog_removal_visit(void *context, uint32_t record, uint32_t number,
+                                 const struct hpclang_rpl_library_binding *binding)
+{
+    struct catalog_removal_search *search = context;
+    if (search->plan.count && number <= search->previous)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    search->previous = number;
+    ++search->plan.count;
+    search->plan.end = record + 16u;
+    if (number == search->number) {
+        search->found = 1;
+        search->plan.slot = record;
+        search->plan.binding = *binding;
+    }
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_catalog_plan_remove(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                    uint32_t limit, uint32_t number,
+                                    struct hpclang_rpl_catalog_removal *plan)
+{
+    if (!reader || !reader->read_nibble || !plan)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct catalog_removal_search search = {.number = number};
+    int result = hpclang_rpl_catalog_visit(reader, address, limit, catalog_removal_visit, &search);
+    if (result)
+        return result;
+    if (search.found)
+        *plan = search.plan;
+    return search.found;
+}
+
 int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t address,
                                uint32_t limit, uint32_t number,
                                struct hpclang_rpl_library_binding *binding)

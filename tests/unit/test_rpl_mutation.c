@@ -2600,6 +2600,139 @@ static int alias_catalog_location(void *context, const struct hpclang_rpl_librar
     return 0;
 }
 
+static void test_catalog_remove_commit(void)
+{
+    uint32_t successful_writes = 0;
+    for (unsigned index = 0; index < 2; ++index) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t old_avmem = get_word(AVMEM, 5);
+        struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        struct hpclang_rpl_catalog_removal plan;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, io.library_table, 35, index ? 20 : 10,
+                                               &plan) == 1);
+        assert(hpclang_rpl_catalog_remove_repaired(&io, index ? 20 : 10, &plan, NULL) == 0);
+        assert(get_word(io.library_table, 3) == 1);
+        assert(get_word(0x82003, 3) == (index ? 10 : 20));
+        assert(get_word(0x82006, 5) == (index ? 0x82ff1 : 0x82ff2));
+        assert(get_word(0x806e9, 5) == 0x82ff0);
+        assert(get_word(TEMPTOP, 5) == 0x82ff5 && get_word(RSKTOP, 5) == 0x82fff);
+        assert(get_word(0x82ffa, 5) == 0x82ff1 && get_word(0x90000, 5) == 0x82ff2);
+        assert(get_word(AVMEM, 5) == old_avmem + 3);
+        assert(memory[0x82545] == 11);
+        assert(write_trace[writes - 3] == io.library_table);
+        assert(write_trace[writes - 1] == io.library_table + 2);
+        if (!index)
+            successful_writes = writes;
+    }
+    /* Middle/sole removal and caller-proven embedded/register repairs. */
+    for (unsigned count = 1; count <= 3; count += 2) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        put_word(io.library_table, 3, count);
+        if (count == 3) {
+            put_word(0x82023, 3, 30);
+            put_word(0x82026, 5, 0x83003);
+        }
+        put_word(0x82500, 5, 0x83004);
+        uint32_t native = 0xabc83004;
+        struct hpclang_rpl_register_repair reg = {&native, native};
+        const struct hpclang_rpl_reference_edit edit = {7, 0x82500, 0x83004, 0x82ff4, 5};
+        const struct hpclang_rpl_catalog_repairs repairs = {.main_mapping = 7,
+                                                            .edits = &edit,
+                                                            .edit_count = 1,
+                                                            .registers = &reg,
+                                                            .register_count = 1};
+        struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        struct hpclang_rpl_catalog_removal plan;
+        uint32_t number = count == 1 ? 10 : 20;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, io.library_table, 51, number, &plan) == 1);
+        assert(hpclang_rpl_catalog_remove_repaired(&io, number, &plan, &repairs) == 0);
+        assert(get_word(io.library_table, 3) == count - 1);
+        assert(get_word(0x824f0, 5) == 0x82ff4 && native == 0xabc82ff4);
+        if (count == 3) {
+            assert(get_word(0x82003, 3) == 10 && get_word(0x82013, 3) == 30);
+            assert(get_word(0x82016, 5) == 0x82ff3);
+        }
+    }
+    /* No write may precede plan/binding, root, guard or edit validation. */
+    for (unsigned scenario = 0; scenario < 11; ++scenario) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        struct hpclang_rpl_catalog_removal plan;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, io.library_table, 35, 10, &plan) == 1);
+        struct hpclang_rpl_reference_edit edit = {0};
+        struct hpclang_rpl_reference_guard guard = {0};
+        uint32_t native = 0xabc82004;
+        struct hpclang_rpl_register_repair reg = {&native, native};
+        struct hpclang_rpl_catalog_repairs repairs = {.main_mapping = 7};
+        switch (scenario) {
+        case 0:
+            ++plan.slot;
+            break;
+        case 1:
+            ++plan.end;
+            break;
+        case 2:
+            ++plan.count;
+            break;
+        case 3:
+            ++plan.binding.address;
+            break;
+        case 4:
+            ++plan.binding.bank_switch;
+            break;
+        case 5:
+            ++plan.binding.flags;
+            break;
+        case 6:
+            put_word(0x90000, 5, 0x82004);
+            break;
+        case 7:
+            repairs.registers = &reg;
+            repairs.register_count = 1;
+            break;
+        case 8:
+            edit = (struct hpclang_rpl_reference_edit){7, 0x82004, 0, 0, 1};
+            repairs.edits = &edit;
+            repairs.edit_count = 1;
+            break;
+        case 9:
+            guard = (struct hpclang_rpl_reference_guard){7, 0x82555, 12, 1};
+            repairs.guards = &guard;
+            repairs.guard_count = 1;
+            break;
+        case 10:
+            rejected_read = 0x8300e;
+            break;
+        }
+        uint8_t before[NIBBLES];
+        memcpy(before, memory, sizeof before);
+        assert(hpclang_rpl_catalog_remove_repaired(&io, 10, &plan, &repairs) < 0);
+        assert(!writes && !memcmp(before, memory, sizeof before) && native == 0xabc82004);
+    }
+    /* A source read can fail after root edits have already committed. */
+    {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        struct hpclang_rpl_catalog_removal plan;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, io.library_table, 35, 10, &plan) == 1);
+        rejected_commit_read = 0x82555;
+        assert(hpclang_rpl_catalog_remove_repaired(&io, 10, &plan, NULL) ==
+               HPCLANG_RPL_MUTATION_INCOMPLETE);
+        assert(writes && get_word(io.library_table, 3) == 2);
+    }
+    /* Every write boundary, including final count publication, is non-replayable. */
+    for (uint32_t cut = 0; cut < successful_writes; ++cut) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        struct hpclang_rpl_catalog_removal plan;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, io.library_table, 35, 10, &plan) == 1);
+        rejected_write = cut;
+        assert(hpclang_rpl_catalog_remove_repaired(&io, 10, &plan, NULL) ==
+               HPCLANG_RPL_MUTATION_INCOMPLETE);
+        assert(writes == cut);
+    }
+}
+
 static void test_catalog_alias_repairs(void)
 {
     uint8_t *before = malloc(sizeof memory);
@@ -3388,6 +3521,7 @@ int main(void)
     test_catalog_observed_guards();
     test_catalog_alias_repairs();
     test_catalog_insert_commit();
+    test_catalog_remove_commit();
     test_catalog_switch_growth();
     test_temp_allocation_visit();
     test_read_only_root_visit();
