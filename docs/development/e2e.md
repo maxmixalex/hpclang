@@ -778,32 +778,38 @@ Source hashes and write counts are included in the report. This still skips
 the ARM payload and does not establish validity of its physical mappings
 during arbitrary application execution or complete public-registration safety.
 
-### Offline continuous PrRUN check
+### Offline PrRUN prefix check
 
 `tests/e2e/code-relocation/prrun.py` uses the same `--model`, `--state`,
-`--launcher` and `--output` arguments as the MMU check. It starts the original
-cached PrRUN program with a controlled valid data-stack input and executes the
-RPL preamble, garbage collection, linking, descriptor consumption and MMU setup
-without resetting CPU state between CODE segments. It discovers the ARMSYS
-instruction at its actual post-GC address, skips the ARM payload, and follows
-the resulting original return to the first ROM SEMI dispatch at `03130`.
+`--launcher` and `--output` arguments as the MMU check. It executes the original
+PrRUN prefix from a controlled valid data-stack input without resetting CPU
+state. At the first encountered ARMSYS it follows the original ARM dispatch
+and requires the ROM helper target `0x1596fc`. **This is not the application
+entry.** The helper body is skipped; the check simulates its return and stops
+at the first ROM SEMI dispatch `03130`.
+
+Earlier descriptions overstated this gate as complete GC/link/MMU preparation
+and an application return. Those claims are withdrawn: the helper body invokes
+Stock services and has not been executed by this gate. Complete startup, actual
+application entry/execution and subsequent Stock behavior remain unverified.
+The separate segmented MMU gate and full native Stock tests retain their own
+explicit boundaries and evidence.
 
 Both input policy and initial cache layout are pinned. All eight cursors must
-return with no observed R0–R4 access after the skipped ARM call, valid data-stack
-bounds and unchanged saved registers. Cursor writes show peak extra depth four,
-minimum/final change zero; four unused sentinels survive and four used slots
-clear. Entry therefore requires independently known live depth at most four.
-The successful `prrun.json` retains input hashes and complete entry/return
-traces; failed guards remove stale reports. This gate does not run the ARM
-program, verify arbitrary inputs, or establish later
-Stock execution. Add `--relocate` and use a separate output directory to compile
-the current C catalog mover and production return-root collector, grow the
-catalog by 16 nibbles at the ARM boundary, and continue with the resulting
-memory. Caller and PC repairs use addresses actually generated after PrRUN's
-GC, rather than the fixed offsets used by the segmented gate. The saved IP
-must also move. Reports retain source hashes, original/repaired resume PCs and
-write counts. This combines continuous-entry evidence with relocated return;
-it still skips the ARM payload and does not authorize public registration.
+reach the reviewed helper and simulated continuation, with valid data-stack
+bounds, no R0–R4 access in that continuation and unchanged saved registers.
+Observed peak extra depth is four; four unused sentinels survive and four used
+slots clear. This is only the prefix's depth budget, not a whole-launch budget.
+`prrun.json` records input hashes, entry/dispatch/continuation traces, helper
+identity and explicit false flags for helper-body/application execution. Failed
+guards remove stale reports.
+
+With `--relocate`, the gate compiles the current C catalog mover and production
+return-root collector, grows the catalog by 16 nibbles at this helper boundary,
+and checks the repaired caller, PC and saved IP during the simulated return.
+It records source hashes and write counts. This is bounded synthetic mutation
+coverage; it does not prove mutation during an actual application or authorize
+public registration.
 
 ### Offline alternate ARM return check
 

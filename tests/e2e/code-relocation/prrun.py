@@ -1,4 +1,4 @@
-"""Original PrRUN preamble through MMU entry, skipping only the ARM payload."""
+"""Original PrRUN prefix through its first ROM helper, with a simulated return."""
 
 import argparse
 import ctypes as c
@@ -174,11 +174,28 @@ for cursor in range(8):
         if at < cpu + 0x954 and at + size > cpu + 0x92C:
             accesses.append((kind, at - cpu, size))
 
-    uc.hook_add(UC_HOOK_CODE, hook)
+    entry_hook = uc.hook_add(UC_HOOK_CODE, hook)
     uc.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, access)
     uc.emu_start(0x28828, 0x400000, count=3000000)
     assert word(trace[-1]) == 0xEFB08
     entry_trace = trace.copy()
+    # The first ARMSYS is a ROM auxiliary call, not the application entry.
+    # Prove the actual ARM dispatch target before simulating this helper's return.
+    helper = int.from_bytes(uc.mem_read(cpu + 0x91C, 4), "little")
+    assert helper == 0x1596FC, hex(helper)
+    uc.hook_del(entry_hook)
+    dispatch = []
+
+    def dispatch_hook(_, at, size, user):
+        dispatch.append(at)
+        if at == helper:
+            uc.emu_stop()
+
+    dispatch_handle = uc.hook_add(UC_HOOK_CODE, dispatch_hook)
+    uc.emu_start(0x28898, 0x400000, count=1000)
+    assert dispatch[-1] == helper and 0x30214 in dispatch
+    uc.hook_del(dispatch_handle)
+    uc.hook_add(UC_HOOK_CODE, hook)
     resume = trace[-1] + 5
     writes = c.c_uint32()
     original_resume = resume
@@ -237,6 +254,11 @@ for cursor in range(8):
     rows.append(
         dict(
             cursor=cursor,
+            boundary="first-rom-helper-before-body",
+            helper_target=hex(helper),
+            arm_dispatch=[hex(at) for at in dispatch],
+            helper_body_executed=False,
+            application_executed=False,
             original_resume=hex(original_resume),
             resume=hex(resume),
             relocation_writes=writes.value,
@@ -267,4 +289,7 @@ report.write_text(
     )
     + "\n"
 )
-print(args.model, "PASS eight original PrRUN entry/return cursors; ARM payload skipped")
+print(
+    args.model,
+    "PASS eight PrRUN prefix/first-ROM-helper simulated-return cursors; helper and application skipped",
+)
