@@ -2602,6 +2602,101 @@ static int alias_catalog_location(void *context, const struct hpclang_rpl_librar
     return 0;
 }
 
+static struct hpclang_rpl_mutation_io setup_home_attachments(unsigned count)
+{
+    struct hpclang_rpl_mutation_io io = setup(1);
+    uint32_t home = 0x90040, chain = home + 8 + 13 * count, item = chain + 10;
+    put_word(USEROB, 5, home);
+    put_word(CONTEXT, 5, home);
+    put_word(home, 5, DORRP);
+    put_word(home + 5, 3, count);
+    for (unsigned i = 0; i < count; ++i) {
+        put_word(home + 8 + 13 * i, 3, 10 * (i + 1));
+        put_word(home + 11 + 13 * i, 5, home);
+        put_word(home + 16 + 13 * i, 5, 0x93000);
+    }
+    put_word(chain, 5, 10);
+    put_word(chain + 5, 5, 0);
+    put_word(item, 2, 1);
+    put_word(item + 2, 2, 'A');
+    put_word(item + 4, 2, 1);
+    put_word(item + 6, 5, 0x029bf);
+    put_word(item + 11, 2, 'Z');
+    put_word(0x80716, 5, item + 13);
+    put_word(0x90000, 5, item + 6);
+    return io;
+}
+
+static void test_home_detach(void)
+{
+    uint32_t successful_writes = 0;
+    for (unsigned selected = 0; selected < 4; ++selected) {
+        unsigned count = selected == 3 ? 1 : 3, index = selected % 3;
+        struct hpclang_rpl_mutation_io io = setup_home_attachments(count);
+        uint32_t object = 0x90040 + 24 + 13 * count;
+        uint32_t old_free = get_word(AVMEM, 5);
+        assert(hpclang_rpl_mutation_home_detach(&io, 10 * (index + 1)) == 0);
+        assert(get_word(USEROB, 5) == 0x9004d && get_word(CONTEXT, 5) == 0x9004d);
+        assert(get_word(0x90052, 3) == count - 1 && get_word(DSKTOP, 5) == 0x9000d);
+        assert(get_word(0x9000d, 5) == object && get_word(AVMEM, 5) == old_free + 2);
+        assert_char_at(object, 'Z');
+        struct hpclang_rpl_reader reader = {read_nibble, NULL};
+        struct hpclang_rpl_directory_entry_view entry;
+        assert(hpclang_rpl_directory_find(&reader, 0x9004d, (const uint8_t *)"A", 1, &entry) == 0);
+        assert(entry.object_address == object);
+        unsigned output = 0;
+        for (unsigned i = 0; i < count; ++i) {
+            if (i == index)
+                continue;
+            uint32_t at = 0x90055 + 13 * output++;
+            assert(get_word(at, 3) == 10 * (i + 1));
+            assert(get_word(at + 3, 5) == 0x9004d && get_word(at + 8, 5) == 0x93000);
+        }
+        assert(write_trace[writes - 3] == 0x90052 && write_trace[writes - 1] == 0x90054);
+        if (!selected)
+            successful_writes = writes;
+    }
+    for (unsigned scenario = 0; scenario < 5; ++scenario) {
+        struct hpclang_rpl_mutation_io io = setup_home_attachments(3);
+        int expected = HPCLANG_RPL_MUTATION_NOT_FOUND;
+        uint32_t number = 123;
+        if (scenario == 1) {
+            number = 10;
+            put_word(0x90062, 3, 10);
+            expected = HPCLANG_RPL_MUTATION_MALFORMED;
+        }
+        if (scenario == 2) {
+            number = 10;
+            put_word(0x90000, 5, 0x90049);
+            expected = HPCLANG_RPL_MUTATION_BUSY;
+        }
+        if (scenario == 3) {
+            number = 10;
+            rejected_read = 0x9006e;
+            expected = HPCLANG_RPL_MUTATION_IO;
+        }
+        if (scenario == 4) {
+            number = 10;
+            rejected_read = 0x90020;
+            expected = HPCLANG_RPL_MUTATION_IO;
+        }
+        uint8_t before[NIBBLES];
+        memcpy(before, memory, sizeof before);
+        assert(hpclang_rpl_mutation_home_detach(&io, number) == expected);
+        assert(!writes && !memcmp(before, memory, sizeof before));
+    }
+    for (uint32_t cut = 0; cut < successful_writes; ++cut) {
+        struct hpclang_rpl_mutation_io io = setup_home_attachments(3);
+        rejected_write = cut;
+        assert(hpclang_rpl_mutation_home_detach(&io, 10) == HPCLANG_RPL_MUTATION_INCOMPLETE);
+        assert(writes == cut);
+    }
+    struct hpclang_rpl_mutation_io io = setup_home_attachments(3);
+    rejected_commit_read = 0x90020;
+    assert(hpclang_rpl_mutation_home_detach(&io, 10) == HPCLANG_RPL_MUTATION_INCOMPLETE);
+    assert(writes);
+}
+
 static void test_catalog_attached_rejection(void)
 {
     for (unsigned scenario = 0; scenario < 7; ++scenario) {
@@ -3575,6 +3670,7 @@ int main(void)
     test_catalog_insert_commit();
     test_catalog_remove_commit();
     test_catalog_attached_rejection();
+    test_home_detach();
     test_catalog_switch_growth();
     test_temp_allocation_visit();
     test_read_only_root_visit();

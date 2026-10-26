@@ -11,6 +11,7 @@ from fixtures import word
 CASES = {
     "native": b"",
     "native-remove": b"\0",
+    "native-detach": b"\1",
     "gosub": bytes([0x27, 0, 0x10, 0x10]),
     "gosub-rtnsxm": bytes([0x27, 0, 0x10, 0x00]),
     "gosub-rtnnc": bytes([0x37, 0, 0x05, 0, 0x03]),
@@ -27,6 +28,19 @@ def catalog_records(read):
             for offset, width in ((0, 3), (3, 5), (8, 5), (13, 3))
         )
         for i in range(read(0x8611D, 3))
+    ]
+
+
+def attachment_records(read):
+    home = read(0x80711)
+    if not 0x80000 <= home <= 0xFFFF8 or read(home) != 0x2A96:
+        raise ValueError("Invalid native HOME")
+    count = read(home + 5, 3)
+    if count > (0x100000 - home - 8) // 13:
+        raise ValueError("Invalid native attachment extent")
+    return [
+        tuple(read(home + 8 + 13 * i + offset, width) for offset, width in ((0, 3), (3, 5), (8, 5)))
+        for i in range(count)
     ]
 
 
@@ -108,6 +122,9 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
     before = native_words((source / "sram").read_bytes(), original_flash)
     original_ids = [before(0x86120 + 16 * i, 3) for i in range(before(0x8611D, 3))]
     original_records = catalog_records(before)
+    original_attachments = attachment_records(before)
+    if sum(record[0] == 275 for record in original_attachments) != 1:
+        raise ValueError("Call-root fixture requires one genuine library-275 attachment")
     if 123 in original_ids:
         raise ValueError("Call-root fixture requires an unregistered library 123")
     results = []
@@ -168,7 +185,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if read(obj) != 0x2A2C or read(obj + 5) != 5 + 2 * len(expected):
             raise ValueError("Call fixture object changed")
         actual = bytes(read(obj + 10 + 2 * i, 2) for i in range(len(expected)))
-        if name in ("native", "native-remove", "gosub-rtnnc"):
+        if name in ("native", "native-remove", "native-detach", "gosub-rtnnc"):
             valid = actual == expected
         elif name == "gosbvl":
             valid = (
@@ -188,18 +205,24 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if not valid:
             raise ValueError("Native call operands/return payload changed")
         ids = [read(0x86120 + 16 * i, 3) for i in range(read(0x8611D, 3))]
-        removed = name == "native-remove"
+        removed = name in ("native-remove", "native-detach")
         expected_ids = original_ids if removed else sorted(original_ids + [123])
         if ids != expected_ids or len(ids) != len(set(ids)):
             raise ValueError("Native call did not produce the expected catalog")
         verify_bindings(original_records, read, removed=removed)
+        expected_attachments = [
+            record for record in original_attachments if name != "native-detach" or record[0] != 275
+        ]
+        if attachment_records(read) != expected_attachments:
+            raise ValueError("Native call did not preserve the expected HOME attachments")
         results.append(
             dict(
                 case=name,
                 returned=True,
                 flash_unchanged=True,
-                rewritten_return=name not in ("native", "native-remove"),
+                rewritten_return=name not in ("native", "native-remove", "native-detach"),
                 catalog_removed=removed,
+                home_detached=name == "native-detach",
             )
         )
         print(f"PASS: {args.model}: native {name} roots and catalog checks", flush=True)

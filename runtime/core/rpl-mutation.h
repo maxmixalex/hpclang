@@ -252,6 +252,16 @@ extern "C"
     int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_io *io,
                                                  uint32_t position, int32_t delta);
 
+    /* Internal HOME detachment: remove exactly one matching 13-nibble attachment
+     * and publish its count last. Following directory objects keep their addresses;
+     * HOME, stack cells and the earlier attachment prefix move upward by 13.
+     * Caller retains mapping/IRQ ownership and proves relocation safety beyond
+     * the root sources supplied by io. This does not unregister or free the
+     * library, execute configuration code, or prove that it is no longer running.
+     * Duplicate matching IDs are malformed. Preflight failures make no writes;
+     * any commit failure is INCOMPLETE: retain ownership, no retry/Stock return. */
+    int hpclang_rpl_mutation_home_detach(const struct hpclang_rpl_mutation_io *io, uint32_t number);
+
     /* Internal catalog geometry: open one 16-nibble record at position, moving
      * the catalog suffix, metadata, TEMP and RPL return stack upward. Caller
      * must validate the catalog and prove relocation safety of all object

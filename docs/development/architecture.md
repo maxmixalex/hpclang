@@ -131,6 +131,16 @@ their normal preflight checks. A commit read/write failure is `INCOMPLETE`:
 ownership must be retained, with no retry or Stock return. This is not yet a
 public unload service: detachment, execution-reference coverage and payload
 deletion remain separate obligations.
+
+The internal `hpclang_rpl_mutation_home_detach` removes a matching HOME attachment
+without unregistering or freeing the library. It validates the entire attachment
+prefix and directory geometry, moves the stack/HOME prefix upward by 13 nibbles,
+repairs known roots and publishes the reduced attachment count last. Following
+directory objects retain their addresses; HOME and earlier attachment fields
+move. Duplicate matching IDs, live roots into the removed record and unreadable
+input reject before writes. Commit failures require retained ownership as above.
+Caller-proven relocation safety and execution liveness remain necessary; this
+internal primitive does not make public unloading complete.
 `hpclang_rpl_reference_edits_check_aliases` resolves complete fields before
 checking physical overlap, including different IDs/coordinates and repeated
 pages within one map. The mapped RAM replay entry performs this check before

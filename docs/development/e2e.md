@@ -697,7 +697,18 @@ the still-stored Port0 library, unchanged Flash and the real caller's marker.
 This exercises internal registration/unregistration geometry without deleting
 the payload or proving general-purpose detachment and execution liveness.
 
-Before catalog edits, both original-return cases also attempt removal of the
+The `native-detach` case uses selector byte one and first completes the same
+catalog insertion/removal round trip. It then detaches library 275 from HOME,
+requiring HOME to advance by 13 nibbles, its attachment count to decrease by one,
+and Port0 to remain fixed. A separate snapshot checks every nibble of the HOME
+directory body through Port0 at its original address; obsolete round-trip
+buffers are freed before allocating this snapshot. After the original caller
+returns, the host requires the complete original catalog and all surviving HOME
+attachment records, including both pointer fields, in their original order.
+This tests internal HOME detachment in the controlled fixture, not public unload
+or arbitrary execution-reference safety.
+
+Before catalog edits, all three original-return cases also attempt removal of the
 fixture's genuinely HOME-attached library 275. A rejecting writer counts any
 write attempt. The payload requires `BUSY`, zero write attempts and unchanged
 native roots; it never edits the attachment table to manufacture that result.

@@ -185,6 +185,40 @@ static int probe_attached_rejection(const struct hpclang_rpl_mutation_io *io)
     return 0;
 }
 
+static int probe_detach(struct hpclang_rpl_mutation_io *io)
+{
+    uint32_t home, count, port;
+    if (probe_read_word(io, 0x80711, 5, &home) || probe_read_word(io, home + 5, 3, &count) ||
+        probe_read_word(io, 0x80716, 5, &port))
+        return -1;
+    uint32_t body = home + 8 + 13 * count;
+    if (!count || body >= port || port > 0x100000)
+        return -1;
+    uint8_t *snapshot = malloc(port - body);
+    if (!snapshot)
+        return -1;
+    int result = -1;
+    for (uint32_t i = 0; i < port - body; ++i)
+        if (!io->read_nibble(io->context, body + i, snapshot + i))
+            goto done;
+    if (hpclang_rpl_mutation_home_detach(io, 275))
+        goto done;
+    uint32_t value;
+    if (probe_read_word(io, 0x80711, 5, &value) || value != home + 13 ||
+        probe_read_word(io, value + 5, 3, &value) || value != count - 1 ||
+        probe_read_word(io, 0x80716, 5, &value) || value != port)
+        goto done;
+    for (uint32_t i = 0; i < port - body; ++i) {
+        uint8_t actual;
+        if (!io->read_nibble(io->context, body + i, &actual) || actual != snapshot[i])
+            goto done;
+    }
+    result = 0;
+done:
+    free(snapshot);
+    return result;
+}
+
 static int probe_register(void)
 {
     struct hpclang_rpl_stock_memory memory;
@@ -289,6 +323,16 @@ static int probe_register(void)
                 goto failed_roundtrip;
         }
     }
+    if (remove == 2) {
+        /* The relocation plan and round-trip snapshot are no longer live.
+         * Release them before taking the separate HOME-body snapshot. */
+        free(snapshot);
+        snapshot = NULL;
+        free(p);
+        p = NULL;
+        if (probe_detach(&io))
+            goto failed_roundtrip;
+    }
     result = 0;
 done:
     free(snapshot);
@@ -322,8 +366,8 @@ static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots, in
      * original return roots. Do not manufacture a call or rewrite its payload. */
     if (length == 21)
         return 0;
-    if (length == 23 && !probe_read_word(io, object + 26, 2, &encoded) && !encoded) {
-        *remove = 1;
+    if (length == 23 && !probe_read_word(io, object + 26, 2, &encoded) && encoded <= 1) {
+        *remove = 1 + encoded;
         return 0;
     }
     if (probe_read_word(io, object + 26, 2, &encoded))
