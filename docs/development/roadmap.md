@@ -146,7 +146,10 @@ Next actions, in order:
    relocation plans before enabling public library management and Port1 edits.
 2. Accept submitted branches only after their full CI gates pass. #22 `8d92524e`
    passed all three workflows/jobs; integrating accepted main resolves its roadmap
-   conflict and requires fresh merge-head CI. #23 `e26f83a4` retains pending Runtime gates. #24 `a01248cd` includes their watchdog/PWM
+   conflict. Merge-head `7a1a496b` fails HP48gII Direct immediate-return PWM:
+   captured foreground time is 2,357 us before its alarm deadline. The fixture
+   now imports #23's elapsed-time PWM wait; the same HP48gII test passes locally
+   with settled return. Fresh CI is required. #23 `e26f83a4` passes all seven workflows. #24 `a01248cd` includes their watchdog/PWM
    fixture updates and the clang-format 22 correction for both prior Quality failures.
    All ten preceding-head workflows/jobs were inspected without failures; one
    Quality run passed and other gates remained pending. New-head CI is not yet

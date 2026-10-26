@@ -125,7 +125,7 @@ unsigned hpclang_e2e_irq_test(void)
                     ((source | REG(0x07100010)) & 0x4000u);
     register_writes = 0;
     errno = 0;
-    if (hpclang_time_read_us_masked(&irq_last_time) || irq_last_time > UINT64_MAX - 100000) {
+    if (hpclang_time_read_us_masked(&irq_last_time) || irq_last_time > UINT64_MAX - 1100000) {
         hpclang_irq_restore(cpsr);
         return 7;
     }
@@ -156,19 +156,33 @@ unsigned hpclang_e2e_irq_test(void)
     hpclang_e2e_irq_snapshot(&before);
     struct hpclang_irq_bank bank = {(uintptr_t)(irq_stack + 256), 0, 0};
     hpclang_irq_bank_exchange(&bank);
-    if (bank.stack != before.stack || bank.link != before.link || bank.status != before.status)
+    if (!failure &&
+        (bank.stack != before.stack || bank.link != before.link || bank.status != before.status))
         failure = 2;
     REG(0x08000018) = (uintptr_t)hpclang_e2e_irq_handler;
     REG(0x07100008) = ~UINT32_C(0x4000);
     errno = EDOM;
     hpclang_irq_restore((cpsr | 0x40u) & ~0x80u);
-    /* A bounded busy loop: delivery cannot depend on SDK service calls. */
-    for (volatile unsigned i = 0; i < 20000000 && !irq_finished; ++i)
-        __asm__ volatile("nop");
+    /* A fixed instruction count can finish before the 100 ms alarm deadline.
+     * Only the IRQ advances playback; foreground clock samples bound the wait,
+     * with one second of delivery margin and a cap for a stalled clock. */
+    int wait_clock_error = 0;
+    for (unsigned batch = 0; batch < 200000 && !irq_finished; ++batch) {
+        for (volatile unsigned i = 0; i < 1024; ++i)
+            __asm__ volatile("nop");
+        uint32_t wait_cpsr = hpclang_irq_save_disable();
+        uint64_t now = 0;
+        int saved_errno = errno;
+        wait_clock_error = hpclang_time_read_us_masked(&now);
+        errno = saved_errno;
+        hpclang_irq_restore(wait_cpsr);
+        if (wait_clock_error || now >= irq_deadline + 1000000)
+            break;
+    }
     hpclang_irq_save_disable();
     int wait_errno = errno;
     uint64_t foreground_time = 0;
-    int clock_error = hpclang_time_read_us_masked(&foreground_time);
+    int clock_error = hpclang_time_read_us_masked(&foreground_time) || wait_clock_error;
     errno = wait_errno;
     hpclang_e2e_pwm_observation.hits = hpclang_e2e_irq_hits;
     hpclang_e2e_pwm_observation.finished = irq_finished;
@@ -183,16 +197,18 @@ unsigned hpclang_e2e_irq_test(void)
     for (unsigned i = 0; i < 7; ++i)
         if (REG(audio_addresses[i]) != audio_before[i])
             hpclang_e2e_pwm_observation.audio_mismatch |= 1u << i;
-    if (hpclang_e2e_irq_hits < 2 || !irq_finished || irq_error || irq_last_time < irq_deadline ||
-        playback.alarm.owned || playback.tone.owned || errno != EDOM)
+    if (!failure && (clock_error || hpclang_e2e_irq_hits < 2 || !irq_finished || irq_error ||
+                     irq_last_time < irq_deadline || playback.alarm.owned || playback.tone.owned ||
+                     errno != EDOM))
         failure = 3;
     REG(0x07100008) = UINT32_MAX;
     REG(0x08000018) = vector;
     hpclang_irq_bank_exchange(&bank);
     hpclang_e2e_irq_snapshot(&after);
-    if (before.stack != after.stack || before.link != after.link || before.status != after.status)
+    if (!failure &&
+        (before.stack != after.stack || before.link != after.link || before.status != after.status))
         failure = 4;
-    if (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi)
+    if (!failure && (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi))
         failure = 5;
     /* Preserve an earlier delivery/ownership failure; otherwise identify the
      * exact audio register before foreground cleanup could repair it. */
@@ -202,8 +218,8 @@ unsigned hpclang_e2e_irq_test(void)
     hpclang_sound_playback_stop(&audio, &bus, &playback);
     REG(0x07100004) = mode;
     REG(0x07100008) = mask;
-    if ((REG(0x07100000) & source) != source || REG(0x07100004) != mode ||
-        REG(0x07100008) != mask || REG(0x08000018) != vector)
+    if (!failure && ((REG(0x07100000) & source) != source || REG(0x07100004) != mode ||
+                     REG(0x07100008) != mask || REG(0x08000018) != vector))
         failure = 6;
     hpclang_e2e_pwm_observation.failure = failure;
     if (failure)
