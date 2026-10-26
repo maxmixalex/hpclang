@@ -778,6 +778,33 @@ Source hashes and write counts are included in the report. This still skips
 the ARM payload and does not establish validity of its physical mappings
 during arbitrary application execution or complete public-registration safety.
 
+### Offline continuous PrRUN check
+
+`tests/e2e/code-relocation/prrun.py` uses the same `--model`, `--state`,
+`--launcher` and `--output` arguments as the MMU check. It starts the original
+cached PrRUN program with a controlled valid data-stack input and executes the
+RPL preamble, garbage collection, linking, descriptor consumption and MMU setup
+without resetting CPU state between CODE segments. It discovers the ARMSYS
+instruction at its actual post-GC address, skips the ARM payload, and follows
+the resulting original return to the first ROM SEMI dispatch at `03130`.
+
+Both input policy and initial cache layout are pinned. All eight cursors must
+return with no observed R0–R4 access after the skipped ARM call, valid data-stack
+bounds and unchanged saved registers. Cursor writes show peak extra depth four,
+minimum/final change zero; four unused sentinels survive and four used slots
+clear. Entry therefore requires independently known live depth at most four.
+The successful `prrun.json` retains input hashes and complete entry/return
+traces; failed guards remove stale reports. This gate does not run the ARM
+program, verify arbitrary inputs, or establish later
+Stock execution. Add `--relocate` and use a separate output directory to compile
+the current C catalog mover and production return-root collector, grow the
+catalog by 16 nibbles at the ARM boundary, and continue with the resulting
+memory. Caller and PC repairs use addresses actually generated after PrRUN's
+GC, rather than the fixed offsets used by the segmented gate. The saved IP
+must also move. Reports retain source hashes, original/repaired resume PCs and
+write counts. This combines continuous-entry evidence with relocated return;
+it still skips the ARM payload and does not authorize public registration.
+
 ### Offline alternate ARM return check
 
 `tests/e2e/code-relocation/alternate_return.py` checks the second reviewed
