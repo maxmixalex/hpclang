@@ -782,13 +782,18 @@ fixture's genuinely HOME-attached library 275. A rejecting writer counts any
 write attempt. The payload requires `BUSY`, zero write attempts and unchanged
 native roots; it never edits the attachment table to manufacture that result.
 
-Catalog-growth fixtures record native nibble dependencies from both root scans
-and nested object traversal, coalesce them into a bounded guard array and pass
+Catalog-growth fixtures record native nibble dependencies from root scans,
+TEMP allocation-chain traversal and nested object traversal, coalesce them into
+a bounded guard array and pass
 them to the repaired catalog commit. Guard exhaustion or observation failure
 stops before commit. Only bytes actually read by the parsers are guarded;
 compact synthetic prologues are excluded and opaque contents remain unresolved.
 The unit regression changes each observed field and requires stale-plan rejection,
 and checks callback failures, read faults, invalid nibbles and guard capacity.
+The guarded TEMP regression covers all 35 read-observation interruption points
+and all 25 geometry/sentinel/footer read faults in its two-allocation fixture.
+A malformed older footer rejects before any payload callback; payload bytes
+remain the responsibility of the separate object traversal.
 
 ### Offline HOME attachment table check
 

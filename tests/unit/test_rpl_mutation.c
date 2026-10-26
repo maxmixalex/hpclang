@@ -2516,6 +2516,70 @@ static int visit_temp(void *context, uint32_t first, uint32_t nibbles)
     return state->stop;
 }
 
+struct guarded_temp_state
+{
+    struct temp_visit_state allocations;
+    unsigned calls, stop_at;
+};
+
+static int visit_temp_dependency(void *context, uint32_t address, uint8_t value)
+{
+    struct guarded_temp_state *state = context;
+    assert(value == memory[address] && value <= 15);
+    root_dependencies[address] = 1;
+    return ++state->calls == state->stop_at ? 83 : 0;
+}
+
+static void check_guarded_temp(const struct hpclang_rpl_mutation_io *io)
+{
+    struct hpclang_rpl_mutation_io tracked = *io;
+    tracked.read_nibble = track_root_read;
+    struct guarded_temp_state state = {0};
+    memset(root_reads, 0, sizeof root_reads);
+    memset(root_dependencies, 0, sizeof root_dependencies);
+    assert(!hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp, visit_temp_dependency,
+                                                    &state));
+    assert(state.allocations.count == 2 && state.calls == 35);
+    assert(!memcmp(root_reads, root_dependencies, sizeof root_reads));
+    const uint32_t fields[] = {TEMPTOP - 5, TEMPTOP, 0x83000, 0x8300d, 0x8301e};
+    for (unsigned i = 0; i < sizeof fields / sizeof fields[0]; ++i)
+        for (unsigned n = 0; n < 5; ++n)
+            assert(root_dependencies[fields[i] + n]);
+    /* No allocation payload was interpreted as a dependency. */
+    assert(!root_dependencies[0x83006] && !root_dependencies[0x83013]);
+    for (unsigned stop = 1; stop <= 35; ++stop) {
+        state = (struct guarded_temp_state){.stop_at = stop};
+        assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp, visit_temp_dependency,
+                                                       &state) == 83);
+        assert(state.calls == stop);
+    }
+    state = (struct guarded_temp_state){.allocations.stop = 81};
+    assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp, visit_temp_dependency,
+                                                   &state) == 81);
+    assert(state.allocations.count == 1);
+    for (unsigned i = 0; i < sizeof fields / sizeof fields[0]; ++i)
+        for (unsigned n = 0; n < 5; ++n) {
+            rejected_read = fields[i] + n;
+            state = (struct guarded_temp_state){0};
+            assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp,
+                                                           visit_temp_dependency,
+                                                           &state) == HPCLANG_RPL_MUTATION_IO);
+            assert(!state.allocations.count);
+        }
+    rejected_read = UINT32_MAX;
+    put_word(0x8300d, 5, 10);
+    state = (struct guarded_temp_state){0};
+    assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp, visit_temp_dependency,
+                                                   &state) == HPCLANG_RPL_MUTATION_MALFORMED);
+    assert(!state.allocations.count);
+    put_word(0x8300d, 5, 13);
+    assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp, NULL, &state) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, NULL, visit_temp_dependency, &state) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    assert(!writes);
+}
+
 static void test_temp_allocation_visit(void)
 {
     struct hpclang_rpl_mutation_io io = setup(0);
@@ -2524,6 +2588,7 @@ static void test_temp_allocation_visit(void)
     put_word(TEMPTOP, 5, 0x83023);
     put_word(0x8300d, 5, 13);
     put_word(0x8301e, 5, 17);
+    check_guarded_temp(&io);
     struct temp_visit_state state = {0};
     assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 0);
     assert(state.count == 2 && writes == 0);

@@ -141,6 +141,15 @@ Direct-mapped table pointers are retained even when the table itself is a
 DOACPTR. Wrapper allocation/lifetime and transactional registration remain
 caller obligations; the resolver does not dereference table bodies or run code.
 
+`hpclang_rpl_mutation_visit_guarded_temp` records the allocation traversal's
+geometry, sentinel and footer reads in both validation and enumeration passes.
+These observations let the relocation plan guard the allocation boundaries that
+selected its object graph. A malformed complete chain rejects before payload
+callbacks; dependency/read/callback errors invalidate partial output. Payload
+contents still need separate guarded traversal and execution provenance. The
+native catalog/cache probe uses this traversal instead of an unguarded footer
+walk; this does not authorize public registration.
+
 Internal `hpclang_rpl_mutation_cache_acptr_insert/remove` stores 15-nibble
 DOACPTR wrappers in the main-RAM metadata cache between the catalog end and
 TEMPBOTTOM. Insertion requires the caller's expected TEMPBOTTOM and initializes

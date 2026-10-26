@@ -135,6 +135,17 @@ extern "C"
     int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
                                         hpclang_rpl_temp_visit_fn visit, void *context);
 
+    /* TEMP traversal with observations for every valid nibble read, including
+     * both geometry words, the sentinel and every allocation footer in both
+     * validation/enumeration passes. Dependency errors propagate unchanged;
+     * discard all partial observations/allocations on any failure. Payload
+     * bytes are not read or classified. Keep mappings and IO stable, and guard
+     * payload traversal separately. No native write callback is forwarded. */
+    int hpclang_rpl_mutation_visit_guarded_temp(const struct hpclang_rpl_mutation_io *io,
+                                                hpclang_rpl_temp_visit_fn visit,
+                                                hpclang_rpl_root_dependency_fn dependency,
+                                                void *context);
+
     /* Bootstrap-only: turn the native page interval into a rooted opaque
      * TEMPOB block. Pin
      * the compact pre-existing TEMP prefix as well, so Stock

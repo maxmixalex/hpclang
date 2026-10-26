@@ -108,8 +108,21 @@ static int probe_node(struct live_probe *p, struct hpclang_rpl_reader *reader, u
     return hpclang_rpl_reference_visit_guarded_nested(reader, &node, p->work, 512, 10000,
                                                       probe_edge, probe_dependency, p);
 }
-static int probe_collect(struct live_probe *p, struct hpclang_rpl_reader *reader, uint32_t home,
-                         uint32_t bottom, uint32_t top)
+static int probe_temp(void *context, uint32_t first, uint32_t span)
+{
+    struct live_probe *p = context;
+    struct hpclang_rpl_reader reader = {p->io->read_nibble, p->io->context};
+    uint32_t stop = first + span;
+    while (first < stop) {
+        uint32_t object_span;
+        if (hpclang_rpl_object_span(&reader, first, stop - first, &object_span) || !object_span ||
+            probe_node(p, &reader, first, object_span))
+            return 7;
+        first += object_span;
+    }
+    return 0;
+}
+static int probe_collect(struct live_probe *p, struct hpclang_rpl_reader *reader, uint32_t home)
 {
     hpclang_rpl_reference_edits_begin(&p->builder, p->edits, 4096);
     hpclang_rpl_reference_guards_begin(&p->guard_builder, p->guards, 4096);
@@ -119,21 +132,8 @@ static int probe_collect(struct live_probe *p, struct hpclang_rpl_reader *reader
     result = 7;
     if (probe_node(p, reader, home, 0x100000 - home))
         return result;
-    uint32_t at = top;
-    while (at > bottom + 5) {
-        uint32_t size;
-        if (probe_read_word(p->io, at - 5, 5, &size) || size < 11 || size > at - bottom - 5)
-            return result;
-        uint32_t object = at - size + 1, stop = at - 5;
-        while (object < stop) {
-            uint32_t span;
-            if (hpclang_rpl_object_span(reader, object, stop - object, &span) || !span ||
-                probe_node(p, reader, object, span))
-                return result;
-            object += span;
-        }
-        at -= size;
-    }
+    if (hpclang_rpl_mutation_visit_guarded_temp(p->io, probe_temp, probe_dependency, p))
+        return result;
     const struct hpclang_rpl_reference_reader mapped = {probe_mapped_read, p->io};
     result = 8;
     if (hpclang_rpl_reference_edits_validate(&mapped, p->edits, p->builder.count))
@@ -260,7 +260,7 @@ static int probe_cache_move(struct hpclang_rpl_mutation_io *io, uint32_t positio
     p->end = end;
     p->delta = remove ? -15 : 15;
     struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
-    int result = probe_collect(p, &reader, home, bottom, top);
+    int result = probe_collect(p, &reader, home);
     if (!result) {
         const struct hpclang_rpl_catalog_repairs repairs = {
             1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0};
@@ -424,7 +424,7 @@ static int probe_register(void)
     p->first = insertion.slot;
     p->end = end;
     p->delta = 16;
-    int result = probe_collect(p, &reader, home, bottom, top);
+    int result = probe_collect(p, &reader, home);
     if (result)
         goto done;
     const struct hpclang_rpl_catalog_repairs repairs = {
@@ -445,7 +445,7 @@ static int probe_register(void)
         p->delta = -16;
         uint32_t current_home;
         if (probe_read_word(&io, 0x80711, 5, &current_home) ||
-            probe_collect(p, &reader, current_home, bottom + 16, top + 16) ||
+            probe_collect(p, &reader, current_home) ||
             hpclang_rpl_catalog_plan_remove(&reader, io.library_table, 0x100000 - io.library_table,
                                             123, &removal) != 1)
             goto failed_roundtrip;

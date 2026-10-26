@@ -20,20 +20,16 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
-M8.0 delivery adds actual Stock command-name lookup through newly allocated
-HOME hash wrappers and catalog-dependent messages from a new Port0 library.
-The candidate image and both launchers match the four verified HP49g+/HP50g
-registered/unregistered message cases; 476 source corruptions reject.
-The new image also passes native command-name lookup through retained new
-wrappers on both models, including original Stock return and reference checks.
-ARM analysis, Python lint and strict documentation checks pass locally.
-Built-in message compatibility does not prove HOME message-wrapper routing:
-clearing or redirecting that field still returns the original message.
-Public registration, configuration, complete reference/lifetime coverage and
-parent/full CI acceptance remain open. Maintained procedures and boundaries
-are in the E2E guide; prior artifact evidence remains separately identified.
-The preceding c9dba0c2 head has ten inspected workflows and all jobs reviewed:
-three workflows pass and seven are queued, with no reported failures.
+M8.0 delivery now guards TEMP allocation geometry, sentinel and both footer
+traversal passes alongside root/object dependencies. The native catalog/cache
+probe uses this complete-chain traversal. The 59,656-byte candidate and both
+launchers match verified HP49g+/HP50g cache allocation/attachment/reclamation
+round trips; independent checks reject 372 corrupt bindings and 100 entry
+records. Earlier lookup/message evidence belongs to its 59,352-byte artifact.
+Public registration, configuration, complete opaque/banked reference coverage
+and parent/full CI acceptance remain open. Procedures are in the E2E guide.
+All nine preceding-head workflows and every job were inspected: eight queued
+and one pending, with no reported failures. This is not CI acceptance.
 
 ## M8 follow-up evidence history
 
