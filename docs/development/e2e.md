@@ -658,6 +658,25 @@ immediate `stock-resume` failure. The existing return deadline still bounds a
 screen that never recovers. Gallery artifacts retain each shard's result and
 before/PASS/return images so later shards cannot hide the failing screen.
 
+### Native launcher observation in call-root cases
+
+`tests/e2e/code-relocation/call_roots.py` creates a fixed 128-byte `ENTRYOBS`
+string before launching each of its five controlled call-root cases. The native
+payload fills that string after bootstrap, before creating its test library or
+rewriting the suspended return path. It captures the native page-pool count and
+table, saved Saturn PC/IP/caller, machine-stack cursor, hidden launcher root,
+R0–R4 and the stage0 source prefix. Recording does not resize the string.
+
+The verifier requires a complete versioned record and matches 32 source bytes
+against the current model's generated stage0 image. `entry.json` keeps the
+observed values separately from the later controlled mutation results. C still
+names ROM helper `0x1596fc`; R3.H identifies the stage0 source. These fields must
+not be conflated with an ARM PC sample. The record proves that the native
+payload reached its observation point through Stock; it is not a trace of every
+instruction before entry, nor proof of arbitrary live-register/banked safety.
+Existing complete catalog bindings, fixture operands, final return marker and
+unchanged Flash checks remain required after the observation.
+
 ### Offline original-ROM threaded return check
 
 `tests/e2e/code-relocation/threaded_return.py` checks the reviewed HP49g+/HP50g

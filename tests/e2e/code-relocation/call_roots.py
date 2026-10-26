@@ -1,6 +1,9 @@
 """Run controlled direct-call continuations through the standard Stock launcher."""
 
 import json
+import struct
+
+from verify import home_string
 
 from fixtures import word
 
@@ -70,6 +73,33 @@ def package(launcher, name):
     )
 
 
+def verify_entry(observation, stage0):
+    """Validate the original native entry, independently of simulated returns."""
+    if len(observation) != 128:
+        raise ValueError("Missing native entry observation")
+    words = struct.unpack("<32I", observation)
+    if (
+        words[0] != 1
+        or words[30] != 0x454E5452
+        or words[31] != 0x1596FC
+        or words[8] != 3
+        or words[3] >= 8
+        or not 0 < words[4] <= 256
+        or words[7] & 1023
+        or words[6] & 3
+        or words[1] & 3
+        or not 0x08000000 <= words[1] <= 0x0807F000
+        or not 0 < words[2] < 0x100000
+        or not 0 < words[10] < 0x100000
+        or not 0 < words[11] < 0x100000
+        or not 0x08000000 <= words[6] <= 0x0807FFE0
+    ):
+        raise ValueError("Invalid native entry state")
+    if observation[88:120] != stage0[:32]:
+        raise ValueError("Native entry does not identify this stage0 image")
+    return words
+
+
 def verify_calls(args, build, source, output, *, transfer, native_words):
     original_flash = (source / "flash").read_bytes()
     before = native_words((source / "sram").read_bytes(), original_flash)
@@ -90,13 +120,42 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             source,
             package_dir,
             "CALLROOT",
-            remote_commands=["-95 CF HOME CLEAR 'CALLROOT' RCL"],
+            remote_commands=[
+                "-95 CF HOME CLEAR",
+                "\"0\" 1 7 START DUP + NEXT 'ENTRYOBS' STO",
+                "'CALLROOT' RCL",
+            ],
         )
         state = case / "run/state"
         flash = (state / "flash").read_bytes()
         if flash != original_flash:
             raise ValueError("Call-root fixture changed Flash")
         read = native_words((state / "sram").read_bytes(), flash)
+        observation = home_string(read, b"ENTRYOBS")
+        words = verify_entry(observation, (build / "launchers" / f"{args.model}.bin").read_bytes())
+        (case / "entry.json").write_text(
+            json.dumps(
+                dict(
+                    version=1,
+                    before_fixture_rewrites=True,
+                    cpu=words[1],
+                    suspended_pc=words[2],
+                    cursor=words[3],
+                    pool_pages=words[4],
+                    os_block=words[5],
+                    stage0_source=words[6],
+                    rom_helper=words[31],
+                    pool_table=words[7],
+                    hidden_launcher=words[9],
+                    caller=words[10],
+                    saved_ip=words[11],
+                    saved_registers=list(words[12:22]),
+                    stage0_prefix=observation[88:120].hex(),
+                ),
+                indent=2,
+            )
+            + "\n"
+        )
         stack = read(0x806F8)
         marker = read(stack)
         if read(marker) != 0x2911 or read(marker + 5) != MARKER:

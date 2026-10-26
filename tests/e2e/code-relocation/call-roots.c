@@ -253,6 +253,50 @@ static int library_nibble(void *context, uint32_t at, uint8_t *out)
     return 1;
 }
 
+/* Record entry before library creation and controlled return-path rewrites.
+ * ENTRYOBS is a fixed-size test-owned string: no geometry changes are needed. */
+static int capture_entry(struct hpclang_rpl_mutation_io *io, uint32_t home)
+{
+    if (io->native_root_count != 3 || !io->native_roots[1])
+        return -1;
+    uint32_t *cpu = (uint32_t *)(uintptr_t)io->native_roots[1][1];
+    if (!cpu || cpu[0x998 / 4] >= 8)
+        return -1;
+    /* C still names the ROM helper; R3.H retains the launcher source. */
+    uint32_t target = cpu[0x948 / 4];
+    if ((target & 3) || target < 0x08000000u || target > 0x08080000u - 32)
+        return -1;
+    struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    struct hpclang_rpl_directory_entry_view entry;
+    uint32_t length;
+    if (hpclang_rpl_directory_find(&reader, home, (const uint8_t *)"ENTRYOBS", 8, &entry) ||
+        entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
+        length != 261)
+        return -1;
+    uint32_t words[32] = {1,
+                          (uint32_t)(uintptr_t)cpu,
+                          *io->native_roots[1],
+                          cpu[0x998 / 4],
+                          cpu[0x914 / 4],
+                          cpu[0x918 / 4],
+                          target,
+                          cpu[0x920 / 4],
+                          io->native_root_count,
+                          *io->native_roots[0],
+                          cpu[0x978 / 4 + ((cpu[0x998 / 4] + 7) & 7)]};
+    if (probe_read_word(io, 0x8076b, 5, words + 11))
+        return -1;
+    for (unsigned i = 0; i < 10; ++i)
+        words[12 + i] = cpu[0x92c / 4 + i];
+    memcpy(words + 22, (const void *)(uintptr_t)target, 32);
+    words[30] = 0x454e5452u;
+    words[31] = cpu[0x91c / 4];
+    for (unsigned i = 0; i < 32; ++i)
+        if (probe_write_word(io, entry.object_address + 10 + i * 8, words[i], 8))
+            return -1;
+    return 0;
+}
+
 int hpclang_call_roots_probe(void)
 {
     struct hpclang_rpl_stock_memory memory;
@@ -269,6 +313,8 @@ int hpclang_call_roots_probe(void)
         return -1;
     if (found || entry.prologue != 0x2d9d)
         return 60;
+    if (capture_entry(&io, home))
+        return 64;
     struct hpclang_rpl_reader encoded = {library_nibble, NULL};
     struct hpclang_object *source = NULL, *existing = NULL;
     if (hpclang_object_snapshot_copy(&encoded, 0, sizeof library_encoding - 1, &source))
