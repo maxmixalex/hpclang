@@ -1312,19 +1312,26 @@ settled return and phases 0x4f530400/401/402. All five retained CI code artifact
 only the wrapping request changes. The production wrapper reproduces both
 tested packages exactly. `research/oct27-port0-reserve-identity.py` and
 `/work/oct27-port0-reserve/{code-identity,verified-results}.json` retain the
-artifact checks and six result records. Remaining model checks and new CI are
-still required; these local passes do not complete M8.0.
+artifact checks and six result records. All six models now pass: three invocations each on HP48gII/HP49g+/HP50g
+and 15 each on HP39g+/HP39gs/HP40gs, totaling 54 lifecycle phases with settled
+return. The independently checked structured records are retained in
+`/work/oct27-port0-reserve/verified-results.json`, separately from the subsequent
+catalog suite which reuses the harness build-output paths. The accepted-main integration preserves
+all three family payloads/result addresses and six launchers byte-for-byte;
+integration port/mutation/reference/physical-mapping sanitizer tests pass.
+New CI remains required; these local passes do not complete M8.0.
 
-The separate code-relocation CI failure (job 121826775572, same `0e68b3b1`
-head) is a test allocation failure before HOME detachment. The retained PC
+The code-relocation CI failures (HP49g+ job 121826775448 and HP50g job
+121826775572, same `0e68b3b1` head) are test allocation failures before HOME
+detachment. Independent snapshots from both models agree on the following bounds. The retained PC
 `0x0122c298`, malloc return LR `0x0122c45f`, stack operands and TLS errno 12
 identify the one-byte-per-nibble HOME snapshot: 246,907 requested bytes exceed
 the complete 229,376-byte RW region. HOME is `0xc3a60`, its body begins at
 `0xc3b04`, and Port 0 begins at `0xfff7f`. The candidate packs both nibbles into
 each snapshot byte, needing 123,454 bytes for this odd-sized body, and still
 compares every native nibble after detach/reattach. ARM build, formatting and
-static analysis pass; the ten native cases across HP49g+/HP50g are queued,
-not yet validated. Failure RAM, matching-image identity and allocation audit
+static analysis pass; the ten native cases across HP49g+/HP50g are now
+running sequentially after the completed lifecycle suite, not yet validated. Failure RAM, matching-image identity and allocation audit
 remain under `research/oct27-code-ci`; `oct27-code-ci-allocation.py` reproduces
 the address/size/errno checks. This fixture fix changes neither production
 mutation behavior nor its memory fences.
