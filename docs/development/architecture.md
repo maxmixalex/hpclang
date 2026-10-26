@@ -190,6 +190,15 @@ target I/O, then preserves the ordinary expected-or-replacement retry rules.
 Resolvers must prove contiguity and stable mappings across the entire batch;
 this adds no permission to write ROM or move objects with unresolved roots.
 
+The public port adapter treats `HPCLANG_RPL_MUTATION_INCOMPLETE` as terminal.
+`hpclang_runtime_stop` masks IRQ/FIQ and retains the current mappings/ownership
+without destructors, service cleanup or Stock return. Ordinary `exit`/`_Exit`
+would release that ownership, so they are not valid commit-failure paths.
+Port1 body preparation failures remain recoverable `EIO` while its zero
+prologue still hides the record. Stable production RAM callbacks should not
+fail after preflight; the terminal path preserves the contract if they do.
+Public Port1 replace/remove still require complete reference protection.
+
 ## Platform families and model profiles
 
 The platform family is the implementation unit for launch and low-level integration:
