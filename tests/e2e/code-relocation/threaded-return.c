@@ -70,3 +70,24 @@ int bank_catalog_grow(uint8_t *nibbles, uint32_t *root, uint32_t *entry, uint32_
     *writes = f.writes;
     return result;
 }
+
+/* Controlled alternate command-4 return: caller proves R0's low address use.
+ * This fixture supplies that obligation; it does not discover production roots. */
+int bank_catalog_grow_r0(uint8_t *nibbles, uint32_t *entry, uint32_t *r0, unsigned repair_r0,
+                         uint32_t *writes)
+{
+    struct fixture f = {nibbles, 0};
+    uint32_t *roots[] = {entry};
+    const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
+    struct hpclang_rpl_mutation_io io = {
+        read_nibble, write_nibble, &f, 0x100000, 0x80000, 0, roots, 1, 0x8611d, display, 4};
+    const struct hpclang_rpl_register_repair reg = {r0, *r0};
+    const struct hpclang_rpl_catalog_repairs repairs = {
+        .main_mapping = 1,
+        .registers = repair_r0 ? &reg : NULL,
+        .register_count = repair_r0 ? 1u : 0u,
+    };
+    int result = hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x86500, &repairs);
+    *writes = f.writes;
+    return result;
+}

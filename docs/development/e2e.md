@@ -702,6 +702,133 @@ whole ARMJUMP reachability, or replace full Stock registration/startup acceptanc
 A different ROM or cached-program layout requires review before extending this
 gate. This optional offline check is not automatically included in CI.
 
+### Offline MMU entry/return check
+
+`tests/e2e/code-relocation/mmu_entry.py` connects the reviewed command-4 MMU
+entry (`889A5` to ARMSYS at `88B43`) with its bounded return through GETPTR
+and dispatch to `03130`. Use the same Linux/Unicorn environment and private
+saved state, plus a generated Launcher V3 file:
+
+```sh
+python tests/e2e/code-relocation/mmu_entry.py \
+  --model hp50g --state /path/to/before-registration \
+  --launcher /path/to/hp50g.hp --output /tmp/mmu-entry
+```
+
+The launcher supplies the reviewed memory policy; physical entry/code addresses
+and length are controlled. All eight cursors must reach the MMU ARM boundary.
+R0 retains the physical ARM entry, R1 receives code address/length, R3 receives
+entry/policy, R4 receives the ROM conversion entry, and R2's low field becomes
+the table extent. The bounded return must neither read nor write R0–R4.
+The original MMU helpers need three temporary return slots and the return
+consumes one caller: safe initial live depth is independently known 1–5.
+Four untouched sentinels survive; the other four slots end cleared.
+
+This skips the intervening ARM execution and does not prove initial descriptor
+loading, arbitrary memory geometry, actual code relocation, or later Stock
+execution. Original instructions run in both segments; controlled values are
+not evidence for every launcher. Changed policy/code guards remove stale
+reports; successful `mmu-entry.json` reports retain traces and input hashes.
+
+With `--descriptor` and a separate output directory, entry begins at `8890D`.
+A controlled 40-nibble launch descriptor is placed in a hex-string object and
+referenced by the data stack. Initial A/C/R0 values are poisoned; B retains the live RPL return-stack
+position required by SAVPTR. That position must survive both SAVPTR and the
+bounded return. Original
+instructions must load the descriptor fields, save pointers and generate the
+MMU caller return address. Each model checks all eight cursors. The full tested
+segment peaks at four extra return slots and ends at its original depth;
+four other stack sentinels survive. Independently known initial live depth must
+therefore be at most four. This connects descriptor consumption to MMU setup
+and return, but does not execute the earlier descriptor producer, validate an
+arbitrary object supplied by a user, or run the intervening ARM application.
+
+`--linked-descriptor` additionally places the supplied launcher at a controlled
+main-RAM address and executes the original GETOBJINFO and GETLINKINFO helpers.
+Their entry/address/size outputs feed the original allocation and descriptor
+field-writing instructions (`88378`–`883BA`). The resulting object, rather than
+a manually assembled descriptor, then feeds the descriptor/MMU/return segment.
+Each model checks all eight cursors. The helper invocations have controlled
+return boundaries and reset cursors; the published four-slot bound applies to
+the descriptor/MMU/return segment only. ARMLAUNCH lookup and its final address
+field remain controlled, and no ARM payload is executed. Traces retain these
+boundaries explicitly; this is not complete PrLNK or whole-launch acceptance.
+
+`--full-link` instead runs the cached PrLNK CODE continuously from `88311` to
+the Stock continuation at `05143`. It uses the original `XLIB 275 11` reference
+at `882F7`, as found in this saved state's PrLNK program, rather than the global
+ARMLAUNCH name used by another historical source version. Lookup, allocation,
+and all descriptor-field writes execute without helper-boundary resets. The
+resolved launch entry returned by GETLINKINFO must equal the final descriptor
+field and the MMU ARM target. The resulting descriptor then feeds the existing
+descriptor/MMU/return check, with a controlled boundary between the two CODE
+segments. The RPL preamble, intervening ARM payload, arbitrary bank lifetime
+and complete launch remain outside this gate; the four-slot bound applies only
+to the descriptor/MMU segment, not to the preceding PrLNK execution.
+
+Combine `--full-link --relocate` to compile the current C catalog mover and
+production return-root collector (a host C compiler is required). At the
+controlled ARM boundary, grow the catalog by 16 nibbles and repair its saved
+IP, suspended PC and proven caller slot before executing the original return.
+The mutated memory, not an independently reconstructed snapshot, feeds GETPTR
+and dispatch. R0–R4 remain untouched through this bounded return. Data-stack
+inputs reserve real slots below EDITLINE and adjust the available-cell count;
+stack bounds and the shifted RPL return-stack position are checked afterward.
+Source hashes and write counts are included in the report. This still skips
+the ARM payload and does not establish validity of its physical mappings
+during arbitrary application execution or complete public-registration safety.
+
+### Offline alternate ARM return check
+
+`tests/e2e/code-relocation/alternate_return.py` checks the second reviewed
+command-4 ARMSYS return, from `88C73` through GETPTR, PUTPTR and RTNCC to a
+controlled ROM caller address (`03130`, stopped before execution), using the same
+Linux/Unicorn environment and private saved-state inputs:
+
+```sh
+python tests/e2e/code-relocation/alternate_return.py \
+  --model hp50g --state /path/to/before-registration \
+  --output /tmp/alternate-return
+```
+
+Run separately for HP49g+. Each model checks eight stack cursors and four R2
+low-bit combinations, before and after actual C catalog growth: 64 cases plus
+eight intentionally omitted R0 repairs. When the low two R2 bits equal one,
+the original code copies R0's low 20 bits into the RPL data stack. The C
+assignment inspector identifies that field, and the production guarded register
+repair preserves the upper bits while relocating the controlled address.
+Other flag combinations must not read R0. Omitting the needed repair must
+produce the stale address. All five saved registers remain unchanged during
+the original interpreter execution.
+
+GETPTR and PUTPTR each temporarily use the same free machine return-stack slot;
+RTNCC then consumes the controlled caller slot. The peak depth increases by one
+and the final depth decreases by one. Both used slots end cleared, while the
+other six distinct sentinels survive. Safe entry therefore requires independently
+known live depth 1–7; the cursor alone cannot establish this condition. Baseline
+and moved instruction traces must match after RAM-PC normalization. PUTPTR must
+publish the expected data-stack position and saved IP, and RTNCC must clear carry.
+
+Reviewed instruction and target guards reject changed inputs. The gate removes
+stale reports before checking and writes `alternate-return.json` with source
+and input hashes only on success. CPU/register values and the target are
+controlled: this does not establish incoming R0 provenance, reachability of
+this entry, arbitrary flags/register states, or execution beyond the controlled
+ROM caller. It supplements the first return-path gate and remains optional offline
+evidence, not complete relocation or public-registration acceptance.
+
+Add `--allocated-root` with a separate output directory to obtain R0 from the
+original legacy allocation path (`88BC1` to just before ARMSYS at `88C6E`).
+This uses a controlled 32-byte request with the leave-on-stack flag, runs the
+ROM allocator, and verifies that R0 identifies its new string object. Each
+model then runs 16 baseline/move cases and eight omitted-repair controls with
+that allocated object. The allocator-created memory is carried into the C
+mover and return check. The ARM program itself is not executed between those
+segments; the return CPU state remains controlled, so this does not prove
+preservation across arbitrary ARM execution or whole-launcher reachability.
+The current hpclang wrapper selects the separate MMU path; legacy allocation
+coverage must not be mistaken for a prerequisite of every generated launcher.
+
 ### Offline ACCESSRAM return check
 
 `tests/e2e/code-relocation/accessram_return.py` checks four reviewed command-4
