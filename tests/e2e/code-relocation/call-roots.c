@@ -214,13 +214,19 @@ static int probe_detach(struct hpclang_rpl_mutation_io *io, int reattach)
             second >= stack)
             return -1;
     }
-    uint8_t *snapshot = malloc(port - body);
+    /* Preserve every nibble without doubling the HOME body's storage. Stock
+     * CI retains both the original launcher and this call fixture in HOME;
+     * one byte per nibble can exceed the entire application RW allocation. */
+    uint8_t *snapshot = calloc(((size_t)(port - body) + 1u) / 2u, 1u);
     if (!snapshot)
         return -1;
     int result = -1;
-    for (uint32_t i = 0; i < port - body; ++i)
-        if (!io->read_nibble(io->context, body + i, snapshot + i))
+    for (uint32_t i = 0; i < port - body; ++i) {
+        uint8_t value;
+        if (!io->read_nibble(io->context, body + i, &value) || value > 15u)
             goto done;
+        snapshot[i / 2u] |= (uint8_t)(value << (4u * (i & 1u)));
+    }
     if (hpclang_rpl_mutation_home_detach(io, 275))
         goto done;
     uint32_t value;
@@ -236,7 +242,8 @@ static int probe_detach(struct hpclang_rpl_mutation_io *io, int reattach)
         goto done;
     for (uint32_t i = 0; i < port - body; ++i) {
         uint8_t actual;
-        if (!io->read_nibble(io->context, body + i, &actual) || actual != snapshot[i])
+        uint8_t expected = (snapshot[i / 2u] >> (4u * (i & 1u))) & 15u;
+        if (!io->read_nibble(io->context, body + i, &actual) || actual != expected)
             goto done;
     }
     result = 0;

@@ -1315,6 +1315,20 @@ tested packages exactly. `research/oct27-port0-reserve-identity.py` and
 artifact checks and six result records. Remaining model checks and new CI are
 still required; these local passes do not complete M8.0.
 
+The separate code-relocation CI failure (job 121826775572, same `0e68b3b1`
+head) is a test allocation failure before HOME detachment. The retained PC
+`0x0122c298`, malloc return LR `0x0122c45f`, stack operands and TLS errno 12
+identify the one-byte-per-nibble HOME snapshot: 246,907 requested bytes exceed
+the complete 229,376-byte RW region. HOME is `0xc3a60`, its body begins at
+`0xc3b04`, and Port 0 begins at `0xfff7f`. The candidate packs both nibbles into
+each snapshot byte, needing 123,454 bytes for this odd-sized body, and still
+compares every native nibble after detach/reattach. ARM build, formatting and
+static analysis pass; the ten native cases across HP49g+/HP50g are queued,
+not yet validated. Failure RAM, matching-image identity and allocation audit
+remain under `research/oct27-code-ci`; `oct27-code-ci-allocation.py` reproduces
+the address/size/errno checks. This fixture fix changes neither production
+mutation behavior nor its memory fences.
+
 The historical implementations assemble a pool from available native memory
 and optionally append an OS allocation. Their OS probing policy varies: the
 1.1 HP48 source leaves 4 KiB after its probe, while the other 1.1 source leaves
