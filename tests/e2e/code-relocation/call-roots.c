@@ -195,24 +195,40 @@ static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots)
             return -1;
     if (probe_read_word(io, object + 26, 2, &encoded))
         return -1;
-    unsigned size = encoded == 0x27 ? 4 : encoded == 0xe8 ? 6 : encoded == 0xf8 ? 7 : 0;
-    if (!size || length != (size == 4 ? 29u : size == 6 ? 31u : 33u))
+    unsigned conditional = encoded == 0x37;
+    unsigned size = encoded == 0x27 || conditional ? 4
+                    : encoded == 0xe8              ? 6
+                    : encoded == 0xf8              ? 7
+                                                   : 0;
+    if (!size || length != (conditional ? 31u : size == 4 ? 29u : size == 6 ? 31u : 33u))
         return -1;
     unsigned absolute = size == 7;
     if (probe_read_word(io, object + 26 + (absolute ? 2 : 0), absolute ? 5 : size, &encoded) ||
-        encoded != (absolute    ? 0u
+        encoded != (conditional ? 0x37u
+                    : absolute  ? 0u
                     : size == 4 ? 0x27u
                                 : 0x2e8u))
         return -1;
     uint32_t tail = object + 26 + size;
-    if (probe_read_word(io, tail, 4, &encoded) || encoded != 0x1010 ||
-        probe_read_word(io, *io->native_roots[1], 2, &opcode) ||
+    if (probe_read_word(io, *io->native_roots[1], 2, &opcode) ||
         (opcode != 0x10 && opcode != 0x20 && opcode != 0x30))
         return -1;
+    if (conditional) {
+        uint32_t padding;
+        /* GOSUB -> RTNCC -> RTNNC must preserve the actual caller's clear carry. */
+        if (opcode != 0x30 || probe_read_word(io, tail, 5, &encoded) || encoded != 0x30005 ||
+            probe_read_word(io, tail + 5, 1, &padding) || padding)
+            return -1;
+    } else if (probe_read_word(io, tail, 4, &encoded) || (encoded != 0x1010 && encoded != 0x0010)) {
+        return -1;
+    }
     uint32_t *cpu = (uint32_t *)(uintptr_t)io->native_roots[1][1];
     if (cpu[0x998 / 4] >= 8)
         return -1;
-    if (probe_write_word(io, tail - 1, (opcode << 4) | 0x10000, 5) ||
+    /* Preserve the selected callee return (RTN or RTNSXM), while restoring the
+     * original continuation's flag-setting return at the call fallthrough. */
+    if ((!conditional &&
+         probe_write_word(io, tail - 1, (opcode << 4) | ((encoded & 0xff00) << 4), 5)) ||
         (absolute && probe_write_word(io, object + 28, tail + 2, 5)))
         return -1;
     roots[0] = io->native_roots[0];
