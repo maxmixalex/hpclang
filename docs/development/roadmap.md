@@ -20,6 +20,8 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Port0 growth-reservation fix is local: the wrapper requests 240 bytes instead of 16 while retaining native-page fences. Both HP49g+/HP50g now pass all three Stock object-mutation invocations with settled return. Application ELF/HPC, both launcher ELFs and stage1 ELF match failed CI artifacts byte-for-byte; only the wrapper request changes. Two envelope checks and Ruff pass. Remaining model checks are running; no new #24 CI or acceptance is claimed.
+
 M8.0 guarded dispatch decoding now retains reads for both caller-proven
 schemas, while scalar type IDs remain values and execution edges remain
 unresolved obligations. Candidate sanitizer tests and ARM analysis pass;

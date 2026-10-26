@@ -1277,15 +1277,43 @@ documented target adaptations, not removed application requirements.
 
 ### Startup resource admission
 
-The wrapper's native request word is `0x01c00000`, not a byte count. The
+The wrapper's native request word is `0x0fc00000`, not a byte count. The
 Launcher V3 format in HPGCC 1.1's `ARMToolbox/LibFmt.txt` and HPGCC 2.0 SP2's
 `sources/ARMToolbox/masd_source/ARMTBX_3_SOURCES.DIR` assigns bit 22 to the MMU
 packer, bit 23 to optional ARM OS RAM, and bits 24–27 to native stack-growth
-reservation in 16-byte blocks. Our word sets both flags and one stack block.
+reservation in 16-byte blocks. Our word sets both flags and all 15 stack blocks
+(240 bytes), the largest representable request. Runtime fences still bound
+each mutation; this request does not promise unlimited or unconsumed capacity.
 With the packer enabled, the low 20 bits describe space to leave for TEMPOB
 growth, not the application's pool size; this word leaves that field zero.
 Writing a 36 KiB application limit there would change native free-space policy,
 not enforce a 36 KiB allocation.
+
+The exact-head `0e68b3b1` object-mutation CI failures on HP49g+ and HP50g
+expose a concrete USEROB capacity limit on the third invocation. Independent
+reads of both captured MMU tables, boot bounds and Saturn RAM give DSKTOP
+`0xe0012`, RSKTOP `0x88de4`, USEROB fence `0xe0000` and five reserved nibbles.
+Only 13 nibbles remain for growth, despite a raw stack gap of 356,910 nibbles.
+Replacing integer 987 (14 nibbles) with the unchanged 34-character test string
+(78 nibbles) needs 64 nibbles and would lower DSKTOP to `0xdffd2`, below the
+required `0xe0005`. Both captured TLS errno cells contain ENOSPC (28). The
+native-page fence must remain intact; total free RAM is not contiguous USEROB
+capacity. The failed wrapper requested only one 16-byte stack-growth block.
+
+Reproduction artifacts are retained in `research/oct27-object-ci`: the two
+full SRAM/on-chip captures and `capacity-audit.json` with SHA-256 input identities.
+`research/oct27-object-ci-capacity.py` checks the bounds against both captures.
+The original CI jobs are 121826320519 and 121826320547. The historical Launcher
+V3 source's MMUARMJUMP subtracts the stack-growth request from DSKTOP before
+assembling main-RAM pages. The 240-byte candidate now passes the complete
+three-invocation Stock object-mutation lifecycle on both models, including
+settled return and phases 0x4f530400/401/402. All five retained CI code artifacts
+(application ELF/HPC, two launcher ELFs and stage1 ELF) match byte-for-byte;
+only the wrapping request changes. The production wrapper reproduces both
+tested packages exactly. `research/oct27-port0-reserve-identity.py` and
+`/work/oct27-port0-reserve/{code-identity,verified-results}.json` retain the
+artifact checks and six result records. Remaining model checks and new CI are
+still required; these local passes do not complete M8.0.
 
 The historical implementations assemble a pool from available native memory
 and optionally append an OS allocation. Their OS probing policy varies: the
