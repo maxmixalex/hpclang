@@ -5,6 +5,12 @@
 #include "rpl-stock-memory.h"
 #include "launch-services.h"
 
+static int valid_page(uint32_t page)
+{
+    return !(page & 0x7ffu) &&
+           (page <= 0x200000u - 0x800u || (page >= 0x08000000u && page <= 0x08080000u - 0x800u));
+}
+
 int hpclang_rpl_stock_resolve_span(const uint32_t read_map[256], uint32_t address, uint32_t span,
                                    uint32_t *physical)
 {
@@ -16,13 +22,42 @@ int hpclang_rpl_stock_resolve_span(const uint32_t read_map[256], uint32_t addres
     uint32_t base = read_map[first];
     for (uint32_t i = first; i <= last; ++i) {
         uint32_t page = read_map[i];
-        if ((page & 0x7ffu) ||
-            !(page <= 0x200000u - 0x800u || (page >= 0x08000000u && page <= 0x08080000u - 0x800u)))
+        if (!valid_page(page))
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
         if (page != base + (i - first) * 0x800u)
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
     }
     *physical = base * 2u + (address & 0xfffu);
+    return 0;
+}
+
+int hpclang_rpl_stock_visit_spans(const uint32_t read_map[256], uint32_t address, uint32_t span,
+                                  hpclang_rpl_stock_span_visit_fn visit, void *context)
+{
+    if (!read_map || !visit)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!span || address >= 0x100000u || span > 0x100000u - address)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t first = address >> 12, last = (address + span - 1u) >> 12;
+    for (uint32_t page = first; page <= last; ++page)
+        if (!valid_page(read_map[page]))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t end = address + span;
+    while (address < end) {
+        uint32_t page = address >> 12;
+        uint32_t physical = read_map[page] * 2u + (address & 0xfffu);
+        uint32_t stop = (page + 1u) << 12;
+        while (stop < end && read_map[page + 1u] == read_map[page] + 0x800u) {
+            ++page;
+            stop += 0x1000u;
+        }
+        if (stop > end)
+            stop = end;
+        int result = visit(context, address, physical, stop - address);
+        if (result)
+            return result;
+        address = stop;
+    }
     return 0;
 }
 

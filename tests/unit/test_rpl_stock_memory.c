@@ -13,6 +13,81 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
     return active_boot;
 }
 
+struct span_walk
+{
+    const uint32_t *map;
+    uint32_t next, end, previous_end, calls, stop;
+};
+
+static int inspect_span(void *context, uint32_t logical, uint32_t physical, uint32_t span)
+{
+    struct span_walk *walk = context;
+    assert(logical == walk->next && span && span <= walk->end - logical);
+    if (walk->calls)
+        assert(physical != walk->previous_end); /* Maximal runs. */
+    for (uint32_t i = 0; i < span; ++i) {
+        uint32_t at = logical + i;
+        assert(physical + i == walk->map[at / 4096] * 2u + at % 4096);
+    }
+    walk->previous_end = physical + span;
+    walk->next += span;
+    return ++walk->calls == walk->stop ? 73 : 0;
+}
+
+static void test_discontinuous_spans(void)
+{
+    uint32_t map[256];
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        for (unsigned i = 0; i < 256; ++i)
+            map[i] = mode == 0   ? i * 0x800u
+                     : mode == 1 ? 0x08020000u
+                     : mode == 2 ? 0x08000000u + (255u - i) * 0x800u
+                                 : (i & 1u ? 0x08000000u : 0u) + (i / 2u) * 0x800u;
+        struct span_walk walk = {.map = map, .end = 0x100000};
+        assert(!hpclang_rpl_stock_visit_spans(map, 0, walk.end, inspect_span, &walk));
+        assert(walk.next == walk.end && walk.calls == (mode ? 256u : 1u));
+        /* Offsets, nibble parity, partial pages and cross-region boundaries. */
+        for (uint32_t i = 0; i < 256; ++i) {
+            uint32_t start = (i * 7919u) % 0x100000u;
+            uint32_t length = 1u + (i * 2053u) % 65536u;
+            if (length > 0x100000u - start)
+                length = 0x100000u - start;
+            walk = (struct span_walk){.map = map, .next = start, .end = start + length};
+            assert(!hpclang_rpl_stock_visit_spans(map, start, length, inspect_span, &walk));
+            assert(walk.next == walk.end && walk.calls);
+        }
+        if (mode) {
+            for (uint32_t stop = 1; stop <= 256; ++stop) {
+                walk = (struct span_walk){.map = map, .end = 0x100000, .stop = stop};
+                assert(hpclang_rpl_stock_visit_spans(map, 0, walk.end, inspect_span, &walk) == 73);
+                assert(walk.calls == stop && walk.next == stop * 4096u);
+            }
+        }
+    }
+    for (unsigned i = 0; i < 256; ++i)
+        map[i] = i * 0x800u;
+    const uint32_t invalid[] = {1, 0x200000, 0x08080000, UINT32_MAX};
+    for (unsigned i = 0; i < 256; ++i) {
+        for (unsigned j = 0; j < sizeof invalid / sizeof invalid[0]; ++j) {
+            map[i] = invalid[j];
+            struct span_walk walk = {.map = map, .end = 0x100000};
+            assert(hpclang_rpl_stock_visit_spans(map, 0, walk.end, inspect_span, &walk) ==
+                   HPCLANG_RPL_SPAN_UNSUPPORTED);
+            assert(!walk.calls); /* Reject even a late bad page before callbacks. */
+        }
+        map[i] = i * 0x800u;
+    }
+    struct span_walk walk = {.map = map, .end = 0x100000};
+    assert(hpclang_rpl_stock_visit_spans(map, 0, 0, inspect_span, &walk) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_stock_visit_spans(map, 0xfffff, 2, inspect_span, &walk) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_stock_visit_spans(NULL, 0, 1, inspect_span, &walk) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_stock_visit_spans(map, 0, 1, NULL, &walk) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!walk.calls);
+}
+
 static void test_physical_spans(void)
 {
     uint32_t map[256];
@@ -73,6 +148,7 @@ static void test_physical_spans(void)
 
 int main(void)
 {
+    test_discontinuous_spans();
     test_physical_spans();
     static uint8_t port1[HPCLANG_RPL_PORT1_NIBBLES / 2u];
     struct hpclang_rpl_reader port_reader = {0};

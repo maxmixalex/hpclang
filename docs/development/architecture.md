@@ -85,6 +85,13 @@ partial mapping disables publication of mutation bounds; absence from main RAM
 is distinct from an invalid partial mapping. This proof covers main-RAM aliases
 only, not arbitrary banked aliases or future mapping changes.
 
+For read-only range analysis, `hpclang_rpl_stock_visit_spans` walks a stable
+Stock Read map and reports maximal physically contiguous runs. It validates
+every touched page before callbacks, retains separate logical aliases and
+uses absolute physical nibble coordinates. This permits whole-range overlap
+checks without assuming that consecutive Saturn pages are physically adjacent.
+It does not select a bank, classify pointer values or authorize relocation.
+
 ## Platform families and model profiles
 
 The platform family is the implementation unit for launch and low-level integration:
