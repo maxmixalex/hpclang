@@ -141,6 +141,19 @@ Direct-mapped table pointers are retained even when the table itself is a
 DOACPTR. Wrapper allocation/lifetime and transactional registration remain
 caller obligations; the resolver does not dereference table bodies or run code.
 
+Internal `hpclang_rpl_mutation_cache_acptr_insert/remove` stores 15-nibble
+DOACPTR wrappers in the main-RAM metadata cache between the catalog end and
+TEMPBOTTOM. Insertion requires the caller's expected TEMPBOTTOM and initializes
+the prologue, target and switch before publishing geometry. Removal verifies all
+three fields within the cache; the caller must independently prove the complete
+object boundary and ownership. Surviving references into the removed extent
+reject with BUSY. Shared movement uses the actual 15- or 16-nibble width for field
+boundaries, root repairs, fences and accounting. Caller-proven embedded/register
+repairs retain their original guards; preflight is write-free and commit failure
+is INCOMPLETE. These primitives neither attach HOME fields nor execute switches.
+Registration transactions, complete reference discovery, lifetime integration and
+native execution acceptance remain open.
+
 The internal `hpclang_rpl_mutation_home_attach` appends a HOME attachment using
 two caller-proven native pointer fields. It validates the complete existing
 prefix before rejecting a duplicate ID, checks count capacity and free-space

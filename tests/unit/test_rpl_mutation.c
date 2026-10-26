@@ -3620,6 +3620,159 @@ static void test_catalog_allocation_lifetime(void)
 }
 #endif
 
+static void test_cache_acptr(void)
+{
+    struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+    uint8_t before[NIBBLES];
+    memcpy(before, memory, sizeof before);
+    uint32_t native = 0x83001, *roots[] = {&native};
+    io.native_roots = roots;
+    io.native_root_count = 1;
+    assert(!hpclang_rpl_mutation_cache_acptr_insert(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL));
+    assert(native == 0x83010);
+    assert(get_word(0x83000, 5) == 0x02baa);
+    assert(get_word(0x83005, 5) == 0x6ffe1);
+    assert(get_word(0x8300a, 5) == 0x22f5a);
+    assert(get_word(0x806e9, 5) == 0x8300f);
+    assert(get_word(TEMPTOP, 5) == 0x83014);
+    assert(get_word(RSKTOP, 5) == 0x8301e);
+    assert(get_word(io.library_table, 3) == 2);
+    assert(get_word(0x82006, 5) == 0x83010);
+    assert(get_word(0x90000, 5) == 0x83011);
+    assert(!hpclang_rpl_mutation_cache_acptr_remove(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL));
+    assert(native == 0x83001);
+    /* Vacated scratch bytes are not part of the restored live extent. */
+    assert(!memcmp(memory, before, 0x8300f));
+    assert(!memcmp(memory + 0x90000, before + 0x90000, NIBBLES - 0x90000));
+
+    /* Removing the first of two objects must retain the complete second one. */
+    io = setup_catalog_growth();
+    assert(!hpclang_rpl_mutation_cache_acptr_insert(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL));
+    assert(!hpclang_rpl_mutation_cache_acptr_insert(&io, 0x8300f, 0x6fd6b, 0x22f5a, NULL));
+    native = 0x8300f;
+    io.native_roots = roots;
+    io.native_root_count = 1;
+    assert(!hpclang_rpl_mutation_cache_acptr_remove(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL));
+    assert(native == 0x83000);
+    assert(get_word(0x83000, 5) == 0x02baa);
+    assert(get_word(0x83005, 5) == 0x6fd6b);
+    assert(get_word(0x8300a, 5) == 0x22f5a);
+    for (unsigned offset = 0; offset < 15; ++offset) {
+        native = 0x83000 + offset;
+        writes = 0;
+        assert(hpclang_rpl_mutation_cache_acptr_remove(&io, 0x83000, 0x6fd6b, 0x22f5a, NULL) ==
+               HPCLANG_RPL_MUTATION_BUSY);
+        assert(!writes);
+    }
+    io.native_root_count = 0;
+    assert(!hpclang_rpl_mutation_cache_acptr_remove(&io, 0x83000, 0x6fd6b, 0x22f5a, NULL));
+
+    for (unsigned fault = 0; fault < 8; ++fault) {
+        io = setup_catalog_growth();
+        uint32_t position = 0x83000, target = 0x6ffe1, bank = 0x22f5a;
+        if (fault == 0)
+            --position;
+        if (fault == 1)
+            ++position;
+        if (fault == 2)
+            target = 0x100000;
+        if (fault == 3)
+            bank = 0x100000;
+        if (fault == 4)
+            io.temp_limit = 0x83022;
+        if (fault == 5)
+            rejected_read = 0x8300e;
+        if (fault == 6)
+            rejected_read = 0x8301d;
+        if (fault == 7)
+            put_word(0x806e9, 5, 0x82010);
+        memcpy(before, memory, sizeof before);
+        assert(hpclang_rpl_mutation_cache_acptr_insert(&io, position, target, bank, NULL) < 0);
+        assert(!writes && !memcmp(memory, before, sizeof before));
+    }
+    for (unsigned fault = 0; fault < 6; ++fault) {
+        io = setup_catalog_growth();
+        assert(!hpclang_rpl_mutation_cache_acptr_insert(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL));
+        uint32_t position = 0x83000;
+        if (fault < 3)
+            memory[position + 5 * fault] ^= 1;
+        if (fault == 3)
+            position = 0x82022;
+        if (fault == 4)
+            ++position;
+        if (fault == 5)
+            rejected_read = position + 14;
+        writes = 0;
+        memcpy(before, memory, sizeof before);
+        assert(hpclang_rpl_mutation_cache_acptr_remove(&io, position, 0x6ffe1, 0x22f5a, NULL) < 0);
+        assert(!writes && !memcmp(memory, before, sizeof before));
+    }
+    /* The first nibble beyond the 15-nibble destination is not overwritten. */
+    io = setup_catalog_growth();
+    struct hpclang_rpl_reference_edit edge = {
+        .mapping = 7, .field = 0x8301e, .expected = 0, .value = 9, .width = 1};
+    uint32_t reg = 0xabc83001;
+    struct hpclang_rpl_register_repair register_repair = {&reg, reg};
+    struct hpclang_rpl_catalog_repairs repairs = {.main_mapping = 7,
+                                                  .edits = &edge,
+                                                  .edit_count = 1,
+                                                  .registers = &register_repair,
+                                                  .register_count = 1};
+    assert(!hpclang_rpl_mutation_cache_acptr_insert(&io, 0x83000, 0x6ffe1, 0x22f5a, &repairs));
+    assert(memory[0x8301e] == 9 && reg == 0xabc83010);
+    /* A surviving field ending at the removed object's start stays intact. */
+    edge = (struct hpclang_rpl_reference_edit){
+        .mapping = 7, .field = 0x82ffb, .expected = 0, .value = 7, .width = 5};
+    register_repair.expected = reg;
+    assert(!hpclang_rpl_mutation_cache_acptr_remove(&io, 0x83000, 0x6ffe1, 0x22f5a, &repairs));
+    assert(get_word(0x82ffb, 5) == 7 && reg == 0xabc83001);
+    for (unsigned remove = 0; remove < 2; ++remove) {
+        io = setup_catalog_growth();
+        if (remove)
+            assert(!hpclang_rpl_mutation_cache_acptr_insert(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL));
+        writes = 0;
+        reg = 0xabc83001;
+        register_repair.expected = reg;
+        repairs.edits = NULL;
+        repairs.edit_count = 0;
+        if (remove) {
+            assert(hpclang_rpl_mutation_cache_acptr_remove(&io, 0x83000, 0x6ffe1, 0x22f5a,
+                                                           &repairs) == HPCLANG_RPL_MUTATION_BUSY);
+            assert(!writes && reg == 0xabc83001);
+        } else {
+            rejected_commit_read = 0x8300e;
+            assert(
+                hpclang_rpl_mutation_cache_acptr_insert(&io, 0x83000, 0x6ffe1, 0x22f5a, &repairs) ==
+                HPCLANG_RPL_MUTATION_INCOMPLETE);
+            assert(writes && reg == 0xabc83010);
+        }
+    }
+    /* Every write cut, including wrapper initialization and geometry publication. */
+    for (unsigned remove = 0; remove < 2; ++remove) {
+        io = setup_catalog_growth();
+        assert(!hpclang_rpl_mutation_cache_acptr_insert(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL));
+        uint32_t total = writes;
+        if (remove) {
+            writes = 0;
+            assert(!hpclang_rpl_mutation_cache_acptr_remove(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL));
+            total = writes;
+        }
+        for (uint32_t cut = 0; cut < total; ++cut) {
+            io = setup_catalog_growth();
+            if (remove)
+                assert(
+                    !hpclang_rpl_mutation_cache_acptr_insert(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL));
+            writes = 0;
+            rejected_write = cut;
+            int result =
+                remove
+                    ? hpclang_rpl_mutation_cache_acptr_remove(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL)
+                    : hpclang_rpl_mutation_cache_acptr_insert(&io, 0x83000, 0x6ffe1, 0x22f5a, NULL);
+            assert(result == HPCLANG_RPL_MUTATION_INCOMPLETE && writes == cut);
+        }
+    }
+}
+
 static void test_catalog_growth(void)
 {
     struct hpclang_rpl_mutation_io io = setup_catalog_growth();
@@ -3742,6 +3895,7 @@ int main(void)
     test_conditional_return_relocation();
     test_return_chain_relocation();
     test_catalog_growth();
+    test_cache_acptr();
     test_catalog_observed_guards();
     test_catalog_alias_repairs();
     test_catalog_insert_commit();

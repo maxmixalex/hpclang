@@ -718,7 +718,21 @@ order. After reattachment, another removal probe must reject the attached librar
 with BUSY and zero write attempts. These operations still do not execute library
 configuration or establish general-purpose public registration safety.
 
-Before catalog edits, all four original-return cases also attempt removal of the
+The `native-cache` case uses selector byte three and follows the reattachment
+case with a cache ownership round trip. It copies the target/switch identities
+from library 275's genuine DOACPTRs, detaches the library, creates two new wrappers
+at TEMPBOTTOM and attaches their new addresses. Both wrappers must reject removal
+with BUSY and zero write attempts while HOME still references them. After a second
+detachment, the test removes the wrappers in reverse order and restores the
+original fields. Each movement collects fresh guarded object/root repairs.
+The full original catalog/cache/TEMP/return-stack extent, five geometry/accounting
+fields and three native roots must match the pre-operation snapshot. The host
+also checks the original Stock return marker, catalog, HOME records and unchanged
+Flash. This verifies storage/attachment/reclamation in the controlled fixture;
+it does not execute a ROM table lookup through the new wrappers or run library
+configuration, and does not establish arbitrary opaque-reference coverage.
+
+Before catalog edits, all original-return cases also attempt removal of the
 fixture's genuinely HOME-attached library 275. A rejecting writer counts any
 write attempt. The payload requires `BUSY`, zero write attempts and unchanged
 native roots; it never edits the attachment table to manufacture that result.

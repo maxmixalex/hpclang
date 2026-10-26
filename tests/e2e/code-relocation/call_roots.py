@@ -13,6 +13,7 @@ CASES = {
     "native-remove": b"\0",
     "native-detach": b"\1",
     "native-reattach": b"\2",
+    "native-cache": b"\3",
     "gosub": bytes([0x27, 0, 0x10, 0x10]),
     "gosub-rtnsxm": bytes([0x27, 0, 0x10, 0x00]),
     "gosub-rtnnc": bytes([0x37, 0, 0x05, 0, 0x03]),
@@ -186,7 +187,14 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if read(obj) != 0x2A2C or read(obj + 5) != 5 + 2 * len(expected):
             raise ValueError("Call fixture object changed")
         actual = bytes(read(obj + 10 + 2 * i, 2) for i in range(len(expected)))
-        if name in ("native", "native-remove", "native-detach", "native-reattach", "gosub-rtnnc"):
+        if name in (
+            "native",
+            "native-remove",
+            "native-detach",
+            "native-reattach",
+            "native-cache",
+            "gosub-rtnnc",
+        ):
             valid = actual == expected
         elif name == "gosbvl":
             valid = (
@@ -206,7 +214,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if not valid:
             raise ValueError("Native call operands/return payload changed")
         ids = [read(0x86120 + 16 * i, 3) for i in range(read(0x8611D, 3))]
-        removed = name in ("native-remove", "native-detach", "native-reattach")
+        removed = name in ("native-remove", "native-detach", "native-reattach", "native-cache")
         expected_ids = original_ids if removed else sorted(original_ids + [123])
         if ids != expected_ids or len(ids) != len(set(ids)):
             raise ValueError("Native call did not produce the expected catalog")
@@ -214,9 +222,9 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         expected_attachments = [
             record
             for record in original_attachments
-            if name not in ("native-detach", "native-reattach") or record[0] != 275
+            if name not in ("native-detach", "native-reattach", "native-cache") or record[0] != 275
         ]
-        if name == "native-reattach":
+        if name in ("native-reattach", "native-cache"):
             expected_attachments += [record for record in original_attachments if record[0] == 275]
         if attachment_records(read) != expected_attachments:
             raise ValueError("Native call did not preserve the expected HOME attachments")
@@ -226,10 +234,17 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                 returned=True,
                 flash_unchanged=True,
                 rewritten_return=name
-                not in ("native", "native-remove", "native-detach", "native-reattach"),
+                not in (
+                    "native",
+                    "native-remove",
+                    "native-detach",
+                    "native-reattach",
+                    "native-cache",
+                ),
                 catalog_removed=removed,
                 home_detached=name == "native-detach",
-                home_reattached=name == "native-reattach",
+                cache_roundtrip=name == "native-cache",
+                home_reattached=name in ("native-reattach", "native-cache"),
             )
         )
         print(f"PASS: {args.model}: native {name} roots and catalog checks", flush=True)

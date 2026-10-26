@@ -245,6 +245,122 @@ done:
     return result;
 }
 
+static int probe_cache_move(struct hpclang_rpl_mutation_io *io, uint32_t position, uint32_t target,
+                            uint32_t bank, int remove)
+{
+    uint32_t bottom, top, end, home;
+    if (probe_read_word(io, 0x806e9, 5, &bottom) || probe_read_word(io, 0x806ee, 5, &top) ||
+        probe_read_word(io, 0x806f3, 5, &end) || probe_read_word(io, 0x80711, 5, &home))
+        return -1;
+    struct live_probe *p = calloc(1, sizeof *p);
+    if (!p)
+        return -1;
+    p->io = io;
+    p->first = position + (remove ? 15 : 0);
+    p->end = end;
+    p->delta = remove ? -15 : 15;
+    struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    int result = probe_collect(p, &reader, home, bottom, top);
+    if (!result) {
+        const struct hpclang_rpl_catalog_repairs repairs = {
+            1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0};
+        result =
+            remove ? hpclang_rpl_mutation_cache_acptr_remove(io, position, target, bank, &repairs)
+                   : hpclang_rpl_mutation_cache_acptr_insert(io, position, target, bank, &repairs);
+    }
+    free(p);
+    return result;
+}
+
+static int probe_cache_roundtrip(struct hpclang_rpl_mutation_io *io)
+{
+    uint32_t home, count, bottom, end, fields[2] = {0}, targets[2], banks[2];
+    const uint32_t boundaries[] = {0x806e9, 0x806ee, 0x806f3, 0x80711, 0x80e9b};
+    uint32_t before[5], native[3];
+    for (unsigned i = 0; i < 5; ++i)
+        if (probe_read_word(io, boundaries[i], 5, before + i))
+            return -1;
+    bottom = before[0];
+    end = before[2];
+    home = before[3];
+    for (unsigned i = 0; i < 3; ++i)
+        native[i] = *io->native_roots[i];
+    if (probe_read_word(io, home + 5, 3, &count))
+        return -1;
+    unsigned matches = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t slot = home + 8 + 13 * i, id;
+        if (probe_read_word(io, slot, 3, &id))
+            return -1;
+        if (id == 275) {
+            ++matches;
+            if (probe_read_word(io, slot + 3, 5, fields) ||
+                probe_read_word(io, slot + 8, 5, fields + 1))
+                return -1;
+        }
+    }
+    if (matches != 1 || end < bottom)
+        return -1;
+    for (unsigned i = 0; i < 2; ++i) {
+        uint32_t prologue;
+        if (fields[i] < io->library_table || fields[i] + 15 > bottom ||
+            probe_read_word(io, fields[i], 5, &prologue) || prologue != 0x2baa ||
+            probe_read_word(io, fields[i] + 5, 5, targets + i) ||
+            probe_read_word(io, fields[i] + 10, 5, banks + i) || !banks[i])
+            return -1;
+    }
+    uint32_t size = end - io->library_table;
+    uint8_t *snapshot = malloc(size);
+    if (!snapshot)
+        return -1;
+    int result = -1;
+    for (uint32_t i = 0; i < size; ++i)
+        if (!io->read_nibble(io->context, io->library_table + i, snapshot + i))
+            goto done;
+    if (hpclang_rpl_mutation_home_detach(io, 275) ||
+        probe_cache_move(io, bottom, targets[0], banks[0], 0) ||
+        probe_cache_move(io, bottom + 15, targets[1], banks[1], 0) ||
+        hpclang_rpl_mutation_home_attach(io, 275, bottom, bottom + 15))
+        goto done;
+    /* Prove HOME now owns the new wrappers, not the original cached pointers. */
+    uint32_t value;
+    if (probe_read_word(io, 0x80711, 5, &value) || value != home ||
+        probe_read_word(io, home + 8 + 13 * (count - 1) + 3, 5, &value) || value != bottom ||
+        probe_read_word(io, home + 8 + 13 * (count - 1) + 8, 5, &value) || value != bottom + 15)
+        goto done;
+    for (unsigned i = 0; i < 2; ++i) {
+        struct rejected_removal probe = {io, 0};
+        struct hpclang_rpl_mutation_io readonly = *io;
+        readonly.context = &probe;
+        readonly.read_nibble = rejected_read;
+        readonly.write_nibble = rejected_write;
+        if (hpclang_rpl_mutation_cache_acptr_remove(&readonly, bottom + 15 * i, targets[i],
+                                                    banks[i], NULL) != HPCLANG_RPL_MUTATION_BUSY ||
+            probe.writes)
+            goto done;
+    }
+    if (hpclang_rpl_mutation_home_detach(io, 275) ||
+        probe_cache_move(io, bottom + 15, targets[1], banks[1], 1) ||
+        probe_cache_move(io, bottom, targets[0], banks[0], 1) ||
+        hpclang_rpl_mutation_home_attach(io, 275, fields[0], fields[1]))
+        goto done;
+    for (uint32_t i = 0; i < size; ++i) {
+        uint8_t value;
+        if (!io->read_nibble(io->context, io->library_table + i, &value) || value != snapshot[i])
+            goto done;
+    }
+    for (unsigned i = 0; i < 5; ++i)
+        if (probe_read_word(io, boundaries[i], 5, &value) || value != before[i])
+            goto done;
+    for (unsigned i = 0; i < 3; ++i)
+        if (*io->native_roots[i] != native[i])
+            goto done;
+    result = 0;
+done:
+    free(snapshot);
+    return result;
+}
+
 static int probe_register(void)
 {
     struct hpclang_rpl_stock_memory memory;
@@ -356,9 +472,11 @@ static int probe_register(void)
         snapshot = NULL;
         free(p);
         p = NULL;
-        if (probe_detach(&io, remove == 3))
+        if (probe_detach(&io, remove >= 3))
             goto failed_roundtrip;
     }
+    if (remove == 4 && probe_cache_roundtrip(&io))
+        goto failed_roundtrip;
     result = 0;
 done:
     free(snapshot);
@@ -392,7 +510,7 @@ static int prepare_call(struct hpclang_rpl_mutation_io *io, uint32_t **roots, in
      * original return roots. Do not manufacture a call or rewrite its payload. */
     if (length == 21)
         return 0;
-    if (length == 23 && !probe_read_word(io, object + 26, 2, &encoded) && encoded <= 2) {
+    if (length == 23 && !probe_read_word(io, object + 26, 2, &encoded) && encoded <= 3) {
         *remove = 1 + encoded;
         return 0;
     }

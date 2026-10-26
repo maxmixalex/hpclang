@@ -343,6 +343,25 @@ extern "C"
                                                  uint32_t position,
                                                  const struct hpclang_rpl_catalog_repairs *repairs);
 
+    /* Internal metadata-cache DOACPTR storage. Same full reference, mapping/IRQ
+     * ownership and INCOMPLETE contract as repaired catalog movement. Insert
+     * only at the caller's expected TEMPBOTTOM; initialize all 15 nibbles before
+     * publishing geometry. Remove only a caller-proven complete object within
+     * [catalog end, TEMPBOTTOM), matching prologue, target and switch exactly.
+     * Matching bytes do not prove an object boundary or ownership. The caller
+     * proves both, detaches all uses, and supplies all surviving field repairs.
+     * Roots into a removed object return BUSY. Neither operation changes the
+     * catalog count or HOME attachments, invokes the switch, or grants public
+     * registration authority. Target/switch are 20-bit Saturn coordinates. */
+    int hpclang_rpl_mutation_cache_acptr_insert(const struct hpclang_rpl_mutation_io *io,
+                                                uint32_t position, uint32_t target,
+                                                uint32_t bank_switch,
+                                                const struct hpclang_rpl_catalog_repairs *repairs);
+    int hpclang_rpl_mutation_cache_acptr_remove(const struct hpclang_rpl_mutation_io *io,
+                                                uint32_t position, uint32_t target,
+                                                uint32_t bank_switch,
+                                                const struct hpclang_rpl_catalog_repairs *repairs);
+
 #ifdef __cplusplus
 }
 #endif
