@@ -113,6 +113,12 @@ resolve discontinuous mappings or bypass executable-reference obligations.
 catalog payloads and switch-function targets independently. Its edits/guards
 keep original catalog addresses for the existing preflight/commit path; zero
 switches stay zero and nonzero function targets cannot become zero.
+`hpclang_rpl_reference_edits_check_aliases` resolves complete fields before
+checking physical overlap, including different IDs/coordinates and repeated
+pages within one map. The mapped RAM replay entry performs this check before
+target I/O, then preserves the ordinary expected-or-replacement retry rules.
+Resolvers must prove contiguity and stable mappings across the entire batch;
+this adds no permission to write ROM or move objects with unresolved roots.
 
 ## Platform families and model profiles
 

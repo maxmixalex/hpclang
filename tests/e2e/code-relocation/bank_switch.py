@@ -79,6 +79,21 @@ class Patch(c.Structure):
     _fields_ = [(name, c.c_uint32) for name in ("field", "value")]
 
 
+class Edit(c.Structure):
+    _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "value", "width")]
+
+
+Location = c.CFUNCTYPE(
+    c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint32)
+)
+lib.hpclang_rpl_reference_edits_check_aliases.argtypes = [
+    c.POINTER(Edit),
+    c.c_uint32,
+    Location,
+    c.c_void_p,
+]
+
+
 lib.hpclang_rpl_reference_plan_offset_shift.argtypes = [
     c.POINTER(Edge),
     c.POINTER(Mappings),
@@ -220,6 +235,11 @@ for (model, state), cursor in itertools.product(states, range(8)):
     # patched address resolves to the canonical destination's physical nibble.
     target_offset = 2 * (views[0][1] - views[1][1])
     assert target_offset == -0x30000
+
+    @Location
+    def locate_field(_, mapping, field, width, physical):
+        return lib.hpclang_rpl_stock_resolve_span(views[mapping][0], field, width, physical)
+
     for offset in (0, 1, 0xFFE, 0xFFF, 0xFEFF):
         edge = Edge(3, 0x80000, 0x70000 + offset, 0, entries[0][1])
         mappings = Mappings(2, 1, 1)
@@ -247,7 +267,12 @@ for (model, state), cursor in itertools.product(states, range(8)):
             == 0
         )
         assert native.value == canonical.value
+        edits = (Edit * 2)(Edit(0, 0x70000 + offset, 0, 1, 5), Edit(1, 0x40000 + offset, 0, 1, 5))
+        assert lib.hpclang_rpl_reference_edits_check_aliases(edits, 2, locate_field, None) < 0
+        edits[1].field += 5
+        assert lib.hpclang_rpl_reference_edits_check_aliases(edits, 2, locate_field, None) == 0
     rows[-1]["offset_plan_checks"] = 5
+    rows[-1]["physical_field_checks"] = 10
     print(
         "PASS",
         model,

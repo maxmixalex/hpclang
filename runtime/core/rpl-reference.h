@@ -387,8 +387,10 @@ int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_rea
                                           const struct hpclang_rpl_reference_guard *guards,
                                           uint32_t count);
 
-/* Read-only preflight of a complete caller-owned edit array. Mapping IDs must
- * normalize physical aliases to the same identity. All fields/words and
+/* Read-only preflight of a complete caller-owned edit array. Aliased fields must
+ * already share both mapping identity and address coordinates, or callers must
+ * also use edits_check_aliases with independently resolved physical locations.
+ * All fields/words and
  * same-mapping overlaps (including duplicate fields) are checked before I/O;
  * then every five-nibble old value must equal expected. Returns a span result:
  * malformed plans or changed old values are MALFORMED, read errors UNAVAILABLE.
@@ -399,6 +401,25 @@ int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_rea
 int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_reader *reader,
                                          const struct hpclang_rpl_reference_edit *edits,
                                          uint32_t count);
+
+/* Resolve a complete 1..5-nibble field to an absolute physical nibble address.
+ * Zero means success; errors propagate. The caller proves stable map provenance
+ * and physical contiguity of the entire field, not only its first nibble.
+ * Split discontinuous fields before building the batch. No target reads/writes. */
+typedef int (*hpclang_rpl_reference_field_location_fn)(void *context, uint32_t mapping,
+                                                       uint32_t field, uint32_t width,
+                                                       uint32_t *physical);
+
+/* Validate all edit metadata and reject any physically overlapping fields,
+ * including aliases with different mapping IDs or logical coordinates. Equal
+ * replacements do not excuse overlap. Resolve callbacks may repeat (O(N^2));
+ * keep mappings and edits immutable. No allocation or target memory access.
+ * This checks field geometry only; expected bytes/guards require their separate
+ * preflight. Empty batches succeed without inputs. */
+int hpclang_rpl_reference_edits_check_aliases(const struct hpclang_rpl_reference_edit *edits,
+                                              uint32_t count,
+                                              hpclang_rpl_reference_field_location_fn resolve,
+                                              void *context);
 
 struct hpclang_rpl_reference_writer
 {
@@ -421,5 +442,15 @@ struct hpclang_rpl_reference_writer
 int hpclang_rpl_reference_edits_replay(const struct hpclang_rpl_reference_writer *writer,
                                        const struct hpclang_rpl_reference_edit *edits,
                                        uint32_t count);
+
+/* Same authorized-RAM replay contract, with physical field overlap preflight
+ * before any reader/writer callback. Mapping lifetime must cover both geometry
+ * checks and replay, including retries. Preserves expected-or-replacement
+ * admission for interrupted batches; it does not authorize writes by itself. */
+int hpclang_rpl_reference_edits_replay_mapped(const struct hpclang_rpl_reference_writer *writer,
+                                              const struct hpclang_rpl_reference_edit *edits,
+                                              uint32_t count,
+                                              hpclang_rpl_reference_field_location_fn resolve,
+                                              void *context);
 
 #endif

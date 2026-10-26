@@ -856,6 +856,108 @@ static void metadata_guards(void)
     }
 }
 
+struct alias_edit_memory
+{
+    uint8_t data[32];
+    int32_t bias;
+    unsigned reads, writes, locations, fail_location;
+};
+
+static int alias_field(void *context, uint32_t mapping, uint32_t field, uint32_t width,
+                       uint32_t *physical)
+{
+    struct alias_edit_memory *memory = context;
+    assert(mapping < 2 && width && width <= 5);
+    if (++memory->locations == memory->fail_location)
+        return 73;
+    *physical = (uint32_t)((int64_t)field + (mapping ? memory->bias : 0));
+    return 0;
+}
+
+static int alias_read(void *context, uint32_t mapping, uint32_t field, uint8_t *value)
+{
+    struct alias_edit_memory *memory = context;
+    int64_t at = (int64_t)field + (mapping ? memory->bias : 0);
+    assert(at >= 0 && at < 32);
+    ++memory->reads;
+    *value = memory->data[at];
+    return 1;
+}
+
+static int alias_write(void *context, uint32_t mapping, uint32_t field, uint8_t value)
+{
+    struct alias_edit_memory *memory = context;
+    int64_t at = (int64_t)field + (mapping ? memory->bias : 0);
+    assert(at >= 0 && at < 32);
+    ++memory->writes;
+    memory->data[at] = value;
+    return 1;
+}
+
+static int repeated_page_field(void *context, uint32_t mapping, uint32_t field, uint32_t width,
+                               uint32_t *physical)
+{
+    (void)context;
+    (void)mapping;
+    assert(width == 1);
+    *physical = field & 7;
+    return 0;
+}
+
+static void physical_alias_replay(void)
+{
+    assert(!hpclang_rpl_reference_edits_replay_mapped(NULL, NULL, 0, NULL, NULL));
+    const struct hpclang_rpl_reference_edit repeated[] = {{0, 5, 0, 1, 1}, {0, 13, 0, 1, 1}};
+    assert(hpclang_rpl_reference_edits_check_aliases(repeated, 2, repeated_page_field, NULL) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    for (uint32_t width = 1; width <= 5; ++width) {
+        for (int32_t bias = -8; bias <= 2; ++bias) {
+            struct alias_edit_memory memory = {.bias = bias};
+            const struct hpclang_rpl_reference_writer writer = {{alias_read, &memory}, alias_write};
+            const struct hpclang_rpl_reference_edit edits[] = {{0, 5, 0, 1, 5},
+                                                               {1, 9, 0, 1, width}};
+            int overlaps = 9 + bias < 10 && 9 + bias + (int32_t)width > 5;
+            int result =
+                hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field, &memory);
+            if (overlaps) {
+                assert(result == HPCLANG_RPL_SPAN_MALFORMED);
+                assert(!memory.reads && !memory.writes);
+                for (unsigned i = 0; i < sizeof memory.data; ++i)
+                    assert(!memory.data[i]);
+            } else {
+                assert(!result && memory.writes == 2);
+                /* Replay accepts replacement bytes from an earlier attempt. */
+                assert(!hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field,
+                                                                  &memory));
+                assert(memory.writes == 2);
+            }
+        }
+    }
+    struct alias_edit_memory memory = {0};
+    const struct hpclang_rpl_reference_writer writer = {{alias_read, &memory}, alias_write};
+    struct hpclang_rpl_reference_edit edits[] = {{0, 5, 0, 1, 5}, {1, 15, 0, 1, 5}};
+    for (unsigned fail = 1; fail <= 3; ++fail) {
+        memory = (struct alias_edit_memory){.fail_location = fail};
+        assert(hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field, &memory) ==
+               73);
+        assert(!memory.reads && !memory.writes);
+    }
+    memory = (struct alias_edit_memory){0};
+    edits[1].width = 6;
+    assert(hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field, &memory) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memory.locations && !memory.reads && !memory.writes);
+    edits[1].width = 5;
+    memory.bias = -16; /* Resolved start UINT32_MAX cannot contain five nibbles. */
+    assert(hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field, &memory) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!memory.reads && !memory.writes);
+    edits[1].width = 1;
+    assert(!hpclang_rpl_reference_edits_check_aliases(edits, 2, alias_field, &memory));
+    assert(hpclang_rpl_reference_edits_check_aliases(edits, 2, NULL, NULL) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 struct edit_memory
 {
     uint8_t banks[2][32];
@@ -883,7 +985,25 @@ static int edit_write(void *context, uint32_t mapping, uint32_t at, uint8_t valu
     return !failed;
 }
 
-static void batch_replay(unsigned first_width, unsigned second_width)
+static int distinct_ram_field(void *context, uint32_t mapping, uint32_t field, uint32_t width,
+                              uint32_t *physical)
+{
+    (void)context;
+    assert(mapping < 2 && field + width <= 32);
+    *physical = mapping * 32 + field;
+    return 0;
+}
+
+static int mapped_batch_replay(const struct hpclang_rpl_reference_writer *writer,
+                               const struct hpclang_rpl_reference_edit *edits, uint32_t count)
+{
+    return hpclang_rpl_reference_edits_replay_mapped(writer, edits, count, distinct_ram_field,
+                                                     NULL);
+}
+
+static void batch_replay(unsigned first_width, unsigned second_width,
+                         int (*replay)(const struct hpclang_rpl_reference_writer *,
+                                       const struct hpclang_rpl_reference_edit *, uint32_t))
 {
     struct edit_memory initial = {0}, completed;
     memset(initial.banks, 7, sizeof initial.banks);
@@ -907,22 +1027,21 @@ static void batch_replay(unsigned first_width, unsigned second_width)
     struct hpclang_rpl_reference_writer writer = {{edit_read, &memory}, edit_write};
     assert(!hpclang_rpl_reference_edits_validate(&writer.reader, edits, 2));
     memory = initial;
-    assert(!hpclang_rpl_reference_edits_replay(NULL, NULL, 0));
-    assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+    assert(!replay(NULL, NULL, 0));
+    assert(!replay(&writer, edits, 2));
     assert(!memcmp(memory.banks, completed.banks, sizeof memory.banks));
     unsigned reads = memory.reads, writes = memory.writes;
     assert(writes == first_width + second_width);
-    assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+    assert(!replay(&writer, edits, 2));
     assert(memory.writes == writes);
     for (unsigned cut = 1; cut <= reads; ++cut) {
         memory = initial;
         memory.fail_read = cut;
-        assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) ==
-               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_UNAVAILABLE);
         if (cut <= first_width + second_width)
             assert(!memory.writes);
         memory.fail_read = 0;
-        assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+        assert(!replay(&writer, edits, 2));
         assert(!memcmp(memory.banks, completed.banks, sizeof memory.banks));
     }
     for (unsigned cut = 1; cut <= writes; ++cut) {
@@ -930,24 +1049,23 @@ static void batch_replay(unsigned first_width, unsigned second_width)
             memory = initial;
             memory.fail_write = cut;
             memory.acknowledge_failure = committed;
-            assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) ==
-                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_UNAVAILABLE);
             memory.fail_write = 0;
-            assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+            assert(!replay(&writer, edits, 2));
             assert(!memcmp(memory.banks, completed.banks, sizeof memory.banks));
         }
     }
     memory = initial;
     memory.banks[1][4 + second_width] = 0; /* Late corruption prevents all writes. */
-    assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
     assert(!memory.writes);
     memory = initial;
     edits[1].mapping = 0; /* Same-address edits in distinct banks above were valid. */
-    assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
     assert(!memory.reads && !memory.writes);
     edits[1].mapping = 1;
     memory.silent_write = 1;
-    assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
     assert(!memcmp(memory.banks, initial.banks, sizeof memory.banks));
 }
 
@@ -1680,11 +1798,14 @@ int main(void)
     catalog_relocation_plan();
     catalog_executable_switches();
     catalog_offset_plans();
+    physical_alias_replay();
     execution_address_planning();
     rebuilt_catalog_replay();
     for (unsigned first = 1; first <= 5; ++first)
-        for (unsigned second = 1; second <= 5; ++second)
-            batch_replay(first, second);
+        for (unsigned second = 1; second <= 5; ++second) {
+            batch_replay(first, second, hpclang_rpl_reference_edits_replay);
+            batch_replay(first, second, mapped_batch_replay);
+        }
     metadata_guards();
     batch_preflight();
     qualified_relocation();

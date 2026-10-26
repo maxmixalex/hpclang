@@ -331,6 +331,50 @@ static int edits_metadata(const struct hpclang_rpl_reference_edit *edits, uint32
     return HPCLANG_RPL_SPAN_OK;
 }
 
+int hpclang_rpl_reference_edits_check_aliases(const struct hpclang_rpl_reference_edit *edits,
+                                              uint32_t count,
+                                              hpclang_rpl_reference_field_location_fn resolve,
+                                              void *context)
+{
+    if (!count)
+        return 0;
+    if (!edits || !resolve)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    int result = edits_metadata(edits, count);
+    if (result)
+        return result;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t physical;
+        result = resolve(context, edits[i].mapping, edits[i].field, edits[i].width, &physical);
+        if (result)
+            return result;
+        if (physical > UINT32_MAX - (edits[i].width - 1))
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        for (uint32_t j = 0; j < i; ++j) {
+            uint32_t previous;
+            result = resolve(context, edits[j].mapping, edits[j].field, edits[j].width, &previous);
+            if (result)
+                return result;
+            if (previous > UINT32_MAX - (edits[j].width - 1))
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            if ((uint64_t)physical < (uint64_t)previous + edits[j].width &&
+                (uint64_t)previous < (uint64_t)physical + edits[i].width)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+        }
+    }
+    return 0;
+}
+
+int hpclang_rpl_reference_edits_replay_mapped(const struct hpclang_rpl_reference_writer *writer,
+                                              const struct hpclang_rpl_reference_edit *edits,
+                                              uint32_t count,
+                                              hpclang_rpl_reference_field_location_fn resolve,
+                                              void *context)
+{
+    int result = hpclang_rpl_reference_edits_check_aliases(edits, count, resolve, context);
+    return result ? result : hpclang_rpl_reference_edits_replay(writer, edits, count);
+}
+
 int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_reader *reader,
                                          const struct hpclang_rpl_reference_edit *edits,
                                          uint32_t count)

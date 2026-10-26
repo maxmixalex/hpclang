@@ -736,6 +736,16 @@ alias catalog feeds its generated edits/guards into actual catalog insertion:
 and an unchanged memory snapshot; the unchanged case repairs the encoded alias,
 moves the catalog/root and completes insertion. This synthetic mapping test
 does not establish complete live roots for public library operations.
+Physical field checks add 320 executed-map comparisons: aliased fields reject
+while adjacent fields pass. RAM replay regressions cover 55 width/offset
+combinations, repeated-page aliases, resolver errors, late invalid metadata,
+physical-address overflow and idempotent replay. Conflicts and resolution
+failures must precede every target read/write.
+Both ordinary and mapped replay run the complete 25 width-pair fault matrix:
+each target read and write boundary is interrupted, including writes that took
+effect before reporting failure. Retries must reproduce the complete expected
+memory image; late corruption must prevent writes and silent writes must fail
+verification. These are RAM replay tests, not a persistent recovery protocol.
 This is a reviewed firmware-profile check, not general ROM discovery,
 allocation/liveness proof, hardware acceptance or permission to relocate.
 
