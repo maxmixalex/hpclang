@@ -930,6 +930,11 @@ slots clear. This is only the prefix's depth budget, not a whole-launch budget.
 identity and explicit execution flags for the helper and application. Failed
 guards remove stale reports.
 
+This is an opt-in offline check using a matching private saved state. The ordinary
+Stock CI fixture has a different PrRUN/cache layout and is rejected by this
+check; its native execution gates remain separate. Do not treat submission of
+this driver or a passing generic CI job as execution of the private-state matrix.
+
 With `--execute-helper`, the driver enters ARM user mode and models SVC exception
 entry into the original ROM vector. The ROM handler, allocator and free routine
 execute without substituted service results. The controlled fixtures require
