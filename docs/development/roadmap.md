@@ -20,16 +20,15 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
-M8.0 delivery now guards TEMP allocation geometry, sentinel and both footer
-traversal passes alongside root/object dependencies. The native catalog/cache
-probe uses this complete-chain traversal. The 59,656-byte candidate and both
-launchers match verified HP49g+/HP50g cache allocation/attachment/reclamation
-round trips; independent checks reject 372 corrupt bindings and 100 entry
-records. Earlier lookup/message evidence belongs to its 59,352-byte artifact.
-Public registration, configuration, complete opaque/banked reference coverage
-and parent/full CI acceptance remain open. Procedures are in the E2E guide.
-All nine preceding-head workflows and every job were inspected: eight queued
-and one pending, with no reported failures. This is not CI acceptance.
+M8.0 delivery adds actual stage0 execution to the stage1-entry boundary after
+the real ROM allocation helper. Both models pass all eight return-stack cursors;
+copy/clear writes, image bytes, zero tail, entry arguments, stack, descriptor
+and SWI vector are checked. Translation uses modeled physical page aliases.
+No application body or return is executed or simulated in this mode. The E2E
+guide records its private-state requirements and limits. Normal application
+exit, complete opaque/banked references and public registration remain open.
+The runtime and 59,656-byte native-cache artifact are unchanged by this test
+follow-up. Parent and full CI acceptance remain required.
 
 ## M8 follow-up evidence history
 

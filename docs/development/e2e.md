@@ -1049,6 +1049,26 @@ flag. An omitted free instruction must fail even if the return itself succeeds.
 This covers preflight rejection and its cleanup, not normal application exit or
 whole-heap leak freedom. It cannot be combined with application-side relocation.
 
+`--stage0-entry path/to/launchers/objects/stage1.bin` instead continues from
+that helper into the packaged stage0, stopping before the first stage1
+instruction. The independent image must occur exactly once in the launcher.
+The check executes the three temporary supervisor handlers and verifies the
+published L1 descriptor, restored SWI vector, copied image, zeroed memory tail,
+model/CPU/HPC arguments, saved CPSR/frame and stack placement for all eight
+return-stack cursors. A write observer requires an actual write to every image
+and zero-tail byte, so initially zero memory cannot hide a missing clear loop.
+Omitting either copy/clear store or changing the model argument must reject and
+remove any stale report.
+
+This mode models translation with shared physical-RAM page aliases derived from
+the helper's validated pool descriptors and a controlled L1 table. It executes
+real stage0 instructions but does not emulate MMU/TLB/cache hardware behavior.
+Reports explicitly record `modeled-page-aliases`, the stage1-entry boundary,
+supervisor calls and image digest. No application or return is executed or
+simulated. This supplements native Stock gates; it does not establish complete
+startup/exit, mapping restoration or public-registration safety. It cannot be
+combined with relocation or invalid-pool rejection.
+
 With `--relocate`, the gate compiles the current C catalog mover and production
 return-root collector, grows the catalog by 16 nibbles at the selected boundary,
 and checks the repaired caller, PC and saved IP during the simulated return.

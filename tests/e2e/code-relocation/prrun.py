@@ -1,4 +1,4 @@
-"""Original PrRUN prefix, optional real ROM allocation helper, simulated payload return."""
+"""Original PrRUN/helper, bounded stage0 entry or rejection, and return checks."""
 
 import argparse
 import ctypes as c
@@ -22,6 +22,8 @@ from unicorn import (
 from unicorn.arm_const import (
     UC_ARM_REG_R0,
     UC_ARM_REG_R1,
+    UC_ARM_REG_R2,
+    UC_ARM_REG_R3,
     UC_ARM_REG_R4,
     UC_ARM_REG_R5,
     UC_ARM_REG_R7,
@@ -52,7 +54,17 @@ parser.add_argument(
     choices=(0, 1, 257),
     help="Execute stage0 rejection/free/return with an injected invalid page count",
 )
+parser.add_argument(
+    "--stage0-entry",
+    type=Path,
+    metavar="STAGE1_BIN",
+    help="Execute stage0 to stage1 entry with modeled page aliases and verify the supplied image",
+)
 args = parser.parse_args()
+if args.stage0_entry:
+    if args.relocate or args.reject_stage0_pool is not None:
+        parser.error("Stage0 entry cannot be combined with relocation or rejection")
+    args.execute_helper = True
 if args.reject_stage0_pool is not None:
     if args.relocate:
         parser.error("Stage0 rejection cannot perform an application-side relocation")
@@ -101,7 +113,9 @@ if args.relocate:
             )
         ],
     ]
-    sources = {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files}
+    sources = {
+        str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files
+    }
     subprocess.run(
         [
             args.cc,
@@ -138,6 +152,9 @@ if (
     or int.from_bytes(launcher[-4:], "little") != 0x3176B34C
 ):
     raise ValueError("Expected reviewed MMU launcher")
+stage1_image = args.stage0_entry.read_bytes() if args.stage0_entry else None
+if stage1_image is not None and (not stage1_image or launcher.count(stage1_image) != 1):
+    raise ValueError("Expected one independently supplied stage1 image in launcher")
 mapping = native_words(ram, flash)
 cache = bytes(mapping(0x877D1 + i, 1) for i in range(0x88D6C - 0x877D1))
 if (
@@ -154,12 +171,18 @@ for cursor in range(8):
         uc.reg_write(UC_ARM_REG_CPSR, 0xD0)  # User mode, IRQ/FIQ initially masked.
     uc.mem_map(0, len(flash))
     uc.mem_write(0, flash)
-    uc.mem_map(0x08000000, len(ram))
-    uc.mem_write(0x08000000, ram)
+    if args.stage0_entry:
+        ram_storage = (c.c_ubyte * len(ram)).from_buffer_copy(ram)
+        uc.mem_map_ptr(0x08000000, len(ram), 7, c.addressof(ram_storage))
+    else:
+        uc.mem_map(0x08000000, len(ram))
+        uc.mem_write(0x08000000, ram)
     uc.mem_map(0x300000, 0x10000)
     syscalls = []
     release_calls = []
     rejection_active = False
+    stage0_active = False
+    stage0_svcs = []
 
     def interrupt(_, number, user):
         # Model ARM SVC exception entry only; execute the original vector,
@@ -172,7 +195,15 @@ for cursor in range(8):
             assert stage0 <= pc - 4 < stage0 + len(launcher) - 20
             assert uc.reg_read(UC_ARM_REG_R0) == 101
             assert uc.reg_read(UC_ARM_REG_R1) == allocation
-            release_calls.append(dict(instruction=hex(pc - 4), allocation=hex(allocation)))
+            release_calls.append(
+                dict(instruction=hex(pc - 4), allocation=hex(allocation))
+            )
+        elif stage0_active:
+            handler = int.from_bytes(uc.mem_read(0x08000008, 4), "little")
+            assert stage0 <= handler < stage0 + launcher.index(stage1_image) - 20
+            stage0_svcs.append(
+                dict(instruction=hex(pc - 4), handler=hex(handler), cpsr=cpsr)
+            )
         else:
             assert pc == 0x159888
         syscalls.append(uc.reg_read(UC_ARM_REG_R0))
@@ -190,11 +221,14 @@ for cursor in range(8):
             p = mapping.physical(at + i)
             shift = 4 * ((at + i) & 1)
             old = uc.mem_read(p, 1)[0]
-            uc.mem_write(p, bytes([(old & ~(15 << shift)) | ((value >> (4 * i) & 15) << shift)]))
+            uc.mem_write(
+                p, bytes([(old & ~(15 << shift)) | ((value >> (4 * i) & 15) << shift)])
+            )
 
     def word(at):
         return sum(
-            ((uc.mem_read(mapping.physical(at + i), 1)[0] >> (4 * ((at + i) & 1))) & 15) << (4 * i)
+            ((uc.mem_read(mapping.physical(at + i), 1)[0] >> (4 * ((at + i) & 1))) & 15)
+            << (4 * i)
             for i in range(5)
         )
 
@@ -289,7 +323,9 @@ for cursor in range(8):
         uc.emu_start(helper, 0x400000, count=200000)
         uc.hook_del(handle)
         assert helper_path[-1] == stage0
-        assert all(at in helper_path for at in (8, vector_entry, 0x3F568, 0x1597B0, 0x159738))
+        assert all(
+            at in helper_path for at in (8, vector_entry, 0x3F568, 0x1597B0, 0x159738)
+        )
         assert syscalls == [0xC9, 0xC9, 0xC9, 0xC9, 0x65, 0xC9]
         assert uc.reg_read(UC_ARM_REG_SP) == old_sp
         assert uc.reg_read(UC_ARM_REG_LR) == old_lr == 0x2A928
@@ -297,7 +333,9 @@ for cursor in range(8):
         assert uc.reg_read(UC_ARM_REG_CPSR) & 0x1F == 0x10
         pages, allocation, _, table = struct.unpack("<4I", uc.mem_read(cpu + 0x914, 16))
         assert 0 < pages <= 256 and allocation and table == 0x08021000
-        descriptors = list(struct.unpack("<" + "I" * pages, uc.mem_read(table, 4 * pages)))
+        descriptors = list(
+            struct.unpack("<" + "I" * pages, uc.mem_read(table, 4 * pages))
+        )
         assert all(value & 0xFFF == 0xFFE for value in descriptors)
         assert bytes(uc.mem_read(table, initial_bytes)) == initial_table
         added = descriptors[initial_bytes // 4 :]
@@ -312,6 +350,97 @@ for cursor in range(8):
             table=hex(table),
             descriptors=[hex(value) for value in descriptors],
         )
+    if args.stage0_entry:
+        # Unicorn's address aliases model translation only. Actual stage0
+        # instructions must publish the expected descriptor, copy/clear the
+        # image and establish the ABI before this check can succeed.
+        stage0_active = True
+        for index, descriptor in enumerate(descriptors):
+            physical = descriptor & ~0xFFF
+            assert 0x08000000 <= physical <= 0x08080000 - 4096
+            uc.mem_map_ptr(
+                0x01300000 + index * 4096,
+                4096,
+                7,
+                c.addressof(ram_storage) + physical - 0x08000000,
+            )
+        uc.mem_map(0x07F00000, 0x4000)
+        vector_before = bytes(uc.mem_read(0x08000008, 4))
+        incoming_r0 = uc.reg_read(UC_ARM_REG_R0)
+        stage_trace = []
+        stage_written = bytearray(pages * 4096)
+
+        def stage_write(_, access, address, size, value, user):
+            first = max(address, 0x01300000)
+            end = min(address + size, 0x01300000 + len(stage_written))
+            for at in range(first, end):
+                stage_written[at - 0x01300000] = 1
+
+        uc.hook_add(UC_HOOK_MEM_WRITE, stage_write)
+
+        def stage_hook(_, at, size, user):
+            stage_trace.append(at)
+            if at == 0x01300400:
+                uc.emu_stop()
+
+        uc.hook_add(UC_HOOK_CODE, stage_hook)
+        uc.emu_start(stage0, 0x400000, count=2000000)
+        assert stage_trace[-1] == 0x01300400
+        assert len(stage0_svcs) == 3
+        assert bytes(uc.mem_read(0x08000008, 4)) == vector_before
+        assert int.from_bytes(uc.mem_read(0x07F0004C, 4), "little") == table | 0x11
+        assert uc.reg_read(UC_ARM_REG_CPSR) & 0xDF == 0xD0
+        assert uc.reg_read(UC_ARM_REG_R0) == cpu
+        assert uc.reg_read(UC_ARM_REG_R3) == {"hp49gplus": 5, "hp50g": 6}[args.model]
+        extent = uc.reg_read(UC_ARM_REG_R2)
+        assert len(stage1_image) <= extent <= pages * 4096 - 0x400 - 4096
+        assert bytes(uc.mem_read(0x01300400, len(stage1_image))) == stage1_image
+        assert all(stage_written[0x400 : 0x400 + extent]), (
+            "Stage1 copy/clear writes omitted"
+        )
+        tail = extent - len(stage1_image)
+        assert not tail or bytes(
+            uc.mem_read(0x01300400 + len(stage1_image), tail)
+        ) == bytes(tail)
+        stack = uc.reg_read(UC_ARM_REG_SP)
+        assert stack == 0x01300000 + pages * 4096 - 40
+        parameters = struct.unpack("<7I", uc.mem_read(stack, 28))
+        assert parameters[:6] == (
+            incoming_r0,
+            old_lr,
+            stage0_svcs[0]["cpsr"],
+            old_sp - 56,
+            stage0,
+            launcher.index(stage1_image) - 20,
+        )
+        hpc = uc.reg_read(UC_ARM_REG_R1)
+        offset = hpc - stage0 + 20
+        assert (
+            20 <= offset < len(launcher) and 0 < parameters[6] <= len(launcher) - offset
+        )
+        assert (
+            bytes(uc.mem_read(hpc, parameters[6]))
+            == launcher[offset : offset + parameters[6]]
+        )
+        rows.append(
+            dict(
+                cursor=cursor,
+                boundary="stage1-before-body",
+                helper_body_executed=True,
+                stage0_body_executed=True,
+                application_executed=False,
+                return_executed=False,
+                return_simulated=False,
+                translation_mode="modeled-page-aliases",
+                allocation_pool=pool,
+                stage0_svc_calls=stage0_svcs,
+                stage0_instruction_count=len(stage_trace),
+                stage1_memory_bytes=extent,
+                stage1_written_bytes=sum(stage_written[0x400 : 0x400 + extent]),
+                stage1_image_sha256=hashlib.sha256(stage1_image).hexdigest(),
+            )
+        )
+        continue
     uc.hook_add(UC_HOOK_CODE, hook)
     resume = trace[-1] + 5
     writes = c.c_uint32()
@@ -331,7 +460,13 @@ for cursor in range(8):
         )
         array = (c.c_uint8 * len(nibbles)).from_buffer(nibbles)
         status = lib.bank_catalog_grow(
-            array, c.byref(caller), c.byref(pc), 0x86500, 0, current_cursor, c.byref(writes)
+            array,
+            c.byref(caller),
+            c.byref(pc),
+            0x86500,
+            0,
+            current_cursor,
+            c.byref(writes),
         )
         assert status == 0, (status, writes.value)
         assert (
@@ -343,7 +478,10 @@ for cursor in range(8):
             first = (page - 128) * 4096
             uc.mem_write(
                 mapping.physical(page << 12),
-                bytes(nibbles[i] | nibbles[i + 1] << 4 for i in range(first, first + 4096, 2)),
+                bytes(
+                    nibbles[i] | nibbles[i + 1] << 4
+                    for i in range(first, first + 4096, 2)
+                ),
             )
         uc.mem_write(caller_at, struct.pack("<I", caller.value))
         assert word(0x8076B) == original_ip + 16
@@ -431,6 +569,9 @@ report.write_text(
                 "flash": hashlib.sha256(flash).hexdigest(),
                 "launcher": hashlib.sha256(launcher).hexdigest(),
                 "driver": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                "stage1": hashlib.sha256(stage1_image).hexdigest()
+                if stage1_image
+                else None,
             },
             rows=rows,
         ),
@@ -443,7 +584,9 @@ print(
     "PASS eight PrRUN cursors; real allocation helper"
     if args.execute_helper
     else "PASS eight PrRUN prefix cursors; helper skipped",
-    "; stage0 rejection/free/return executed"
+    "; stage0 executed to stage1 entry (modeled translation)"
+    if args.stage0_entry
+    else "; stage0 rejection/free/return executed"
     if args.reject_stage0_pool is not None
     else "; application return simulated",
 )
