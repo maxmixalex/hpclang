@@ -775,6 +775,44 @@ int hpclang_rpl_reference_visit_nested(const struct hpclang_rpl_reader *reader,
     return 0;
 }
 
+struct guarded_reference_scan
+{
+    const struct hpclang_rpl_reader *reader;
+    hpclang_rpl_reference_dependency_fn dependency;
+    void *context;
+    int error;
+};
+
+static int guarded_reference_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct guarded_reference_scan *scan = context;
+    if (scan->error || !scan->reader->read_nibble(scan->reader->context, address, value))
+        return 0;
+    if (*value <= 15) {
+        scan->error = scan->dependency(scan->context, address, *value);
+        if (scan->error)
+            return 0;
+    }
+    return 1;
+}
+
+int hpclang_rpl_reference_visit_guarded_nested(const struct hpclang_rpl_reader *reader,
+                                               const struct hpclang_rpl_reference_node *root,
+                                               struct hpclang_rpl_reference_node *workspace,
+                                               uint32_t capacity, uint32_t node_budget,
+                                               hpclang_rpl_reference_visit_fn visit,
+                                               hpclang_rpl_reference_dependency_fn dependency,
+                                               void *context)
+{
+    if (!reader || !reader->read_nibble || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct guarded_reference_scan scan = {reader, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {guarded_reference_read, &scan};
+    int result = hpclang_rpl_reference_visit_nested(&observed, root, workspace, capacity,
+                                                    node_budget, visit, context);
+    return scan.error ? scan.error : result;
+}
+
 struct catalog_plan_state
 {
     const struct hpclang_rpl_catalog_move *move;

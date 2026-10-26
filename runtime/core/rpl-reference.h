@@ -138,6 +138,25 @@ int hpclang_rpl_reference_visit_nested(const struct hpclang_rpl_reader *reader,
                                        uint32_t capacity, uint32_t node_budget,
                                        hpclang_rpl_reference_visit_fn visit, void *context);
 
+/* Observe each successful native nibble read during the same nested traversal,
+ * including prologues, lengths and structural metadata. Repeated reads may
+ * repeat observations; compact synthetic prologues are not native dependencies.
+ * Feed these observations to a guard builder using the reader's independently
+ * resolved mapping. Both callbacks are read-only; any callback error propagates
+ * unchanged and invalidates all partial edges/dependencies. Failed reads and
+ * invalid nibbles are not reported as observations. Keep all inputs/mappings
+ * stable through traversal and any later validation/commit. This records only
+ * actual parser reads: opaque contents and unfollowed edges remain unresolved,
+ * and success does not establish complete references or authorize mutation. */
+typedef int (*hpclang_rpl_reference_dependency_fn)(void *context, uint32_t address, uint8_t value);
+int hpclang_rpl_reference_visit_guarded_nested(const struct hpclang_rpl_reader *reader,
+                                               const struct hpclang_rpl_reference_node *root,
+                                               struct hpclang_rpl_reference_node *workspace,
+                                               uint32_t capacity, uint32_t node_budget,
+                                               hpclang_rpl_reference_visit_fn visit,
+                                               hpclang_rpl_reference_dependency_fn dependency,
+                                               void *context);
+
 enum hpclang_rpl_dispatch_schema
 {
     HPCLANG_RPL_DISPATCH_DUPLICATE_THEN_ENTRY,

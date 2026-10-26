@@ -21,6 +21,8 @@ struct live_probe
     uint32_t first, end, roots[2048], root_count;
     struct hpclang_rpl_reference_edit_builder builder;
     struct hpclang_rpl_reference_edit edits[4096];
+    struct hpclang_rpl_reference_guard_builder guard_builder;
+    struct hpclang_rpl_reference_guard guards[4096];
     struct hpclang_rpl_reference_node work[512];
 };
 static int probe_read_word(struct hpclang_rpl_mutation_io *io, uint32_t at, unsigned width,
@@ -92,11 +94,18 @@ static int probe_mapped_read(void *ctx, uint32_t map, uint32_t at, uint8_t *out)
     struct hpclang_rpl_mutation_io *io = ctx;
     return map == 1 && io->read_nibble(io->context, at, out);
 }
+static int probe_dependency(void *context, uint32_t at, uint8_t value)
+{
+    struct live_probe *p = context;
+    return hpclang_rpl_reference_guards_observe(&p->guard_builder, 1, at, value);
+}
+
 static int probe_node(struct live_probe *p, struct hpclang_rpl_reader *reader, uint32_t at,
                       uint32_t span)
 {
     struct hpclang_rpl_reference_node node = {at, span, 0};
-    return hpclang_rpl_reference_visit_nested(reader, &node, p->work, 512, 10000, probe_edge, p);
+    return hpclang_rpl_reference_visit_guarded_nested(reader, &node, p->work, 512, 10000,
+                                                      probe_edge, probe_dependency, p);
 }
 static int probe_register(void)
 {
@@ -133,8 +142,9 @@ static int probe_register(void)
     p->first = insertion.slot;
     p->end = end;
     hpclang_rpl_reference_edits_begin(&p->builder, p->edits, 4096);
+    hpclang_rpl_reference_guards_begin(&p->guard_builder, p->guards, 4096);
     int result = 6;
-    if (hpclang_rpl_mutation_visit_root_sources(&io, probe_root, p))
+    if (hpclang_rpl_mutation_visit_guarded_roots(&io, probe_root, probe_dependency, p))
         goto done;
     result = 7;
     if (probe_node(p, &reader, home, 0x100000 - home))
@@ -158,8 +168,8 @@ static int probe_register(void)
     result = 8;
     if (hpclang_rpl_reference_edits_validate(&mapped, p->edits, p->builder.count))
         goto done;
-    const struct hpclang_rpl_catalog_repairs repairs = {1,    p->edits, p->builder.count, NULL, 0,
-                                                        NULL, 0};
+    const struct hpclang_rpl_catalog_repairs repairs = {
+        1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0};
     /* After this boundary an error must halt the test, never return Stock. */
     const struct hpclang_rpl_library_binding added = {binding, 0, 0};
     if (hpclang_rpl_catalog_insert_repaired(&io, 123, &added, &insertion, &repairs)) {

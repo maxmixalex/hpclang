@@ -1403,8 +1403,135 @@ static void mixed_width_metadata(void)
     assert(hpclang_rpl_reference_edits_add(&builder, &edit) == HPCLANG_RPL_SPAN_BOUNDS);
 }
 
+struct guarded_edges
+{
+    struct edges edges;
+    struct hpclang_rpl_reference_guard_builder builder;
+    struct hpclang_rpl_reference_guard guards[32];
+    uint8_t seen[128];
+    uint32_t observations, stop_at;
+};
+
+static int guarded_edge(void *context, const struct hpclang_rpl_reference *edge)
+{
+    struct guarded_edges *state = context;
+    return collect(&state->edges, edge);
+}
+
+static int observe_reference(void *context, uint32_t address, uint8_t value)
+{
+    struct guarded_edges *state = context;
+    assert(address < sizeof state->seen && value < 16);
+    if (++state->observations == state->stop_at)
+        return 73;
+    state->seen[address] = 1;
+    return hpclang_rpl_reference_guards_observe(&state->builder, 7, address, value);
+}
+
+static int guarded_mapped_read(void *context, uint32_t mapping, uint32_t address, uint8_t *value)
+{
+    return mapping == 7 && read_nibble(context, address, value);
+}
+
+static void begin_guarded_edges(struct guarded_edges *state)
+{
+    memset(state, 0, sizeof *state);
+    assert(!hpclang_rpl_reference_guards_begin(&state->builder, state->guards, 32));
+}
+
+static void guarded_nested_references(void)
+{
+    struct image image = {.size = 45, .fail = UINT32_MAX};
+    put(&image, 0, 0x2a74, 5);
+    put(&image, 5, 0x29e8, 5);
+    put(&image, 10, 30, 5);
+    put(&image, 15, 0x2baa, 5);
+    put(&image, 20, 1, 5);
+    put(&image, 25, 1, 5);
+    put(&image, 30, 0x4001c, 5);
+    put(&image, 35, 0x23c21, 5);
+    put(&image, 40, 0x312b, 5);
+    const struct image original = image;
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    const struct hpclang_rpl_reference_reader mapped = {guarded_mapped_read, &image};
+    const struct hpclang_rpl_reference_node root = {0, 45, 0};
+    struct hpclang_rpl_reference_node work[1];
+    struct guarded_edges state;
+    begin_guarded_edges(&state);
+    assert(!hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                       observe_reference, &state));
+    assert(state.edges.count == 4 && state.seen[0] && state.seen[10] && state.seen[20] &&
+           state.seen[35] && state.seen[40]);
+    assert(!memcmp(&image, &original, sizeof image));
+    assert(!hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count));
+    for (unsigned i = 0; i < image.size; ++i) {
+        if (!state.seen[i])
+            continue;
+        image.data[i] ^= 1;
+        assert(hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        image.data[i] ^= 1;
+    }
+    /* Every callback failure must survive the parser's read-error conversion. */
+    uint32_t observations = state.observations;
+    for (uint32_t stop = 1; stop <= observations; ++stop) {
+        begin_guarded_edges(&state);
+        state.stop_at = stop;
+        assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                          observe_reference, &state) == 73);
+        assert(state.observations == stop);
+    }
+    for (uint32_t at = 30; at < 40; ++at) {
+        image.fail = at;
+        begin_guarded_edges(&state);
+        assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                          observe_reference,
+                                                          &state) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!state.seen[at]);
+    }
+    image.fail = UINT32_MAX;
+    const struct hpclang_rpl_reference_node compact = {30, 10, 0x2baa};
+    begin_guarded_edges(&state);
+    assert(!hpclang_rpl_reference_visit_guarded_nested(&reader, &compact, work, 1, 1, guarded_edge,
+                                                       observe_reference, &state));
+    for (unsigned i = 0; i < sizeof state.seen; ++i)
+        assert(state.seen[i] == (i >= 30 && i < 40));
+    begin_guarded_edges(&state);
+    state.edges.stop = 81;
+    assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                      observe_reference, &state) == 81);
+    assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                      NULL,
+                                                      &state) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    begin_guarded_edges(&state);
+    assert(!hpclang_rpl_reference_guards_begin(&state.builder, state.guards, 1));
+    assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                      observe_reference,
+                                                      &state) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!state.builder.count);
+    /* Opaque payload bytes are not fabricated into dependencies or silently
+     * declared reference-free; the unresolved edge must still reach the caller. */
+    image = (struct image){.size = 15, .fail = UINT32_MAX};
+    put(&image, 0, 0x2dcc, 5);
+    put(&image, 5, 10, 5);
+    put(&image, 10, 0x81234, 5);
+    const struct hpclang_rpl_reference_node opaque = {0, 15, 0};
+    begin_guarded_edges(&state);
+    assert(!hpclang_rpl_reference_visit_guarded_nested(&reader, &opaque, work, 1, 1, guarded_edge,
+                                                       observe_reference, &state));
+    assert(state.edges.count == 1 && state.edges.items[0].kind == HPCLANG_RPL_REFERENCE_OPAQUE);
+    for (unsigned i = 10; i < 15; ++i)
+        assert(!state.seen[i]);
+    image.data[0] = 16;
+    begin_guarded_edges(&state);
+    assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &opaque, work, 1, 1, guarded_edge,
+                                                      observe_reference, &state));
+    assert(!state.seen[0]);
+}
+
 int main(void)
 {
+    guarded_nested_references();
     mixed_width_metadata();
     code_operand_replay();
     cached_command_program();

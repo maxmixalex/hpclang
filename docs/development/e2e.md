@@ -687,6 +687,14 @@ must resolve to its new Port0 record. This covers the unmodified launcher return
 in the controlled clean-state fixture; it does not establish complete opaque
 object or banked-reference safety for arbitrary applications.
 
+Catalog-growth fixtures record native nibble dependencies from both root scans
+and nested object traversal, coalesce them into a bounded guard array and pass
+them to the repaired catalog commit. Guard exhaustion or observation failure
+stops before commit. Only bytes actually read by the parsers are guarded;
+compact synthetic prologues are excluded and opaque contents remain unresolved.
+The unit regression changes each observed field and requires stale-plan rejection,
+and checks callback failures, read faults, invalid nibbles and guard capacity.
+
 ### Offline original-ROM threaded return check
 
 `tests/e2e/code-relocation/threaded_return.py` checks the reviewed HP49g+/HP50g
