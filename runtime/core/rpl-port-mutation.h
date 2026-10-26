@@ -90,7 +90,9 @@ int hpclang_rpl_catalog_insert_repaired(const struct hpclang_rpl_mutation_io *io
 struct hpclang_rpl_catalog_removal;
 /* Internal unregister commit. Caller proves the library is detached and unused
  * and supplies all relocation repairs. Revalidate the complete ordered catalog
- * and exact expected binding before contraction; publish count last. No payload
+ * and exact expected binding before contraction. Validate the entire HOME
+ * attachment prefix and reject a matching ID as BUSY before writes; this does
+ * not establish complete execution liveness. Publish count last. No payload
  * deletion or configuration execution. Ownership and INCOMPLETE handling match
  * insert_repaired; a partial commit must not be retried or resumed in Stock. */
 int hpclang_rpl_catalog_remove_repaired(const struct hpclang_rpl_mutation_io *io, uint32_t number,

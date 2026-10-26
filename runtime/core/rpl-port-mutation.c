@@ -408,6 +408,18 @@ int hpclang_rpl_catalog_remove_repaired(const struct hpclang_rpl_mutation_io *io
         plan.binding.bank_switch != expected->binding.bank_switch ||
         plan.binding.flags != expected->binding.flags)
         return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t home = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        uint8_t nibble;
+        if (!io->read_nibble(io->context, 0x80711u + i, &nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (nibble > 15)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        home |= (uint32_t)nibble << (4 * i);
+    }
+    result = hpclang_rpl_home_library_attached(&reader, home, 0x100000u - home, number);
+    if (result)
+        return result == 1 ? HPCLANG_RPL_MUTATION_BUSY : parse_error(result);
     result = hpclang_rpl_mutation_catalog_shrink_repaired(io, plan.slot, repairs);
     if (result)
         return result;

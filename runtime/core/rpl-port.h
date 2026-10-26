@@ -104,6 +104,14 @@ struct hpclang_rpl_catalog_removal
     struct hpclang_rpl_library_binding binding;
 };
 
+/* Inspect the native HOME attachment prefix (DORRP, count, 13-nibble records).
+ * Caller supplies the proven HOME address and readable extent. Validate every
+ * encoded record, including records after a match. Return 1 attached, 0 absent
+ * or a negative span result. Absence is not proof of execution-reference
+ * liveness or validation of the directory's stored objects. No writes. */
+int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                      uint32_t limit, uint32_t number);
+
 /* Plan removal from the strictly ID-ordered catalog. Validate the entire table,
  * including entries after the match, before publishing its slot and binding.
  * Returns 1 found, 0 absent, or a negative span result; output changes only on

@@ -697,6 +697,11 @@ the still-stored Port0 library, unchanged Flash and the real caller's marker.
 This exercises internal registration/unregistration geometry without deleting
 the payload or proving general-purpose detachment and execution liveness.
 
+Before catalog edits, both original-return cases also attempt removal of the
+fixture's genuinely HOME-attached library 275. A rejecting writer counts any
+write attempt. The payload requires `BUSY`, zero write attempts and unchanged
+native roots; it never edits the attachment table to manufacture that result.
+
 Catalog-growth fixtures record native nibble dependencies from both root scans
 and nested object traversal, coalesce them into a bounded guard array and pass
 them to the repaired catalog commit. Guard exhaustion or observation failure

@@ -365,6 +365,50 @@ static void test_catalog_insertion(void)
     assert(plan.slot == 8 && plan.end == 8 && plan.count == 0);
 }
 
+static int read_home(void *context, uint32_t address, uint8_t *value)
+{
+    return address >= 0x80000 && read_nibble(context, address - 0x80000, value);
+}
+
+static void test_home_attachment(void)
+{
+    struct image image = {.count = 34, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_home, &image};
+    put_word(&image, 0, 0x2a96, 5);
+    put_word(&image, 5, 2, 3);
+    put_word(&image, 8, 123, 3);
+    put_word(&image, 11, 0x90000, 5);
+    put_word(&image, 16, 0x91000, 5);
+    put_word(&image, 21, 275, 3);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 123) == 1);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 275) == 1);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 124) == 0);
+    for (unsigned at = 0; at < 34; ++at) {
+        image.fail_at = at;
+        assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 123) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        image.fail_at = UINT32_MAX;
+        uint8_t saved = image.data[at];
+        image.data[at] = 16;
+        assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 123) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        image.data[at] = saved;
+    }
+    for (unsigned limit = 0; limit < 34; ++limit)
+        assert(hpclang_rpl_home_library_attached(&reader, 0x80000, limit, 123) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_home_library_attached(NULL, 0x80000, 34, 123) < 0);
+    assert(hpclang_rpl_home_library_attached(&reader, 0, 34, 123) < 0);
+    assert(hpclang_rpl_home_library_attached(&reader, 0xfffff, 34, 123) < 0);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 4096) < 0);
+    put_word(&image, 0, 0x2a2c, 5);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 123) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    put_word(&image, 0, 0x2a96, 5);
+    put_word(&image, 5, 0, 3);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 8, 123) == 0);
+}
+
 static void test_catalog_removal(void)
 {
     struct image image = {.count = 56, .fail_at = UINT32_MAX};
@@ -968,6 +1012,7 @@ int main(void)
     test_catalog_rebind();
     test_catalog_insertion();
     test_catalog_removal();
+    test_home_attachment();
     test_acptr_resolution();
     test_flashptr_resolution();
     test_flashptr_bank();

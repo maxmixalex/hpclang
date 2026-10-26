@@ -2555,6 +2555,8 @@ static struct hpclang_rpl_mutation_io setup_catalog_growth(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1);
     io.library_table = 0x82000;
+    put_word(USEROB, 5, 0x92000);
+    put_word(0x92000, 5, DORRP);
     put_word(io.library_table, 3, 2);
     put_word(0x82003, 3, 10);
     put_word(0x82006, 5, 0x83001);
@@ -2598,6 +2600,56 @@ static int alias_catalog_location(void *context, const struct hpclang_rpl_librar
     (void)binding;
     *locations = (struct hpclang_rpl_catalog_locations){{7, 9}, 0x12580, 0};
     return 0;
+}
+
+static void test_catalog_attached_rejection(void)
+{
+    for (unsigned scenario = 0; scenario < 7; ++scenario) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        struct hpclang_rpl_catalog_removal plan;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, io.library_table, 35, 10, &plan) == 1);
+        put_word(0x92005, 3, 2);
+        put_word(0x92008, 3, 10);
+        put_word(0x9200b, 5, 0x93000);
+        put_word(0x92010, 5, 0x94000);
+        put_word(0x92015, 3, 20);
+        int expected = HPCLANG_RPL_MUTATION_BUSY;
+        switch (scenario) {
+        case 0:
+            break;
+        case 1:
+            rejected_read = 0x92021;
+            expected = HPCLANG_RPL_MUTATION_IO;
+            break;
+        case 2:
+            put_word(USEROB, 5, 0);
+            expected = HPCLANG_RPL_MUTATION_MALFORMED;
+            break;
+        case 3:
+            put_word(0x92000, 5, 0x2a2c);
+            expected = HPCLANG_RPL_MUTATION_MALFORMED;
+            break;
+        case 4:
+            rejected_read = USEROB;
+            expected = HPCLANG_RPL_MUTATION_IO;
+            break;
+        case 5:
+            put_word(0x92008, 3, 11);
+            put_word(0x92015, 3, 10);
+            break;
+        case 6:
+            put_word(USEROB, 5, 0xffff8);
+            put_word(0xffff8, 5, DORRP);
+            put_word(0xffffd, 3, 1);
+            expected = HPCLANG_RPL_MUTATION_MALFORMED;
+            break;
+        }
+        uint8_t before[NIBBLES];
+        memcpy(before, memory, sizeof before);
+        assert(hpclang_rpl_catalog_remove_repaired(&io, 10, &plan, NULL) == expected);
+        assert(!writes && !memcmp(before, memory, sizeof before));
+    }
 }
 
 static void test_catalog_remove_commit(void)
@@ -3522,6 +3574,7 @@ int main(void)
     test_catalog_alias_repairs();
     test_catalog_insert_commit();
     test_catalog_remove_commit();
+    test_catalog_attached_rejection();
     test_catalog_switch_growth();
     test_temp_allocation_visit();
     test_read_only_root_visit();

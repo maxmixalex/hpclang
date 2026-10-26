@@ -120,7 +120,10 @@ read-only prerequisite for unloading: callers must still prove detachment and
 reference liveness, revalidate under ownership, and repair references while
 compacting the table. It neither unregisters nor deletes a library record.
 The internal `hpclang_rpl_catalog_remove_repaired` commit revalidates that plan
-and its binding, contracts the catalog/metadata/TEMP/return-stack suffix by
+and its binding, validates the complete HOME attachment prefix and rejects
+still-attached IDs before any writes. A match never hides unreadable later
+records. This check does not replace execution-liveness analysis. It then
+contracts the catalog/metadata/TEMP/return-stack suffix by
 16 nibbles, applies caller-proven repairs and publishes the count last. Roots
 into the removed catalog cell prevent contraction. Supplied fields in that
 cell are rejected; surviving native/register roots and embedded fields retain

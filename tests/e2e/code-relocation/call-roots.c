@@ -141,6 +141,50 @@ static int probe_collect(struct live_probe *p, struct hpclang_rpl_reader *reader
     return 0;
 }
 
+struct rejected_removal
+{
+    const struct hpclang_rpl_mutation_io *source;
+    unsigned writes;
+};
+static int rejected_read(void *context, uint32_t at, uint8_t *value)
+{
+    const struct rejected_removal *probe = context;
+    return probe->source->read_nibble(probe->source->context, at, value);
+}
+static int rejected_write(void *context, uint32_t at, uint8_t value)
+{
+    (void)at;
+    (void)value;
+    struct rejected_removal *probe = context;
+    ++probe->writes;
+    return 0;
+}
+static int probe_attached_rejection(const struct hpclang_rpl_mutation_io *io)
+{
+    /* The actual clean Stock fixture has library 275 attached to HOME. Do not
+     * alter its binding or attachment table to manufacture the rejection. */
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    struct hpclang_rpl_catalog_removal removal;
+    if (hpclang_rpl_catalog_plan_remove(&reader, io->library_table, 0x100000 - io->library_table,
+                                        275, &removal) != 1)
+        return -1;
+    uint32_t roots[3];
+    for (unsigned i = 0; i < 3; ++i)
+        roots[i] = *io->native_roots[i];
+    struct rejected_removal probe = {io, 0};
+    struct hpclang_rpl_mutation_io readonly = *io;
+    readonly.read_nibble = rejected_read;
+    readonly.write_nibble = rejected_write;
+    readonly.context = &probe;
+    int result = hpclang_rpl_catalog_remove_repaired(&readonly, 275, &removal, NULL);
+    if (result != HPCLANG_RPL_MUTATION_BUSY || probe.writes)
+        return -1;
+    for (unsigned i = 0; i < 3; ++i)
+        if (*io->native_roots[i] != roots[i])
+            return -1;
+    return 0;
+}
+
 static int probe_register(void)
 {
     struct hpclang_rpl_stock_memory memory;
@@ -151,6 +195,11 @@ static int probe_register(void)
     int remove = 0;
     if (prepare_call(&io, roots, &remove))
         return 61;
+    if (probe_attached_rejection(&io)) {
+        hpclang_e2e_result = 0x46410ffc;
+        for (;;)
+            __asm__ volatile("nop");
+    }
     struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
     struct hpclang_rpl_catalog_insertion insertion;
     if (hpclang_rpl_catalog_plan_insert(&reader, io.library_table, 0x100000 - io.library_table, 123,
