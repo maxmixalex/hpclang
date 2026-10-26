@@ -91,6 +91,10 @@ every touched page before callbacks, retains separate logical aliases and
 uses absolute physical nibble coordinates. This permits whole-range overlap
 checks without assuming that consecutive Saturn pages are physically adjacent.
 It does not select a bank, classify pointer values or authorize relocation.
+`hpclang_rpl_stock_spans_overlap` compares complete ranges under independently
+qualified maps, including discontinuities and aliases. Both ranges must be
+valid even when early pages overlap; adjacent or opposite-parity nibbles do
+not overlap. The result describes physical aliasing, not reference liveness.
 
 ## Platform families and model profiles
 

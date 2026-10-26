@@ -61,6 +61,37 @@ int hpclang_rpl_stock_visit_spans(const uint32_t read_map[256], uint32_t address
     return 0;
 }
 
+struct overlap_scan
+{
+    const uint32_t *right_map;
+    uint32_t right_address, right_span, physical, span;
+};
+
+static int overlap_right(void *context, uint32_t logical, uint32_t physical, uint32_t span)
+{
+    (void)logical;
+    const struct overlap_scan *scan = context;
+    return physical < scan->physical + scan->span && scan->physical < physical + span;
+}
+
+static int overlap_left(void *context, uint32_t logical, uint32_t physical, uint32_t span)
+{
+    (void)logical;
+    struct overlap_scan *scan = context;
+    scan->physical = physical;
+    scan->span = span;
+    return hpclang_rpl_stock_visit_spans(scan->right_map, scan->right_address, scan->right_span,
+                                         overlap_right, scan);
+}
+
+int hpclang_rpl_stock_spans_overlap(const uint32_t left_map[256], uint32_t left_address,
+                                    uint32_t left_span, const uint32_t right_map[256],
+                                    uint32_t right_address, uint32_t right_span)
+{
+    struct overlap_scan scan = {right_map, right_address, right_span, 0, 0};
+    return hpclang_rpl_stock_visit_spans(left_map, left_address, left_span, overlap_left, &scan);
+}
+
 static int port1_read(void *context, uint32_t address, uint8_t *value)
 {
     if (!context || !value || address >= HPCLANG_RPL_PORT1_NIBBLES)

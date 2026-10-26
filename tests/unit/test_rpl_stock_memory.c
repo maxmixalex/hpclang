@@ -88,6 +88,64 @@ static void test_discontinuous_spans(void)
     assert(!walk.calls);
 }
 
+static uint32_t mapped_nibble(const uint32_t map[256], uint32_t address)
+{
+    return map[address / 4096] * 2u + address % 4096;
+}
+
+static void test_mapping_overlap(void)
+{
+    uint32_t left[256], right[256];
+    for (unsigned i = 0; i < 256; ++i) {
+        left[i] = i * 0x800u;
+        right[i] = 0x08000000u + i * 0x800u;
+    }
+    assert(!hpclang_rpl_stock_spans_overlap(left, 0, 0x100000, right, 0, 0x100000));
+    right[128] = left[64];
+    assert(hpclang_rpl_stock_spans_overlap(left, 0x40003, 1, right, 0x80003, 1) == 1);
+    assert(!hpclang_rpl_stock_spans_overlap(left, 0x40002, 1, right, 0x80003, 1));
+    assert(!hpclang_rpl_stock_spans_overlap(left, 0x40004, 1, right, 0x80003, 1));
+    assert(!hpclang_rpl_stock_spans_overlap(left, 0x40000, 4096, right, 0x40000, 4096));
+    /* A late invalid page must not be hidden by an earlier matching alias. */
+    right[0] = left[0];
+    right[255] = 1;
+    assert(hpclang_rpl_stock_spans_overlap(left, 0, 0x100000, right, 0, 0x100000) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    right[255] = 0x0807f800;
+    left[255] = 1;
+    assert(hpclang_rpl_stock_spans_overlap(left, 0, 0x100000, right, 0, 0x100000) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    left[255] = 255 * 0x800u;
+    assert(hpclang_rpl_stock_spans_overlap(left, 0, 1, NULL, 0, 1) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_stock_spans_overlap(NULL, 0, 1, right, 0, 1) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_stock_spans_overlap(left, 0, 1, right, 0, 0) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_stock_spans_overlap(left, 0, 0, right, 0, 1) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_stock_spans_overlap(left, 0, 1, right, 0xfffff, 2) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    unsigned positives = 0, negatives = 0;
+    for (uint32_t trial = 0; trial < 256; ++trial) {
+        for (uint32_t page = 0; page < 256; ++page)
+            left[page] = ((page * 17u + trial) % 256u) * 0x800u;
+        for (uint32_t page = 0; page < 256; ++page)
+            right[page] = left[(page + trial) % 256u] + (trial & 1u ? 0x08000000u : 0u);
+        uint32_t a = (trial % 255u) * 4096u + 4095u - trial % 16u;
+        uint32_t b = ((trial % 255u + 256u - trial) % 256u) * 4096u + 4093u;
+        uint32_t an = 1u + trial % 97u, bn = 1u + trial % 89u;
+        if (bn > 0x100000u - b)
+            bn = 0x100000u - b;
+        int expected = 0;
+        for (uint32_t i = 0; i < an; ++i)
+            for (uint32_t j = 0; j < bn; ++j)
+                expected |= mapped_nibble(left, a + i) == mapped_nibble(right, b + j);
+        assert(hpclang_rpl_stock_spans_overlap(left, a, an, right, b, bn) == expected);
+        assert(hpclang_rpl_stock_spans_overlap(right, b, bn, left, a, an) == expected);
+        positives += expected != 0;
+        negatives += expected == 0;
+    }
+    assert(positives && negatives);
+}
+
 static void test_physical_spans(void)
 {
     uint32_t map[256];
@@ -149,6 +207,7 @@ static void test_physical_spans(void)
 int main(void)
 {
     test_discontinuous_spans();
+    test_mapping_overlap();
     test_physical_spans();
     static uint8_t port1[HPCLANG_RPL_PORT1_NIBBLES / 2u];
     struct hpclang_rpl_reader port_reader = {0};
