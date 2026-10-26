@@ -95,6 +95,14 @@ It does not select a bank, classify pointer values or authorize relocation.
 qualified maps, including discontinuities and aliases. Both ranges must be
 valid even when early pages overlap; adjacent or opposite-parity nibbles do
 not overlap. The result describes physical aliasing, not reference liveness.
+The profiled original-ROM switches map a full 128 KiB window even for the
+96 KiB bank 0 allocation; its tail aliases bank 1 at different Saturn addresses.
+Mapped extent is not allocation ownership, and bank IDs alone do not prove
+disjointness. Reference planning requires normalized physical identity and
+address offsets. Unused
+bank 14/15 entries select unaligned placeholder pages, which these helpers
+reject. The offline `bank_switch.py` check executes the original switches;
+it does not establish arbitrary bank lifetimes or authorize movement.
 
 ## Platform families and model profiles
 

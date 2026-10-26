@@ -695,6 +695,37 @@ compact synthetic prologues are excluded and opaque contents remain unresolved.
 The unit regression changes each observed field and requires stale-plan rejection,
 and checks callback failures, read faults, invalid nibbles and guard capacity.
 
+### Offline original-ROM bank-switch check
+
+`tests/e2e/code-relocation/bank_switch.py` accepts repeatable
+`--state hp50g:/path/to/state` or `--state hp49gplus:/path/to/state` arguments,
+an `--output` directory and optional host `--cc`. Each state contains `sram`
+and `flash`; the Python environment requires Unicorn. For example:
+
+```sh
+python tests/e2e/code-relocation/bank_switch.py \
+  --state hp50g:/work/saved-state --output /work/bank-switch-check
+```
+
+For each saved state it executes all sixteen profiled ROM Flash switch entries
+and the ERAM entry at every return-stack cursor, using the original ARM Saturn
+interpreter. Only the synthetic caller return and cursor are installed; no
+switch body is skipped. Execution must return within the instruction bound.
+All 256 resulting Read-map entries are checked: the window must match the
+captured bank bases, and entries outside it must stay unchanged. The production
+span resolver must accept real windows and reject unused-bank placeholders
+without changing its output. The report retains traces and state hashes.
+
+Four HP50g/HP49g+ saved states pass 544 cases and 9,632 executed-map
+overlap/alias comparisons locally. Bank 0 maps 128 KiB despite its 96 KiB
+allocation: its last 32 KiB aliases bank 1 at different Saturn addresses.
+The comparisons include these aliases, opposite-parity non-aliases, every
+pair of selected windows and rejection of bank 14/15's unaligned placeholders.
+The caller must normalize physical identity and address offsets before using
+qualified reference plans; unequal bank indices alone cannot prove disjointness.
+This is a reviewed firmware-profile check, not general ROM discovery,
+allocation/liveness proof, hardware acceptance or permission to relocate.
+
 ### Offline original-ROM threaded return check
 
 `tests/e2e/code-relocation/threaded_return.py` checks the reviewed HP49g+/HP50g
