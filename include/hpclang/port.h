@@ -108,6 +108,8 @@ extern "C"
      * EILSEQ, insufficient native space ENOSPC, and a non-library value EINVAL.
      * Port 2 validates all banks and appends to erased space without reclamation.
      * Other valid contexts return ENOSYS. The caller retains its snapshot.
+     * Port 0 create/replace/remove stop on failure after a native-root change
+     * or Saturn write attempt; root snapshot allocation failure returns ENOMEM.
      * An unexpected Port 1 backend failure during record publication stops the
      * runtime with ownership retained; it does not return a recoverable error.
      */

@@ -41,6 +41,12 @@ int hpclang_rpl_port1_remove_backup(const struct hpclang_rpl_mutation_io *io, ui
                                     const uint8_t *name, uint32_t name_length,
                                     const struct hpclang_rpl_port1_guard *guard);
 
+/* Port0 create/replace/remove track native-root changes and Saturn write
+ * attempts. Any subsequent failure is INCOMPLETE: keep ownership and never
+ * retry or resume Stock. Errors before either effect retain their original
+ * result. Root snapshot allocation can return NOMEM without modifying state.
+ * This does not extend the supported reference coverage or provide rollback. */
+
 /* Store a library record without registering or attaching it to the OS.
  * Existing record addresses remain stable; duplicate library IDs are rejected.
  * The caller owns stable packed input, as for backup creation below. */

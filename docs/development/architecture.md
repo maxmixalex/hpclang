@@ -197,6 +197,12 @@ would release that ownership, so they are not valid commit-failure paths.
 Port1 body preparation failures remain recoverable `EIO` while its zero
 prologue still hides the record. Stable production RAM callbacks should not
 fail after preflight; the terminal path preserves the contract if they do.
+Port0 backup creation/replacement/removal and library creation observe Saturn
+write attempts and ARM-root changes, which can precede the first Saturn write.
+A subsequent failure returns `INCOMPLETE`; unchanged preflight failures retain
+their original result. The root snapshot is allocated before mutation; allocation
+failure returns `ENOMEM` without native changes. This boundary adds neither
+rollback nor coverage of previously unsupported references.
 Public Port1 replace/remove still require complete reference protection.
 
 ## Platform families and model profiles

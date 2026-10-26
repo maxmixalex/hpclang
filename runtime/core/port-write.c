@@ -222,6 +222,9 @@ static int mutation_result(int result)
     case HPCLANG_RPL_MUTATION_NOT_FOUND:
         errno = ENOENT;
         break;
+    case HPCLANG_RPL_MUTATION_NOMEM:
+        errno = ENOMEM;
+        break;
     case HPCLANG_RPL_MUTATION_NOSPACE:
         errno = ENOSPC;
         break;

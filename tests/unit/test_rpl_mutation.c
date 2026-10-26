@@ -2057,6 +2057,110 @@ static void test_port1_edit_owned_suffix(void)
     free(large);
 }
 
+struct root_cut
+{
+    uint32_t *root, original;
+};
+static int read_after_root_cut(void *context, uint32_t address, uint8_t *value)
+{
+    const struct root_cut *cut = context;
+    return *cut->root == cut->original && read_nibble(NULL, address, value);
+}
+
+static int port0_fault_operation(const struct hpclang_rpl_mutation_io *io, unsigned operation,
+                                 const uint8_t *packed, uint32_t span)
+{
+    if (operation == 0)
+        return hpclang_rpl_port0_create_backup(io, packed, span);
+    if (operation == 1)
+        return hpclang_rpl_port0_replace_backup(io, packed, span);
+    if (operation == 3)
+        return hpclang_rpl_port0_create_library(io, packed, span);
+    return hpclang_rpl_port0_remove_backup(io, (const uint8_t *)"DATA", 4);
+}
+
+static void test_port0_commit_failures(void)
+{
+    uint8_t *before = malloc(sizeof memory);
+    assert(before);
+    for (unsigned operation = 0; operation < 4; ++operation) {
+        struct hpclang_rpl_mutation_io io = setup(1);
+        uint32_t root = prepare_named_char('H');
+        put_word(0x80716, 5, root + 7);
+        put_word(get_word(DSKTOP, 5), 5, root);
+        uint32_t *roots[] = {&root, &root};
+        io.native_roots = roots;
+        io.native_root_count = 2; /* Duplicate root identity remains supported. */
+        const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+        put_word(0x82000, 5, 0x029bf);
+        put_word(0x82005, 2, 'A');
+        uint8_t *packed;
+        uint32_t span;
+        assert(!hpclang_rpl_backup_encode(&reader, 0x82000, 7, (const uint8_t *)"DATA", 4, &packed,
+                                          &span));
+        if (operation == 1 || operation == 2) {
+            assert(!hpclang_rpl_port0_create_backup(&io, packed, span));
+            free(packed);
+            root = get_word(0x80716, 5); /* Preserve the old wrapper via TEMP. */
+            put_word(0x82005, 2, 'B');
+            assert(!hpclang_rpl_backup_encode(&reader, 0x82000, 7, (const uint8_t *)"DATA", 4,
+                                              &packed, &span));
+        }
+        if (operation == 3) {
+            const char *library = "04b2062000108510b7000000000000000000000d5c2";
+            free(packed);
+            packed = calloc(22, 1);
+            assert(packed);
+            span = 43;
+            for (uint32_t i = 0; i < span; ++i) {
+                uint8_t nibble = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+                packed[i / 2] |= nibble << (4 * (i & 1));
+            }
+        }
+        uint32_t original = root;
+        memcpy(before, memory, sizeof memory);
+        writes = 0;
+#ifdef HPCLANG_TEST_WRAP_ALLOC
+        allocation_attempts = 0;
+        track_allocation = reject_allocation = 1;
+        int allocation_result = port0_fault_operation(&io, operation, packed, span);
+        track_allocation = reject_allocation = 0;
+        assert(allocation_result == HPCLANG_RPL_MUTATION_NOMEM && allocation_attempts == 1);
+        assert(!writes && root == original && !memcmp(before, memory, sizeof memory));
+#endif
+        assert(!port0_fault_operation(&io, operation, packed, span));
+        uint32_t total = writes;
+        assert(total);
+        for (uint32_t cut = 0; cut < total; ++cut) {
+            memcpy(memory, before, sizeof memory);
+            root = original;
+            writes = 0;
+            rejected_write = cut;
+            assert(port0_fault_operation(&io, operation, packed, span) ==
+                   HPCLANG_RPL_MUTATION_INCOMPLETE);
+            assert(writes == cut);
+        }
+        rejected_write = UINT32_MAX;
+        memcpy(memory, before, sizeof memory);
+        root = original;
+        writes = 0;
+        rejected_read = 0x80716;
+        assert(port0_fault_operation(&io, operation, packed, span) == HPCLANG_RPL_MUTATION_IO);
+        assert(!writes && root == original && !memcmp(before, memory, sizeof memory));
+        rejected_read = UINT32_MAX;
+        if (!operation) {
+            struct root_cut cut = {&root, original};
+            io.context = &cut;
+            io.read_nibble = read_after_root_cut;
+            assert(port0_fault_operation(&io, operation, packed, span) ==
+                   HPCLANG_RPL_MUTATION_INCOMPLETE);
+            assert(root != original && !writes); /* ARM change precedes Saturn writes. */
+        }
+        free(packed);
+    }
+    free(before);
+}
+
 static void test_port0_create_library(void)
 {
     const char *library = "04b2062000108510b7000000000000000000000d5c2";
@@ -3978,6 +4082,7 @@ int main(void)
     test_port1_library_append();
     test_port1_append_publication_failures();
     test_port1_edit_owned_suffix();
+    test_port0_commit_failures();
     test_port0_create_library();
     test_library_table_reference_preservation();
     test_port_remove_preserves_backup_references();
