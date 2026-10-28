@@ -785,6 +785,107 @@ int hpclang_rpl_code_branch_inspect(const struct hpclang_rpl_reader *reader, uin
     return 0;
 }
 
+struct bank_entry_reader
+{
+    const struct hpclang_rpl_reader *reader;
+    uint32_t first, end;
+    hpclang_rpl_reference_dependency_fn dependency;
+    void *context;
+    int error;
+};
+
+static int bank_entry_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct bank_entry_reader *state = context;
+    if (state->error)
+        return 0;
+    if (address < state->first || address >= state->end) {
+        state->error = HPCLANG_RPL_SPAN_BOUNDS;
+        return 0;
+    }
+    if (!state->reader->read_nibble(state->reader->context, address, value))
+        return 0;
+    if (*value <= 15u) {
+        state->error = state->dependency(state->context, address, *value);
+        if (state->error > 0)
+            state->error = HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    return !state->error;
+}
+
+static int bank_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t end, uint32_t entry,
+                              struct hpclang_rpl_code_bank_entry *view)
+{
+    struct hpclang_rpl_code_literal literal;
+    int result = hpclang_rpl_code_literal_inspect(reader, entry, end - entry, 0, &literal);
+    if (result)
+        return result;
+    if (literal.destination != HPCLANG_RPL_CODE_D0 || literal.nibbles != 5)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (literal.value > 0xffffbu || end - entry < 11u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    result = read_word(reader, entry + 7, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode != 6)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_code_branch branch;
+    result = hpclang_rpl_code_branch_inspect(reader, entry + 7, 4, &branch);
+    if (result)
+        return result;
+    uint32_t dispatch = branch.target;
+    if (dispatch >= end || end - dispatch < 5)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = read_word(reader, dispatch, 3, &opcode);
+    if (result)
+        return result;
+    if (opcode != 0x098)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    result = hpclang_rpl_code_branch_inspect(reader, dispatch, 5, &branch);
+    if (result)
+        return result;
+    static const uint8_t body[] = {
+        2, 0, 3, 4, 0, 0, 0, 15, 15, 8, 0, 5, 1, 4, 6, 1, 3, 4, 8, 0, 5, 1, 4, 12, 8, 0, 4, 0, 3,
+    };
+    if (branch.target >= end || sizeof body > end - branch.target)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    for (unsigned i = 0; i < sizeof body; ++i) {
+        result = read_word(reader, branch.target + i, 1, &opcode);
+        if (result)
+            return result;
+        if (opcode != body[i])
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    *view = (struct hpclang_rpl_code_bank_entry){(uint32_t)literal.value, dispatch, branch.target};
+    return 0;
+}
+
+int hpclang_rpl_code_bank_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                        uint32_t end, uint32_t entry, unsigned p,
+                                        struct hpclang_rpl_code_bank_entry *view,
+                                        hpclang_rpl_reference_dependency_fn dependency,
+                                        void *context)
+{
+    if (!reader || !reader->read_nibble || !view || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (first >= end || end > 0x100000u || entry < first || entry >= end)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (p > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (p)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct bank_entry_reader state = {reader, first, end, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_entry_read, &state};
+    struct hpclang_rpl_code_bank_entry next;
+    int result = bank_entry_inspect(&observed, end, entry, &next);
+    if (state.error)
+        return state.error;
+    if (!result)
+        *view = next;
+    return result;
+}
+
 static int plan_shift(const struct hpclang_rpl_reader *reader, uint32_t instruction, uint32_t limit,
                       const struct hpclang_rpl_reference_mappings *mappings, uint32_t first,
                       uint32_t end, int32_t delta, struct hpclang_rpl_code_patch *patch,

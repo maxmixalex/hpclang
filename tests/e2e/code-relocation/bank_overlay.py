@@ -134,6 +134,22 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
         return 1
 
     reader = Reader(nibble, None)
+    dependency_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
+
+    class Program(c.Structure):
+        _fields_ = [(name, c.c_uint32) for name in ("selector", "dispatch", "body")]
+
+    lib.hpclang_rpl_code_bank_entry_inspect.argtypes = [
+        c.POINTER(Reader),
+        c.c_uint32,
+        c.c_uint32,
+        c.c_uint32,
+        c.c_uint,
+        c.POINTER(Program),
+        dependency_fn,
+        c.c_void_p,
+    ]
+    programs = {}
     lib.hpclang_rpl_code_literal_inspect.argtypes = [
         c.POINTER(Reader),
         c.c_uint32,
@@ -153,6 +169,33 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
             7,
             5,
             0xFFFFF,
+        )
+        observed = set()
+
+        @dependency_fn
+        def observe(_, address, value):
+            assert value == read(address, 1)
+            observed.add(address)
+            return 0
+
+        program = Program()
+        assert (
+            lib.hpclang_rpl_code_bank_entry_inspect(
+                c.byref(reader), 0, 0x40000, entry, 0, c.byref(program), observe, None
+            )
+            == 0
+        )
+        assert (program.selector, program.dispatch, program.body) == (
+            literal.value,
+            0x22FEC,
+            0x2305A,
+        )
+        expected = set(range(entry, entry + 11))
+        expected.update(range(program.dispatch, program.dispatch + 5))
+        expected.update(range(program.body, program.body + 29))
+        assert observed == expected
+        programs[entry] = dict(
+            dispatch=program.dispatch, body=program.body, observed_code_nibbles=len(observed)
         )
         return literal.value
 
@@ -287,6 +330,7 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
                     stages=actual,
                     selector_field=selector,
                     canonical_selector_field=canonical_selector,
+                    entry_program=programs[switch],
                     changed_selector_stages=changed,
                 )
             )

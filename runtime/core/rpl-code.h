@@ -3,6 +3,28 @@
 
 #include "rpl-reference.h"
 
+struct hpclang_rpl_code_bank_entry
+{
+    uint32_t selector, dispatch, body;
+};
+
+/* Recognize the reviewed P=0 switch-program shape in a caller-qualified code
+ * mapping: full D0 literal, GOTO, ?P=0 branch, then P=0 / LC FF000 / CONFIG /
+ * C=DAT0.A / D0=C.A / CONFIG / DAT0=C.B / UNCONFIG / opcode 03 return.
+ * first/end bound the code mapping, not the selector data. Observe every code
+ * nibble read; output changes only on zero. Callback errors invalidate all
+ * partial dependencies; positive errors become MALFORMED. Other P values and
+ * code shapes are unsupported. No fixed entry or selector addresses are used.
+ * This proves syntax/operands, NOT firmware interpreter identity or the device
+ * semantics of CONFIG and DAT0. Caller still qualifies those, mutable selector
+ * contents, owner/geometry state, pending interrupts and return-stack roots.
+ * No execution, data access, mapping change or mutation authorization. */
+int hpclang_rpl_code_bank_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                        uint32_t end, uint32_t entry, unsigned p,
+                                        struct hpclang_rpl_code_bank_entry *view,
+                                        hpclang_rpl_reference_dependency_fn dependency,
+                                        void *context);
+
 /* Frame one Saturn/Saturn+ instruction at a caller-proven boundary. limit is
  * the available nibble count, not an end address. Validate every consumed nibble
  * and stop at unsupported encodings; never fall back to treating 80B as the

@@ -116,9 +116,9 @@ primitives/regressions are submitted in #26 (`d0471894`); CI is pending. Earlier
 Under the controlled saved profiles, both HOME scans schedule 20 attachments
 and resolve the first ACPTR payload (bank 2, 7291 nibbles), then reject its
 separate execution reference. Selector guards reject 340 stale-nibble changes.
-Local D0/D1 literal decoding now derives selector fields from entry instructions;
-192 original-interpreter cases and both maintained bank regressions pass.
-Local switch tests also check temporary configuration state and bounded write effects.
+Local P=0 program inspection now derives selector and shared-body addresses,
+checks the complete reviewed instruction shape and observes 45 code nibbles per
+entry. Both maintained ROM regressions pass, including configuration side effects.
 Production firmware/handler identity, owner/geometry freshness, complete payload
 and execution coverage, public libraries and Port1 edits remain open.
 

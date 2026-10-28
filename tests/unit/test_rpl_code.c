@@ -1323,8 +1323,89 @@ static void address_origin_invalidation(void)
     assert(hpclang_rpl_code_origins_adjust(&initial, NULL) == HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+struct bank_entry_observations
+{
+    unsigned count, stop;
+    uint8_t seen[64];
+};
+
+static int bank_entry_observe(void *context, uint32_t address, uint8_t value)
+{
+    struct bank_entry_observations *state = context;
+    assert(address >= 0x80000 && address < 0x80040 && value <= 15);
+    state->seen[address - 0x80000] = 1;
+    return ++state->count == state->stop ? -79 : 0;
+}
+
+static void bank_entry_program(void)
+{
+    struct image image = {.address = 0x80000, .size = 61, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    image.data[0] = 1;
+    image.data[1] = 11;
+    encode(&image, 2, 5, 0x12345);
+    image.data[7] = 6;
+    encode(&image, 8, 3, 8);
+    image.data[16] = 8;
+    image.data[17] = 9;
+    image.data[18] = 0;
+    encode(&image, 19, 2, 13);
+    const uint8_t body[] = {2, 0, 3, 4, 0, 0, 0, 15, 15, 8, 0, 5, 1, 4, 6,
+                            1, 3, 4, 8, 0, 5, 1, 4,  12, 8, 0, 4, 0, 3};
+    memcpy(image.data + 32, body, sizeof body);
+    struct hpclang_rpl_code_bank_entry output, sentinel;
+    memset(&sentinel, 0x5a, sizeof sentinel);
+    struct bank_entry_observations observations = {0};
+    assert(!hpclang_rpl_code_bank_entry_inspect(&reader, image.address, image.address + image.size,
+                                                image.address, 0, &output, bank_entry_observe,
+                                                &observations));
+    assert(output.selector == 0x12345 && output.dispatch == image.address + 16 &&
+           output.body == image.address + 32);
+    unsigned count = observations.count;
+    for (unsigned stop = 1; stop <= count; ++stop) {
+        output = sentinel;
+        observations = (struct bank_entry_observations){.stop = stop};
+        assert(hpclang_rpl_code_bank_entry_inspect(
+                   &reader, image.address, image.address + image.size, image.address, 0, &output,
+                   bank_entry_observe, &observations) == -79);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+    }
+    for (unsigned at = 0; at < image.size; ++at) {
+        if ((at >= 11 && at < 16) || (at >= 21 && at < 32))
+            continue;
+        observations = (struct bank_entry_observations){0};
+        image.fail = image.address + at;
+        assert(hpclang_rpl_code_bank_entry_inspect(
+                   &reader, image.address, image.address + image.size, image.address, 0, &output,
+                   bank_entry_observe, &observations) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+        image.fail = UINT32_MAX;
+        if (at < 32)
+            continue;
+        image.data[at] ^= 1;
+        assert(hpclang_rpl_code_bank_entry_inspect(
+                   &reader, image.address, image.address + image.size, image.address, 0, &output,
+                   bank_entry_observe, &observations) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+        image.data[at] ^= 1;
+    }
+    for (unsigned p = 1; p <= 16; ++p) {
+        observations = (struct bank_entry_observations){0};
+        assert(hpclang_rpl_code_bank_entry_inspect(&reader, image.address,
+                                                   image.address + image.size, image.address, p,
+                                                   &output, bank_entry_observe, &observations) ==
+               (p == 16 ? HPCLANG_RPL_SPAN_MALFORMED : HPCLANG_RPL_SPAN_UNSUPPORTED));
+        assert(!observations.count && !memcmp(&output, &sentinel, sizeof output));
+    }
+    assert(hpclang_rpl_code_bank_entry_inspect(
+               &reader, image.address, image.address + image.size - 1, image.address, 0, &output,
+               bank_entry_observe, &observations) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!memcmp(&output, &sentinel, sizeof output));
+}
+
 int main(void)
 {
+    bank_entry_program();
     address_origin_invalidation();
     address_adjustments();
     exhaustive();

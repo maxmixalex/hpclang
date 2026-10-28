@@ -1224,3 +1224,22 @@ trace: `/work/oct29-bank-alias-trace.json`. This bounds observed effects, not al
 possible configurations, pending interrupts or production handler identity.
 The memory-store descriptor alone is insufficient to classify the store as RAM;
 configuration routing must be retained in production reference analysis.
+
+## Bounded P=0 bank-entry program inspection — local, 2026-10-29
+
+`hpclang_rpl_code_bank_entry_inspect` validates a caller-bounded code mapping:
+full D0 literal, GOTO, ?P=0 branch and the complete 29-nibble shared configuration
+sequence. It derives the selector/dispatch/body coordinates without fixed entry
+addresses and observes every code read through the dependency callback. Output
+changes only after complete success. Nonzero P and different code shapes remain
+unsupported; truncation, bad reads and callback errors invalidate partial evidence.
+Sanitizer `rpl_code` passes arbitrary-location layout, exact operands, every
+observed-read failure, every shared-body nibble mutation, every dependency abort,
+unsupported/invalid P and truncated body checks. Both maintained ROM regressions
+validate extra and standard entry programs, covering exactly 45 unique code
+nibbles per entry; the selector/configuration/ERAM tests also pass. Reports:
+`/work/oct29-bank-program/{model}/bank-switch-maps.json`. ARMv4T Thumb compile,
+static analysis, clang-format and Ruff pass. This is a bounded syntactic path
+proof, not interpreter/device authentication: CONFIG routing, mutable data,
+owner/geometry freshness, pending IRQs and return roots remain caller obligations.
+It does not enable public Port1 edits or close complete execution coverage.
