@@ -1190,6 +1190,16 @@ These windows are inspection extents, not claimed complete handler bodies.
 Evidence: `/work/oct28-dispatch-identity/results.json`, reproduced by
 `research/oct28-dispatch-identity-native.py`.
 
+The maintained `dispatch_prefix.py` now uses that identity entry point before
+each real interpreter dispatch, with fixed reviewed window bytes rather than
+learning expected bytes from its input. All 896 prefix/full/DUP cases across
+two models and both snapshot families pass, checking code and object dependency
+coverage. All 44 changed-code cases reject with no edges for the mismatched
+handler. A separate, explicitly bypassed run retains the 44 causal execution
+controls; bypass is forbidden without an injected fault. These counts do not
+extend the windows' semantic scope. Current reports and independent count/hash
+audit: `/work/oct28-dispatch-identity-integrated/`.
+
 With `--through-dispatch --duplicate-entry`, execution starts at `37258`:
 DUP preserves the original stack-top object, consumes one existing stack slot,
 and enters the embedded predicate. The C structural decoder's two wrapper

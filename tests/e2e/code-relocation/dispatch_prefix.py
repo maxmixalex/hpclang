@@ -101,6 +101,12 @@ class Edge(c.Structure):
     ]
 
 
+class Identity(c.Structure):
+    _fields_ = [("address", c.c_uint32), ("length", c.c_uint32), ("nibbles", c.POINTER(c.c_uint8))]
+
+
+Dependency = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
+
 Visit = c.CFUNCTYPE(c.c_int, c.c_void_p, c.POINTER(Edge))
 
 
@@ -113,6 +119,17 @@ lib.hpclang_rpl_dispatch_reference_visit.argtypes = [
     Visit,
     c.c_void_p,
 ]
+lib.hpclang_rpl_dispatch_reference_visit_identified.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.POINTER(Descriptor),
+    c.POINTER(Identity),
+    c.c_uint32,
+    Visit,
+    Dependency,
+    c.c_void_p,
+]
 for name, kind in [("exchange", Exchange), ("assignment", Assignment)]:
     getattr(lib, "hpclang_rpl_code_" + name + "_inspect").argtypes = [
         c.POINTER(Reader),
@@ -121,6 +138,17 @@ for name, kind in [("exchange", Exchange), ("assignment", Assignment)]:
         c.c_uint,
         c.POINTER(kind),
     ]
+# Reviewed inspection windows, not complete handler/callee coverage.
+# These constants must not be learned from the snapshot being classified.
+IDENTITY_WINDOWS = {
+    0x37258: bytes.fromhex(
+        "0801080f00040c0f040f00010407010c040104050800080c08010a0f0001080f0f000f050008010a0f0101060f0d0f0c080207030d000d02060e000009090207030d000d020e060c0f040a030c0f04050300060702010000070d0a070a000008010b0106040800080c0c040d060c040c040c0a030407000103030c0a010c0401"
+    ),
+    0x351CC: bytes.fromhex(
+        "01030201060401040601030200060104070103070104030103050007080a020201050f02050202080f020d0706000402020200030401080a030001040508010b0106040800080c080f020d07060004020e02000304000c0a030001040508010b0106040800080c050b01080f020d070600040b010200030401080a03000d0a0800080c080f020d07060004090e08000b04000c0a03000d0a0800080c0d06020503080e0d0d05000c0f010c04080a02050c050b0d05080205030607070f0e08020503060e080f0c0a0602000100000b0605000006000000000000000000000000000c0a0602000100000c06050000000000020c02050307090000080a08020006"
+    ),
+}
+
 TRACE = [
     0x351CC,
     0x351CF,
@@ -139,7 +167,7 @@ RAM = 0x08000000
 HEADER, SLOT, OBJECT, D0 = 0x90000, 0x91000, 0x92000, 0x93000
 
 
-def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1):
+def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, identify=True):
     result_slot = SLOT - 5 if args.duplicate_entry else SLOT
     state = args.state
     flash = bytearray((state / "flash").read_bytes())
@@ -229,6 +257,7 @@ def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1):
     scalar = []
     checked = []
     entry_edges = []
+    identity_dependencies = []
 
     def check_entry(address, dispatch, schema):
         edges = []
@@ -240,12 +269,50 @@ def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1):
             return 0
 
         descriptor = Descriptor(dispatch, schema)
-        assert (
-            lib.hpclang_rpl_dispatch_reference_visit(
-                c.byref(reader), address, 6 if schema == 0 else 10, c.byref(descriptor), visit, None
+        limit = 6 if schema == 0 else 10
+        if identify:
+            raw = IDENTITY_WINDOWS[dispatch]
+            storage = (c.c_uint8 * len(raw)).from_buffer_copy(raw)
+            identity = Identity(dispatch, len(raw), storage)
+            dependencies = []
+
+            @Dependency
+            def dependency(_, at, value):
+                dependencies.append((at, value))
+                return 0
+
+            result = lib.hpclang_rpl_dispatch_reference_visit_identified(
+                c.byref(reader),
+                address,
+                limit,
+                c.byref(descriptor),
+                c.byref(identity),
+                1,
+                visit,
+                dependency,
+                None,
             )
-            == 0
-        )
+            if result:
+                assert result == -3 and not edges, "unexpected identity failure"
+                raise AssertionError("handler identity")
+            assert dependencies[: len(raw)] == [
+                (dispatch + i, value) for i, value in enumerate(raw)
+            ]
+            assert [at for at, value in dependencies[len(raw) :]] == list(
+                range(address, address + limit)
+            )
+            identity_dependencies.append(
+                dict(dispatch=dispatch, nibbles=len(raw), object_nibbles=limit)
+            )
+        else:
+            # Deliberate bypass only for causal changed-code execution controls.
+            assert fault is not None
+            assert (
+                lib.hpclang_rpl_dispatch_reference_visit(
+                    c.byref(reader), address, limit, c.byref(descriptor), visit, None
+                )
+                == 0
+            )
         expected = [(8, address, dispatch, 0, 0)]
         if schema == 0:
             expected.append((9, address + 5, address + 5, 0, 0))
@@ -402,12 +469,14 @@ def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1):
         through_dispatch=args.through_dispatch,
         duplicate_entry=args.duplicate_entry,
         structural_edges=entry_edges,
+        identity_dependencies=identity_dependencies,
         capacity=capacity if args.duplicate_entry else None,
     )
 
 
 rows = []
 negatives = []
+identity_negatives = []
 for model in (args.model,):
     for cursor in range(8):
         for i, (wanted, actual) in enumerate(
@@ -434,6 +503,21 @@ for model in (args.model,):
         try:
             execute(model, 3, 0x2933 if fault == "false-result" else 0x2A2C, 0x2A2C, 15, fault)
         except AssertionError as error:
+            assert str(error) == "handler identity", str(error)
+            identity_negatives.append(dict(model=model, fault=fault, reason=str(error)))
+        else:
+            raise AssertionError("changed handler identity accepted")
+        try:
+            execute(
+                model,
+                3,
+                0x2933 if fault == "false-result" else 0x2A2C,
+                0x2A2C,
+                15,
+                fault,
+                identify=False,
+            )
+        except AssertionError as error:
             assert str(error) == (
                 "predicate result" if fault.endswith("result") else "address restoration"
             ), str(error)
@@ -443,6 +527,7 @@ for model in (args.model,):
 report = dict(
     cases=rows,
     negative_controls=negatives,
+    identity_negative_controls=identity_negatives,
     scope="Original ARM interpreter, controlled registers/data and no IRQ. "
     + (
         "Includes comparison, Boolean writeback and next RPL dispatch. "
@@ -455,6 +540,9 @@ report = dict(
         else ""
     )
     + "Temporary scalar RSTK slot is cleared, seven others preserved. No unrestricted caller/startup proof or relocation permission.",
+    identity_windows={
+        hex(at): hashlib.sha256(raw).hexdigest() for at, raw in IDENTITY_WINDOWS.items()
+    },
     inputs={
         name: hashlib.sha256((args.state / name).read_bytes()).hexdigest()
         for name in ("sram", "flash")
@@ -476,5 +564,7 @@ print(
     len(rows),
     "original-interpreter predicate prefixes;",
     len(negatives),
-    "changed-code controls",
+    "changed-code controls;",
+    len(identity_negatives),
+    "identity rejections",
 )
