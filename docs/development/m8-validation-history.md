@@ -205,3 +205,25 @@ invalid sequence fields. This is observation at the PTY bridge, not proof that
 all bytes reach the firmware unchanged or that a firmware/timing cause is known.
 Raw-stream hashes, parsed final frames and the independent CRC audit are in
 local `research/oct29-pr18-packet-audit.{py,json}`. No runtime fix is claimed.
+
+### 2026-10-29 — Explicit native-root address fields (local)
+
+Mutation IO now accepts optional whole-word/low-20-bit native-root masks.
+Ordinary shifts preserve unrelated bits; duplicate cells move once and
+conflicting masks fail before writes. Catalog capture guards the complete word
+and coalesces matching register repairs. Default full-word semantics remain.
+The controlled alternate-return fixture supplies its proven R0 through the new
+root interface while retaining its original expected-word transaction guard.
+This is not automatic register provenance or installed-SDK execution coverage.
+
+- Four ASan/UBSan suites pass: stage_stack, rpl_code, rpl_reference,
+  rpl_mutation; 43.16 s total, mutation 41.24 s.
+- New unit cases cover ordinary growth/contraction, equal values in separate
+  cells, duplicate cell identity, invalid/conflicting masks, default high-bit
+  values and catalog preservation/rejection.
+- `/work/oct29-native-mask/matrix/matrix.json`: 304 native return cases and
+  480 pre-write rejections across HP49g+/HP50g, including 48 continuous cases.
+- ARM compilation/static analysis and full tracked-source format/Ruff/shell
+  checks pass. Follow-up is local, not CI accepted.
+- Previous #26 head `8c2bb27f`: 96 successful, ten running and 248 queued jobs;
+  no failures observed. No new push during this turn.

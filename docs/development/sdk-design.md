@@ -1309,6 +1309,18 @@ in Python. The updated matrix in `/work/oct29-origin-adjust/matrix` passes all
 304 return cases and 480 pre-write rejections with current source hashes;
 sanitized origin/decoder unit tests and ARM compilation/static analysis pass.
 
+Native mutation IO accepts an optional parallel `native_root_masks` array.
+NULL retains whole-word address semantics; each explicit mask must be
+`UINT32_MAX` or `0xfffff`. The latter declares a caller-proven low-20-bit
+address and preserves the other bits during movement. Root visitors report the
+masked address. Duplicate cell identities must have equal masks and move once;
+distinct cells with equal addresses still move independently. Invalid masks or
+conflicting duplicate descriptions fail before root callbacks or writes. Keep
+root/mask arrays stable and disjoint from writable state. Catalog plans retain
+full-word expected values, so high-bit changes still fail guards and overlapping
+register repairs coalesce only when both expected and replacement words agree.
+This interface carries proven addresses; it does not discover register roots.
+
 The production `hpclang_rpl_mutation_find_temp` query now supplies exact TEMP
 payload-start lookup; the native return fixture delegates to it rather than
 implementing its own allocation matcher. It validates the entire footer chain,

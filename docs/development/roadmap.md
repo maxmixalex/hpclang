@@ -116,7 +116,7 @@ startup safety and reclamation. Sound compatibility is independent.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
-| Native references and libraries | #25 accepted guarded dispatch/origin foundations; #26 remains pending acceptance. Local exact-TEMP lookup now records chain dependencies through production callbacks before catalog preflight. Updated native validation passes 304 cases and 480 pre-write rejections; all 35 dependency-callback failure positions and 25 unreadable metadata nibbles preserve output with zero writes. Sanitized mutation tests (43.20 s), ARM analysis and source quality checks pass. This lookup follow-up is not yet pushed. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
+| Native references and libraries | #25 accepted; #26 CI remains pending. Local follow-up adds guarded exact-TEMP lookup and explicit native-root address masks, preserving non-address bits and rejecting conflicting aliases before writes. Four sanitizer suites pass (43.16 s); ARM analysis, source quality and the two-model 304-case/480-rejection native return matrix pass. Follow-up is not yet pushed. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
 | Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Accepted in #24; retain lifecycle regressions |
 | Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
 | Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Accepted in #25. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
@@ -131,7 +131,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `8c2bb27f` | **Submitted; CI pending.** Exact-head audit: 27 successful, three running and 306 queued jobs; no failures. The local guarded-TEMP follow-up remains unpushed while this batch runs. |
+| #26 / `8c2bb27f` | **Submitted; CI pending.** Exact-head audit: 96 successful, ten running and 248 queued jobs; no failures. Local guarded-TEMP and native-mask follow-ups remain unpushed. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `01e1d2cf` | **Artifact-transfer fix partially verified remotely; full CI pending.** Eight successful UI job logs across HP39g+/39gs/40gs/48gII/49g+ confirm stack, heap, pool and linked-image budget checks. Remaining UI jobs, earlier watchdog cause and whole-system peaks remain open. |

@@ -46,6 +46,12 @@ extern "C"
          * Addresses, not pointer values; optional for synthetic backends. */
         const uint32_t *display_roots;
         uint32_t display_root_count;
+        /* Optional parallel native-root masks: UINT32_MAX (whole word) or
+         * 0xfffff (proven low-20-bit address, preserve remaining bits). NULL
+         * retains whole-word semantics. Duplicate cells must use equal masks.
+         * Caller proves address provenance; masks do not discover pointers.
+         * Root/mask arrays must remain stable and disjoint from writable state. */
+        const uint32_t *native_root_masks;
     };
 
     enum hpclang_rpl_mutation_result

@@ -4170,8 +4170,54 @@ static void test_boolean_return_formats(void)
     }
 }
 
+static void test_native_address_masks(void)
+{
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        struct hpclang_rpl_mutation_io io = setup(1);
+        struct named_pair pair = prepare_two_named_chars();
+        uint32_t first = 0xabc00000u | pair.object_b;
+        uint32_t second = first;
+        uint32_t *roots[] = {&first, &second, &first};
+        uint32_t masks[] = {0xfffff, 0xfffff, 0xfffff};
+        io.native_roots = roots;
+        io.native_root_count = 3;
+        io.native_root_masks = mode ? masks : NULL;
+        if (mode == 2)
+            masks[2] = UINT32_MAX;
+        if (mode == 3)
+            masks[1] = 0xffff;
+        if (mode >= 2) {
+            assert(hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, 5) ==
+                   HPCLANG_RPL_MUTATION_MALFORMED);
+            assert(!writes && first == second && first == (0xabc00000u | pair.object_b));
+            continue;
+        }
+        assert(!hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, 5));
+        assert(first == (0xabc00000u | (pair.object_b - (mode ? 5u : 0u))));
+        assert(first == second);
+        assert(!hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, -5));
+        assert(first == (0xabc00000u | pair.object_b) && second == first);
+    }
+    for (unsigned mode = 0; mode < 3; ++mode) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t root = 0xabc82500, *roots[] = {&root, &root};
+        uint32_t masks[] = {0xfffff, mode == 2 ? UINT32_MAX : 0xfffff};
+        io.native_roots = roots;
+        io.native_root_count = 2;
+        io.native_root_masks = mode ? masks : NULL;
+        int result = hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, NULL);
+        if (mode == 2) {
+            assert(result == HPCLANG_RPL_MUTATION_MALFORMED && !writes);
+            assert(root == 0xabc82500);
+        } else {
+            assert(!result && root == (mode ? 0xabc82510u : 0xabc82500u));
+        }
+    }
+}
+
 int main(void)
 {
+    test_native_address_masks();
     test_boolean_return_formats();
     test_jump_return_relocation();
     test_call_return_relocation();

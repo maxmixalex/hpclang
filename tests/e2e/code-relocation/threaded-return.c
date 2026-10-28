@@ -101,8 +101,9 @@ int bank_catalog_grow(uint8_t *nibbles, uint32_t *root, uint32_t *entry, uint32_
     if (entry && mode != 2)
         roots[count++] = entry;
     const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
-    struct hpclang_rpl_mutation_io io = {read_nibble, write_nibble, &f,      0x100000, 0x80000, 0,
-                                         roots,       count,        0x8611d, display,  4};
+    struct hpclang_rpl_mutation_io io = {read_nibble, write_nibble, &f,    0x100000, 0x80000,
+                                         0,           roots,        count, 0x8611d,  display,
+                                         4,           NULL};
     int result = hpclang_rpl_mutation_catalog_grow_repaired(&io, position, NULL);
     *root = *caller;
     *writes = f.writes;
@@ -119,10 +120,12 @@ int bank_catalog_grow_r0_guarded(uint8_t *nibbles, uint32_t *entry, uint32_t *r0
                                  uint32_t guard_count, uint32_t expected_r0)
 {
     struct fixture f = {nibbles, 0};
-    uint32_t *roots[] = {entry};
+    uint32_t *roots[] = {entry, r0};
+    const uint32_t masks[] = {UINT32_MAX, 0xfffff};
     const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
     struct hpclang_rpl_mutation_io io = {
-        read_nibble, write_nibble, &f, 0x100000, 0x80000, 0, roots, 1, 0x8611d, display, 4};
+        read_nibble, write_nibble,        &f,      0x100000, 0x80000, 0,
+        roots,       repair_r0 ? 2u : 1u, 0x8611d, display,  4,       masks};
     const struct hpclang_rpl_register_repair reg = {r0, expected_r0};
     const struct hpclang_rpl_catalog_repairs repairs = {
         .main_mapping = 1,
@@ -155,7 +158,7 @@ int bank_catalog_grow_dispatch_guarded(uint8_t *nibbles, uint32_t *a, uint32_t *
     struct fixture f = {nibbles, 0};
     const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
     struct hpclang_rpl_mutation_io io = {
-        read_nibble, write_nibble, &f, 0x100000, 0x80000, 0, NULL, 0, 0x8611d, display, 4};
+        read_nibble, write_nibble, &f, 0x100000, 0x80000, 0, NULL, 0, 0x8611d, display, 4, NULL};
     struct hpclang_rpl_register_repair registers[2];
     unsigned count = 0;
     if (mask & 1u)
