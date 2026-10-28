@@ -3,7 +3,7 @@
 import ctypes as c
 
 
-def verify_alias_selectors(lib, read, ram, flash, cpu, banks):
+def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
     read_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.POINTER(c.c_uint8))
     mapped_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint8))
     dependency_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
@@ -208,9 +208,9 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks):
             result = lib.hpclang_rpl_rom_bank_capture_guarded(
                 c.byref(Reader(physical_rom, None)),
                 c.byref(Reader(native, None)),
-                0x248A0,
-                0xBE0,
-                len(flash),
+                profile["geometry_operands"],
+                profile["geometry_bases"],
+                profile["flash_bytes"],
                 geometries,
                 observe_rom,
                 None,

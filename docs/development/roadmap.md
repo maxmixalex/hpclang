@@ -121,8 +121,11 @@ bank/overlay fields and ROM/native geometry; 11,744 stale-nibble changes reject.
 The full read-map predictor agrees with 336 original-handler executions across
 both models, including no-op selection and two-page overlays. These checks pass
 locally and are submitted as a follow-up; they are not CI or milestone acceptance.
-Firmware/handler identity, layout provenance, exclusive live-state integration,
-complete execution roots, public libraries and Port1 edits remain open.
+A local SHA-256 profile check now identifies the two reviewed immutable ROM
+images and supplies layout locations; mutable user Flash is excluded. Maintained
+composition and controlled HOME use that result. Live physical-reader/exclusive
+integration, complete handler effects/execution roots, public libraries and Port1
+edits remain open; a matching image alone does not authorize mutation.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -145,12 +148,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / branch head | **Follow-up submitted; CI pending.** Pre-push audit of `ac24c17f`: three successful and seven queued workflows; 27 successful and 152 queued jobs, no failures observed. Historical HP39g+ pre-entry Kermit failure remains unexplained. New-head CI is not polled in this push turn. |
+| #26 / `b5891517` | **CI pending:** ten queued workflows and sixteen queued jobs. ROM-profile identification is a local follow-up, not yet submitted. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `4f2ce605` | **CI pending:** five successful, one running and six queued workflows; 149 successful, 21 running and 218 queued jobs. Current main integration still requires fresh CI acceptance. |
+| #20 / `4f2ce605` | **CI pending:** five successful, one running and six queued workflows; 178 successful, nineteen running and 191 queued jobs. Current main integration still requires fresh CI acceptance. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

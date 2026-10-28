@@ -16,6 +16,7 @@ from flashptr_guards import verify_flashptr
 from bank_overlay import verify_attachment_switches, verify_overlay
 from alias_guards import verify_alias_selectors
 from bank_map_model import verify_bank_map
+from rom_profile import verify_rom_profile
 
 if not __debug__:
     raise RuntimeError("Assertions required")
@@ -43,6 +44,7 @@ files = [
         "rpl-object-store.c",
         "rpl-code.c",
         "rpl-stock-memory.c",
+        "rpl-rom-profile.c",
     )
 ]
 sources = {
@@ -52,11 +54,13 @@ sources = {
         base / "rpl-port.h",
         base / "rpl-reference.h",
         base / "rpl-stock-memory.h",
+        base / "rpl-rom-profile.h",
         Path(__file__),
         Path(__file__).with_name("flashptr_guards.py"),
         Path(__file__).with_name("bank_overlay.py"),
         Path(__file__).with_name("alias_guards.py"),
         Path(__file__).with_name("bank_map_model.py"),
+        Path(__file__).with_name("rom_profile.py"),
     ]
 }
 shared = args.output / "bank-switch-maps.so"
@@ -408,7 +412,10 @@ for index in range(17):
 flashptr_rows = verify_flashptr(lib, read, flash, rows)
 overlay_rows = verify_overlay(lib, ram, flash, cpu, rows)
 attachment_rows = verify_attachment_switches(lib, read, ram, flash, cpu, rows)
-alias_selector_rows = verify_alias_selectors(lib, read, ram, flash, cpu, rows)
+profile_row = verify_rom_profile(lib, flash, args.model)
+alias_selector_rows = verify_alias_selectors(
+    lib, read, ram, flash, cpu, rows, profile_row["profile"]
+)
 full_map_rows = verify_bank_map(lib, ram, flash, cpu, rows)
 assert all(
     hashlib.sha256(Path(p).read_bytes()).hexdigest() == value for p, value in sources.items()
@@ -424,6 +431,7 @@ report.write_text(
             attachment_switch_sequences=attachment_rows,
             alias_selector_guards=alias_selector_rows,
             full_bank_read_maps=full_map_rows,
+            rom_profile=profile_row,
             flash_sha256=hashlib.sha256(flash).hexdigest(),
             sram_sha256=hashlib.sha256(ram).hexdigest(),
             incoming_p=incoming_p,

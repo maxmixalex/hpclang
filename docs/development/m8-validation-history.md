@@ -1448,3 +1448,36 @@ locally. Pre-push PR26 ac24c17f audit: three successful/seven queued workflows,
 one running/six queued workflows; 149 successful/21 running/218 queued jobs.
 Follow-up submission is not acceptance; no new-head CI is polled in the push turn.
 No public edit gate or retained M8 requirement is removed.
+
+## Reviewed ROM content profiles — local, 2026-10-29
+
+No reusable launcher content identity existed; its established Read[] checks
+qualify mapping shape, not firmware bytes. Internal `rpl-rom-profile.c` now
+identifies the complete immutable physical prefix [0,0x140000) with SHA-256 and
+returns model-specific layout locations only on a match. User Flash is excluded.
+Reviewed prefix digests:
+
+- HP49g+: `894e146c3252191ad3700b17d24bc0669c6f3f0923e9307c1ed4f3d9857477d8`
+- HP50g: `be21f48a44feb9a899a1e9c31799a55e8d1cbdd7e3774e868d64062e41f5105c`
+
+The reader uses blocks of at most 64 bytes and caller-qualified physical access.
+No Flash commands, allocation or partial output. SHA-256 unit vectors were
+independently generated with Python hashlib for 13 lengths including padding
+boundaries and the full prefix. ASan/UBSan tests, ARMv4T compile/static analysis
+and full tracked-file format/Ruff/ShellCheck pass. The source is included in the
+SDK runtime source list.
+
+Both maintained model runs identify their profile, reject ten changed firmware
+bytes/model and the wrong model, accept changes at both user-area boundaries,
+and reject four early/late read failures/model without publishing a profile.
+Geometry capture now takes its operand/base addresses and Flash size from the
+matched profile. Full combination reports/source hashes:
+`/work/oct29-rom-profile-composed/{model}/bank-switch-maps.json`. Controlled HOME
+also identifies the profile before resolving all 20 payloads/model; execution
+edges still reject. Its report records the matched profile and library digest.
+
+This identifies these exact contents, not an authenticated signature or all
+possible ROM versions. Physical-reader permission/identity, exclusion while
+using the result, CPU-state identity and complete handler/root coverage remain
+production obligations. Firmware matching alone does not enable public edits;
+performance on calculator hardware has not yet been measured.

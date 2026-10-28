@@ -971,3 +971,6 @@ hpclang_unit(win_box_reference "${HPCLANG_ROOT}/tests/compat/win-box.c" ${win_ad
     "${HPCLANG_ROOT}/runtime/core/hpgcc-box.c" "${HPCLANG_ROOT}/runtime/core/win-box-axis.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
 target_include_directories(test_win_box_reference PRIVATE "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/include")
+
+hpclang_unit(rpl_rom_profile test_rpl_rom_profile.c "${HPCLANG_ROOT}/runtime/core/rpl-rom-profile.c")
+target_include_directories(test_rpl_rom_profile PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
