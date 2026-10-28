@@ -408,7 +408,7 @@ for index in range(17):
 flashptr_rows = verify_flashptr(lib, read, flash, rows)
 overlay_rows = verify_overlay(lib, ram, flash, cpu, rows)
 attachment_rows = verify_attachment_switches(lib, read, ram, flash, cpu, rows)
-alias_selector_rows = verify_alias_selectors(lib, read, ram, cpu, rows)
+alias_selector_rows = verify_alias_selectors(lib, read, ram, flash, cpu, rows)
 full_map_rows = verify_bank_map(lib, ram, flash, cpu, rows)
 assert all(
     hashlib.sha256(Path(p).read_bytes()).hexdigest() == value for p, value in sources.items()

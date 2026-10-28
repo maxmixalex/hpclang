@@ -3,7 +3,7 @@
 import ctypes as c
 
 
-def verify_alias_selectors(lib, read, ram, cpu, banks):
+def verify_alias_selectors(lib, read, ram, flash, cpu, banks):
     read_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.POINTER(c.c_uint8))
     mapped_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint8))
     dependency_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
@@ -51,9 +51,18 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
         c.c_uint32,
         c.POINTER(c.c_uint32),
     ]
-    geometries = (Geometry * 16)(
-        *(Geometry(row["physical"] or 0, row["valid_bytes"]) for row in banks[:16])
-    )
+    lib.hpclang_rpl_rom_bank_capture_guarded.argtypes = [
+        c.POINTER(Reader),
+        c.POINTER(Reader),
+        c.c_uint32,
+        c.c_uint32,
+        c.c_uint32,
+        c.POINTER(Geometry),
+        dependency_fn,
+        c.c_void_p,
+        dependency_fn,
+        c.c_void_p,
+    ]
 
     class Guard(c.Structure):
         _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
@@ -114,6 +123,14 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
         value[0] = changed.get((2, address), state_value(address))
         return 1
 
+    def rom_value(address):
+        return (flash[address // 2] >> (4 * (address & 1))) & 15
+
+    @read_fn
+    def physical_rom(_, address, value):
+        value[0] = changed.get((3, address), rom_value(address))
+        return 1
+
     @mapped_fn
     def mapped(_, mapping, address, value):
         return (
@@ -121,6 +138,8 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
             if mapping == 1
             else native(None, address, value)
             if mapping == 2
+            else physical_rom(None, address, value)
+            if mapping == 3
             else 0
         )
 
@@ -142,6 +161,11 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
         def observe_native(_, address, value):
             observed.append((2, address))
             return lib.hpclang_rpl_reference_guards_observe(c.byref(builder), 2, address, value)
+
+        @dependency_fn
+        def observe_rom(_, address, value):
+            observed.append((3, address))
+            return lib.hpclang_rpl_reference_guards_observe(c.byref(builder), 3, address, value)
 
         bank = c.c_uint32(99)
 
@@ -180,6 +204,24 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
             result = lib.hpclang_rpl_stock_bank_route_check(c.byref(route), program.selector, value)
             if result:
                 return result
+            geometries = (Geometry * 16)()
+            result = lib.hpclang_rpl_rom_bank_capture_guarded(
+                c.byref(Reader(physical_rom, None)),
+                c.byref(Reader(native, None)),
+                0x248A0,
+                0xBE0,
+                len(flash),
+                geometries,
+                observe_rom,
+                None,
+                observe_native,
+                None,
+            )
+            if result:
+                return result
+            assert [(g.physical, g.bytes) for g in geometries] == [
+                (row["physical"] or 0, row["valid_bytes"]) for row in banks[:16]
+            ]
             predicted = (c.c_uint32 * 256)()
             lower = (value >> 5) & 3
             result = lib.hpclang_rpl_stock_bank_map_select(
@@ -206,14 +248,18 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
 
         assert resolve() == 1
         dependencies = sorted(set(observed))
-        assert bank.value == expected and len(dependencies) == 2762 and builder.count <= 640
+        assert bank.value == expected and len(dependencies) == 2936 and builder.count <= 640
         assert (
             lib.hpclang_rpl_reference_guards_validate(c.byref(mapped_reader), guards, builder.count)
             == 0
         )
         for mapping, address in dependencies:
             changed[(mapping, address)] = (
-                read(address, 1) if mapping == 1 else state_value(address)
+                read(address, 1)
+                if mapping == 1
+                else state_value(address)
+                if mapping == 2
+                else rom_value(address)
             ) ^ 1
             assert (
                 lib.hpclang_rpl_reference_guards_validate(

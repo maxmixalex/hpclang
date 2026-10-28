@@ -1420,3 +1420,31 @@ all 20 payloads per model resolve and execution edges remain rejected. Report:
 not all interpreter execution state: geometry, handler identity, write/cache
 effects, complete roots and the production exclusive-lifetime adapter remain.
 No public edit capability is enabled.
+
+## Bank geometry capture and delivery — 2026-10-29
+
+`hpclang_rpl_rom_bank_capture_guarded` reads the independently qualified ROM
+operand pair, count and KiB directory plus all sixteen native bases, then validates
+the complete bank layout before publishing sixteen entries. Unused banks are
+zeroed. Physical-ROM and native-state observations keep separate mappings.
+Unit coverage includes 600 per-position read/invalid-data/callback failures,
+unchanged output, unused-base inconsistency and bounds. Rebuilt port ASan/UBSan,
+ARMv4T compile/static analysis and changed-source format/Ruff pass.
+
+Maintained composition now captures geometry under a third mapping and feeds it
+into the full predictor: 594 guards/2,936 nibbles per case; both models/two entries
+reject all 11,744 stale changes. Both full maintained model runs pass, including
+336 actual original-handler read-map comparisons. Reports/source hashes:
+`/work/oct29-bank-geometry-guards/{model}/bank-switch-maps.json`. Controlled HOME
+also uses guarded geometry capture; all 20 payloads/model resolve and execution
+edges still reject (`/work/oct29-home-graph/attachments.json`). The caller still
+qualifies operand locations, Flash size and handler identity; metadata plausibility
+is not authentication.
+
+This batch includes device routing, native-state/geometry guards and complete
+read-map prediction. Full tracked-file format/Ruff/ShellCheck and strict docs pass
+locally. Pre-push PR26 ac24c17f audit: three successful/seven queued workflows,
+27 successful/152 queued jobs, no failures observed. PR20 4f2ce605: five successful,
+one running/six queued workflows; 149 successful/21 running/218 queued jobs.
+Follow-up submission is not acceptance; no new-head CI is polled in the push turn.
+No public edit gate or retained M8 requirement is removed.

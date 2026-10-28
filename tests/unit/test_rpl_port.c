@@ -1419,8 +1419,92 @@ static void test_catalog_rebind(void)
     }
 }
 
+struct geometry_control
+{
+    unsigned reads, observations, stop, mode;
+};
+struct geometry_image
+{
+    uint8_t data[2048];
+    struct geometry_control *control;
+};
+
+static void geometry_put(struct geometry_image *image, unsigned at, uint32_t value, unsigned width)
+{
+    for (unsigned i = 0; i < width; ++i)
+        image->data[at + i] = (value >> (i * 4u)) & 15u;
+}
+static int geometry_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct geometry_image *image = context;
+    assert(address < sizeof image->data);
+    struct geometry_control *control = image->control;
+    *value = image->data[address];
+    if (++control->reads == control->stop) {
+        if (control->mode == 1)
+            return 0;
+        if (control->mode == 2)
+            *value = 16;
+    }
+    return 1;
+}
+static int geometry_observe(void *context, uint32_t address, uint8_t value)
+{
+    struct geometry_image *image = context;
+    assert(image->data[address] == value);
+    struct geometry_control *control = image->control;
+    if (++control->observations == control->stop && control->mode >= 3)
+        return control->mode == 3 ? -71 : 71;
+    return 0;
+}
+static void test_geometry_capture(void)
+{
+    struct geometry_control control = {0};
+    struct geometry_image rom = {.control = &control}, state = {.control = &control};
+    geometry_put(&rom, 0x20, 0x20, 8);
+    geometry_put(&rom, 0x28, 0x3fe, 8);
+    geometry_put(&rom, 0x40, 2, 2);
+    geometry_put(&rom, 0x7fc, 64, 2);
+    geometry_put(&rom, 0x7fe, 32, 2);
+    geometry_put(&state, 0x80, 0x400, 8);
+    geometry_put(&state, 0x88, 0x10400, 8);
+    struct hpclang_rpl_reader rr = {geometry_read, &rom}, sr = {geometry_read, &state};
+    struct hpclang_rpl_rom_bank banks[16], expected[16] = {{0x400, 0x10000}, {0x10400, 0x8000}};
+    assert(!hpclang_rpl_rom_bank_capture_guarded(&rr, &sr, 0x10, 0x40, 0x18400, banks,
+                                                 geometry_observe, &rom, geometry_observe, &state));
+    assert(!memcmp(banks, expected, sizeof banks) && control.reads == 150 &&
+           control.observations == 150);
+    for (unsigned mode = 1; mode <= 4; ++mode) {
+        for (unsigned stop = 1; stop <= 150; ++stop) {
+            control = (struct geometry_control){.stop = stop, .mode = mode};
+            memset(banks, 0xa5, sizeof banks);
+            struct hpclang_rpl_rom_bank before[16];
+            memcpy(before, banks, sizeof banks);
+            int result = hpclang_rpl_rom_bank_capture_guarded(&rr, &sr, 0x10, 0x40, 0x18400, banks,
+                                                              geometry_observe, &rom,
+                                                              geometry_observe, &state);
+            assert(result == (mode == 1   ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                              : mode == 3 ? -71
+                                          : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(control.reads == stop && !memcmp(banks, before, sizeof banks));
+        }
+    }
+    control = (struct geometry_control){0};
+    geometry_put(&state, 0x90, 1, 8); /* Unpopulated bank must have no base. */
+    assert(hpclang_rpl_rom_bank_capture_guarded(&rr, &sr, 0x10, 0x40, 0x18400, banks,
+                                                geometry_observe, &rom, geometry_observe,
+                                                &state) < 0);
+    assert(hpclang_rpl_rom_bank_capture_guarded(&rr, &sr, 0x7fff9, 0x40, 0x18400, banks,
+                                                geometry_observe, &rom, geometry_observe,
+                                                &state) < 0);
+    assert(hpclang_rpl_rom_bank_capture_guarded(NULL, &sr, 0x10, 0x40, 0x18400, banks,
+                                                geometry_observe, &rom, geometry_observe,
+                                                &state) < 0);
+}
+
 int main(void)
 {
+    test_geometry_capture();
     test_catalog_rebind();
     test_catalog_insertion();
     test_catalog_removal();

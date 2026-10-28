@@ -229,6 +229,25 @@ int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t fl
  * lookup dependencies, not switch-code identity, populated-bank geometry or all
  * live references. Keep reader, table and callback state stable throughout. */
 typedef int (*hpclang_rpl_bank_dependency_fn)(void *context, uint32_t address, uint8_t value);
+/* Capture/validate all sixteen bank geometries from an independently qualified
+ * layout. operands is the ROM BYTE offset of two little-endian ARM pointers:
+ * count byte, then KiB-size directory. bases_address is the CPU-state BYTE offset
+ * of sixteen 32-bit bases. Reader/dependency addresses are NIBBLE offsets in
+ * their respective physical-ROM/native-state mappings; never conflate them.
+ * Metadata must fit the first 512 KiB of its mapping (20-bit guard coordinates).
+ * flash_bytes and operand/base provenance require independent qualification;
+ * no scanning for plausible metadata. Record every pointer/count/size/base read.
+ * Return zero with sixteen entries (unused banks zeroed), or a negative error
+ * preserving all output. Discard partial dependencies on failure; positive
+ * callback errors are MALFORMED. Caller holds mappings stable and validates
+ * guards before use. Geometry validation does not identify firmware or authorize
+ * reads, switches or mutation. banks points to sixteen output entries. */
+int hpclang_rpl_rom_bank_capture_guarded(
+    const struct hpclang_rpl_reader *rom, const struct hpclang_rpl_reader *state, uint32_t operands,
+    uint32_t bases_address, uint32_t flash_bytes, struct hpclang_rpl_rom_bank *banks,
+    hpclang_rpl_bank_dependency_fn rom_dependency, void *rom_context,
+    hpclang_rpl_bank_dependency_fn state_dependency, void *state_context);
+
 int hpclang_rpl_bank_lookup_guarded(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
                                     uint32_t eram_entry, uint32_t bank_switch,
                                     struct hpclang_rpl_bank_binding *binding,

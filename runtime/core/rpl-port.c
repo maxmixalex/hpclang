@@ -470,6 +470,77 @@ static int bank_lookup_read(void *context, uint32_t address, uint8_t *value)
     return 1;
 }
 
+static int rom_bank_capture(const struct hpclang_rpl_reader *rom,
+                            const struct hpclang_rpl_reader *state, uint32_t operands,
+                            uint32_t bases_address, uint32_t flash_bytes,
+                            struct hpclang_rpl_rom_bank banks[16])
+{
+    uint32_t metadata_end = flash_bytes < 0x80000u ? flash_bytes : 0x80000u;
+    if (metadata_end < 8 || operands > metadata_end - 8u || bases_address > 0x80000u - 64u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t count_address, directory, count;
+    int result = word(rom, operands * 2u, 8, &count_address);
+    if (result)
+        return result;
+    result = word(rom, (operands + 4u) * 2u, 8, &directory);
+    if (result)
+        return result;
+    if (count_address >= metadata_end)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = word(rom, count_address * 2u, 2, &count);
+    if (result)
+        return result;
+    if (!count || count > 16u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (directory >= metadata_end || count > metadata_end - directory)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint8_t sizes[16];
+    uint32_t bases[16];
+    for (unsigned i = 0; i < count; ++i) {
+        uint32_t size;
+        result = word(rom, (directory + i) * 2u, 2, &size);
+        if (result)
+            return result;
+        sizes[i] = (uint8_t)size;
+    }
+    for (unsigned i = 0; i < 16; ++i) {
+        result = word(state, (bases_address + 4u * i) * 2u, 8, &bases[i]);
+        if (result)
+            return result;
+    }
+    for (unsigned i = 0; i < 16; ++i) {
+        result =
+            hpclang_rpl_rom_bank_layout(sizes, count, directory, flash_bytes, bases, i, &banks[i]);
+        if (result < 0)
+            return result;
+    }
+    return 0;
+}
+
+int hpclang_rpl_rom_bank_capture_guarded(
+    const struct hpclang_rpl_reader *rom, const struct hpclang_rpl_reader *state, uint32_t operands,
+    uint32_t bases_address, uint32_t flash_bytes, struct hpclang_rpl_rom_bank *banks,
+    hpclang_rpl_bank_dependency_fn rom_dependency, void *rom_context,
+    hpclang_rpl_bank_dependency_fn state_dependency, void *state_context)
+{
+    if (!rom || !rom->read_nibble || !state || !state->read_nibble || !banks || !rom_dependency ||
+        !state_dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer ro = {rom, rom_dependency, rom_context, 0};
+    struct bank_lookup_observer so = {state, state_dependency, state_context, 0};
+    const struct hpclang_rpl_reader observed_rom = {bank_lookup_read, &ro};
+    const struct hpclang_rpl_reader observed_state = {bank_lookup_read, &so};
+    struct hpclang_rpl_rom_bank next[16] = {0};
+    int result = rom_bank_capture(&observed_rom, &observed_state, operands, bases_address,
+                                  flash_bytes, next);
+    if (ro.error || so.error)
+        return ro.error ? ro.error : so.error;
+    if (!result)
+        for (unsigned i = 0; i < 16; ++i)
+            banks[i] = next[i];
+    return result;
+}
+
 int hpclang_rpl_bank_lookup_guarded(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
                                     uint32_t eram_entry, uint32_t bank_switch,
                                     struct hpclang_rpl_bank_binding *binding,
