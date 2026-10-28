@@ -417,7 +417,7 @@ flashptr_rows = verify_flashptr(lib, read, flash, rows)
 overlay_rows = verify_overlay(lib, ram, flash, cpu, rows)
 attachment_rows = verify_attachment_switches(lib, read, ram, flash, cpu, rows)
 profile_row = verify_rom_profile(lib, flash, args.model)
-alias_selector_rows = verify_alias_selectors(
+alias_selector_rows, bank_plan_entries = verify_alias_selectors(
     lib, read, ram, flash, cpu, rows, profile_row["profile"]
 )
 full_map_rows = verify_bank_map(lib, ram, flash, cpu, rows)
@@ -434,6 +434,7 @@ report.write_text(
             overlay_sequences=overlay_rows,
             attachment_switch_sequences=attachment_rows,
             alias_selector_guards=alias_selector_rows,
+            runtime_bank_plan_entries=bank_plan_entries,
             full_bank_read_maps=full_map_rows,
             rom_profile=profile_row,
             flash_sha256=hashlib.sha256(flash).hexdigest(),

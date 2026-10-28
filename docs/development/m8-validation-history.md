@@ -1654,3 +1654,26 @@ CI remains pending: #26 bdeb3227 has eight queued/two running/one pending
 workflows and 13 queued/five running jobs; #20 4f2ce605 has seven successful/five
 queued workflow records and 310 successful/16 running/63 queued/one skipped jobs.
 No failed job appeared in this exact-head audit.
+
+## 2026-10-29 — Unified planning across HOME and standard bank entries
+
+Controlled HOME attachment resolution now calls `hpclang_rpl_bank_plan_prepare`
+once per banked payload, replacing its manually sequenced inspection/capture/
+prediction calls. `attachments-plan.json` and `attachments-plan-verified.json`
+under `/work/oct29-home-graph` record script/library/report hashes. Independent
+comparison with the previous full-effects path confirms all 40 payload banks,
+addresses, spans, mappings and code locations agree, while all 40 separate
+EXECUTION obligations still reject and no completed graph is published. The
+saved SRAM/Flash remain unchanged; this remains saved-state integration.
+
+The maintained alias suite additionally calls the planner on all 16 standard
+bank-table entries per model. All fourteen populated banks produce the expected
+selector, configuration and geometry; both absent banks reject without changing
+output. Both full suites pass under `/work/oct29-bank-plan-entries/{model}`,
+retaining the existing 20,096 stale guards, 144 preparation failure controls and
+672 original-handler effect comparisons. Changed Python formatting and Ruff pass.
+
+Exact-head CI: #26 bdeb3227 has nine queued/two running workflows with 15
+successful/219 queued/five running jobs; #20 4f2ce605 has eight successful/one
+running/three queued workflows with 328 successful/15 running/46 queued/one
+skipped jobs. Neither audit shows failures, and neither head is fully accepted.

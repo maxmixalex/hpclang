@@ -433,4 +433,57 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
                 prepare_failure_controls=36,
             )
         )
-    return rows
+    entries = []
+    native_reader, rom_reader = Reader(native, None), Reader(physical_rom, None)
+    qualified = Profile(**profile)
+    sources = Sources(
+        c.pointer(reader),
+        c.pointer(native_reader),
+        c.pointer(rom_reader),
+        c.pointer(qualified),
+        1,
+        2,
+        3,
+        0,
+        0x40000,
+        0x860CC,
+    )
+    for index in range(16):
+        switch = read(0x26BBB + index * 7)
+        observed = {}
+
+        @plan_dependency
+        def capture(_, mapping, address, value):
+            key = (mapping, address)
+            if key in observed and observed[key] != value:
+                return -73
+            observed[key] = value
+            return 0
+
+        plan, workspace = Plan(), Workspace()
+        c.memset(c.byref(plan), 0xA5, c.sizeof(plan))
+        before = bytes(plan)
+        result = lib.hpclang_rpl_bank_plan_prepare(
+            c.byref(sources), switch, c.byref(workspace), c.byref(plan), capture, None
+        )
+        if banks[index]["populated"]:
+            assert result == 0 and plan.bank == index, (index, hex(switch), result)
+            assert plan.program.selector == 0x860CC + index * 5
+            assert plan.configuration == read(plan.program.selector)
+            assert (plan.geometry.physical, plan.geometry.bytes) == (
+                banks[index]["physical"],
+                banks[index]["valid_bytes"],
+            )
+            assert plan.effects.map.upper == index
+        else:
+            assert result < 0 and bytes(plan) == before
+        entries.append(
+            dict(
+                bank=index,
+                entry=switch,
+                result=result,
+                populated=banks[index]["populated"],
+                dependencies=len(observed),
+            )
+        )
+    return rows, entries
