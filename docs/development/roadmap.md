@@ -120,8 +120,9 @@ cases: independent audit confirms 18 original returns, ten rewritten-return
 fixtures, 36 unchanged Flash snapshots and 16 reproduced artifacts. The maintained
 ROM-switch test explicitly requires P=0; 34 switch cases and four rejection
 controls pass. CI acceptance remains open. A local follow-up verifies 32 ERAM
-overlay sequences (128 switch calls): P=0 alone does not determine the visible
-bank while ERAM is active, and unused banks can expose continuous mappings.
+overlay sequences (128 switch calls), including bank/flag/per-page owner state.
+128 separate owner-byte controls show that a clear ERAM flag alone does not prove
+the selected mapping. Unused banks can also expose continuous mappings.
 Supported-firmware/calling-context qualification, complete references, public
 libraries and Port1 edits remain open.
 
@@ -146,12 +147,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `f9f50972` | **CI pending:** ten unfinished workflows; seven running and four queued jobs observed, no failures. Earlier HP39g+ pre-entry Kermit failure remains unexplained. Local ERAM-overlay test follow-up is not submitted. |
+| #26 / `f9f50972` | **CI pending:** 0 successful and 10 unfinished workflows; 19 successful, 7 running and 188 queued jobs, no failures observed. Earlier HP39g+ pre-entry Kermit failure remains unexplained. Local ERAM-overlay follow-up is not submitted. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `1ce01859` | **CI pending after accepted #21:** two successful and two queued workflows; 93 successful, six running and 69 queued jobs observed, no failures. Historical `41e35a36` HP50g PWM failure remains unproven. Mainline integration and full lifecycle/resource acceptance remain open. |
+| #20 / `1ce01859` | **CI pending:** 2 successful and 2 unfinished workflows; 101 successful, 13 running and 54 queued jobs, no failures observed. Historical HP50g PWM failure remains unproven; mainline and lifecycle acceptance remain open. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

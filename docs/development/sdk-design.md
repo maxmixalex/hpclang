@@ -896,6 +896,15 @@ expose a continuous physical-zero window instead of the isolated switch's dummy
 page. Geometry validation must still reject them: neither contiguity nor a
 successful switch establishes populated storage. Production qualification must
 include overlay state and the intended entry/exit sequence.
+In these reviewed fixtures the interpreter stores mapping flags at state+0xb9c,
+the selected Flash bank at +0xbd0, and the bank-window Read[] ownership bytes at
++0x848..+0x887. The maintained sequence verifies ERAM bit 8 and owner 2 during
+overlay, then cleared bit 8 and owner 0 after exit, independently of the selected
+Flash bank. Original ARM code at 0x249a0..0x249ac skips updating each read-map cell
+whose owner byte is nonzero. Controlled per-page owner changes confirm that even
+with the ERAM flag clear, a page can retain its previous mapping. These offsets
+are fixture evidence, not a production firmware identity check; flags or selected
+bank alone must not substitute for qualifying all affected page mappings.
 For each switch it also retains all 85 table nibbles as 17 guards, verifies the
 unchanged table, rejects every individually changed nibble through the C guard
 validator, and rejects insufficient guard capacity without publishing a binding.

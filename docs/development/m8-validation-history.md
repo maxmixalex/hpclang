@@ -972,3 +972,14 @@ Existing 34 isolated-switch and FlashPtr dependency tests also pass. This is
 fixture-specific handler evidence, not public Port1 edit authorization. The
 public replace/remove path still awaits complete banked-reference qualification.
 CI remains incomplete for #26 `f9f50972` and #20 `1ce01859`; no merge or new push.
+
+Original-ROM access tracing now identifies the selected bank (+0xbd0), ERAM
+flag (+0xb9c bit 8) and per-page read ownership (+0x848..+0x887). Maintained
+overlay sequences check all three alongside all mapping cells. 128 independent
+owner-byte controls (64/model) retain precisely the marked page under its old
+mapping with ERAM disabled; all other pages select bank 0 and Flash is unchanged.
+These deliberately changed states are dependency controls, not valid Stock-call
+failures. Reports: `/work/oct29-bank-overlay-state.json`,
+`/work/oct29-bank-owner-controls.json`, and maintained complete suite reports in
+`/work/oct29-bank-overlay-state-checks/`. Firmware/handler identity and complete
+banked-reference integration remain open; no runtime mutation is enabled.
