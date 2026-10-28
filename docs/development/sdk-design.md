@@ -799,6 +799,14 @@ expected the child header to equal the library number failed their assertions;
 these failures do not establish failed execution. This is ordinary Stock
 configuration behavior, not startup safety or permission to move its references.
 
+`configuration_references.py --audits /work/oct28-configuration-audit --output
+/work/oct28-home-reference-maintained` compiles the current C reference scanner
+and replays those five hash-bound snapshots. It matches all 109 nonzero HOME
+attachment edges and skips 21 zero fields, while reading every nibble of each
+zero field. All 105 injected unreadable-nibble cases return `UNAVAILABLE`;
+partial visitor output is not accepted. These local checks need private native
+snapshots and are not ordinary CI coverage or a complete relocation proof.
+
 
 Supported-ID-769 fixtures bind the recorded recovery/admission ELF artifacts
 through the maintained packager. Both HP49g+ and HP50g pass installation,
