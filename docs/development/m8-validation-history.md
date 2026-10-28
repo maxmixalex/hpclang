@@ -494,3 +494,19 @@ Stock CI gate includes this test in its existing isolated environment. Formattin
 Ruff, workflow YAML and ShellCheck pass. This follow-up is local, not submitted.
 Observed CI: #26 f66b3b97 has 14 queued/two running jobs; #21 969ade88 has
 eight queued/three running; no failures reported and no completed acceptance.
+
+PC-exchange movement follow-up: pc_exchange_move.py invokes the production
+exchange descriptor and catalog-grow register-repair transaction, then resumes
+original interpreter execution. Both A/C and movement before/after the exchange
+pass on both models (eight positive paths). Omitting the selected register or
+suspended-PC repair produces an exact stale dispatch address in all 16 negative
+controls; no timeout is used as the negative oracle. Positive paths preserve
+all unrelated CPU fields, upper register bits, flags and return-stack state.
+Flash is unchanged. Reports and source/input hashes are under
+/work/oct29-pc-exchange-move/{hp49gplus,hp50g}/pc-exchange-move.json.
+The pinned caller snapshot supplies provenance; code bytes are patched inside
+known caller locations. This does not establish automatic caller discovery,
+complete opaque-root coverage, public catalog registration or Stock return.
+Ruff/format checks pass; reproduction is documented in sdk-design.md.
+PR26 f66b3b97 audit: ten successful/eight running/16 queued jobs; all 12
+workflows unfinished, no failures reported. This follow-up remains local.

@@ -1504,6 +1504,15 @@ bits, flags and stack state. This gate runs alongside incoming-carry tests in
 Stock code-relocation CI. Indirect-transfer provenance and complete execution
 coverage remain open.
 
+`pc_exchange_move.py` adds a controlled catalog-growth contrast using the pinned
+Stock caller snapshot (`--state`, `--model`, `--output`). It executes APCEX/CPCEX
+and a register return around an actual 16-nibble catalog move, both before and
+after the exchange. Repairing the suspended PC and selected register preserves
+the trace and unrelated CPU state; omitting either produces an observed stale
+dispatch address. The test patches known caller instruction locations and
+supplies their provenance explicitly. It neither discovers arbitrary callers
+nor proves that all opaque references in the snapshot are safe to move.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.
