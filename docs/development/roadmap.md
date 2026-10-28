@@ -110,7 +110,7 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-Incoming-carry root discovery now uses the same suspended HP49g+/HP50g interpreter state. Local sanitizer coverage includes conditional returns, signed branches and unreadable instruction fields; six launcher builds pass. Fresh original-interpreter integration remains required for this follow-up; the prior 28-case result predates it.
+Incoming-carry root discovery passes 192 controlled original-interpreter cases across HP49g+/HP50g, sanitizer tests and six launcher builds. Fresh full Stock call/catalog integration is running for both models; the previous 28-case result predates this follow-up.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -136,7 +136,7 @@ All prior artifact-specific evidence and limitations are retained in
 | #26 / `fb261f17` | **CI pending:** 12 workflows, six running and six queued; 13 successful, seven running and 59 queued jobs at observation, no failures reported. Incoming-carry follow-up passes local sanitizer tests and six launcher builds; original-interpreter integration and submission remain pending. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `10e05bc0` | **PWM failure diagnostics submitted; new CI unobserved.** Previous head 01e1d2cf had all 12 UI jobs passing, 294 successful jobs, one intentional skip and a queued publisher. This PR targets unresolved #20, not main. Whole-system peaks and branch acceptance remain open. |
+| #21 / `10e05bc0` | **CI pending:** seven workflows (three running, four queued); 17 successful, six running and 170 queued jobs at observation, no failures reported. This PR targets unresolved #20; PWM diagnostic coverage is not a claimed fix. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. #21 follow-up 10e05bc0 now submits pre-cleanup IRQ/timing/ownership diagnostics. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports state. Diagnostic coverage is not a claimed fix. |
 

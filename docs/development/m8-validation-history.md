@@ -383,3 +383,18 @@ Original-interpreter integration for the changed launcher is pending; earlier
 Exact-head #26 fb261f17 CI observation: 12 workflows (six running, six queued),
 13 successful jobs, seven running and 59 queued; no failures reported.
 No CI acceptance or M8 milestone completion is claimed.
+
+## 2026-10-29 — Original-interpreter incoming carry comparison
+
+New maintained incoming_carry.py compiles the production stage-stack collector
+and compares its root cells against original Saturn interpreter execution.
+Both HP49g+ and HP50g pass 96 controlled cases each: eight stack cursors, two
+carry values, two conditions, conditional return and forward/backward branches.
+Exact dispatch trace, cursor and all eight post-return cells match; Flash stays
+unchanged. Reports retain source, SRAM and Flash hashes under
+/work/oct29-initial-carry/{hp49gplus,hp50g}/incoming-carry.json. Ruff passes.
+This controlled test is not full launcher or public registration acceptance.
+Fresh application and six launchers built at /work/oct29-carry-launch-e2e;
+two-model full Stock call/catalog integration is running, not yet passed.
+PR21 exact head 10e05bc0 has 17 successful, six running and 170 queued jobs
+across seven unfinished workflows at observation; no failure reported.
