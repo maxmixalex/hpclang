@@ -736,3 +736,26 @@ not PCM/WAV decoding or physical audibility. M8.4 as a whole stays open and
 M8.0 remains the mainline. Historical flaky/failed jobs are not declared fixed.
 PR26 bc6596e6 observation: 12 unfinished workflows; 26 successful, eleven
 running and 169 queued jobs, no failures. No push/merge this turn.
+
+## Guarded switch-table lookup — 2026-10-29, local only
+
+`hpclang_rpl_bank_lookup_guarded` reports valid read dependencies, including
+nonmatching entries, without publishing a binding after any error. Host tests
+inject callback failure, read failure and invalid nibble at each of 85 reads;
+unknown/ambiguous switches, missing callback and positive callback error reject
+without changing the output. ASan/UBSan `rpl_port` and `rpl_reference` pass.
+ARMv4T Thumb compilation and Clang static analysis pass for `rpl-port.c`.
+
+The maintained `bank_switch_maps.py` joins this lookup to the actual C reference
+guard builder and validator. Both original-ROM fixtures pass 17 switches each:
+85 observed nibbles form 17 guards; unchanged tables validate, all 2,890 single
+nibble changes reject, and all 34 capacity-shortage cases invalidate the builder
+without publishing a binding. Original ROM read mappings, populated geometry,
+unused-bank behavior and unchanged Flash checks still pass. Reports and source
+hashes: `/work/oct29-guarded-bank-maps/{hp49gplus,hp50g}/bank-switch-maps.json`.
+This does not prove switch-code identity, complete live-reference coverage or
+authorize Port1 mutation. The implementation is local, not CI accepted.
+
+PR #26 exact head `bc6596e6` observed four successful workflows and eight
+unfinished, with 117 successful / 18 running / 253 queued jobs and no failures.
+The prior-head pre-entry Kermit failure remains unexplained. No new push.

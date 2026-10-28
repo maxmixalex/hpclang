@@ -742,8 +742,84 @@ static void test_rom_bank_layout(void)
     assert(bank.physical == 0x4000 && bank.bytes == 1024);
 }
 
+struct bank_observations
+{
+    const struct image *image;
+    uint8_t seen[160];
+    unsigned count, stop;
+    int positive;
+};
+
+static int observe_bank(void *context, uint32_t address, uint8_t value)
+{
+    struct bank_observations *observations = context;
+    assert(address < sizeof(observations->seen));
+    assert(value == observations->image->data[address]);
+    observations->seen[address] = 1;
+    return ++observations->count == observations->stop ? (observations->positive ? 1 : -79) : 0;
+}
+
+static void test_guarded_bank_lookup(void)
+{
+    struct image image = {.count = 125, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    for (uint32_t i = 0; i < 16; ++i)
+        put_word(&image, 7 * i, 0x12345 + i * i, 5);
+    put_word(&image, 120, 0x45678, 5);
+    struct bank_observations observations = {.image = &image};
+    struct hpclang_rpl_bank_binding binding = {HPCLANG_RPL_BANK_FLASH, 99};
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x45678, &binding, observe_bank,
+                                           &observations) == 1);
+    assert(binding.kind == HPCLANG_RPL_BANK_ERAM && !binding.index);
+    assert(observations.count == 85);
+    for (unsigned at = 0; at < 125; ++at)
+        assert(observations.seen[at] == (at >= 120 || (at < 112 && at % 7 < 5)));
+    const struct hpclang_rpl_bank_binding sentinel = {HPCLANG_RPL_BANK_FLASH, 99};
+    for (unsigned stop = 1; stop <= 85; ++stop) {
+        binding = sentinel;
+        observations = (struct bank_observations){.image = &image, .stop = stop};
+        assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                               &observations) == -79);
+        assert(observations.count == stop && !memcmp(&binding, &sentinel, sizeof(binding)));
+    }
+    for (unsigned at = 0; at < 125; ++at) {
+        if (!(at >= 120 || (at < 112 && at % 7 < 5)))
+            continue;
+        binding = sentinel;
+        observations = (struct bank_observations){.image = &image};
+        image.fail_at = at;
+        assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                               &observations) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!observations.seen[at] && !memcmp(&binding, &sentinel, sizeof(binding)));
+        image.fail_at = UINT32_MAX;
+        uint8_t old = image.data[at];
+        image.data[at] = 16;
+        observations = (struct bank_observations){.image = &image};
+        assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                               &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!observations.seen[at] && !memcmp(&binding, &sentinel, sizeof(binding)));
+        image.data[at] = old;
+    }
+    observations = (struct bank_observations){.image = &image};
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x99999, &binding, observe_bank,
+                                           &observations) == 0);
+    assert(observations.count == 85 && !memcmp(&binding, &sentinel, sizeof(binding)));
+    observations = (struct bank_observations){.image = &image, .stop = 85, .positive = 1};
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                           &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&binding, &sentinel, sizeof(binding)));
+    put_word(&image, 120, 0x12345, 5);
+    observations = (struct bank_observations){.image = &image};
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                           &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&binding, &sentinel, sizeof(binding)));
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, NULL,
+                                           &observations) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 static void test_bank_lookup(void)
 {
+    test_guarded_bank_lookup();
     struct image image = {.count = 125, .fail_at = UINT32_MAX};
     struct hpclang_rpl_reader reader = {read_nibble, &image};
     for (uint32_t i = 0; i < 16; ++i)

@@ -220,6 +220,20 @@ int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t fl
                             uint32_t eram_entry, uint32_t bank_switch,
                             struct hpclang_rpl_bank_binding *binding);
 
+/* Record every valid nibble read from the switch table, including nonmatching
+ * entries needed to rule out an ambiguous match. The caller binds addresses to
+ * the reader's proven mapping and retains them as commit guards. The callback
+ * returns zero or a negative error, propagated unchanged; positive returns are
+ * MALFORMED, never a successful lookup. Discard partial dependencies on error. Output changes
+ * only on a complete successful match. No writes or allocation. This observes
+ * lookup dependencies, not switch-code identity, populated-bank geometry or all
+ * live references. Keep reader, table and callback state stable throughout. */
+typedef int (*hpclang_rpl_bank_dependency_fn)(void *context, uint32_t address, uint8_t value);
+int hpclang_rpl_bank_lookup_guarded(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
+                                    uint32_t eram_entry, uint32_t bank_switch,
+                                    struct hpclang_rpl_bank_binding *binding,
+                                    hpclang_rpl_bank_dependency_fn dependency, void *context);
+
 struct hpclang_rpl_banked_target
 {
     struct hpclang_rpl_bank_binding bank;

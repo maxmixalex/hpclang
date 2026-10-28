@@ -854,6 +854,16 @@ capture stable inputs; plausible bytes or a successful parse do not identify a R
 or authorize recovery. Both native saved-state inventories use this parser and
 the first bank's actual 96 KiB bound when resolving configuration entries.
 
+`hpclang_rpl_bank_lookup_guarded()` records every valid nibble read while
+resolving a switch, including nonmatching entries needed to exclude ambiguity.
+The caller qualifies these addresses with a proven mapping and feeds them into
+the existing reference guard builder. Callback failures invalidate the lookup;
+the output changes only on a complete match. Positive callback errors are
+rejected as malformed, never mistaken for lookup success. Discard partial
+dependencies after failure. This records table dependencies only: switch-code
+identity, bank geometry and complete live-reference coverage remain separate
+requirements, with stable ownership required through commit.
+
 `tests/e2e/code-relocation/bank_switch_maps.py` compares all sixteen Flash
 switches and the ERAM switch with original ROM execution on both HP49g+/HP50g
 fixtures. Populated banks match all 64 read-map cells; ERAM maps to physical
@@ -862,6 +872,9 @@ a repeated dummy page and return no usable geometry. A successful switch lookup
 alone therefore cannot qualify a target. The mapped window can also exceed a
 bank's declared size: callers must retain the geometry bound. These checks do
 not establish a complete banked-reference graph or authorize Port1 edits.
+For each switch it also retains all 85 table nibbles as 17 guards, verifies the
+unchanged table, rejects every individually changed nibble through the C guard
+validator, and rejects insufficient guard capacity without publishing a binding.
 
 The maintained installation witness exercises this capture on ARM, using the
 supported Stock 2.15 fixture's verified initializer literal-pool addresses and

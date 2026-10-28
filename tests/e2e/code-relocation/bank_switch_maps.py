@@ -28,10 +28,20 @@ args.output.mkdir(parents=True, exist_ok=True)
 report = args.output / "bank-switch-maps.json"
 report.unlink(missing_ok=True)
 base = root / "runtime/core"
-files = [base / name for name in ("rpl-port.c", "rpl-backup.c", "rpl-object-span.c")]
+files = [
+    base / name
+    for name in (
+        "rpl-port.c",
+        "rpl-backup.c",
+        "rpl-object-span.c",
+        "rpl-reference.c",
+        "rpl-object-store.c",
+        "rpl-code.c",
+    )
+]
 sources = {
     str(p): hashlib.sha256(p.read_bytes()).hexdigest()
-    for p in [*files, base / "rpl-port.h", Path(__file__)]
+    for p in [*files, base / "rpl-port.h", base / "rpl-reference.h", Path(__file__)]
 }
 shared = args.output / "bank-switch-maps.so"
 subprocess.run(
@@ -53,6 +63,25 @@ subprocess.run(
 )
 lib = c.CDLL(str(shared.resolve()))
 Read = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.POINTER(c.c_uint8))
+Dependency = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
+MappedRead = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint8))
+
+
+class Guard(c.Structure):
+    _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
+
+
+class GuardBuilder(c.Structure):
+    _fields_ = [
+        ("guards", c.POINTER(Guard)),
+        ("capacity", c.c_uint32),
+        ("count", c.c_uint32),
+        ("error", c.c_int),
+    ]
+
+
+class GuardReader(c.Structure):
+    _fields_ = [("read", MappedRead), ("context", c.c_void_p)]
 
 
 class Reader(c.Structure):
@@ -68,6 +97,27 @@ class Geometry(c.Structure):
 
 
 lib.hpclang_rpl_bank_lookup.argtypes = [c.POINTER(Reader), *([c.c_uint32] * 3), c.POINTER(Bank)]
+lib.hpclang_rpl_bank_lookup_guarded.argtypes = [
+    *lib.hpclang_rpl_bank_lookup.argtypes,
+    Dependency,
+    c.c_void_p,
+]
+lib.hpclang_rpl_reference_guards_begin.argtypes = [
+    c.POINTER(GuardBuilder),
+    c.POINTER(Guard),
+    c.c_uint32,
+]
+lib.hpclang_rpl_reference_guards_observe.argtypes = [
+    c.POINTER(GuardBuilder),
+    c.c_uint32,
+    c.c_uint32,
+    c.c_uint8,
+]
+lib.hpclang_rpl_reference_guards_validate.argtypes = [
+    c.POINTER(GuardReader),
+    c.POINTER(Guard),
+    c.c_uint32,
+]
 lib.hpclang_rpl_rom_bank_layout.argtypes = [
     c.POINTER(c.c_uint8),
     *([c.c_uint32] * 3),
@@ -85,14 +135,23 @@ assert count_address < len(flash) and directory == count_address + 1
 count = flash[count_address]
 assert 0 < count <= 16 and directory + count <= len(flash)
 sizes = (c.c_uint8 * count).from_buffer_copy(flash, directory)
+corrupt = None
 
 
 @Read
 def nibble(_, address, out):
-    out[0] = read(address, 1)
+    out[0] = read(address, 1) ^ (1 if address == corrupt else 0)
     return 1
 
 
+@MappedRead
+def mapped_nibble(_, mapping, address, out):
+    if mapping != 1:
+        return 0
+    return nibble(None, address, out)
+
+
+guard_reader = GuardReader(mapped_nibble, None)
 reader = Reader(nibble, None)
 rows = []
 for index in range(17):
@@ -103,6 +162,62 @@ for index in range(17):
         == 1
     )
     assert (binding.kind, binding.index) == ((0, index) if index < 16 else (1, 0))
+    guards = (Guard * 17)()
+    builder = GuardBuilder()
+    assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 17) == 0
+    observed = []
+
+    @Dependency
+    def observe(_, address, value):
+        observed.append(address)
+        return lib.hpclang_rpl_reference_guards_observe(c.byref(builder), 1, address, value)
+
+    guarded = Bank(-1, 99)
+    assert (
+        lib.hpclang_rpl_bank_lookup_guarded(
+            c.byref(reader),
+            0x26BBB,
+            0x26C39,
+            switch,
+            c.byref(guarded),
+            observe,
+            None,
+        )
+        == 1
+    )
+    assert (guarded.kind, guarded.index) == (binding.kind, binding.index)
+    expected = {0x26BBB + i * 7 + j for i in range(16) for j in range(5)}
+    expected.update(range(0x26C39, 0x26C39 + 5))
+    assert len(observed) == 85 and set(observed) == expected and builder.count == 17
+    assert (
+        lib.hpclang_rpl_reference_guards_validate(c.byref(guard_reader), guards, builder.count) == 0
+    )
+    for corrupt in observed:
+        assert (
+            lib.hpclang_rpl_reference_guards_validate(
+                c.byref(guard_reader),
+                guards,
+                builder.count,
+            )
+            < 0
+        )
+    corrupt = None
+    short_builder = GuardBuilder()
+    assert lib.hpclang_rpl_reference_guards_begin(c.byref(short_builder), guards, 16) == 0
+
+    @Dependency
+    def short_observe(_, address, value):
+        return lib.hpclang_rpl_reference_guards_observe(c.byref(short_builder), 1, address, value)
+
+    unavailable = Bank(-1, 99)
+    assert (
+        lib.hpclang_rpl_bank_lookup_guarded(
+            c.byref(reader), 0x26BBB, 0x26C39, switch, c.byref(unavailable), short_observe, None
+        )
+        < 0
+    )
+    assert short_builder.error < 0 and short_builder.count == 0
+    assert (unavailable.kind, unavailable.index) == (-1, 99)
     geometry = Geometry(0xDEAD, 0xBEEF)
     if index < 16:
         populated = lib.hpclang_rpl_rom_bank_layout(
@@ -160,6 +275,9 @@ for index in range(17):
             physical=geometry.physical if populated else None,
             valid_bytes=geometry.size if populated else 0,
             pages=list(pages),
+            switch_guards=builder.count,
+            rejected_stale_nibbles=len(observed),
+            insufficient_guard_capacity_rejected=True,
         )
     )
 assert all(
