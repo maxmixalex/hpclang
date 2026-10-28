@@ -12,6 +12,8 @@ import sys
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE
 from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
 
+from flashptr_guards import verify_flashptr
+
 if not __debug__:
     raise RuntimeError("Assertions required")
 root = Path(__file__).resolve().parents[3]
@@ -41,7 +43,13 @@ files = [
 ]
 sources = {
     str(p): hashlib.sha256(p.read_bytes()).hexdigest()
-    for p in [*files, base / "rpl-port.h", base / "rpl-reference.h", Path(__file__)]
+    for p in [
+        *files,
+        base / "rpl-port.h",
+        base / "rpl-reference.h",
+        Path(__file__),
+        Path(__file__).with_name("flashptr_guards.py"),
+    ]
 }
 shared = args.output / "bank-switch-maps.so"
 subprocess.run(
@@ -379,6 +387,7 @@ for index in range(17):
             controlled_acptr_stale_rejections=len(source_observed) + len(table_observed),
         )
     )
+flashptr_rows = verify_flashptr(lib, read, flash, rows)
 assert all(
     hashlib.sha256(Path(p).read_bytes()).hexdigest() == value for p, value in sources.items()
 )
@@ -388,6 +397,7 @@ report.write_text(
             model=args.model,
             sources=sources,
             cases=rows,
+            flashptr_tables=flashptr_rows,
             flash_sha256=hashlib.sha256(flash).hexdigest(),
             sram_sha256=hashlib.sha256(ram).hexdigest(),
             scope="Reviewed ROM switches and read mappings only; no complete reference graph or mutation authorization",

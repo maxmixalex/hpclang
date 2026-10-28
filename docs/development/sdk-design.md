@@ -904,6 +904,17 @@ target dependencies compose under their respective mapping identities; discard
 the whole accumulated plan after any failure. Proven mappings, table locations,
 geometry and complete live-reference discovery remain required before mutation.
 
+The maintained bank-map test also runs `flashptr_guards.py` against both saved
+Stock fixtures. It resolves seven configured logical selectors to physical
+banks whose read maps were independently checked against original ROM switch
+execution. Six ordinary tables and selector 15's special table are read within
+the declared physical geometry. All 3,976 entries per model agree with direct
+ROM data, including one absent entry. Constructed source objects feed the C
+decode/configuration/lookup chain; exact dependency sets are checked for every
+entry. Mutating each dependency of the first, middle and last entries produces
+2,319 rejected validations per model. Fixture-specific locations are reviewed
+test inputs, not runtime ROM identification or complete live-pointer discovery.
+
 The maintained installation witness exercises this capture on ARM, using the
 supported Stock 2.15 fixture's verified initializer literal-pool addresses and
 state layout. Its existing missing-library and matched-installation invocations

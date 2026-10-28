@@ -830,3 +830,27 @@ after marking the accepted draft ready, it merged into its parent #20 as
 `1ce018599b622d6762cf02e4f5aa9c62873b188f`. Parent #20 now has that head and still
 targets main. New parent CI was not polled in the merge turn. This accepts the
 child delivery only; parent acceptance and M8.2/M8.3 completion remain open.
+
+## FlashPtr guards against saved-state ROM tables — 2026-10-29
+
+The maintained bank-switch CI test now invokes `flashptr_guards.py`. Each model
+resolves seven logical configurations to physical banks; these bank mappings
+are checked independently by original-ROM switch execution in the same run.
+The helper visits all six ordinary tables and selector 15's special table,
+within their geometry bounds. Each model has 3,976 entries, including one zero
+target that must return absent without changing the output. Constructed source
+FlashPtrs are decoded and their selector/index passed through the actual C
+configuration and target resolvers. Every lookup's exact dependency set and
+unchanged validation are checked. First/middle/last-entry mutations reject
+2,319 dependencies per model, 4,638 in total. All prior bank/ACPTR checks remain.
+
+Reports, input/source hashes and physical mappings are retained under
+`/work/oct29-flashptr-rom-guards/{hp49gplus,hp50g}/bank-switch-maps.json`.
+Callback exceptions are captured and fail the test, not silently accepted as
+negative controls. Sources include the new helper. This proves fixture-specific
+table integration; it does not authenticate arbitrary ROMs or discover every
+live FlashPtr, and it does not authorize production Port1 mutation.
+
+Pre-delivery #26 `abf9135c`: one successful/nine unfinished workflows;
+40 successful, 18 running, 296 queued jobs, no failures observed. Parent #20
+`1ce01859` has four workflows/six jobs queued. Neither branch is accepted.
