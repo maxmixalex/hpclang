@@ -131,10 +131,10 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `8c2bb27f` | **Submitted; CI pending.** Exact-head audit: ten successful, four running and 78 queued jobs; no failures. The local guarded-TEMP follow-up remains unpushed while this batch runs. |
+| #26 / `8c2bb27f` | **Submitted; CI pending.** Exact-head audit: 27 successful, three running and 306 queued jobs; no failures. The local guarded-TEMP follow-up remains unpushed while this batch runs. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `01e1d2cf` | **Artifact-transfer fix submitted; fresh CI pending.** All 12 prior UI failures omitted `launchers/memory.json`; six-model transfer/verification replay and omission controls pass. Earlier watchdog cause and whole-system peaks remain open. |
+| #21 / `01e1d2cf` | **Artifact-transfer fix partially verified remotely; full CI pending.** Eight successful UI job logs across HP39g+/39gs/40gs/48gII/49g+ confirm stack, heap, pool and linked-image budget checks. Remaining UI jobs, earlier watchdog cause and whole-system peaks remain open. |
 | #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; cause unproven. |
 
