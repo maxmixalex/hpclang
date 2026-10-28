@@ -135,6 +135,15 @@ extern "C"
     int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
                                         hpclang_rpl_temp_visit_fn visit, void *context);
 
+    /* Query an exact TEMP payload start after validating the complete chain.
+     * Interior addresses, markers and footers return NOT_FOUND. The payload
+     * extent is published only on success; errors leave it unchanged. No native
+     * writes. Retain stable IO/mappings and guard read dependencies before a
+     * later mutation. This proves allocation bounds, not object type, execution
+     * provenance or permission to relocate. Output must not alias native state. */
+    int hpclang_rpl_mutation_find_temp(const struct hpclang_rpl_mutation_io *io, uint32_t address,
+                                       uint32_t *nibbles);
+
     /* TEMP traversal with observations for every valid nibble read, including
      * both geometry words, the sentinel and every allocation footer in both
      * validation/enumeration passes. Dependency errors propagate unchanged;

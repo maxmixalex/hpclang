@@ -1309,6 +1309,15 @@ in Python. The updated matrix in `/work/oct29-origin-adjust/matrix` passes all
 304 return cases and 480 pre-write rejections with current source hashes;
 sanitized origin/decoder unit tests and ARM compilation/static analysis pass.
 
+The production `hpclang_rpl_mutation_find_temp` query now supplies exact TEMP
+payload-start lookup; the native return fixture delegates to it rather than
+implementing its own allocation matcher. It validates the entire footer chain,
+rejects interior/marker/footer addresses, and preserves the output on failure.
+A matching newer block cannot mask a malformed or unreadable older footer.
+It performs no native writes and proves only allocation bounds; stable mappings,
+read-dependency guards, object parsing and execution-use proof remain separate.
+The updated return reports are in `/work/oct29-temp-query/matrix`.
+
 The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
 `--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles
 the current C decoders and executes the original ARM Saturn interpreter. The

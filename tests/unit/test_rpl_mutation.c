@@ -2696,6 +2696,19 @@ static void test_temp_allocation_visit(void)
     struct temp_visit_state state = {0};
     assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 0);
     assert(state.count == 2 && writes == 0);
+    for (uint32_t address = 0x83000; address <= 0x83023; ++address) {
+        uint32_t extent = UINT32_MAX;
+        int expected =
+            address == 0x83006 || address == 0x83013 ? 0 : HPCLANG_RPL_MUTATION_NOT_FOUND;
+        assert(hpclang_rpl_mutation_find_temp(&io, address, &extent) == expected);
+        assert(extent == (address == 0x83006 ? 7u : address == 0x83013 ? 11u : UINT32_MAX));
+        assert(writes == 0);
+    }
+    uint32_t extent = UINT32_MAX;
+    assert(hpclang_rpl_mutation_find_temp(NULL, 0x83013, &extent) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    assert(extent == UINT32_MAX);
+    assert(hpclang_rpl_mutation_find_temp(&io, 0x83013, NULL) == HPCLANG_RPL_MUTATION_UNAVAILABLE);
     state = (struct temp_visit_state){.stop = 81};
     assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 81);
     assert(state.count == 1 && writes == 0);
@@ -2706,13 +2719,21 @@ static void test_temp_allocation_visit(void)
         assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) ==
                HPCLANG_RPL_MUTATION_MALFORMED);
         assert(state.count == 0 && writes == 0);
+        /* Even a matching newer allocation cannot hide a broken older footer. */
+        assert(hpclang_rpl_mutation_find_temp(&io, 0x83013, &extent) ==
+               HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(extent == UINT32_MAX && writes == 0);
     }
     put_word(0x8300d, 5, 13);
     rejected_read = 0x8300d;
+    assert(hpclang_rpl_mutation_find_temp(&io, 0x83013, &extent) != 0);
+    assert(extent == UINT32_MAX && writes == 0);
     assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) != 0);
     assert(state.count == 0 && writes == 0);
     rejected_read = UINT32_MAX;
     put_word(TEMPTOP, 5, 0x83005);
+    assert(hpclang_rpl_mutation_find_temp(&io, 0x83006, &extent) == HPCLANG_RPL_MUTATION_NOT_FOUND);
+    assert(extent == UINT32_MAX && writes == 0);
     assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 0);
     assert(state.count == 0);
     put_word(0x83000, 5, 1);

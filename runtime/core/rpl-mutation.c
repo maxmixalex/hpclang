@@ -693,6 +693,34 @@ int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
     return 0;
 }
 
+struct temp_allocation_query
+{
+    uint32_t address, nibbles;
+};
+
+static int match_temp_allocation(void *context, uint32_t first, uint32_t nibbles)
+{
+    struct temp_allocation_query *query = context;
+    if (first == query->address)
+        query->nibbles = nibbles;
+    return 0;
+}
+
+int hpclang_rpl_mutation_find_temp(const struct hpclang_rpl_mutation_io *io, uint32_t address,
+                                   uint32_t *nibbles)
+{
+    if (!nibbles)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct temp_allocation_query query = {address, 0};
+    int result = hpclang_rpl_mutation_visit_temp(io, match_temp_allocation, &query);
+    if (result)
+        return result;
+    if (!query.nibbles)
+        return HPCLANG_RPL_MUTATION_NOT_FOUND;
+    *nibbles = query.nibbles;
+    return 0;
+}
+
 int hpclang_rpl_mutation_visit_root_sources(const struct hpclang_rpl_mutation_io *io,
                                             hpclang_rpl_root_source_visit_fn visit, void *context)
 {
