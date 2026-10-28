@@ -47,7 +47,13 @@ sources += [
     Path(__file__).with_name("threaded-return.c"),
 ]
 sources.append(base / "rpl-code.c")
-tracked = [*sources, Path(__file__), base / "rpl-mutation.h", base / "rpl-code.h"]
+tracked = [
+    *sources,
+    Path(__file__),
+    base / "rpl-mutation.h",
+    base / "rpl-code.h",
+    root / "platform/armtoolbox/stage-stack.h",
+]
 hashes = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in tracked}
 subprocess.run(
     [
@@ -79,6 +85,27 @@ Read = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.POINTER(c.c_uint8))
 
 class Reader(c.Structure):
     _fields_ = [("read", Read), ("context", c.c_void_p)]
+
+
+ReadWord = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint, c.POINTER(c.c_uint32))
+
+
+class StackIO(c.Structure):
+    _fields_ = [("context", c.c_void_p), ("read", ReadWord), ("write", c.c_void_p)]
+
+
+lib.hpclang_stage_execution_roots.argtypes = [
+    c.POINTER(StackIO),
+    c.c_uint32,
+    c.POINTER(c.c_uint32),
+    c.c_uint32,
+    c.c_int,
+    c.POINTER(c.c_uint32),
+    c.POINTER(c.c_uint32),
+    c.POINTER(c.POINTER(c.c_uint32)),
+    c.POINTER(c.c_uint32),
+]
+lib.hpclang_stage_execution_roots.restype = c.c_uint
 
 
 class Guard(c.Structure):
@@ -220,6 +247,32 @@ for register in (0, 2):
                 Guard(1, entry, 0x6B18 if register == 0 else 0x7B18, 4),
                 Guard(1, target, 0x2B18 if register == 0 else 0x3B18, 4),
             )
+
+            @ReadWord
+            def read_word(_, at, width, result):
+                # Only these caller-owned instruction extents are qualified.
+                if not any(g.field <= at and at + width <= g.field + g.width for g in guards):
+                    return 0
+                result[0] = sum(int(array[at - 0x80000 + i]) << (4 * i) for i in range(width))
+                return 1
+
+            stack_io = StackIO(None, read_word, None)
+            a = c.c_uint32(struct.unpack_from("<I", before, 0)[0])
+            cv = c.c_uint32(struct.unpack_from("<I", before, 16)[0])
+            stack = (c.c_uint32 * 8).from_buffer_copy(before[0x978 - 0x90C : 0x998 - 0x90C])
+            original_stack = bytes(stack)
+            discovered = (c.POINTER(c.c_uint32) * 10)()
+            masks = (c.c_uint32 * 10)()
+            assert (
+                lib.hpclang_stage_execution_roots(
+                    c.byref(stack_io), pc, stack, 3, 1, c.byref(a), c.byref(cv), discovered, masks
+                )
+                == 1
+            )
+            selected_root = a if register == 0 else cv
+            assert c.addressof(discovered[0].contents) == c.addressof(selected_root)
+            assert masks[0] == 0xFFFFF and selected_root.value == value.value
+            assert bytes(stack) == original_stack
             if mask == 3:
                 # Both instruction identities must survive until commit. Inject
                 # each changed/invalid nibble, including the final dependency.

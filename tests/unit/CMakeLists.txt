@@ -231,6 +231,16 @@ target_include_directories(test_rpl_flash_plan PRIVATE "${HPCLANG_ROOT}/runtime/
 hpclang_unit(stage_stack test_stage_stack.c "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c")
 target_include_directories(test_stage_stack PRIVATE "${HPCLANG_ROOT}/platform/armtoolbox")
 
+hpclang_unit(stage_register test_stage_register.c "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c")
+target_include_directories(test_stage_register PRIVATE "${HPCLANG_ROOT}/platform/armtoolbox")
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    hpclang_unit(port1_bounds test_port1_bounds.c "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
+    target_include_directories(test_port1_bounds PRIVATE
+        "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+endif()
+
+
 add_executable(stage_image_driver stage_image_driver.c
     "${HPCLANG_ROOT}/platform/armtoolbox/stage-image.c"
     "${HPCLANG_ROOT}/third_party/tinf/tinflate.c")

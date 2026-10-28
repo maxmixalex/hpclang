@@ -1323,10 +1323,12 @@ This interface carries proven addresses; it does not discover register roots.
 The private launch descriptor has an RPL4 extension for these masks. Runtime
 services read that field only after checking its version; RPL2/RPL3 descriptors
 retain full-word semantics without accessing the extension. Port1 fences work
-with RPL3 and RPL4. The current launcher initializes the extension to NULL and
-continues publishing RPL3 for its whole-word roots, preserving older embedded
-runtimes. A launcher adding proven partial-word roots must publish RPL4 and be
-paired with a runtime that supports it; this change does not qualify new roots.
+with RPL3 and RPL4, including the Port1 mutation entry. Whole-word-only paths
+retain the earlier descriptor version and a NULL mask array. When bounded
+execution analysis identifies an initial A/C register consumed as a jump target,
+the HP49g+/HP50g launcher publishes RPL4 with low-20-bit register masks and
+whole-word masks for its other roots. That path requires an RPL4-aware runtime;
+an older embedded runtime cannot use the extended descriptor.
 
 The production `hpclang_rpl_mutation_find_temp` query now supplies exact TEMP
 payload-start lookup; the native return fixture delegates to it rather than
@@ -1504,13 +1506,26 @@ bits, flags and stack state. This gate runs alongside incoming-carry tests in
 Stock code-relocation CI. Indirect-transfer provenance and complete execution
 coverage remain open.
 
+`hpclang_stage_execution_roots()` follows the existing bounded return/call path
+and PC=A/C, A/C=PC and APCEX/CPCEX. It tracks private register values separately
+from their initial storage: a capture kills the old value's origin, while an
+exchange consumes that value before replacing it. Only consumed original cells
+are reported, once each. The walk stops at unknown instructions, invalid reads,
+wrapping captures or its 64-instruction limit; inputs and unrelated high digits
+remain unchanged. It supplies at most eight stack cells and two masked register
+cells. This is partial execution-use discovery, not complete opaque/banked
+provenance, operand relocation or public-library authorization. The maintained
+`register_roots.py` checks all six register PC operations against original ROM
+execution (288 cases/model); the host suite covers use/overwrite paths and faults.
+
 `pc_exchange_move.py` adds a controlled catalog-growth contrast using the pinned
 Stock caller snapshot (`--state`, `--model`, `--output`). It executes APCEX/CPCEX
 and a register return around an actual 16-nibble catalog move, both before and
 after the exchange. Repairing the suspended PC and selected register preserves
 the trace and unrelated CPU state; omitting either produces an observed stale
 dispatch address. The test patches known caller instruction locations and
-supplies their provenance explicitly. Both four-nibble instruction identities
+supplies their provenance explicitly. The launcher scanner must identify the
+selected register and its mask from the guarded path before the move. Both four-nibble instruction identities
 are guarded through transaction preflight. Changed or invalid values at every
 instruction nibble reject without RAM or register writes. It neither discovers arbitrary callers
 nor proves that all opaque references in the snapshot are safe to move.

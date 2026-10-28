@@ -68,6 +68,25 @@ unsigned hpclang_stage_return_roots_with_carry(const struct hpclang_stage_stack_
                                                uint32_t continuation, uint32_t *machine_stack,
                                                uint32_t cursor, int carry, uint32_t **roots);
 
+/* Extend the bounded return/call walk with PC=A/C, A/C=PC and APCEX/CPCEX.
+ * a_low/c_low point to the low words of the SAME suspended A/C registers.
+ * Report an initial register only when its original value is consumed as a
+ * jump target; captures replace the private value and kill that original fact.
+ * Exchange consumes the old value before capturing the following PC. Captures
+ * that wrap the address space are unsupported. No caller storage is modified.
+ * roots/masks provide ten disjoint output slots. Stack cells use UINT32_MAX;
+ * register cells use 0xfffff, preserving high register digits during repair.
+ * Each original cell is reported once. Unknown instructions stop the walk;
+ * this does not infer addresses from numeric resemblance or prove complete
+ * execution coverage, bank identity, code relocation or public-library safety.
+ * All inputs, interpreter state and instruction mappings remain exclusively
+ * owned and stable through use of these facts. As above, only returned slots
+ * are written. Invalid arguments leave all output untouched. */
+unsigned hpclang_stage_execution_roots(const struct hpclang_stage_stack_io *io,
+                                       uint32_t continuation, uint32_t *machine_stack,
+                                       uint32_t cursor, int carry, uint32_t *a_low, uint32_t *c_low,
+                                       uint32_t **roots, uint32_t *masks);
+
 /* Invert a physical 4 KiB page through the 256-entry Stock Read map.
  * Return 1 only for one complete, consecutive pair of 2 KiB mappings in
  * main RAM, 0 for no overlap, -1 for partial/ambiguous/invalid mappings.

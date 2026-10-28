@@ -32,9 +32,9 @@ uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_i
     return *root < RPL_MAIN_END ? root : NULL;
 }
 
-unsigned hpclang_stage_return_roots_with_carry(const struct hpclang_stage_stack_io *io,
-                                               uint32_t continuation, uint32_t *machine_stack,
-                                               uint32_t cursor, int carry, uint32_t **roots)
+static unsigned execution_roots(const struct hpclang_stage_stack_io *io, uint32_t continuation,
+                                uint32_t *machine_stack, uint32_t cursor, int carry,
+                                uint32_t *a_low, uint32_t *c_low, uint32_t **roots, uint32_t *masks)
 {
     if (!roots || !io || !io->read || !machine_stack || cursor >= 8u || carry < -1 || carry > 1)
         return 0;
@@ -43,12 +43,46 @@ unsigned hpclang_stage_return_roots_with_carry(const struct hpclang_stage_stack_
     for (unsigned i = 0; i < 8u; ++i)
         stack[i] = machine_stack[i];
     unsigned original = 255u;
+    uint32_t *register_cells[2] = {a_low, c_low};
+    uint32_t registers[2] = {a_low ? *a_low & 0xfffffu : 0, c_low ? *c_low & 0xfffffu : 0};
+    unsigned register_original = 3u, reported_registers = 0u;
+    unsigned capacity = a_low && c_low ? 10u : 8u;
     /* Track call-generated continuations separately: a push overwrites that
      * cell's original value, which must never be reported as a consumed root. */
-    for (unsigned steps = 0; count < 8u && steps < 64u; ++steps) {
+    for (unsigned steps = 0; count < capacity && steps < 64u; ++steps) {
         uint8_t opcode;
         if (continuation > RPL_MAIN_END - 2u || !read_byte(io, continuation, &opcode))
             break;
+        if (opcode == 0x18u && a_low && c_low) {
+            uint32_t instruction;
+            if (continuation > RPL_MAIN_END - 4u ||
+                !io->read(io->context, continuation, 4, &instruction) || instruction > 0xffffu ||
+                (instruction & 0xfffu) != 0xb18u)
+                break;
+            unsigned operation = instruction >> 12;
+            if (operation < 2u || operation > 7u)
+                break;
+            if (operation >= 4u && continuation > RPL_MAIN_END - 5u)
+                break;
+            unsigned selected = operation & 1u;
+            uint32_t target = registers[selected];
+            if (operation < 4u || operation >= 6u) {
+                if ((register_original & ~reported_registers) & (1u << selected)) {
+                    if (masks)
+                        masks[count] = 0xfffffu;
+                    roots[count++] = register_cells[selected];
+                    reported_registers |= 1u << selected;
+                }
+            }
+            if (operation >= 4u) {
+                /* The captured next PC has no backing initial-register cell.
+                 * Reject wrap rather than introduce an unqualified address. */
+                registers[selected] = continuation + 4u;
+                register_original &= ~(1u << selected);
+            }
+            continuation = operation == 4u || operation == 5u ? continuation + 4u : target;
+            continue;
+        }
         uint32_t *root = hpclang_stage_immediate_return_root(io, continuation, stack, cursor);
         if (root) {
             if (opcode == 0x20u)
@@ -78,6 +112,8 @@ unsigned hpclang_stage_return_roots_with_carry(const struct hpclang_stage_stack_
         if (root) {
             cursor = (cursor + 7u) & 7u;
             if (original & (1u << cursor)) {
+                if (masks)
+                    masks[count] = UINT32_MAX;
                 roots[count++] = machine_stack + cursor;
                 original &= ~(1u << cursor);
             }
@@ -119,6 +155,24 @@ unsigned hpclang_stage_return_roots_with_carry(const struct hpclang_stage_stack_
         }
     }
     return count;
+}
+
+unsigned hpclang_stage_execution_roots(const struct hpclang_stage_stack_io *io,
+                                       uint32_t continuation, uint32_t *machine_stack,
+                                       uint32_t cursor, int carry, uint32_t *a_low, uint32_t *c_low,
+                                       uint32_t **roots, uint32_t *masks)
+{
+    if (!a_low || !c_low || !masks)
+        return 0;
+    return execution_roots(io, continuation, machine_stack, cursor, carry, a_low, c_low, roots,
+                           masks);
+}
+
+unsigned hpclang_stage_return_roots_with_carry(const struct hpclang_stage_stack_io *io,
+                                               uint32_t continuation, uint32_t *machine_stack,
+                                               uint32_t cursor, int carry, uint32_t **roots)
+{
+    return execution_roots(io, continuation, machine_stack, cursor, carry, NULL, NULL, roots, NULL);
 }
 
 unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uint32_t continuation,

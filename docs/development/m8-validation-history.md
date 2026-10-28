@@ -545,3 +545,30 @@ discovery, complete execution safety, public management or M8.0 acceptance.
 Pre-push f66b3b97 audit: four workflows pass/eight unfinished; 85 successful,
 ten running, 197 queued jobs and one intentional skip, no failures reported.
 The follow-up is submitted without observing its new CI in the push turn.
+
+## 2026-10-29 — Bounded launcher register roots (local, not submitted)
+
+The shared launcher walk now follows PC=A/C, A/C=PC and APCEX/CPCEX along with
+the earlier return/call paths. Only consumed initial register values become
+low-20-bit roots; captures kill old origins. The launcher conditionally publishes
+RPL4 and retains prior descriptors for all-word roots. The old collector API
+retains its existing behavior. Discovery remains bounded and incomplete.
+
+The Port1 mutation entry incorrectly rejected RPL4 despite compatible fence
+support elsewhere. A regression fails on the preceding source and passes after
+accepting RPL3/RPL4: 48 model/version/fence combinations, with nibble-preserving
+I/O and unchanged outputs on rejection. Five maintained ASan/UBSan suites pass
+(1.85 s); register paths include 240 use/overwrite cases, 24 read faults and four
+capture-wrap rejections. Maintained register_roots.py agrees with ROM execution
+in 576 cases. pc_exchange_move.py now requires automatic selected-root/mask
+discovery; eight positive, 16 stale-address and 128 guard rejection cases pass.
+Evidence: /work/oct29-stage-register/current and /movement, plus unit CTest logs.
+
+Full format/Ruff/ShellCheck and ARM static analysis pass. Fixed-address analysis
+is excluded only for the stock hardware mapping backend. Initial launcher link
+exposed an unavailable __aeabi_memclr4 from partial array initialization; explicit
+initialization of the two fixed masks fixes it. The application and all six
+raw/wrapped launchers now build. Fresh Stock integration uses
+/work/oct29-stage-register/app: sessions 38127 (HP49g+) and 51605 (HP50g).
+These are running, not accepted; the preceding PC-exchange 28-case audit does
+not validate this changed launcher. No new-head CI is polled in this push turn.

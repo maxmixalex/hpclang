@@ -110,9 +110,15 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-Incoming-carry root discovery now passes 192 controlled interpreter cases and all 28 fresh HP49g+/HP50g Stock call/catalog cases. Independent checks confirm unchanged Flash in 36 saved states and byte-identical reproduction of six launchers. Its CI gate is submitted in #26; this is local validation, not branch acceptance or complete execution-reference coverage.
+PC-exchange batch `1dc590b1` is submitted in #26. All 28 fresh Stock cases,
+36 unchanged Flash snapshots and 16 reproducible artifacts pass local audit;
+new-head CI is unobserved, and branch acceptance remains open.
 
-PC-exchange follow-up passes 192 interpreter cases, eight catalog-movement paths, 16 stale-address controls and 128 pre-write instruction-guard rejections. Sanitizer/ARM analysis and full format/lint checks pass. Independent rebuilding reproduces all 16 application/launcher artifacts byte for byte; temporary build files were removed. All 28 fresh Stock call/catalog cases pass, with 36 unchanged Flash snapshots and matching source/artifact hashes independently audited. Automatic provenance qualification and public library management remain open.
+Local launcher follow-up now discovers bounded A/C execution uses and publishes
+RPL4 masks only when needed; Port1 mutation accepts RPL4 too. Five sanitizer
+suites, 576 original-interpreter cases and guarded catalog-movement checks pass.
+ARM analysis/build and format/lint pass. Fresh two-model Stock integration is
+running; complete execution-reference coverage and public management remain open.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,

@@ -393,6 +393,10 @@ jobs:
             --state "build/$HPCLANG_E2E_TARGET-state" \
             --model "$HPCLANG_E2E_TARGET" \
             --output "build/$HPCLANG_E2E_TARGET-incoming-carry/pc-exchange"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/register_roots.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/register-roots"
 
       - name: Verify suite-specific evidence
         if: matrix.suite.verifier != ''

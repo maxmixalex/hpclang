@@ -165,7 +165,9 @@ int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     const struct hpclang_rpl_memory_bounds *bounds = hpclang_launch_rpl_bounds(boot);
     struct hpclang_rpl_reader reader;
-    if (!io || !limit || !bounds || bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
+    if (!io || !limit || !bounds ||
+        (bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC &&
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4) ||
         bounds->port1_limit > HPCLANG_RPL_PORT1_NIBBLES || !hpclang_rpl_stock_port1_reader(&reader))
         return 0;
     *limit = hpclang_launch_port1_limit(boot);
