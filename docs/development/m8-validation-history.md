@@ -523,3 +523,13 @@ app/ artifacts; sessions 68139 (HP49g+) and 74211 (HP50g). The initial wrapper
 path typo failed before execution and was corrected before these live runs.
 PR26 f66b3b97 observation: 35 successful/eight running/232 queued jobs,
 12 unfinished workflows, no failures reported. No follow-up push or acceptance.
+
+The complete PC-exchange application was independently rebuilt in a disposable
+directory: HPC1, result address, stage1, launcher memory metadata and all six
+raw/wrapped launchers reproduce byte for byte (16 artifacts). Tracked-source
+hashes remained stable throughout rebuilding; temporary build files were removed.
+ELF debug paths are not compared across build directories. Evidence:
+`/work/oct29-pc-exchange/reproduction.json` and `reproduction.log`.
+This proves artifact reproduction, not completed Stock integration: both live
+matrices have passed their first four native cases and continue on the original
+sessions. No follow-up push or milestone acceptance is claimed.
