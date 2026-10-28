@@ -865,6 +865,79 @@ static int observe_mapped_bank(void *context, uint32_t address, uint8_t value)
 
 static void test_guarded_flashptr(void)
 {
+    for (unsigned special = 0; special < 2; ++special) {
+        struct image image = {.count = 15, .fail_at = UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {special ? mapped_nibble : read_nibble, &image};
+        hpclang_rpl_bank_dependency_fn observe = special ? observe_mapped_bank : observe_bank;
+        put_word(&image, 0, special ? 2 : 0x26ac, 5);
+        if (special) {
+            put_word(&image, 10, 0x6f8e, 5);
+        } else {
+            put_word(&image, 5, 0xfff, 3);
+            put_word(&image, 8, 0xffff, 4);
+        }
+        unsigned count = special ? 10 : 12;
+        for (unsigned fault = 0; fault < 5; ++fault) {
+            for (unsigned stop = 1; stop <= (fault ? count : 1); ++stop) {
+                unsigned at = special && stop > 5 ? stop + 4 : stop - 1;
+                uint8_t saved = image.data[at];
+                struct bank_observations observations = {.image = &image};
+                if (fault == 1 || fault == 2) {
+                    observations.stop = stop;
+                    observations.positive = fault == 2;
+                } else if (fault == 3) {
+                    image.fail_at = at;
+                } else if (fault == 4) {
+                    image.data[at] = 16;
+                }
+                uint32_t target = 99;
+                struct hpclang_rpl_flashptr decoded = {99, 99};
+                int result = special ? hpclang_rpl_flashptr_table_lookup_guarded(
+                                           &reader, 0x40000, 0x4000f, 0x40000, 1, &target, observe,
+                                           &observations)
+                                     : hpclang_rpl_flashptr_decode_guarded(&reader, 0, 12, &decoded,
+                                                                           observe, &observations);
+                if (!fault) {
+                    assert(result == 1 && observations.count == count);
+                    assert(special ? target == 0x6f8e
+                                   : decoded.selector == 0xfff && decoded.index == 0xffff);
+                    for (unsigned p = 0; p < 160; ++p)
+                        assert(observations.seen[p] ==
+                               (special ? p < 5 || (p >= 10 && p < 15) : p < 12));
+                } else {
+                    int expected = fault == 1   ? -79
+                                   : fault == 3 ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                                                : HPCLANG_RPL_SPAN_MALFORMED;
+                    assert(result == expected && target == 99 && decoded.selector == 99 &&
+                           decoded.index == 99);
+                    assert(observations.count == stop - (fault >= 3));
+                }
+                image.fail_at = UINT32_MAX;
+                image.data[at] = saved;
+            }
+        }
+    }
+    {
+        struct image image = {.count = 15, .fail_at = UINT32_MAX};
+        const struct hpclang_rpl_reader mapped = {mapped_nibble, &image};
+        const struct hpclang_rpl_reader source = {read_nibble, &image};
+        struct bank_observations observations = {.image = &image};
+        uint32_t target = 99;
+        put_word(&image, 0, 2, 5);
+        assert(!hpclang_rpl_flashptr_table_lookup_guarded(
+            &mapped, 0x40000, 0x4000f, 0x40000, 2, &target, observe_mapped_bank, &observations));
+        assert(target == 99 && observations.count == 5);
+        struct hpclang_rpl_flashptr pointer = {99, 99};
+        observations = (struct bank_observations){.image = &image};
+        assert(hpclang_rpl_flashptr_decode_guarded(&source, 0, 12, &pointer, observe_bank,
+                                                   &observations) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(pointer.selector == 99 && pointer.index == 99 && observations.count == 5);
+        assert(hpclang_rpl_flashptr_decode_guarded(&source, 0, 12, &pointer, NULL, &observations) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(hpclang_rpl_flashptr_table_lookup_guarded(&mapped, 0x40000, 0x4000f, 0x40000, 0,
+                                                         &target, NULL, &observations) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+    }
     for (unsigned stage = 0; stage < 2; ++stage) {
         struct image image = {.count = 160, .fail_at = UINT32_MAX};
         const struct hpclang_rpl_reader reader = {stage ? mapped_nibble : read_nibble, &image};

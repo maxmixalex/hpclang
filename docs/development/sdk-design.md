@@ -892,9 +892,17 @@ exclude ambiguous matches. `hpclang_rpl_flashptr_lookup_guarded()` retains the
 bank header identity, table count and selected target. Callers preserve separate
 mapping identities while accumulating both streams in one guard builder. Errors
 leave output unchanged; callback errors follow the bank-lookup contract. These
-entries do not capture the source FlashPtr, authenticate the mapping or geometry,
-dereference targets, or cover the special count-prefixed table format. Those
-dependencies and proof obligations must be supplied before mutation is allowed.
+entries do not authenticate the mapping or geometry or dereference targets.
+`hpclang_rpl_flashptr_decode_guarded()` records the source object's 12 nibbles,
+including both indices; decoding alone does not resolve a selector, so all
+three-nibble selector values remain representable. The separate bank resolver
+rejects unsupported selectors. `hpclang_rpl_flashptr_table_lookup_guarded()`
+records the count and selected target of a separately proven special table;
+it must not be used to infer table format or location from plausible bytes.
+Both entries use the same failure/output contract. Source, configuration and
+target dependencies compose under their respective mapping identities; discard
+the whole accumulated plan after any failure. Proven mappings, table locations,
+geometry and complete live-reference discovery remain required before mutation.
 
 The maintained installation witness exercises this capture on ARM, using the
 supported Stock 2.15 fixture's verified initializer literal-pool addresses and

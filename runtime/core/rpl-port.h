@@ -250,6 +250,13 @@ struct hpclang_rpl_flashptr
 int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_t address,
                                 uint32_t limit, struct hpclang_rpl_flashptr *pointer);
 
+/* Observe all 12 source nibbles without resolving selector/index or reading a
+ * target. Same dependency/error contract as bank_lookup_guarded; preserve output
+ * on failure. Keep the source mapping identity with these dependencies. */
+int hpclang_rpl_flashptr_decode_guarded(const struct hpclang_rpl_reader *source, uint32_t address,
+                                        uint32_t limit, struct hpclang_rpl_flashptr *pointer,
+                                        hpclang_rpl_bank_dependency_fn dependency, void *context);
+
 /* Match a logical FlashPtr selector's live configuration against a separate
  * physical-bank configuration table. Both tables contain 16 five-nibble cells
  * at caller-validated RAM addresses. Zero/unknown configuration returns 0;
@@ -295,6 +302,16 @@ int hpclang_rpl_flashptr_lookup_guarded(const struct hpclang_rpl_reader *mapped,
 int hpclang_rpl_flashptr_table_lookup(const struct hpclang_rpl_reader *mapped, uint32_t first,
                                       uint32_t end, uint32_t table, uint32_t index,
                                       uint32_t *target);
+
+/* Observe count and selected target for a separately proven special table.
+ * Does not infer table identity, format or mapping from plausible bytes. Retain
+ * those proofs and their dependencies separately. Same callback/error contract
+ * as bank_lookup_guarded; absent/error results preserve output. */
+int hpclang_rpl_flashptr_table_lookup_guarded(const struct hpclang_rpl_reader *mapped,
+                                              uint32_t first, uint32_t end, uint32_t table,
+                                              uint32_t index, uint32_t *target,
+                                              hpclang_rpl_bank_dependency_fn dependency,
+                                              void *context);
 
 /* Resolve a bounded DOACPTR through caller-validated ROM switch tables. The
  * source and ROM may have distinct readers. Return a bank-qualified nibble

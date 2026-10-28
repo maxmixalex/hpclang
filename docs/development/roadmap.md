@@ -115,9 +115,9 @@ Register-root follow-up `bc6596e6` is submitted in #26. All 28 fresh Stock cases
 CI remains unfinished; branch acceptance remains open.
 
 Bank/ACPTR guards are submitted in #26 (`abf9135c`); CI is unfinished.
-Local FlashPtr configuration and ordinary target-table guards pass sanitizer
-composition/failure tests and ARM analysis. Source-object and special-table
-dependencies, complete reference coverage, public libraries and Port1 edits
+Local FlashPtr source, configuration, ordinary and special target-table guards
+pass sanitizer composition/failure tests and ARM analysis. Proven mapping and
+table integration, complete live references, public libraries and Port1 edits
 remain open. This FlashPtr follow-up is not submitted.
 
 The active dependencies are complete execution-reference handling for safe
@@ -141,12 +141,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `abf9135c` | **CI pending:** ten unfinished workflows (six queued, two pending, two running); five running and seven queued jobs observed, no completed jobs or failures. Earlier HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `abf9135c` | **CI pending:** ten unfinished workflows (seven running, three queued); 16 successful, 14 running and 15 queued jobs observed, no failures. Earlier HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `969ade88` | **CI pending:** two unfinished workflows; 277 successful, 39 queued and three running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |
+| #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. #21 follow-up 10e05bc0 now submits pre-cleanup IRQ/timing/ownership diagnostics. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports state. Diagnostic coverage is not a claimed fix. |
+| #20 / `1ce01859` | **Parent updated by accepted #21; new CI not yet observed.** Historical `41e35a36` HP50g PWM failure remains unproven; #21 supplies elapsed-time tests and captured diagnostics. Mainline integration and full lifecycle/resource acceptance remain open. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

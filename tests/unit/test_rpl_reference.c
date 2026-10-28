@@ -1926,16 +1926,16 @@ static void guarded_nested_references(void)
 
 struct flashptr_guard_fixture
 {
-    uint8_t data[2][160];
+    uint8_t data[3][160];
     struct hpclang_rpl_reference_guard_builder builder;
 };
 
 static int flashptr_guard_read(void *context, uint32_t mapping, uint32_t address, uint8_t *value)
 {
     struct flashptr_guard_fixture *fixture = context;
-    if (mapping > 1 || address < (mapping ? 0x40000u : 0))
+    if (mapping > 2 || address < (mapping == 1 ? 0x40000u : 0))
         return 0;
-    address -= mapping ? 0x40000u : 0;
+    address -= mapping == 1 ? 0x40000u : 0;
     if (address >= 160)
         return 0;
     *value = fixture->data[mapping][address];
@@ -1964,10 +1964,22 @@ static int flashptr_target_observe(void *context, uint32_t address, uint8_t valu
     return hpclang_rpl_reference_guards_observe(&fixture->builder, 1, address, value);
 }
 
-static void flashptr_guard_composition(void)
+static int flashptr_source_read(void *context, uint32_t address, uint8_t *value)
+{
+    return flashptr_guard_read(context, 2, address, value);
+}
+
+static int flashptr_source_observe(void *context, uint32_t address, uint8_t value)
+{
+    struct flashptr_guard_fixture *fixture = context;
+    return hpclang_rpl_reference_guards_observe(&fixture->builder, 2, address, value);
+}
+
+static void flashptr_guard_composition(unsigned special)
 {
     struct flashptr_guard_fixture fixture = {0};
-    struct hpclang_rpl_reference_guard guards[20];
+    struct hpclang_rpl_reference_guard guards[23];
+    const struct hpclang_rpl_reader source = {flashptr_source_read, &fixture};
     const struct hpclang_rpl_reader config = {flashptr_config_read, &fixture};
     const struct hpclang_rpl_reader mapped = {flashptr_target_read, &fixture};
     const struct hpclang_rpl_reference_reader validation = {flashptr_guard_read, &fixture};
@@ -1982,24 +1994,41 @@ static void flashptr_guard_composition(void)
     fixture.data[1][29] = 2;
     fixture.data[1][39] = 1;
     fixture.data[1][43] = 5; /* Index 1 targets 0x50001. */
-    for (unsigned capacity = 19; capacity <= 20; ++capacity) {
+    fixture.data[2][0] = 12;
+    fixture.data[2][1] = 10;
+    fixture.data[2][2] = 6;
+    fixture.data[2][3] = 2; /* DOFLASHP 0x26ac. */
+    fixture.data[2][5] = 1;
+    fixture.data[2][8] = 1;
+    unsigned required = special ? 22 : 23;
+    for (unsigned capacity = required - 1; capacity <= required; ++capacity) {
         assert(!hpclang_rpl_reference_guards_begin(&fixture.builder, guards, capacity));
+        struct hpclang_rpl_flashptr pointer;
+        assert(hpclang_rpl_flashptr_decode_guarded(&source, 0, 12, &pointer,
+                                                   flashptr_source_observe, &fixture) == 1);
         uint32_t bank = 99, target = 99;
-        assert(hpclang_rpl_flashptr_bank_guarded(&config, 0, 80, 1, &bank, flashptr_config_observe,
-                                                 &fixture) == 1 &&
+        assert(hpclang_rpl_flashptr_bank_guarded(&config, 0, 80, pointer.selector, &bank,
+                                                 flashptr_config_observe, &fixture) == 1 &&
                bank == 2);
-        int result = hpclang_rpl_flashptr_lookup_guarded(&mapped, 0x40000, bank, 1, &target,
-                                                         flashptr_target_observe, &fixture);
-        if (capacity == 19) {
+        int result =
+            special
+                ? hpclang_rpl_flashptr_table_lookup_guarded(&mapped, 0x40000, 0x4002c, 0x4001d,
+                                                            pointer.index, &target,
+                                                            flashptr_target_observe, &fixture)
+                : hpclang_rpl_flashptr_lookup_guarded(&mapped, 0x40000, bank, pointer.index,
+                                                      &target, flashptr_target_observe, &fixture);
+        if (capacity < required) {
             assert(result < 0 && target == 99 && fixture.builder.count == 0);
             continue;
         }
-        assert(result == 1 && target == 0x50001 && fixture.builder.count == 20);
+        assert(result == 1 && target == 0x50001 && fixture.builder.count == required);
         assert(!hpclang_rpl_reference_guards_validate(&validation, guards, fixture.builder.count));
-        for (unsigned mapping = 0; mapping < 2; ++mapping) {
+        for (unsigned mapping = 0; mapping < 3; ++mapping) {
             for (unsigned at = 0; at < 160; ++at) {
-                int observed = mapping ? (at < 4 || (at >= 29 && at < 34) || (at >= 39 && at < 44))
-                                       : ((at >= 5 && at < 10) || at >= 80);
+                int observed = mapping == 2 ? at < 12
+                               : mapping    ? ((!special && at < 4) || (at >= 29 && at < 34) ||
+                                               (at >= 39 && at < 44))
+                                            : ((at >= 5 && at < 10) || at >= 80);
                 fixture.data[mapping][at] ^= 1;
                 int status = hpclang_rpl_reference_guards_validate(&validation, guards,
                                                                    fixture.builder.count);
@@ -2012,7 +2041,8 @@ static void flashptr_guard_composition(void)
 
 int main(void)
 {
-    flashptr_guard_composition();
+    flashptr_guard_composition(0);
+    flashptr_guard_composition(1);
     identified_dispatch_references();
     guarded_dispatch_references();
     guarded_nested_references();

@@ -802,3 +802,31 @@ claimed; source FlashPtr, special tables and geometry remain separate obligation
 PR #26 head `abf9135c` observed ten unfinished workflows: six queued, two pending,
 two running; five running and seven queued jobs, none completed and no failures.
 This is not acceptance. No push was made in this turn.
+
+## Source and special-table FlashPtr guards — 2026-10-29, local only
+
+Guarded decoding records the 12 source nibbles without conflating decoding with
+selector resolution; selector 0xfff and index 0xffff remain representable.
+Guarded special-table lookup records the count and selected target after the
+caller separately proves table location/format. Both preserve output on failure.
+The two new paths add 88 per-position callback/read/invalid-nibble rejections,
+plus absent-index, unsupported-prologue and missing-callback controls. Together
+with ordinary/configuration paths, 484 per-position fault cases pass.
+
+The maintained C integration test now composes source, configuration and either
+ordinary or special target lookup under three mapping identities. It validates
+111/107 observed nibbles using 23/22 guards, rejects all 218 changed dependencies,
+accepts changes to 742 unobserved cells, and rejects both insufficient-capacity
+cases. ASan/UBSan port/reference units, ARMv4T compilation/static analysis, full
+tracked-file formatting/Ruff/ShellCheck pass. This is controlled parser/guard
+composition, not proven production mappings or complete live-reference coverage.
+
+PR #26 `abf9135c`: ten unfinished workflows, 16 successful / 14 running /
+15 queued jobs at observation, no failures. No new #26 push this turn.
+
+PR #21 `969ade88` completed all seven workflows: 319 successful jobs and one
+conditional PR evidence-publisher skip. GitHub reported a clean mergeable head;
+after marking the accepted draft ready, it merged into its parent #20 as
+`1ce018599b622d6762cf02e4f5aa9c62873b188f`. Parent #20 now has that head and still
+targets main. New parent CI was not polled in the merge turn. This accepts the
+child delivery only; parent acceptance and M8.2/M8.3 completion remain open.

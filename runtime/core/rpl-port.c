@@ -649,6 +649,46 @@ int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t 
     return found;
 }
 
+int hpclang_rpl_flashptr_decode_guarded(const struct hpclang_rpl_reader *source, uint32_t address,
+                                        uint32_t limit, struct hpclang_rpl_flashptr *pointer,
+                                        hpclang_rpl_bank_dependency_fn dependency, void *context)
+{
+    if (!source || !source->read_nibble || !pointer || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {source, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    struct hpclang_rpl_flashptr next = {UINT32_MAX, UINT32_MAX};
+    int result = hpclang_rpl_flashptr_decode(&observed, address, limit, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1 && (next.selector > 0xfffu || next.index > 0xffffu))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result == 1)
+        *pointer = next;
+    return result;
+}
+
+int hpclang_rpl_flashptr_table_lookup_guarded(const struct hpclang_rpl_reader *mapped,
+                                              uint32_t first, uint32_t end, uint32_t table,
+                                              uint32_t index, uint32_t *target,
+                                              hpclang_rpl_bank_dependency_fn dependency,
+                                              void *context)
+{
+    if (!mapped || !mapped->read_nibble || !target || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {mapped, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    uint32_t next = UINT32_MAX;
+    int result = hpclang_rpl_flashptr_table_lookup(&observed, first, end, table, index, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1 && (!next || next >= 0x80000u))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result == 1)
+        *target = next;
+    return result;
+}
+
 int hpclang_rpl_flashptr_bank_guarded(const struct hpclang_rpl_reader *reader, uint32_t selectors,
                                       uint32_t banks, uint32_t selector, uint32_t *bank,
                                       hpclang_rpl_bank_dependency_fn dependency, void *context)
