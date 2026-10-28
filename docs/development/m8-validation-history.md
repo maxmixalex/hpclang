@@ -1277,3 +1277,28 @@ These are unfinished CI results, not acceptance. Follow-up delivery retains all
 public Port1 and complete execution-reference gates. No new-head CI is polled in
 the push turn. Full source-quality logs remain at `/work/oct28-pr25-format-fix`,
 and documentation log at `/work/oct29-current-docs-check.log`.
+
+## Device-routing dependency — local, 2026-10-29
+
+Original-ROM read-before-write tracing identifies device configuration fields
+among the incoming bank-switch dependencies. Inspection of the CONFIG and
+UNCONFIG handlers shows that UNCONFIG checks configured RAM before the temporary
+bank-control device. Changing only CPU+0xba8 from 0x80 to 0x7f makes the reviewed
+P=0 path return with flags 5 instead of 3: RAM is unconfigured and Read mappings
+change, despite unchanged entry code, selector and selected bank. This synthetic
+state is a dependency counterexample, not a claim that ordinary launches use it.
+
+Maintained `bank_overlay.py` now checks this for both alias and canonical entries
+for banks 2 and 4 on both models (eight executions), including actual return,
+flags [3, 0x23, 7, 5], changed Read maps, identical selected banks, bounded state/
+stack writes and unchanged Flash. Both full maintained bank-map runs pass, with
+reports/source hashes at `/work/oct29-bank-routing/{model}/bank-switch-maps.json`.
+Ruff check/format pass. Read-before-write traces remain at
+`/work/oct29-bank-dependency-trace.json`; independent collision traces are at
+`/work/oct29-bank-config-collision.json`. Trace coverage does not establish all
+possible dependencies. Runtime integration must qualify device-routing state as
+well as code, mutable selectors, owners and geometry; public edit gates remain.
+
+Exact-head CI audit: PR26 ac24c17f has eight queued/two pending workflows and
+twelve queued jobs; PR20 4f2ce605 has ten queued/two running workflows, thirteen
+queued/seven running jobs. Neither is accepted or merged.

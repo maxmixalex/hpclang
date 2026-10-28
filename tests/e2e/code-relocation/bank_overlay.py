@@ -199,12 +199,17 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
         )
         return literal.value
 
-    def execute(initial, entry, selector=None):
+    def execute(initial, entry, selector=None, ram_collision=False):
         uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
         for address, data in ((0, flash), (0x08000000, ram)):
             uc.mem_map(address, len(data))
             uc.mem_write(address, data)
         uc.mem_map(0x300000, 0x10000)
+        if ram_collision:
+            # UNCONFIG checks RAM before the bank-control device. Changing this
+            # initial field alone must invalidate a claimed bank-only effect.
+            assert initial is None and selector is None
+            uc.mem_write(cpu + 0xBA8, struct.pack("<I", 0x7F))
         for reg, value in (
             (UC_ARM_REG_R4, cpu),
             (UC_ARM_REG_R5, 0xFFFFF),
@@ -267,7 +272,7 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
                     before_flags,
                     before_flags | 0x20,
                     before_flags | 4,
-                    before_flags,
+                    5 if ram_collision else before_flags,
                 ]
                 assert config_stages[0]["c_low"] == 0xFF000
                 assert config_stages[2]["d0"] == config_stages[2]["c_low"]
@@ -292,6 +297,9 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
             shift = 4 * (address & 1)
             old = uc.mem_read(physical, 1)[0]
             uc.mem_write(physical, bytes([(old & ~(15 << shift)) | (value << shift)]))
+        if ram_collision:
+            assert struct.unpack("<I", uc.mem_read(cpu + 0xB9C, 4))[0] == 3
+            return [call(entry, 0)]
         return [call(entry, 0), call(entry, 1)]
 
     # These addresses are evidence for the two captured supported ROMs only.
@@ -322,6 +330,14 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
             else:
                 assert changed[0]["pages"][64:128] == banks[alternate]["pages"]
                 assert changed[1]["pages"][64:128] == banks[2]["pages"]
+            collision = None
+            if initial is None:
+                collision = execute(None, switch, ram_collision=True)[0]
+                assert collision == execute(None, banks[bank]["switch"], ram_collision=True)[0]
+                assert collision["banks"] == actual[0]["banks"]
+                assert collision["configuration_flags"] == [3, 0x23, 7, 5]
+                assert collision["flags"] != actual[0]["flags"]
+                assert collision["pages"] != actual[0]["pages"]
             results.append(
                 dict(
                     switch=switch,
@@ -332,6 +348,7 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
                     canonical_selector_field=canonical_selector,
                     entry_program=programs[switch],
                     changed_selector_stages=changed,
+                    ram_configuration_collision=collision,
                 )
             )
     return results
