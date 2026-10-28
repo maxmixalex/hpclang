@@ -1236,9 +1236,18 @@ segment instead of fresh symbolic seeds. Interior/adjacent candidates and
 unreadable chain metadata are rejected with query output unchanged (six checks
 per allocated case). This covers the exercised no-GC allocation path; it does
 not establish every allocator/launcher path or safe execution across native ARM.
+The allocation proof's captured instruction, chain and object-span reads are
+revalidated by catalog transaction guards before writing: main-RAM dependencies
+use mutation IO and ROM dependencies use a distinct read-only mapping. Across
+the 32 allocated move attempts, 96 deliberately mismatched witnesses reject
+before any memory, entry or register update. After successful movement, a new
+whole-chain query and span parse must find the same-sized allocation and all
+object nibbles must match. The 32 baseline/repaired cases retain qualified R0;
+the 16 deliberately stale-R0 controls fail the exact-allocation query. These
+guards bind the recorded inputs, not unobserved launcher or caller behavior.
 Unit tests cover descriptor composition,
 overlapping copies, simultaneous exchanges, clearing constants, and unchanged
-state on invalid inputs. `/work/oct28-allocation-origin/return` retains current
+state on invalid inputs. `/work/oct28-allocation-guards/return` retains current
 hash-bound reports; the earlier three-step and fixed-address-step evidence
 remain in `/work/oct28-origins-return` and `/work/oct28-origin-stack`.
 Seeding R0 tokens identifies their origin; it does not by itself prove the

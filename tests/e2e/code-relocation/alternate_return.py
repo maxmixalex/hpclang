@@ -100,6 +100,25 @@ class Reader(c.Structure):
     _fields_ = [("read", Read), ("context", c.c_void_p)]
 
 
+MappedRead = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint8))
+
+
+class MappedReader(c.Structure):
+    _fields_ = [("read", MappedRead), ("context", c.c_void_p)]
+
+
+class Guard(c.Structure):
+    _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
+
+
+lib.bank_catalog_grow_r0_guarded.argtypes = [
+    *lib.bank_catalog_grow_r0.argtypes,
+    c.POINTER(MappedReader),
+    c.POINTER(Guard),
+    c.c_uint32,
+]
+
+
 class Assignment(c.Structure):
     _fields_ = [
         (n, c.c_uint32)
@@ -262,22 +281,25 @@ for cursor in range(8):
                         p, bytes([(old & ~(15 << shift)) | ((value >> (4 * i) & 15) << shift)])
                     )
 
+            def nibble(at):
+                return uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
+
             def word(at):
-                return sum(
-                    ((uc.mem_read(mapping.physical(at + i), 1)[0] >> (4 * ((at + i) & 1))) & 15)
-                    << (4 * i)
-                    for i in range(5)
-                )
+                return sum(nibble(at + i) << (4 * i) for i in range(5))
 
             allocation_trace = []
             allocation_origins = Origins()
             allocation_origin_path = []
             allocation_bounds = []
             allocation_start_top = word(0x806EE)
+            allocation_reads = {}
+            guard_rejections = 0
+            post_move_allocation = None
 
             @Read
             def allocation_read(_, at, value):
                 value[0] = uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
+                allocation_reads[at] = value[0]
                 return 1
 
             allocation_reader = Reader(allocation_read, None)
@@ -422,6 +444,11 @@ for cursor in range(8):
             r0 = c.c_uint32(initial_r0)
             writes = c.c_uint32()
             delta = 0 if mode == "baseline" else 16
+            allocation_bytes = (
+                bytes(nibble(target + i) for i in range(allocation_bounds[1]))
+                if args.allocated_root
+                else b""
+            )
             if delta:
                 nibbles = bytearray(
                     n
@@ -430,13 +457,60 @@ for cursor in range(8):
                     for n in (value & 15, value >> 4)
                 )
                 data = (c.c_uint8 * len(nibbles)).from_buffer(nibbles)
+                guards = (Guard * len(allocation_reads))(
+                    *[
+                        Guard(1 if at >= 0x80000 else 2, at, value, 1)
+                        for at, value in sorted(allocation_reads.items())
+                    ]
+                )
+
+                @MappedRead
+                def read_guard(_, identity, at, value):
+                    # Main-RAM dependencies must use the mutation IO, not this
+                    # alternate reader. ROM has a separately owned mapping.
+                    if identity != 2 or at >= 0x80000:
+                        return 0
+                    value[0] = uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
+                    return 1
+
+                guard_reader = MappedReader(read_guard, None)
+                if args.allocated_root:
+                    before_move = bytes(data)
+                    for field in (0x806EE, 0x5BC8, target):
+                        guard = next(g for g in guards if g.field == field)
+                        guard.expected ^= 1
+                        probe_entry, probe_r0, probe_writes = (
+                            c.c_uint32(entry.value),
+                            c.c_uint32(r0.value),
+                            c.c_uint32(),
+                        )
+                        assert (
+                            lib.bank_catalog_grow_r0_guarded(
+                                data,
+                                c.byref(probe_entry),
+                                c.byref(probe_r0),
+                                1,
+                                c.byref(probe_writes),
+                                c.byref(guard_reader),
+                                guards,
+                                len(guards),
+                            )
+                            < 0
+                        )
+                        assert not probe_writes.value and bytes(data) == before_move
+                        assert (probe_entry.value, probe_r0.value) == (entry.value, r0.value)
+                        guard.expected ^= 1
+                        guard_rejections += 1
                 assert (
-                    lib.bank_catalog_grow_r0(
+                    lib.bank_catalog_grow_r0_guarded(
                         data,
                         c.byref(entry),
                         c.byref(r0),
                         int(flags == 1 and mode == "move"),
                         c.byref(writes),
+                        c.byref(guard_reader),
+                        guards,
+                        len(guards),
                     )
                     == 0
                 )
@@ -448,6 +522,35 @@ for cursor in range(8):
                         bytes(nibbles[i] | nibbles[i + 1] << 4 for i in range(lo, lo + 4096, 2)),
                     )
                 assert word(target + 16) == target_word and word(target) != target_word
+            if args.allocated_root:
+                moved = target + delta
+                extent = c.c_uint32()
+                assert (
+                    lib.bank_temp_allocation(c.byref(allocation_reader), moved, c.byref(extent))
+                    == 0
+                )
+                assert extent.value == allocation_bounds[1]
+                assert bytes(nibble(moved + i) for i in range(extent.value)) == allocation_bytes
+                span = c.c_uint32()
+                assert (
+                    lib.hpclang_rpl_object_span(
+                        c.byref(allocation_reader), moved, extent.value, c.byref(span)
+                    )
+                    == 0
+                )
+                assert span.value == extent.value
+                candidate = c.c_uint32(0x12345678)
+                qualified = lib.bank_temp_allocation(
+                    c.byref(allocation_reader), r0.value & 0xFFFFF, c.byref(candidate)
+                )
+                assert qualified == (-7 if mode == "stale-r0" else 0)
+                if mode == "stale-r0":
+                    assert candidate.value == 0x12345678
+                else:
+                    assert candidate.value == extent.value
+                post_move_allocation = dict(
+                    first=moved, extent=extent.value, r0_qualified=qualified == 0
+                )
             assert r0.value == initial_r0 + (16 if mode == "move" and flags == 1 else 0)
             for off, value in ((0x95C, 0), (0x970, 0), (0xC24, 0), (0x998, cursor)):
                 uc.mem_write(cpu + off, struct.pack("<I", value))
@@ -675,6 +778,8 @@ for cursor in range(8):
                     allocation_trace=[hex(x) for x in allocation_trace],
                     allocation_origin_path=allocation_origin_path,
                     allocation_bounds=allocation_bounds,
+                    allocation_guard_rejections=guard_rejections,
+                    post_move_allocation=post_move_allocation,
                     target=hex(target),
                     cursor=cursor,
                     flags=flags,
