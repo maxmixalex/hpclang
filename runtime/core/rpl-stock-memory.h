@@ -9,6 +9,30 @@
 #define HPCLANG_RPL_PORT2_BANKS 6u
 #define HPCLANG_RPL_FLASH_BANK_NIBBLES 0x40000u
 
+struct hpclang_rpl_rom_bank;
+struct hpclang_rpl_stock_rom_bank
+{
+    const volatile uint8_t *bytes;
+    uint32_t size;
+};
+
+/* Read a separately proven ROM bank in native 0x40000-based coordinates,
+ * bounded by its actual declared byte size, not the entire bank-switch window.
+ * Capture checks Flash extent and every touched ARM identity section for user
+ * read permission. bank_bytes must correspond to bank->physical; the caller
+ * proves geometry provenance (rom_bank_layout) and retains memory/reader storage
+ * and exclusive mapping lifetime. No switch, allocation, native call or write.
+ * Failure preserves both outputs. Shape/permission checks do not identify ROMs.
+ * The Stock entry uses the current launcher identity mapping on HP49g+/HP50g. */
+int hpclang_rpl_stock_rom_bank_capture(struct hpclang_rpl_stock_rom_bank *memory,
+                                       struct hpclang_rpl_reader *reader,
+                                       const volatile uint8_t *bank_bytes,
+                                       const struct hpclang_rpl_rom_bank *bank,
+                                       const uint32_t flash_sections[2]);
+int hpclang_rpl_stock_rom_bank_reader(struct hpclang_rpl_stock_rom_bank *memory,
+                                      struct hpclang_rpl_reader *reader,
+                                      const struct hpclang_rpl_rom_bank *bank);
+
 /* HP49g+/50g user Flash banks 8..13 occupy physical 0x140000..0x1fffff.
  * Capture verifies their enclosing identity section permits user reads. */
 int hpclang_rpl_stock_port2_capture(struct hpclang_rpl_reader *reader,

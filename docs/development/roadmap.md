@@ -114,12 +114,12 @@ Register-root follow-up `bc6596e6` is submitted in #26. All 28 fresh Stock cases
 36 unchanged Flash snapshots and 16 reproducible artifacts pass local audit;
 CI remains unfinished; branch acceptance remains open.
 
-Bank/ACPTR guards are submitted in #26 (`abf9135c`); CI is unfinished.
-Local FlashPtr guard composition passes all 7,952 entries in both fixtures' ROM
-tables (including two absent entries) and 4,638 stale-dependency rejections.
-Source objects are controlled test inputs. Production mapping qualification,
-complete live references, public libraries and Port1 edits remain open.
-This FlashPtr follow-up is a delivery candidate, not submitted.
+FlashPtr guard composition is submitted in #26 (`d7db49e8`); CI is unfinished.
+Local bounded ROM-bank capture checks ARM identity sections and declared bank
+sizes; both-model integration passes all 7,952 table entries and 4,638 stale
+dependency rejections using that C reader. Host descriptors/source objects are
+controlled inputs. Live mapping qualification, complete references, public
+libraries and Port1 edits remain open. The reader follow-up is not submitted.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -142,7 +142,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `abf9135c` | **CI pending:** one workflow successful, nine unfinished; 40 successful, 18 running and 296 queued jobs observed, no failures. Earlier HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `d7db49e8` | **CI pending:** ten unfinished workflows (three queued, five pending, two running); four running and five queued jobs observed, none completed and no failures. Earlier HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |

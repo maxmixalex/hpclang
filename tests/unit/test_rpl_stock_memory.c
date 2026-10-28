@@ -6,6 +6,7 @@
 #include <hpclang/bootstrap.h>
 #include <hpclang/target.h>
 #include "rpl-stock-memory.h"
+#include "rpl-port.h"
 
 static const struct hpclang_boot_info *active_boot;
 const struct hpclang_boot_info *hpclang_boot_info(void)
@@ -204,8 +205,68 @@ static void test_physical_spans(void)
     assert(physical == 123);
 }
 
+static void test_rom_bank_reader(void)
+{
+    static uint8_t bytes[0x20000];
+    for (unsigned i = 0; i < sizeof bytes; ++i)
+        bytes[i] = (uint8_t)(i * 37u + 11u);
+    const struct hpclang_rpl_rom_bank banks[] = {
+        {0x48000, 0x18000}, {0x80000, 0x20000}, {0xffc00, 0x800}, {0x1e0000, 0x20000}};
+    uint32_t sections[] = {0x00000802, 0x00100c02};
+    struct hpclang_rpl_stock_rom_bank memory = {0};
+    struct hpclang_rpl_reader reader = {0};
+    assert(!hpclang_rpl_stock_rom_bank_reader(&memory, &reader, banks));
+    for (unsigned i = 0; i < sizeof banks / sizeof banks[0]; ++i) {
+        const struct hpclang_rpl_rom_bank *bank = &banks[i];
+        assert(hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, bank, sections));
+        assert(memory.bytes == bytes && memory.size == bank->bytes && reader.context == &memory);
+        uint8_t value;
+        for (unsigned at = 0; at < bank->bytes * 2u; ++at) {
+            assert(reader.read_nibble(reader.context, 0x40000u + at, &value));
+            assert(value == ((bytes[at / 2u] >> (4u * (at & 1u))) & 15u));
+        }
+        const uint32_t invalid[] = {0, 0x3ffff, 0x40000 + bank->bytes * 2u, 0x80000, UINT32_MAX};
+        for (unsigned j = 0; j < sizeof invalid / sizeof invalid[0]; ++j) {
+            value = 99;
+            assert(!reader.read_nibble(reader.context, invalid[j], &value) && value == 99);
+        }
+        assert(!reader.read_nibble(reader.context, 0x40000, NULL));
+        unsigned first = bank->physical >> 20, last = (bank->physical + bank->bytes - 1u) >> 20;
+        for (unsigned section = first; section <= last; ++section) {
+            const uint32_t masks[] = {2, 0x800, 0x100000};
+            for (unsigned j = 0; j < sizeof masks / sizeof masks[0]; ++j) {
+                sections[section] ^= masks[j];
+                struct hpclang_rpl_reader before = reader;
+                assert(
+                    !hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, bank, sections));
+                assert(memory.bytes == bytes && memory.size == bank->bytes);
+                assert(reader.context == before.context &&
+                       reader.read_nibble == before.read_nibble);
+                sections[section] ^= masks[j];
+            }
+        }
+    }
+    const struct hpclang_rpl_rom_bank invalid[] = {{0, 0},
+                                                   {0x48000, 1},
+                                                   {0x48001, 0x18000},
+                                                   {0x48000, 0x20400},
+                                                   {0x200000, 0x400},
+                                                   {0x1ffc00, 0x800},
+                                                   {UINT32_MAX, 0x400}};
+    for (unsigned i = 0; i < sizeof invalid / sizeof invalid[0]; ++i)
+        assert(!hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, &invalid[i], sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(NULL, &reader, bytes, banks, sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(&memory, NULL, bytes, banks, sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(&memory, &reader, NULL, banks, sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, NULL, sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, banks, NULL));
+    for (unsigned i = 0; i < sizeof bytes; ++i)
+        assert(bytes[i] == (uint8_t)(i * 37u + 11u));
+}
+
 int main(void)
 {
+    test_rom_bank_reader();
     test_discontinuous_spans();
     test_mapping_overlap();
     test_physical_spans();

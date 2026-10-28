@@ -17,6 +17,25 @@ def verify_flashptr(lib, read, flash, mappings):
     class Pointer(c.Structure):
         _fields_ = [("selector", c.c_uint32), ("index", c.c_uint32)]
 
+    class Geometry(c.Structure):
+        _fields_ = [("physical", c.c_uint32), ("size", c.c_uint32)]
+
+    class BankMemory(c.Structure):
+        _fields_ = [("bytes", c.POINTER(c.c_uint8)), ("size", c.c_uint32)]
+
+    lib.hpclang_rpl_stock_rom_bank_capture.argtypes = [
+        c.POINTER(BankMemory),
+        c.POINTER(Reader),
+        c.POINTER(c.c_uint8),
+        c.POINTER(Geometry),
+        c.POINTER(c.c_uint32),
+    ]
+    flash_storage = (c.c_uint8 * len(flash)).from_buffer_copy(flash)
+    # Host capture tests the same permission gates as Stock, with explicit
+    # identity descriptors. This does not inspect the live machine's L1 table.
+    sections = (c.c_uint32 * 2)(0x802, 0x100802)
+    bank_memory, bank_reader = BankMemory(), Reader()
+
     class Guard(c.Structure):
         _fields_ = [(key, c.c_uint32) for key in ("mapping", "field", "expected", "width")]
 
@@ -95,7 +114,10 @@ def verify_flashptr(lib, read, flash, mappings):
         else:
             assert mapping == 2 and 0x40000 <= address < 0x40000 + active["valid_bytes"] * 2
             offset = active["physical"] + (address - 0x40000) // 2
-            result = (flash[offset] >> (4 * (address & 1))) & 15
+            nibble = c.c_uint8(99)
+            assert bank_reader.read(bank_reader.context, address, c.byref(nibble)) == 1
+            result = nibble.value
+            assert result == (flash[offset] >> (4 * (address & 1))) & 15
         return result ^ (1 if corrupt == (mapping, address) else 0)
 
     def make_read(mapping):
@@ -138,6 +160,18 @@ def verify_flashptr(lib, read, flash, mappings):
     for selector, bank in expected_banks.items():
         active = mappings[bank]
         assert active["populated"]
+        geometry = Geometry(active["physical"], active["valid_bytes"])
+        packed = c.cast(c.byref(flash_storage, active["physical"]), c.POINTER(c.c_uint8))
+        assert (
+            lib.hpclang_rpl_stock_rom_bank_capture(
+                c.byref(bank_memory), c.byref(bank_reader), packed, c.byref(geometry), sections
+            )
+            == 1
+        )
+        for outside in (0x3FFFF, 0x40000 + active["valid_bytes"] * 2, 0x80000):
+            nibble = c.c_uint8(99)
+            assert bank_reader.read(bank_reader.context, outside, c.byref(nibble)) == 0
+            assert nibble.value == 99
         # These locations come from the reviewed fixture handlers, not header scanning.
         header = 0x60200 if selector == 15 else 0x40200
         table = header + 29
@@ -237,5 +271,6 @@ def verify_flashptr(lib, read, flash, mappings):
                 stale_rejections=rejected,
             )
         )
+    assert bytes(flash_storage) == flash
     assert not callback_errors, callback_errors
     return rows

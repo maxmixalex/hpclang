@@ -39,6 +39,7 @@ files = [
         "rpl-reference.c",
         "rpl-object-store.c",
         "rpl-code.c",
+        "rpl-stock-memory.c",
     )
 ]
 sources = {
@@ -47,11 +48,16 @@ sources = {
         *files,
         base / "rpl-port.h",
         base / "rpl-reference.h",
+        base / "rpl-stock-memory.h",
         Path(__file__),
         Path(__file__).with_name("flashptr_guards.py"),
     ]
 }
 shared = args.output / "bank-switch-maps.so"
+stub = args.output / "stock-host-stub.c"
+stub.write_text(
+    "#include <hpclang/bootstrap.h>\nconst struct hpclang_boot_info *hpclang_boot_info(void) { return 0; }\n"
+)
 subprocess.run(
     [
         args.cc,
@@ -64,6 +70,7 @@ subprocess.run(
         "-I" + str(base),
         "-I" + str(root / "include"),
         *map(str, files),
+        str(stub),
         "-o",
         str(shared),
     ],

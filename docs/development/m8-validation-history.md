@@ -854,3 +854,27 @@ live FlashPtr, and it does not authorize production Port1 mutation.
 Pre-delivery #26 `abf9135c`: one successful/nine unfinished workflows;
 40 successful, 18 running, 296 queued jobs, no failures observed. Parent #20
 `1ce01859` has four workflows/six jobs queued. Neither branch is accepted.
+
+## Bounded ROM-bank reader — 2026-10-29, local only
+
+The Stock-memory adapter now captures separately proven ROM geometry into a
+caller-owned native-coordinate reader. It validates both Flash extent and all
+touched identity sections, including a bank crossing the 1 MiB boundary. Reads
+are bounded by the declared bank size, not by the 128 KiB Saturn window. The
+Stock wrapper selects current launcher identity mappings on HP49g+/HP50g; it
+does not switch banks or write Flash. Failed captures preserve both outputs.
+
+ASan/UBSan Stock-memory tests cover every nibble of 96 KiB/128 KiB, cross-section
+and end-of-Flash examples, invalid dimensions/permissions/identity, boundary
+reads, unchanged outputs and unchanged source bytes. Both-model bank-map and
+FlashPtr integration now use this C capture reader for all 7,952 ROM table entries,
+with 4,638 stale dependencies rejected and every read compared with independent
+ROM indexing. The host explicitly supplies section descriptors; it does not
+validate the live machine's L1 table. Reports retain source/input hashes under
+`/work/oct29-rom-bank-reader/{hp49gplus,hp50g}/bank-switch-maps.json`.
+
+ARMv4T compilation/static analysis pass; the hardware adapter's fixed-address
+checker is excluded, as in its preceding analysis. Firmware identity, live mapping
+capture, complete references and production Port1 mutation remain open.
+PR #26 `d7db49e8` has ten unfinished workflows, four running/five queued jobs,
+none completed and no failures at observation. No push this turn.

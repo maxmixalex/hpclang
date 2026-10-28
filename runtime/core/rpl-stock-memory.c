@@ -3,6 +3,7 @@
 #include <hpclang/bootstrap.h>
 #include <hpclang/target.h>
 #include "rpl-stock-memory.h"
+#include "rpl-port.h"
 #include "launch-services.h"
 
 static int valid_page(uint32_t page)
@@ -109,6 +110,51 @@ static int flash_read(void *context, uint32_t address, uint8_t *value)
     const volatile uint8_t *bytes = context;
     *value = (bytes[address / 2u] >> (4u * (address & 1u))) & 15u;
     return 1;
+}
+
+static int rom_bank_read(void *context, uint32_t address, uint8_t *value)
+{
+    const struct hpclang_rpl_stock_rom_bank *memory = context;
+    if (!memory || !value || !memory->bytes || address < 0x40000u ||
+        address - 0x40000u >= memory->size * 2u)
+        return 0;
+    uint32_t offset = address - 0x40000u;
+    *value = (memory->bytes[offset / 2u] >> (4u * (offset & 1u))) & 15u;
+    return 1;
+}
+
+int hpclang_rpl_stock_rom_bank_capture(struct hpclang_rpl_stock_rom_bank *memory,
+                                       struct hpclang_rpl_reader *reader,
+                                       const volatile uint8_t *bank_bytes,
+                                       const struct hpclang_rpl_rom_bank *bank,
+                                       const uint32_t flash_sections[2])
+{
+    if (!memory || !reader || !bank_bytes || !bank || !flash_sections || !bank->bytes ||
+        bank->bytes > 0x20000u || (bank->physical & 1023u) || (bank->bytes & 1023u) ||
+        bank->physical >= 0x200000u || bank->bytes > 0x200000u - bank->physical)
+        return 0;
+    uint32_t first = bank->physical >> 20;
+    uint32_t last = (bank->physical + bank->bytes - 1u) >> 20;
+    for (uint32_t section = first; section <= last; ++section)
+        if ((flash_sections[section] & UINT32_C(0xfff00803)) != ((section << 20) | UINT32_C(0x802)))
+            return 0;
+    *memory = (struct hpclang_rpl_stock_rom_bank){bank_bytes, bank->bytes};
+    *reader = (struct hpclang_rpl_reader){rom_bank_read, memory};
+    return 1;
+}
+
+int hpclang_rpl_stock_rom_bank_reader(struct hpclang_rpl_stock_rom_bank *memory,
+                                      struct hpclang_rpl_reader *reader,
+                                      const struct hpclang_rpl_rom_bank *bank)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (!memory || !reader || !bank || !boot || !boot->saturn_state ||
+        (boot->model != HPCLANG_MODEL_HP49GPLUS && boot->model != HPCLANG_MODEL_HP50G))
+        return 0;
+    volatile const uint32_t *l1 = (const void *)(uintptr_t)0x07f00000u;
+    const uint32_t sections[] = {l1[0], l1[1]};
+    return hpclang_rpl_stock_rom_bank_capture(
+        memory, reader, (const void *)(uintptr_t)bank->physical, bank, sections);
 }
 
 int hpclang_rpl_stock_port2_capture(struct hpclang_rpl_reader *reader,

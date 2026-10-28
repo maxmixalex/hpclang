@@ -915,6 +915,18 @@ entry. Mutating each dependency of the first, middle and last entries produces
 2,319 rejected validations per model. Fixture-specific locations are reviewed
 test inputs, not runtime ROM identification or complete live-pointer discovery.
 
+`hpclang_rpl_stock_rom_bank_capture()` supplies the bank reader used by that
+integration test. It accepts separately proven geometry, checks the Flash extent
+and each touched ARM identity section's user-read permission, then bounds native
+reads to `0x40000 + 2 * bank.bytes`. The 96 KiB first bank cannot expose the tail
+of the 128 KiB switch window. Invalid captures preserve both caller-owned outputs;
+invalid reads preserve the nibble output. `hpclang_rpl_stock_rom_bank_reader()`
+uses the current launcher identity mappings on HP49g+/HP50g. Neither entry changes
+the Saturn bank, allocates memory or writes Flash. The caller retains geometry
+provenance, context storage and stable mappings; shape checks do not identify a
+ROM. Host tests supply explicit section descriptors and compare each captured
+read with the independently indexed ROM bytes; they do not inspect live ARM L1.
+
 The maintained installation witness exercises this capture on ARM, using the
 supported Stock 2.15 fixture's verified initializer literal-pool addresses and
 state layout. Its existing missing-library and matched-installation invocations
