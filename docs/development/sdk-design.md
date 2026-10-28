@@ -1212,6 +1212,21 @@ and script hashes, trace tail and per-slot checks are retained in
 `/work/oct28-capacity-stock-probe/<model>.json`. No interpreter instruction or
 allocator was stubbed; IRQs were disabled and the caller machine stack cleared.
 
+The RAM-interior contrast fixture exposes an unresolved execution constraint.
+A modeled 32-nibble TEMP DOCSTR envelope contains the same inline dispatch;
+its footer chain is validated and a separate data-stack object-start root is
+installed. On both models, original ROM collection relocates that object from
+556486 to 554937 and repairs the data-stack root, but A.A/R1.A remain at 556501
+instead of the required 554952. The original 20 stack values remain intact.
+Reaching the predicate handler therefore does not prove a safe continuation:
+old payload bytes can still be readable after collection. This is an unsupported
+execution fixture, not a supported Stock application or hpclang allocator bug
+claim. Public relocation requires an explicit continuation repair/pinning
+contract or a proven native launch convention; ROM-resident success cannot
+justify arbitrary movable RAM entries. Reproducer:
+`research/oct28-capacity-ram-probe.py`; per-model negative findings, base/variant
+driver hashes and final SRAM: `/work/oct28-capacity-ram-probe/`.
+
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
 A/C bit-test instruction boundaries. Its relocation planner
