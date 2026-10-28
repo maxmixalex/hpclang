@@ -112,7 +112,7 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 Incoming-carry root discovery now passes 192 controlled interpreter cases and all 28 fresh HP49g+/HP50g Stock call/catalog cases. Independent checks confirm unchanged Flash in 36 saved states and byte-identical reproduction of six launchers. Its CI gate is submitted in #26; this is local validation, not branch acceptance or complete execution-reference coverage.
 
-Local PC-exchange follow-up passes sanitizer/ARM analysis, 192 interpreter cases, and eight catalog-movement paths with 16 observed stale-address controls. It covers exchanges before/after movement; automatic provenance qualification and public library management remain open.
+Local PC-exchange follow-up passes 192 interpreter cases, eight catalog-movement paths, 16 stale-address controls and 128 pre-write instruction-guard rejections. Sanitizer/ARM analysis and full format/lint checks pass. Fresh two-model Stock integration is running; automatic provenance qualification and public library management remain open.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -135,7 +135,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `f66b3b97` | **CI pending:** 12 unfinished workflows; ten successful, eight running and 16 queued jobs at observation, no failures reported. Incoming-carry local integration is complete. The PC-exchange descriptor, interpreter gate and catalog-movement contrasts pass locally and are not yet pushed. |
+| #26 / `f66b3b97` | **CI pending:** 12 unfinished workflows; 35 successful, eight running and 232 queued jobs at observation, no failures reported. The local PC-exchange batch passes targeted checks and fresh ARM builds; its full Stock integration is running. Follow-up not yet pushed. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI pending:** seven unfinished workflows; eight queued and three running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |

@@ -1510,7 +1510,9 @@ and a register return around an actual 16-nibble catalog move, both before and
 after the exchange. Repairing the suspended PC and selected register preserves
 the trace and unrelated CPU state; omitting either produces an observed stale
 dispatch address. The test patches known caller instruction locations and
-supplies their provenance explicitly. It neither discovers arbitrary callers
+supplies their provenance explicitly. Both four-nibble instruction identities
+are guarded through transaction preflight. Changed or invalid values at every
+instruction nibble reject without RAM or register writes. It neither discovers arbitrary callers
 nor proves that all opaque references in the snapshot are safe to move.
 
 ## Capabilities

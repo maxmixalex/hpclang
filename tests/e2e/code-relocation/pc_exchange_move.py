@@ -81,6 +81,18 @@ class Reader(c.Structure):
     _fields_ = [("read", Read), ("context", c.c_void_p)]
 
 
+class Guard(c.Structure):
+    _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
+
+
+lib.bank_catalog_grow_dispatch_guarded.argtypes = [
+    *lib.bank_catalog_grow_dispatch.argtypes,
+    c.c_void_p,
+    c.POINTER(Guard),
+    c.c_uint32,
+]
+
+
 class Assignment(c.Structure):
     _fields_ = [
         (name, c.c_uint32)
@@ -117,6 +129,7 @@ cpu = 0x08000000 + (mapping.table - 128) * 4
 entry, target = 0x88B48, 0x88985
 assert mapping(entry, 2) == 0x30 and mapping(target, 2) == 0x95
 rows = []
+rejections = []
 for register in (0, 2):
     for phase in ("before-exchange", "after-exchange"):
         for mask in (3, 1, 2):
@@ -203,8 +216,53 @@ for register in (0, 2):
             value = c.c_uint32(int.from_bytes(uc.mem_read(selected, 4), "little"))
             saved_pc = c.c_uint32(pc)
             writes = c.c_uint32()
-            status = lib.bank_catalog_grow_dispatch(
-                array, c.byref(value), c.byref(saved_pc), mask, c.byref(writes)
+            guards = (Guard * 2)(
+                Guard(1, entry, 0x6B18 if register == 0 else 0x7B18, 4),
+                Guard(1, target, 0x2B18 if register == 0 else 0x3B18, 4),
+            )
+            if mask == 3:
+                # Both instruction identities must survive until commit. Inject
+                # each changed/invalid nibble, including the final dependency.
+                for guard in guards:
+                    for nibble in range(guard.width):
+                        index = guard.field + nibble - 0x80000
+                        for fault in ("changed", "invalid"):
+                            faulty = (c.c_uint8 * len(data)).from_buffer_copy(data)
+                            faulty[index] = (faulty[index] ^ 1) if fault == "changed" else 16
+                            unchanged = bytes(faulty)
+                            register_copy, pc_copy = c.c_uint32(value.value), c.c_uint32(pc)
+                            rejected_writes = c.c_uint32(123)
+                            result = lib.bank_catalog_grow_dispatch_guarded(
+                                faulty,
+                                c.byref(register_copy),
+                                c.byref(pc_copy),
+                                3,
+                                c.byref(rejected_writes),
+                                None,
+                                guards,
+                                len(guards),
+                            )
+                            assert result != 0 and rejected_writes.value == 0
+                            assert bytes(faulty) == unchanged
+                            assert register_copy.value == value.value and pc_copy.value == pc
+                            rejections.append(
+                                dict(
+                                    register=register,
+                                    phase=phase,
+                                    address=guard.field + nibble,
+                                    fault=fault,
+                                    result=result,
+                                )
+                            )
+            status = lib.bank_catalog_grow_dispatch_guarded(
+                array,
+                c.byref(value),
+                c.byref(saved_pc),
+                mask,
+                c.byref(writes),
+                None,
+                guards,
+                len(guards),
             )
             assert status == 0 and writes.value > 0, status
             assert value.value == int.from_bytes(
@@ -255,6 +313,7 @@ report.write_text(
         dict(
             model=args.model,
             cases=rows,
+            rejections=rejections,
             source_sha256=hashes,
             flash_sha256=hashlib.sha256(flash).hexdigest(),
             sram_sha256=hashlib.sha256(ram).hexdigest(),

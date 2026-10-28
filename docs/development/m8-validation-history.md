@@ -510,3 +510,16 @@ complete opaque-root coverage, public catalog registration or Stock return.
 Ruff/format checks pass; reproduction is documented in sdk-design.md.
 PR26 f66b3b97 audit: ten successful/eight running/16 queued jobs; all 12
 workflows unfinished, no failures reported. This follow-up remains local.
+
+PC-exchange commit dependencies: both four-nibble instructions now enter the
+production guarded catalog transaction. All changed/invalid nibble injections
+reject with zero RAM/register writes (64/model, 128 total), while all eight
+positive and 16 stale-address paths remain verified. Reports:
+/work/oct29-pc-exchange-guarded/{hp49gplus,hp50g}/pc-exchange-move.json.
+Fresh ARM application/six-launcher build and full tracked-source format/Ruff/
+ShellCheck pass. The new binaries differ from the previous Stock-tested batch,
+so fresh full Stock integration is running at /work/oct29-pc-exchange using
+app/ artifacts; sessions 68139 (HP49g+) and 74211 (HP50g). The initial wrapper
+path typo failed before execution and was corrected before these live runs.
+PR26 f66b3b97 observation: 35 successful/eight running/232 queued jobs,
+12 unfinished workflows, no failures reported. No follow-up push or acceptance.
