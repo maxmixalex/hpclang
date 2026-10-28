@@ -116,10 +116,10 @@ startup safety and reclamation. Sound compatibility is independent.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
-| Native references and libraries | #24 accepted guarded catalog/HOME/cache edits, register repairs, physical mappings and terminal handling of partial publication; local follow-ups add dispatch identity and read-only mapped commit guards; local D0/D1 rules pass sanitizer/ARM and emulator checks; 896 identity-checked interpreter cases, 44 identity rejections and 44 execution controls pass, including DUP/inline-entry composition with existing stack capacity; local configuration/reference audits through `b64aed18` pass five native snapshots and 105 unreadable-field rejections (local checks pass; delivery CI pending); maintained exhaustion/repair regressions distinguish stale Stock-GC entries from successful catalog repairs with ROM commit guards on both models | Complete launcher/opaque/banked provenance, handler identity and RAM continuation repair across exhausted-stack collection (stale A/R1 reproduced), library configuration and public management (ordinary configuration probes add HOME records, not child-header IDs); Port1 replace/remove remain unavailable |
+| Native references and libraries | #24 accepted catalog/HOME/cache repairs and partial-publication handling. #25 submits dispatch identity, mapped commit guards and native regressions; CI pending. Local `380427f3` adds PC-capture provenance with 192 original-interpreter cases, sanitizer/ARM analysis and strict docs passing; not pushed. Detailed counts and evidence remain in sdk-design and validation history. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
 | Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Accepted in #24; retain lifecycle regressions |
 | Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
-| Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Local checks pass; delivery CI pending. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
+| Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Submitted in #25; CI acceptance pending. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
 
 Guarded ID769 tests retain 23,900 user elements. Earlier complete two-model
 matrices used ID1701. Fourteen configured Stock libraries precede supported
@@ -131,7 +131,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| `m8-dispatch-identity` | Prepared follow-up: dispatch identity, read-only mapped guards, D0/D1 decoding and maintained native regressions. Four sanitizer suites, 73 recovery tests and Ruff pass locally; remote CI acceptance pending. |
+| #25 / `0c67540c` | **Submitted; CI acceptance pending.** First snapshot: six workflows queued, two running; eight jobs queued, four running. Dispatch identity, read-only mapped guards, D0/D1 decoding and native regressions. Four sanitizer suites, 73 recovery tests, Ruff, ARM analysis and strict docs pass locally. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `00d5ddf1` | UI pool/RW checks pass six retained Stock fixtures locally. HP39g+ immediate retest passes; earlier watchdog failure cause, full CI and total system peaks remain open. |
 | #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
