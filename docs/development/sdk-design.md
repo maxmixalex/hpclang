@@ -1330,8 +1330,13 @@ the complete 229,376-byte RW region. HOME is `0xc3a60`, its body begins at
 `0xc3b04`, and Port 0 begins at `0xfff7f`. The candidate packs both nibbles into
 each snapshot byte, needing 123,454 bytes for this odd-sized body, and still
 compares every native nibble after detach/reattach. ARM build, formatting and
-static analysis pass; the ten native cases across HP49g+/HP50g are now
-running sequentially after the completed lifecycle suite, not yet validated. Failure RAM, matching-image identity and allocation audit
+static analysis pass. All ten native detach/reattach/cache cases across
+HP49g+/HP50g now pass from fresh standard Stock installations. The 62,136-byte
+payload, verifier inputs and every packaged case match the saved input hashes;
+`research/oct28-packed-home-audit.py` replays all checks against the retained
+RAM/Flash without running the emulator. The replay verifies catalog bindings,
+HOME attachments, cache lookup/message behavior and original Flash preservation.
+New delivery CI is still required. Failure RAM, matching-image identity and allocation audit
 remain under `research/oct27-code-ci`; `oct27-code-ci-allocation.py` reproduces
 the address/size/errno checks. This fixture fix changes neither production
 mutation behavior nor its memory fences.

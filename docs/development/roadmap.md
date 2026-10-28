@@ -1,9 +1,9 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-10-27. **M8 is incomplete; only M8.1 is accepted complete.**
+Current checkpoint: 2026-10-28. **M8 is incomplete; only M8.1 is accepted complete.**
 Docker/WSL is restored. Both-model reservation retests pass guarded recovery,
 repeat restart, absent-reservation recovery and all 16 rejection cases per model.
-Accepted main: `038b0f41` (PR #22 return-root coverage, elapsed-time PWM witness and M0–M7 overview accepted; SD Reset #15 and opt-in legacy formatting #17 retained). Local passing tests, submitted CI, CI acceptance and
+Accepted main: `f806b299` (physical span qualification #23, return-root coverage and M0–M7 overview #22, SD Reset #15 and opt-in legacy formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
@@ -121,9 +121,9 @@ Submitted guarded dispatch decoding retains both caller-proven schemas' read dep
 
 Port2 startup: a real supported-ID-769 HP50g fixture now passes owned installation, guarded low-memory recovery and repeat restart, retaining 23,900 user elements. Absent-reservation/rejection cases and HP49g+ remain unrun for this binding. Earlier traces are explicitly ID1701, not ID4; 14 configured Stock libraries precede minimum supported ID769, and complete startup safety remains open.
 
-Port0 growth-reservation fix remains local (`5771b470`, integrated with parent as `96852e99`): the wrapper requests 240 bytes instead of 16 and retains native-page fences. All six models pass their complete Stock object-mutation lifecycle: three invocations each on HP48gII/HP49g+/HP50g and 15 each on HP39g+/HP39gs/HP40gs, totaling 54 checked phases with settled return. After accepted-main integration, all three family payloads/result addresses and six launchers are byte-identical to the tested artifacts. Envelope tests, Ruff and strict docs pass. No new #24 CI or acceptance is claimed.
+Local #24 follow-up passes all six Stock object-mutation lifecycles: three invocations per classic model and 15 per HP39 model, totaling 54 phases with settled return. The native wrapper reserves 240 bytes instead of 16 without weakening page fences. All three payloads/result addresses and six launchers remain identical after accepted-main integration. Ten fresh HP49g+/HP50g detach, reattach and cache cases also pass with the packed HOME snapshot; saved states, input hashes and every fixture package independently verify. Sanitizers, ARM analysis, envelope checks, formatting and strict docs pass. Fresh CI acceptance remains required.
 
-Prior #24 `0e68b3b1` fails both code-relocation jobs 121826775448/121826775572 at native-detach; exact HP49g+/HP50g snapshots establish the same fixture allocation failure. Exact CI RAM and matching ELF identify a fixture allocation failure before home_detach: 246,907 requested snapshot bytes exceed the entire 229,376-byte application RW region; TLS errno is ENOMEM (12). The local fixture now packs two nibbles per byte (123,454 bytes for this case), retaining comparison of every nibble. ARM build, format and static analysis pass; fresh two-model native detach/reattach/cache validation is now running sequentially; no passing result is claimed yet. The latest prior-head audit has five failed jobs, 285 successful, 49 queued, 14 running and one skipped. Additional HP50g object-mutation job 121836646822 reproduces the same 13-nibble capacity versus 64-nibble growth, with ENOSPC in captured TLS. All five failures map to the two investigated causes; CI remains unaccepted. Integration ASan/UBSan passes port, mutation, reference and physical-mapping tests.
+Prior #24 `0e68b3b1` finished with 345 successful jobs, two skipped, eight failures and one cancelled publisher. All eight failure snapshots confirm two causes: Port0 needs 64 growth nibbles with only 13 available; the test HOME snapshot requests 246,907 bytes against 229,376 total RW bytes. The fixes reserve Stock growth space and pack the complete snapshot into 123,454 bytes. Publisher annotations confirm cancellation by a higher-priority waiting ci-evidence-publisher request. All preceding workflows/jobs were inspected before this delivery; that failed head is not accepted.
 
 Current implementation and evidence:
 
@@ -197,18 +197,18 @@ Current implementation and evidence:
   pass, with ARM build/analysis and docs. Public library registration, Port1
   replace/remove and Port2 startup/reclamation remain open.
 
-- Submitted Port0 commit-failure handling passes four operation write-cut matrices, root-before-write and allocation/preflight controls, plus four public API terminal-path cases. Delivery sanitizers, ARM analysis and strict docs pass. The 62,088-byte image, both launchers and verifier inputs match four HP49g+/HP50g registered/unregistered message cases; 476 source corruptions reject. Included in #24 `0e68b3b1`; the current CI investigation is recorded above. New CI and parent acceptance remain required.
+- Submitted Port0 commit-failure handling passes four operation write-cut matrices, root-before-write and allocation/preflight controls, plus four public API terminal-path cases. Delivery sanitizers, ARM analysis and strict docs pass. The 62,088-byte image, both launchers and verifier inputs match four HP49g+/HP50g registered/unregistered message cases; 476 source corruptions reject. Included in #24 `0e68b3b1`; the current CI investigation is recorded above. Fresh delivery CI remains required; both parents are accepted.
 
 Next actions, in order:
 
 1. Complete launcher/opaque-object provenance and bank/register coverage for
    relocation plans before enabling public library management and Port1 edits.
-2. PR #22 is accepted as `038b0f41`: all nine workflows pass, with 354
-   successful jobs and two skipped. M0–M7 summaries are restored on main.
-   #23 `7dadd8a0` merges accepted main after all seven preceding-head workflows
-   passed. Integration sanitizer checks and strict docs pass; new CI is submitted.
-   #24 remains unaccepted pending the growth-reservation validation described above. Earlier unrelated PWM/watchdog and HP39 transfer failures
-   retain their documented limits; later local passes alone do not prove causes.
+2. PR #22 is accepted as `038b0f41`; M0–M7 summaries remain visible.
+   PR #23 is accepted as `f806b299`: all ten exact-head workflows pass,
+   with 373 successful jobs and one skipped. #24 integrates this accepted
+   parent and passes the local follow-up checks above; fresh CI remains required.
+   Earlier unrelated PWM/watchdog and transfer failures retain their documented
+   limits; these fixes do not establish their causes.
 3. Complete retained Port2 trusted recovery installation, authority lifecycle,
    safe startup and reclamation. Preserve the independent M8 stage requirements.
    During CI wait, UI pool/RW checks pass all six retained Stock CLI cases.
