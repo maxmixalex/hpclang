@@ -69,9 +69,7 @@ subprocess.run(
     ],
     check=True,
 )
-MappedRead = c.CFUNCTYPE(
-    c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint8)
-)
+MappedRead = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint8))
 
 
 class MappedReader(c.Structure):
@@ -79,9 +77,7 @@ class MappedReader(c.Structure):
 
 
 class Guard(c.Structure):
-    _fields_ = [
-        (name, c.c_uint32) for name in ("mapping", "field", "expected", "width")
-    ]
+    _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
 
 
 guards = []
@@ -198,16 +194,12 @@ for model in (args.model,):
         )
         assert status == 0, (model, mask, status)
         assert reads == [
-            address + i
-            for address, raw in IDENTITY_WINDOWS.items()
-            for i in range(len(raw))
+            address + i for address, raw in IDENTITY_WINDOWS.items() for i in range(len(raw))
         ]
         changed = bytes(array)
         for at in range(0x80000, 0x100000, 2):
             physical = mapping.physical(at)
-            ram[physical - 0x08000000] = (
-                changed[at - 0x80000] | changed[at + 1 - 0x80000] << 4
-            )
+            ram[physical - 0x08000000] = changed[at - 0x80000] | changed[at + 1 - 0x80000] << 4
         for offset, v in (
             (0x90C, a.value),
             (0x934, r1.value),
@@ -238,11 +230,7 @@ for model in (args.model,):
         def hook(uc, address, size, data):
             pc = uc.reg_read(UC_ARM_REG_R7)
             trace.append(pc)
-            if (
-                pc == 0x351E8
-                or (len(trace) == 7 and pc != 0x351CC)
-                or len(trace) >= 100
-            ):
+            if pc == 0x351E8 or (len(trace) == 7 and pc != 0x351CC) or len(trace) >= 100:
                 uc.emu_stop()
 
         uc.hook_add(UC_HOOK_CODE, hook, begin=0x28898, end=0x28898)
@@ -304,10 +292,7 @@ report = dict(
     commit_guard_rejections=rejections,
     identity_nibbles=sum(len(raw) for raw in IDENTITY_WINDOWS.values()),
     scope="Controlled catalog geometry transaction without catalog publication; original interpreter stopped at comparison or wrong dispatch. Does not establish full reference closure or public registration.",
-    sources={
-        str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
-        for p in sources
-    },
+    sources={str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
     inputs={
         str(p): hashlib.sha256(p.read_bytes()).hexdigest()
         for p in (args.state / "flash", args.prepared_sram)

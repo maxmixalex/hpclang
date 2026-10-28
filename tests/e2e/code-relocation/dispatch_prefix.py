@@ -72,8 +72,7 @@ class Reader(c.Structure):
 
 class Exchange(c.Structure):
     _fields_ = [
-        (k, c.c_uint32)
-        for k in ("instruction", "length", "left", "right", "first", "nibbles")
+        (k, c.c_uint32) for k in ("instruction", "length", "left", "right", "first", "nibbles")
     ]
 
 
@@ -166,9 +165,7 @@ RAM = 0x08000000
 HEADER, SLOT, OBJECT, D0 = 0x90000, 0x91000, 0x92000, 0x93000
 
 
-def execute(
-    model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, identify=True
-):
+def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, identify=True):
     result_slot = SLOT - 5 if args.duplicate_entry else SLOT
     state = args.state
     flash = bytearray((state / "flash").read_bytes())
@@ -185,9 +182,7 @@ def execute(
             pos = at + n
             physical = mapping.physical(pos)
             shift = 4 * (pos & 1)
-            assert (
-                RAM <= physical < RAM + len(ram) and not cpu <= physical < cpu + 0xD00
-            )
+            assert RAM <= physical < RAM + len(ram) and not cpu <= physical < cpu + 0xD00
             i = physical - RAM
             ram[i] = (ram[i] & ~(15 << shift)) | (((value >> (4 * n)) & 15) << shift)
 
@@ -326,14 +321,8 @@ def execute(
         assert word(0x954) == D0 and word(0x958) == result_slot and word(0x95C) == p, (
             "address restoration"
         )
-        assert (
-            reg(0) >> 20
-            == int.from_bytes(ram[offset + 0x90C : offset + 0x914], "little") >> 20
-        )
-        assert (
-            reg(2) >> 20
-            == int.from_bytes(ram[offset + 0x91C : offset + 0x924], "little") >> 20
-        )
+        assert reg(0) >> 20 == int.from_bytes(ram[offset + 0x90C : offset + 0x914], "little") >> 20
+        assert reg(2) >> 20 == int.from_bytes(ram[offset + 0x91C : offset + 0x924], "little") >> 20
         for first, last in ((0x914, 0x91C), (0x924, 0x954)):
             expected = bytearray(ram[offset + first : offset + last])
             if args.duplicate_entry and first == 0x924:
@@ -348,9 +337,7 @@ def execute(
         for at in (HEADER, HEADER + 5, SLOT, OBJECT):
             for n in range(5):
                 physical = mapping.physical(at + n)
-                assert (
-                    uc.mem_read(physical, 1) == ram[physical - RAM : physical - RAM + 1]
-                )
+                assert uc.mem_read(physical, 1) == ram[physical - RAM : physical - RAM + 1]
 
     def hook(_, at, size, user):
         if at != 0x28898:
@@ -368,9 +355,7 @@ def execute(
         )
         if args.duplicate_entry:
             expected_trace = DUP_TRACE + expected_trace
-        assert len(trace) < len(expected_trace) and pc == expected_trace[len(trace)], (
-            hex(pc)
-        )
+        assert len(trace) < len(expected_trace) and pc == expected_trace[len(trace)], hex(pc)
         trace.append(pc)
         if args.duplicate_entry and pc == DUP_TRACE[0]:
             check_entry(HEADER, 0x37258, 0)
@@ -410,9 +395,7 @@ def execute(
         if pc == 0x351E3:
             value = Assignment()
             assert (
-                lib.hpclang_rpl_code_assignment_inspect(
-                    c.byref(reader), pc, 3, p, c.byref(value)
-                )
+                lib.hpclang_rpl_code_assignment_inspect(c.byref(reader), pc, 3, p, c.byref(value))
                 == 0
             )
             mask = (1 << (4 * value.nibbles)) - 1
@@ -541,9 +524,7 @@ for model in (args.model,):
             )
         except AssertionError as error:
             assert str(error) == (
-                "predicate result"
-                if fault.endswith("result")
-                else "address restoration"
+                "predicate result" if fault.endswith("result") else "address restoration"
             ), str(error)
             negatives.append(dict(model=model, fault=fault, reason=str(error)))
         else:
@@ -574,9 +555,7 @@ report = dict(
         name: hashlib.sha256((args.state / name).read_bytes()).hexdigest()
         for name in ("sram", "flash")
     },
-    sources={
-        name: hashlib.sha256((base / name).read_bytes()).hexdigest() for name in names
-    },
+    sources={name: hashlib.sha256((base / name).read_bytes()).hexdigest() for name in names},
     headers={
         name: hashlib.sha256((base / name).read_bytes()).hexdigest()
         for name in ("rpl-code.h", "rpl-reference.h", "rpl-object-span.h")
