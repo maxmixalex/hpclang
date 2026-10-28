@@ -786,6 +786,20 @@ installer still needs availability, firmware and complete startup-safety checks.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
 
+Ordinary Stock probes on HP49g+/HP50g evaluate configuration 2 while a child directory is current. They add a duplicate HOME attachment; the child header remains `0x7FF`.
+
+The maintained `tests/e2e/port-library/configuration_audit.py` checks those two
+snapshots and three additional HP49g+ executions: inline BINT 2, inline BINT 12
+and the original ROM configuration-2 program. The library-2 cases add the same
+duplicate HOME record. Library 12 adds `(12, 0, 550399)` to HOME, preserving
+the other records, catalog, Flash, child header and sentinel with an empty stack.
+All five audits and five deliberately wrong expected-record controls pass;
+reports are in `/work/oct28-configuration-audit`. The exploratory scripts that
+expected the child header to equal the library number failed their assertions;
+these failures do not establish failed execution. This is ordinary Stock
+configuration behavior, not startup safety or permission to move its references.
+
+
 Supported-ID-769 fixtures bind the recorded recovery/admission ELF artifacts
 through the maintained packager. Both HP49g+ and HP50g pass installation,
 guarded low-memory repair, reset checkpoint verification, repeat restart,
