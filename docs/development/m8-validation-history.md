@@ -170,3 +170,13 @@ Earlier ID1701 recovery fixture retests pass on both models against the failed C
 M0–M7 summaries are restored on main by accepted PR #22. Keep these summaries visible in the roadmap. All original milestone requirements remain in `docs/development/roadmap-history.md`. Keep current state here, reproducible details in tests/PRs, and history in the archive. Local passes, submitted CI, accepted delivery and milestone completion are distinct.
 
 Before every push, inspect the preceding exact-head CI and investigate failures. Do not poll newly pushed CI in the same turn or merge unfinished gates. HP39gs/40gs ROM-write capability remains deferred research; no hardware flashing is authorized. Legacy formatting uses explicit `HPCLANG_HPGCC_LEGACY_FORMAT=1`.
+
+## Container duplicate-cache cleanup — 2026-10-29
+
+While #26 CI was running, removed six inactive, byte-identical HP39 Aplet tool
+cache copies from old oct24 source snapshots: 487.48 MiB of duplicate contents.
+Retained `/work/oct25-watchdog-src/.cache/hp39-aplet`, verified all 1,416 files
+by size/SHA-256 before removal and rechecked the retained copy afterward.
+Source snapshots, ROM/state evidence, reports and final artifacts remain.
+The file manifest and deletion results are retained at
+`/work/oct29-duplicate-cache-cleanup.json` and in local `research/`.

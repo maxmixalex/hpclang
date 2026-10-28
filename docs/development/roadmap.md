@@ -131,7 +131,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `8c2bb27f` | **Follow-up submitted; fresh CI pending.** Based on accepted main #25. Includes production arithmetic-origin invalidation, 304-case/480-rejection native validation and four passing sanitizer suites (37.21 s), plus CI budget/publication fixes. CI is running; no failures observed, not accepted. |
+| #26 / `8c2bb27f` | **Submitted; CI pending.** Exact-head audit: ten successful, four running and 78 queued jobs; no failures. The local guarded-TEMP follow-up remains unpushed while this batch runs. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `01e1d2cf` | **Artifact-transfer fix submitted; fresh CI pending.** All 12 prior UI failures omitted `launchers/memory.json`; six-model transfer/verification replay and omission controls pass. Earlier watchdog cause and whole-system peaks remain open. |
