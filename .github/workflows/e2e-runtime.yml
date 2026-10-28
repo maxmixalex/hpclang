@@ -324,7 +324,9 @@ jobs:
     name: Stock / ${{ matrix.suite.mode }} / ${{ matrix.model.target }}
     needs: [build, x50ng, stock-assets]
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # Code relocation includes 14 independent native call/catalog launches;
+    # a passing HP50g job took nearly 25 minutes including setup.
+    timeout-minutes: ${{ matrix.suite.mode == 'code-relocation' && 35 || 25 }}
     strategy:
       fail-fast: false
       matrix:
