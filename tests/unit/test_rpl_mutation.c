@@ -4170,6 +4170,62 @@ static void test_boolean_return_formats(void)
     }
 }
 
+struct masked_visit_state
+{
+    uint32_t expected, calls;
+};
+
+static int visit_masked_root(void *context, enum hpclang_rpl_root_source source, uint32_t slot,
+                             uint32_t value)
+{
+    struct masked_visit_state *state = context;
+    if (source == HPCLANG_RPL_ROOT_NATIVE) {
+        assert(slot == 0 && value == state->expected);
+        ++state->calls;
+    }
+    return 0;
+}
+
+static void test_masked_root_visit_and_removal(void)
+{
+    uint8_t *before = malloc(sizeof memory);
+    assert(before);
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t root = 0xabc82500, *roots[] = {&root, &root};
+        uint32_t masks[] = {mode == 1 ? UINT32_MAX : 0xfffff, 0xfffff};
+        masks[1] = mode == 3 ? UINT32_MAX : masks[0];
+        io.native_roots = roots;
+        io.native_root_count = 2;
+        io.native_root_masks = mode ? masks : NULL;
+        struct masked_visit_state visit = {.expected = mode >= 2 ? 0x82500 : root};
+        memcpy(before, memory, sizeof memory);
+        int result = hpclang_rpl_mutation_visit_root_sources(&io, visit_masked_root, &visit);
+        assert(result == (mode == 3 ? HPCLANG_RPL_MUTATION_MALFORMED : 0));
+        assert(visit.calls == (mode == 3 ? 0u : 1u));
+        assert(!writes && root == 0xabc82500 && !memcmp(before, memory, sizeof memory));
+    }
+    /* Both ends of the deleted cell and every interior nibble are live uses;
+     * adjacent addresses are legal, and only the following one moves. */
+    for (uint32_t at = 0x82012; at <= 0x82023; ++at) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t root = 0xabc00000u | at, *roots[] = {&root};
+        const uint32_t masks[] = {0xfffff};
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        io.native_root_masks = masks;
+        memcpy(before, memory, sizeof memory);
+        int result = hpclang_rpl_mutation_catalog_shrink_repaired(&io, 0x82013, NULL);
+        if (at >= 0x82013 && at < 0x82023) {
+            assert(result == HPCLANG_RPL_MUTATION_BUSY && !writes);
+            assert(root == (0xabc00000u | at) && !memcmp(before, memory, sizeof memory));
+        } else {
+            assert(!result && root == (0xabc00000u | (at == 0x82023 ? at - 16u : at)));
+        }
+    }
+    free(before);
+}
+
 static void test_native_address_masks(void)
 {
     for (unsigned mode = 0; mode < 4; ++mode) {
@@ -4217,6 +4273,7 @@ static void test_native_address_masks(void)
 
 int main(void)
 {
+    test_masked_root_visit_and_removal();
     test_native_address_masks();
     test_boolean_return_formats();
     test_jump_return_relocation();

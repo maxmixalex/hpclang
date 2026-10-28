@@ -278,3 +278,27 @@ only after all cases pass. Current source remains unchanged during execution.
 
 #26 head 8c2bb27f audit: 120 successful, nine running, 225 queued jobs,
 no observed failures. No new push this turn.
+
+### 2026-10-29 — Masked-root deletion guards and delivery dependencies
+
+Added source-aware root enumeration checks for default, explicit full-word and
+low-20-bit masks: aliases enumerate once, conflicting descriptions produce no
+callbacks or writes. Catalog contraction now has regression coverage for every
+nibble of a live 16-nibble deleted cell plus both adjacent addresses. All deleted
+addresses return BUSY without RAM/native-root changes; the following address
+moves with its high bits intact. Sanitized mutation suite passes in 41.08 s.
+Only the test source changed; running Stock integration sources are unchanged.
+Both existing Stock processes have passed native, native-new-message and
+native-missing-message; the remaining cases are still live, not accepted.
+
+#21 is explicitly stacked on #20 (m8-resource-observer), not main. #20 exact
+head 41e35a36 has 369 successful jobs, one failure, two skipped publishers and
+two cancelled publishers across its runs. Job 121190803963 / run 40194091672
+fails HP50g Direct/system-services-exit with 0x46417b03; HP49g+ passes. Its
+artifact 12604497124 is retained in research/oct29-pr20-pwm. Exact-head
+checks.c distinguishes PWM failure 3 from watchdog failures by adding 0x80
+only for the latter. Thus the later watchdog waiting fix does not itself
+resolve this failure. PWM failure 3 combines IRQ count/completion/error,
+deadline, ownership and errno predicates. Saved JSON/images do not retain
+those individual fields, so no single cause is established; targeted PWM
+observations are required before treating it as a deadline-loop failure.
