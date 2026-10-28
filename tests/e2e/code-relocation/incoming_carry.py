@@ -88,12 +88,7 @@ for cursor in range(8):
                         old = uc.mem_read(p, 1)[0]
                         uc.mem_write(
                             p,
-                            bytes(
-                                [
-                                    (old & ~(15 << shift))
-                                    | (((value >> (4 * i)) & 15) << shift)
-                                ]
-                            ),
+                            bytes([(old & ~(15 << shift)) | (((value >> (4 * i)) & 15) << shift)]),
                         )
 
                 @Read
@@ -101,13 +96,7 @@ for cursor in range(8):
                     if at < 0x80000 or at + width > 0x100000:
                         return 0
                     value[0] = sum(
-                        (
-                            (
-                                uc.mem_read(mapping.physical(at + i), 1)[0]
-                                >> (4 * ((at + i) & 1))
-                            )
-                            & 15
-                        )
+                        ((uc.mem_read(mapping.physical(at + i), 1)[0] >> (4 * ((at + i) & 1))) & 15)
                         << (4 * i)
                         for i in range(width)
                     )

@@ -110,7 +110,7 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-Incoming-carry root discovery passes 192 controlled original-interpreter cases across HP49g+/HP50g, sanitizer tests and six launcher builds. Its Stock code-relocation CI gate is implemented locally and reproduced in a clean virtual environment. Fresh full Stock call/catalog integration is running for both models; the previous 28-case result predates this follow-up.
+Incoming-carry root discovery passes 192 controlled original-interpreter cases across HP49g+/HP50g, sanitizer tests and six launcher builds. Its Stock code-relocation CI gate is implemented locally; clean-environment reproduction and repository-wide format/lint checks pass. Fresh full Stock call/catalog integration is running for both models; the previous 28-case result predates this follow-up.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,

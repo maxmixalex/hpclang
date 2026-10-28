@@ -408,6 +408,13 @@ jobs do not acquire this dependency. Workflow YAML/Stock-only placement and
 ShellCheck pass. A fresh local venv reproduces all 192 two-model cases with only
 the declared Python dependency. The workflow change is not yet submitted.
 Full Stock integration sessions 85305 (HP49g+) and 76272 (HP50g) remain live;
-both have reported the first native catalog case passed, not the complete suite.
+both have reported native, native-new-message and native-missing-message passed,
+not the complete suite.
 Exact-head PR26 fb261f17 now has 21 successful, three running and 118 queued
 jobs; 12 workflows remain unfinished. No failure or acceptance is reported.
+
+Pre-delivery review corrected incoming_carry.py to the repository Ruff settings
+(100 columns rather than the standalone formatter default). All tracked source
+formatting, Python lint and shell checks pass after the correction. The 192
+clean-venv interpreter cases were rerun successfully, refreshing driver hashes
+in /work/oct29-initial-carry/ci-clean-{hp49gplus,hp50g}/incoming-carry.json.
