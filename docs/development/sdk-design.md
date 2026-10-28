@@ -886,6 +886,16 @@ bank. Other altered contexts can fault or exceed the instruction budget. These
 are deliberately changed register contexts, not failures of valid Stock calls.
 Production qualification must establish the supported handler's calling contract
 and relevant register dependencies before treating a table match as a target map.
+P=0 alone is also insufficient when the ERAM overlay is already enabled. The
+maintained `bank_overlay.py` sequences ERAM entry, Flash selection, ERAM exit and
+Flash exit for all sixteen Flash selectors. The visible window remains ERAM
+through Flash selection, then exposes the selected Flash bank on ERAM exit;
+the final Flash exit selects bank 2. These are controlled original-ROM sequences,
+not complete caller qualification. For unused selectors 14/15, ERAM exit can
+expose a continuous physical-zero window instead of the isolated switch's dummy
+page. Geometry validation must still reject them: neither contiguity nor a
+successful switch establishes populated storage. Production qualification must
+include overlay state and the intended entry/exit sequence.
 For each switch it also retains all 85 table nibbles as 17 guards, verifies the
 unchanged table, rejects every individually changed nibble through the C guard
 validator, and rejects insufficient guard capacity without publishing a binding.

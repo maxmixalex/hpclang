@@ -952,3 +952,23 @@ all 16 packaged artifacts still match byte-for-byte. Report:
 `/work/oct29-rom-bank-stock/verified.json`. ARM analysis, source quality and strict
 docs passed separately. This verifies fixture-specific live mappings and bounded
 reads, not complete banked-reference coverage, firmware qualification or M8.0.
+
+Submitted as `f9f50972` in #26 with the bounded reader commit `4b6f328e`.
+Prior-head `d7db49e8` CI audit found five successful/five unfinished workflows
+and 131 successful/17 running/223 queued jobs, no failures observed.
+New-head CI was not polled in the push turn; no merge or milestone acceptance.
+
+## Bank overlay calling-context regression — local, 2026-10-29
+
+510 controlled initial/selected bank pairs all return, but invalidate a generic
+"P=1 restores the previous mapping" assumption. The maintained bank-map suite now
+checks 16 ERAM-entry/Flash-selection/ERAM-exit/Flash-exit sequences per model,
+128 original-ROM calls total. ERAM hides Flash selection until ERAM exit; Flash
+exit selects bank 2. Unused banks 14/15 can expose physical 0..0x1ffff after ERAM
+exit, despite remaining invalid geometry. All 64 pages are compared at every
+step, other Read[] windows and Flash remain unchanged. Reports and source hashes:
+`/work/oct29-bank-overlay-maintained/{hp49gplus,hp50g}/bank-switch-maps.json`.
+Existing 34 isolated-switch and FlashPtr dependency tests also pass. This is
+fixture-specific handler evidence, not public Port1 edit authorization. The
+public replace/remove path still awaits complete banked-reference qualification.
+CI remains incomplete for #26 `f9f50972` and #20 `1ce01859`; no merge or new push.
