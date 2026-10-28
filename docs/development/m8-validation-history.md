@@ -683,3 +683,21 @@ normalized sources and generated site are removed; logs retained at
 /work/oct28-pr25-format-fix and /work/oct29-current-docs-check.log.
 Stock sessions 33856/94548 have each completed eleven cases and remain live;
 exact CI-artifact HP39g+ reproduction session 14864 also remains live.
+
+## 2026-10-29 — Corrected register-root integration and prior-CI replay
+
+Sessions 33856/94548 are terminal success. Independent
+oct29-stage-underflow-stock-audit.py verifies all 28 cases, 18 original library
+returns, 36 unchanged Flash states, stable source/artifact hashes and agreement
+with the independently reproduced 16 artifacts. Report:
+/work/oct29-stage-underflow/verified.json. These full Stock paths exercise RPL3;
+explicit masked RPL4 remains covered by controlled fixtures, not arbitrary callers.
+
+Session 14864 is terminal success: exact failed-CI HP39g+ payload, transfer assets
+and emulator complete all lifecycle runs and settled return. Independent audit
+verifies input hashes and unchanged 2 MiB Flash at
+/work/oct29-pr26-object-ci/verified.json. The historical pre-entry transfer
+failure is not reproduced; its cause remains unproven, not fixed by this pass.
+Pre-push 1dc590b1 audit: 79 successful, 13 running, 182 queued and one failed job;
+two successful workflows/eight unfinished. PR21: 277 successful, three running,
+39 queued jobs; five workflows pass/two unfinished. No branch acceptance.

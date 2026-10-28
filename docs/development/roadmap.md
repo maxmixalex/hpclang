@@ -114,13 +114,12 @@ PC-exchange batch `1dc590b1` is submitted in #26. All 28 fresh Stock cases,
 36 unchanged Flash snapshots and 16 reproducible artifacts pass local audit;
 CI remains unfinished; branch acceptance remains open.
 
-Local launcher follow-up discovers bounded A/C execution uses and conditionally
-publishes RPL4 masks; Port1 accepts RPL4. A reproduced stack-underflow
-misclassification is fixed by clearing consumed private stack cells. The fix
-passes 16 ROM/linked-ARM regressions, existing register/movement tests, sanitizers,
-ARM analysis/build, artifact reproduction, full source checks and strict docs.
-Fresh full Stock integration is running. All 34 native bank switches pass ROM mapping/geometry checks, including
-unused-bank rejection; full reference coverage and public management remain open.
+Register-root follow-up passes all 28 fresh HP49g+/HP50g Stock cases,
+18 original library returns, 36 unchanged Flash states and matching reproduced
+artifacts. The bounded A/C collector publishes RPL4 when needed and clears
+consumed private stack cells. Linked-ARM/ROM, sanitizer, bank-mapping, source
+quality and strict documentation checks pass locally. Complete reference
+coverage, public library management and Port1 edits remain open.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -128,7 +127,7 @@ startup safety and reclamation. Sound compatibility is independent.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
-| Native references and libraries | #25 accepted; #26 follow-up submitted. Guarded TEMP lookup and masked roots pass 304 controlled return cases/480 rejections, sanitizer/API checks and ARM builds. The current incoming-carry build passes all 28 HP49g+/HP50g Stock call/catalog cases, with source/artifact hashes and unchanged Flash independently checked. This exercises default RPL3; explicit RPL4 masks retain host/controlled-fixture coverage only. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and a production banked-reference guard for Port1 replace/remove |
+| Native references and libraries | #25 accepted; #26 follow-up submitted. Guarded TEMP lookup and masked roots pass 304 controlled return cases/480 rejections, sanitizer/API checks and ARM builds. The corrected register-root build passes all 28 HP49g+/HP50g Stock call/catalog cases, with source/artifact hashes and unchanged Flash independently checked. This exercises default RPL3; explicit RPL4 masks retain host/controlled-fixture coverage only. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and a production banked-reference guard for Port1 replace/remove |
 | Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Accepted in #24; retain lifecycle regressions |
 | Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
 | Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Accepted in #25. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
@@ -143,10 +142,10 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `1dc590b1` | **CI failure under investigation:** HP39g+ Stock object-mutation stalls before application entry during Kermit transfer (job 123048995027). 62 successful, 15 running, 197 queued and one failed job observed; workflows remain unfinished. All 949 audited data/ACK/NAK frames pass framing/CRC checks; exact-artifact local reproduction is running. Local register-root/underflow fixes remain unsubmitted. |
+| #26 / `1dc590b1` | **Prior-head CI failure remains unresolved:** HP39g+ pre-entry Kermit transfer (job 123048995027). Exact-CI-artifact local reproduction passes lifecycle/settled return with unchanged Flash; historical cause remains unproven. Latest audit: 79 successful, 13 running, 182 queued and one failed job. Register-root follow-up passes full local integration and is ready for submission. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `969ade88` | **CI pending:** three unfinished workflows; 254 successful, 51 queued and 13 running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |
+| #21 / `969ade88` | **CI pending:** three unfinished workflows; 277 successful, 39 queued and three running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. #21 follow-up 10e05bc0 now submits pre-cleanup IRQ/timing/ownership diagnostics. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports state. Diagnostic coverage is not a claimed fix. |
 
