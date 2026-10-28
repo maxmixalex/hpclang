@@ -133,10 +133,10 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `fb261f17` | **CI pending:** 12 workflows (three running, nine queued); 21 successful, three running and 118 queued jobs at observation, no failures reported. Local incoming-carry follow-up passes 192 interpreter cases and clean-environment reproduction; full Stock integration is running. Follow-up and its CI gate are not yet pushed. |
+| #26 / `fb261f17` | **CI pending:** two workflows pass and ten remain queued; 24 successful and 135 queued jobs at observation, no failures reported. Local incoming-carry follow-up passes 192 interpreter cases; full Stock integration is running. Follow-up and its CI gate are not yet pushed. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `10e05bc0` | **CI pending:** seven workflows (three running, four queued); 17 successful, six running and 170 queued jobs at observation, no failures reported. This PR targets unresolved #20; PWM diagnostic coverage is not a claimed fix. |
+| #21 / `10e05bc0` | **Two Direct PWM failures:** HP40gs system-services and HP39gs system-services-immediate, both 0x46417b03. Captured diagnostics show one IRQ and an unfinished 100 ms session when the fixed-count foreground wait ends. Local elapsed-time wait fix is under six-model/negative-control validation; not submitted or accepted. Other CI gates remain unfinished. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. #21 follow-up 10e05bc0 now submits pre-cleanup IRQ/timing/ownership diagnostics. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports state. Diagnostic coverage is not a claimed fix. |
 

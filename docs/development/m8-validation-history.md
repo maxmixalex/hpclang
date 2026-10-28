@@ -418,3 +418,21 @@ Pre-delivery review corrected incoming_carry.py to the repository Ruff settings
 formatting, Python lint and shell checks pass after the correction. The 192
 clean-venv interpreter cases were rerun successfully, refreshing driver hashes
 in /work/oct29-initial-carry/ci-clean-{hp49gplus,hp50g}/incoming-carry.json.
+
+## 2026-10-29 — PR21 captured PWM wait failures
+
+Exact head 10e05bc0: jobs 123001306554 (HP40gs system-services) and
+123001306568 (HP39gs system-services-immediate), run 40739395357, fail
+with 0x46417b03. Downloaded artifacts 12839963078 and 12839622538 contain
+the new 0x7b10 diagnostic: one IRQ, unfinished, no IRQ error, both resources
+still owned, errno 33. Foreground time is deadline+96 us and deadline-1131 us
+respectively. The fixed 20-million-iteration wait does not guarantee the
+100 ms playback interval or interrupt delivery margin. Exact decoded data
+and artifact hashes: research/oct29-pr21-pwm-failures.json.
+A local irq.c change samples elapsed time between bounded busy batches; only
+IRQ dispatch advances playback. All completion/ownership/errno assertions
+remain. Six-model Direct and masked-IRQ negative checks are running in
+session 50816 under /work/oct29-pwm-elapsed; no fix acceptance yet. This is
+independent work during live M8.0 integration sessions 85305 and 76272.
+PR26 fb261f17 has 24 successful/135 queued jobs, two passed/ten queued
+workflows at observation; no failure reported.
