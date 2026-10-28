@@ -1,5 +1,6 @@
 /* Offline original-ROM continuation fixture; not public registration. */
 #include "rpl-mutation.h"
+#include "rpl-reference.h"
 #include "stage-stack.h"
 #include <stddef.h>
 
@@ -72,7 +73,8 @@ int bank_catalog_grow(uint8_t *nibbles, uint32_t *root, uint32_t *entry, uint32_
 }
 
 /* Controlled alternate command-4 return: caller proves R0's low address use.
- * This fixture supplies that obligation; it does not discover production roots. */
+ * This fixture supplies that obligation; it does not discover production roots.
+ */
 int bank_catalog_grow_r0(uint8_t *nibbles, uint32_t *entry, uint32_t *r0, unsigned repair_r0,
                          uint32_t *writes)
 {
@@ -90,4 +92,44 @@ int bank_catalog_grow_r0(uint8_t *nibbles, uint32_t *entry, uint32_t *r0, unsign
     int result = hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x86500, &repairs);
     *writes = f.writes;
     return result;
+}
+
+/* Controlled DUP continuation: A.A and R1.A point inside one TEMP allocation.
+ * The mask deliberately omits roots in negative controls; no discovery claim.
+ */
+int bank_catalog_grow_dispatch_guarded(uint8_t *nibbles, uint32_t *a, uint32_t *r1, unsigned mask,
+                                       uint32_t *writes,
+                                       const struct hpclang_rpl_reference_reader *guard_reader,
+                                       const struct hpclang_rpl_reference_guard *guards,
+                                       uint32_t guard_count)
+{
+    struct fixture f = {nibbles, 0};
+    const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
+    struct hpclang_rpl_mutation_io io = {
+        read_nibble, write_nibble, &f, 0x100000, 0x80000, 0, NULL, 0, 0x8611d, display, 4};
+    struct hpclang_rpl_register_repair registers[2];
+    unsigned count = 0;
+    if (mask & 1u)
+        registers[count++] = (struct hpclang_rpl_register_repair){a, *a};
+    if (mask & 2u)
+        registers[count++] = (struct hpclang_rpl_register_repair){r1, *r1};
+    const struct hpclang_rpl_catalog_repairs repairs = {.main_mapping = 1,
+                                                        .registers = registers,
+                                                        .register_count = count,
+                                                        .guard_reader = guard_reader,
+                                                        .guards = guards,
+                                                        .guard_count = guard_count};
+    uint32_t libraries;
+    if (!stage_word(&f, io.library_table, 3, &libraries))
+        return -1;
+    int result = hpclang_rpl_mutation_catalog_grow_repaired(
+        &io, io.library_table + 3u + libraries * 16u, &repairs);
+    *writes = f.writes;
+    return result;
+}
+
+int bank_catalog_grow_dispatch(uint8_t *nibbles, uint32_t *a, uint32_t *r1, unsigned mask,
+                               uint32_t *writes)
+{
+    return bank_catalog_grow_dispatch_guarded(nibbles, a, r1, mask, writes, NULL, NULL, 0);
 }

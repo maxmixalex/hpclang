@@ -1761,6 +1761,79 @@ static void guarded_dispatch_references(void)
     }
 }
 
+static void identified_dispatch_references(void)
+{
+    struct image image = {.size = 128, .fail = UINT32_MAX};
+    put(&image, 0, 80, 5);
+    put(&image, 5, 0x81234, 5);
+    uint8_t expected[] = {1, 3, 2, 1, 6, 4, 0, 3};
+    memcpy(image.data + 80, expected, 5);
+    memcpy(image.data + 100, expected + 5, 3);
+    struct hpclang_rpl_dispatch_identity_range ranges[] = {{80, 5, expected},
+                                                           {100, 3, expected + 5}};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    const struct hpclang_rpl_reference_reader mapped = {guarded_mapped_read, &image};
+    for (unsigned schema = 0; schema < 2; ++schema) {
+        const struct hpclang_rpl_dispatch_descriptor descriptor = {80, schema};
+        struct guarded_edges state;
+        begin_guarded_edges(&state);
+        assert(!hpclang_rpl_dispatch_reference_visit_identified(
+            &reader, 0, 10, &descriptor, ranges, 2, guarded_edge, observe_reference, &state));
+        assert(state.edges.count == (schema ? 1u : 2u));
+        assert(state.observations == 8 + (schema ? 10u : 6u));
+        assert(!hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count));
+        for (unsigned i = 0; i < 8; ++i) {
+            unsigned at = i < 5 ? 80 + i : 100 + i - 5;
+            image.data[at] ^= 1;
+            assert(
+                hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count));
+            image.data[at] ^= 1;
+        }
+        for (unsigned i = 0; i < 8; ++i) {
+            unsigned at = i < 5 ? 80 + i : 100 + i - 5;
+            for (unsigned failure = 0; failure < 4; ++failure) {
+                begin_guarded_edges(&state);
+                if (failure == 0)
+                    image.data[at] ^= 1;
+                else if (failure == 1)
+                    image.fail = at;
+                else if (failure == 2)
+                    image.data[at] = 16;
+                else
+                    state.stop_at = i + 1;
+                int result = hpclang_rpl_dispatch_reference_visit_identified(
+                    &reader, 0, 10, &descriptor, ranges, 2, guarded_edge, observe_reference,
+                    &state);
+                assert(result == (failure == 0   ? HPCLANG_RPL_SPAN_UNSUPPORTED
+                                  : failure == 1 ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                                  : failure == 2 ? HPCLANG_RPL_SPAN_MALFORMED
+                                                 : 73));
+                assert(!state.edges.count);
+                image.data[at] = expected[i];
+                image.fail = UINT32_MAX;
+            }
+        }
+        for (unsigned invalid = 0; invalid < 5; ++invalid) {
+            struct hpclang_rpl_dispatch_identity_range bad = ranges[0];
+            if (invalid == 0)
+                bad.length = 0;
+            if (invalid == 1)
+                bad.address = 0xffffe;
+            if (invalid == 2)
+                bad.nibbles = NULL;
+            if (invalid == 3)
+                bad.address = 81;
+            if (invalid == 4)
+                expected[0] = 16;
+            begin_guarded_edges(&state);
+            assert(hpclang_rpl_dispatch_reference_visit_identified(
+                &reader, 0, 10, &descriptor, &bad, 1, guarded_edge, observe_reference, &state));
+            assert(!state.edges.count && !state.observations);
+            expected[0] = 1;
+        }
+    }
+}
+
 static void guarded_nested_references(void)
 {
     struct image image = {.size = 45, .fail = UINT32_MAX};
@@ -1853,6 +1926,7 @@ static void guarded_nested_references(void)
 
 int main(void)
 {
+    identified_dispatch_references();
     guarded_dispatch_references();
     guarded_nested_references();
     mixed_width_metadata();

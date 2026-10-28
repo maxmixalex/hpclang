@@ -60,7 +60,7 @@ def packager():
     return module
 
 
-def observed_library(pack, library, *, identity_nibble=None):
+def observed_library(pack, library, *, identity_nibble=None, library_id=LIBRARY_ID):
     """Append a completion witness without changing any generated guard command.
 
     The unmodified library is tested separately for successful recovery. Negative
@@ -83,7 +83,8 @@ def observed_library(pack, library, *, identity_nibble=None):
 
     header = 14 + 2 * word(10, 2)
     fields = header + 3
-    assert word(header, 3) == LIBRARY_ID
+    if word(header, 3) != library_id:
+        raise ValueError("Observed library ID differs from the requested binding")
     links = fields + 10 + word(fields + 10)
     configuration_at = fields + 15 + word(fields + 15)
     assert word(links) == 0x2A4E and word(links + 5) in (35, 40)
@@ -98,7 +99,7 @@ def observed_library(pack, library, *, identity_nibble=None):
     marker += "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in MARKER)
     marker += pack.immediate(0x38A14) + pack.immediate(0x3E739)
     observed = pack._configuration_library(
-        configuration[:-10] + marker + configuration[-10:], LIBRARY_ID, commands
+        configuration[:-10] + marker + configuration[-10:], library_id, commands
     )
     if identity_nibble is not None:
         observed = pack.seal_recovery_identity(observed, identity_nibble)
@@ -125,8 +126,13 @@ def require_marker(read):
         raise ValueError("Guard configuration did not finish with the expected marker")
 
 
-def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
+def run_reservation(
+    args, clean, *, transfer, emulator, completed, verify_busy_reads, library_id=LIBRARY_ID
+):
     from creation import creation_record
+
+    if type(library_id) is not int or not 769 <= library_id <= 1791:
+        raise ValueError("Recovery library ID must be in the user-library range 769..1791")
 
     root = args.output / "reservation"
     root.mkdir()
@@ -167,7 +173,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             "--creation-claim-slot",
             str(claim_slot),
             "--library-id",
-            str(LIBRARY_ID),
+            str(library_id),
             "--reservation-name",
             NAME.decode(),
             "--reservation-bytes",
@@ -197,7 +203,12 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     library = (package / "recovery-guarded.hp").read_bytes()
     layout = json.loads((package / "recovery-layout.json").read_text())
     (package / "recovery-observed.hp").write_bytes(
-        observed_library(pack, library, identity_nibble=layout.get("identity_object_nibble"))
+        observed_library(
+            pack,
+            library,
+            identity_nibble=layout.get("identity_object_nibble"),
+            library_id=library_id,
+        )
     )
     source = root / "install-source"
     bank = args.target & ~0x1FFFF
@@ -216,7 +227,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     original_ids = {original(0x86120 + 16 * i, 3) for i in range(original_count)}
     if len(original_ids) != original_count:
         raise ValueError("Duplicate initial native library IDs")
-    if LIBRARY_ID in original_ids:
+    if library_id in original_ids:
         raise ValueError("Recovery fixture library ID is already occupied")
 
     def boot(before, label):
@@ -270,19 +281,19 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
         installed_recovery(
             (baseline / "flash").read_bytes(),
             (package / artifact).read_bytes(),
-            LIBRARY_ID,
+            library_id,
             args.target,
             read=read,
         )
         count = read(0x8611D, 3)
         if count != len(original_ids) + 1 or {
             read(0x86120 + 16 * i, 3) for i in range(count)
-        } != original_ids | {LIBRARY_ID}:
+        } != original_ids | {library_id}:
             raise ValueError("Guarded library did not preserve the native catalog")
         claim_flash = bytearray((baseline / "flash").read_bytes())
         artifact_bytes = (package / artifact).read_bytes()
         installed_slot, _ = installed_recovery(
-            claim_flash, artifact_bytes, LIBRARY_ID, args.target, read=read
+            claim_flash, artifact_bytes, library_id, args.target, read=read
         )
         header = bound_header(
             artifact_bytes,
@@ -300,7 +311,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
 
     def reservation_package(state, library, label):
         flash = (state / "flash").read_bytes()
-        slot, _ = installed_recovery(flash, library, LIBRARY_ID, args.target, read=reader(state))
+        slot, _ = installed_recovery(flash, library, library_id, args.target, read=reader(state))
         header = bound_header(
             library, layout["identity_object_nibble"], slot, args.slot, args.target, flash
         )
@@ -452,7 +463,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     observed_slot, _ = installed_recovery(
         (admission_before / "flash").read_bytes(),
         observed_package,
-        LIBRARY_ID,
+        library_id,
         args.target,
         read=admission_read,
     )
@@ -461,7 +472,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     altered_view[observed_slot + 4 : observed_slot + 4 + len(altered_package) - 8] = (
         altered_package[8:]
     )
-    installed_recovery(altered_view, altered_package, LIBRARY_ID, args.target, read=admission_read)
+    installed_recovery(altered_view, altered_package, library_id, args.target, read=admission_read)
     binding_faults = {
         "resource-root": 24,
         "resource-location": 56,
@@ -585,6 +596,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             {
                 "status": "pass",
                 "model": args.model,
+                "library_id": library_id,
                 "initial_gap": gap,
                 "admission_copy_bytes": admission_bytes,
                 "reservation_bytes": RESERVE_BYTES,

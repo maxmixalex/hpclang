@@ -898,6 +898,52 @@ int hpclang_rpl_dispatch_reference_visit_guarded(
     return scan.error ? scan.error : result;
 }
 
+int hpclang_rpl_dispatch_reference_visit_identified(
+    const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_dispatch_descriptor *descriptor,
+    const struct hpclang_rpl_dispatch_identity_range *ranges, uint32_t range_count,
+    hpclang_rpl_reference_visit_fn visit, hpclang_rpl_reference_dependency_fn dependency,
+    void *context)
+{
+    if (!reader || !reader->read_nibble || !descriptor || !ranges || !range_count || !visit ||
+        !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    int contains_entry = 0;
+    for (uint32_t i = 0; i < range_count; ++i) {
+        const struct hpclang_rpl_dispatch_identity_range *range = &ranges[i];
+        if (!range->nibbles)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (!range->length || range->address >= 0x100000u ||
+            range->length > 0x100000u - range->address)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        if (descriptor->dispatch >= range->address &&
+            descriptor->dispatch - range->address < range->length)
+            contains_entry = 1;
+        for (uint32_t j = 0; j < range->length; ++j)
+            if (range->nibbles[j] > 15u)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    if (!contains_entry)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    for (uint32_t i = 0; i < range_count; ++i) {
+        const struct hpclang_rpl_dispatch_identity_range *range = &ranges[i];
+        for (uint32_t j = 0; j < range->length; ++j) {
+            uint8_t value;
+            if (!reader->read_nibble(reader->context, range->address + j, &value))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (value > 15u)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            if (value != range->nibbles[j])
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            int result = dependency(context, range->address + j, value);
+            if (result)
+                return result;
+        }
+    }
+    return hpclang_rpl_dispatch_reference_visit_guarded(reader, address, limit, descriptor, visit,
+                                                        dependency, context);
+}
+
 struct catalog_plan_state
 {
     const struct hpclang_rpl_catalog_move *move;

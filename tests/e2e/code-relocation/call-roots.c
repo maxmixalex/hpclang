@@ -270,7 +270,7 @@ static int probe_cache_move(struct hpclang_rpl_mutation_io *io, uint32_t positio
     int result = probe_collect(p, &reader, home);
     if (!result) {
         const struct hpclang_rpl_catalog_repairs repairs = {
-            1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0};
+            1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0, NULL};
         result =
             remove ? hpclang_rpl_mutation_cache_acptr_remove(io, position, target, bank, &repairs)
                    : hpclang_rpl_mutation_cache_acptr_insert(io, position, target, bank, &repairs);
@@ -435,7 +435,7 @@ static int probe_register(void)
     if (result)
         goto done;
     const struct hpclang_rpl_catalog_repairs repairs = {
-        1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0};
+        1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0, NULL};
     /* After this boundary an error must halt the test, never return Stock. */
     const struct hpclang_rpl_library_binding added = {binding, 0, 0};
     if (hpclang_rpl_catalog_insert_repaired(&io, 123, &added, &insertion, &repairs)) {
@@ -457,7 +457,7 @@ static int probe_register(void)
                                             123, &removal) != 1)
             goto failed_roundtrip;
         const struct hpclang_rpl_catalog_repairs undo = {
-            1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0};
+            1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0, NULL};
         if (hpclang_rpl_catalog_remove_repaired(&io, 123, &removal, &undo))
             goto failed_roundtrip;
         for (uint32_t i = 0; i < snapshot_size; ++i) {

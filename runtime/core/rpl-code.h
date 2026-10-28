@@ -53,7 +53,10 @@ enum hpclang_rpl_code_register
     HPCLANG_RPL_CODE_R3,
     HPCLANG_RPL_CODE_R4,
     HPCLANG_RPL_CODE_P,
-    HPCLANG_RPL_CODE_CONSTANT
+    HPCLANG_RPL_CODE_CONSTANT,
+    HPCLANG_RPL_CODE_D0,
+    HPCLANG_RPL_CODE_D1,
+    HPCLANG_RPL_CODE_NEXT_PC
 };
 
 struct hpclang_rpl_code_literal
@@ -84,9 +87,17 @@ struct hpclang_rpl_code_assignment
 };
 
 /* Describe one plain register copy/zero or P literal/nibble transfer. Nibble
- * indices refer to 64-bit A/B/C/D/R0..R4 or one-nibble P. Other destination
+ * indices refer to 64-bit A/B/C/D/R0..R4, 20-bit D0/D1 or one-nibble P. Other destination
  * nibbles survive; source nibbles come from the pre-instruction state. Supports
  * classic field copies and 81A register copies with standard fields (0..7,F).
+ * D0/D1=A/C copies five low nibbles; D0/D1=AS/CS copies four, preserving
+ * the fifth address nibble. Source A/C remains unchanged.
+ * A=PC/C=PC copy the following instruction address into five low nibbles.
+ * Their source is NEXT_PC and constant holds instruction+4 in the instruction
+ * reader's mapping, not an arbitrary literal or a physical address. Preserve
+ * that mapping and the instruction dependency when propagating this fact.
+ * Captures whose next PC leaves the 20-bit address space are rejected.
+ * PC exchanges and control transfers are not plain assignments.
  * Exchanges, arithmetic, memory reads and custom fields remain unsupported.
  * p must be 0..15 and is the proven P value AT the instruction, needed for
  * P/WP fields. Interpreter-internal caches updated by P writes are not modeled.
@@ -104,10 +115,63 @@ struct hpclang_rpl_code_exchange
     unsigned first, nibbles;
 };
 
+struct hpclang_rpl_code_memory
+{
+    uint32_t instruction, length;
+    enum hpclang_rpl_code_register data, address;
+    unsigned first, nibbles, load;
+};
+
+/* Describe DAT0/DAT1 transfers to/from A/C at a proven instruction boundary.
+ * load=1 reads memory into the register, load=0 writes the register to memory.
+ * Memory starts at the caller-proven D0/D1 address; first selects the register
+ * field, not an offset added to memory. Neither address register is advanced.
+ * Supports fixed A/B fields, standard P/WP/XS/X/S/M/B/W/A fields and explicit
+ * low-register nibble counts. p must be the established value at this instruction.
+ * No data-memory reads/writes, address-wrap policy, pointer classification or
+ * relocation permission is implied. Guard code, P, address and mapping inputs
+ * separately before using this descriptor. Errors leave the output untouched. */
+int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                    uint32_t limit, unsigned p,
+                                    struct hpclang_rpl_code_memory *memory);
+
+/* Abstract origins, not register values or pointer classifications. Each token
+ * names one caller-owned nibble fact; zero means unknown. Register numbers are
+ * the enum above, through D1. CONSTANT's slot and unused high nibbles are unused.
+ * Callers establish seeds, memory identity/aliasing, instruction identity and
+ * the executed path. Unmodeled writes must invalidate their affected facts;
+ * never skip unsupported instructions and continue with stale origins. */
+struct hpclang_rpl_code_origins
+{
+    uint32_t registers[HPCLANG_RPL_CODE_D1 + 1][16];
+};
+
+/* Apply descriptors obtained from the inspectors to abstract facts only.
+ * Assignment snapshots its source, exchange snapshots both sides, and memory
+ * transfers snapshot the selected source before writing. Overlapping tag arrays
+ * are supported. Scalar constants clear destination facts. NEXT_PC requires
+ * five caller-established tokens (all zero is allowed), separately guarded for
+ * the instruction mapping. Memory tokens name exactly count consecutive nibbles
+ * starting at the established D0/D1 address; load reads them, store replaces them.
+ * Descriptors must be disjoint from writable token storage. Validate register
+ * and field bounds before any change; errors preserve state and memory tags.
+ * These operations do not execute code, access native memory, create pointer
+ * provenance from numeric values, or establish complete relocation coverage. */
+int hpclang_rpl_code_origins_assign(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_assignment *assignment,
+                                    const uint32_t *next_pc);
+int hpclang_rpl_code_origins_exchange(struct hpclang_rpl_code_origins *state,
+                                      const struct hpclang_rpl_code_exchange *exchange);
+int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_memory *transfer,
+                                    uint32_t *memory, unsigned count);
+
 /* Describe a simultaneous exchange of the same field in two registers. Both
  * sources are the pre-instruction values; preserve all nibbles outside the field.
  * Supports A/B/C/D pairs and A/C with R0..R4, standard fields (0..7,F).
- * Data-address registers, P exchanges and custom fields remain unsupported.
+ * Also supports A/C with 20-bit D0/D1: EX swaps low five nibbles, XS low four;
+ * preserve the fifth D0/D1 nibble for XS and all higher A/C nibbles.
+ * P exchanges and custom fields remain unsupported.
  * p is the proven P value at this instruction. This transfers caller-proven
  * provenance only; it does not establish addresses or authorize relocation.
  * No writes; errors leave output untouched. Guard the instruction and P before

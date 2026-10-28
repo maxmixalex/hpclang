@@ -318,7 +318,18 @@ int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
     const uint8_t *op = cursor.code;
     struct hpclang_rpl_code_assignment next = {.instruction = instruction, .length = size};
     unsigned field = 7;
-    if (op[0] == 2) {
+    if (op[0] == 8 && op[1] == 1 && op[2] == 11 && (op[3] == 4 || op[3] == 5)) {
+        if (instruction > 0xffffbu)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        next.source = HPCLANG_RPL_CODE_NEXT_PC;
+        next.destination = op[3] == 4 ? HPCLANG_RPL_CODE_A : HPCLANG_RPL_CODE_C;
+        next.nibbles = 5;
+        next.constant = instruction + 4;
+    } else if (op[0] == 1 && op[1] == 3 && !(op[2] & 2)) {
+        next.source = (op[2] & 4) ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A;
+        next.destination = (op[2] & 1) ? HPCLANG_RPL_CODE_D1 : HPCLANG_RPL_CODE_D0;
+        next.nibbles = (op[2] & 8) ? 4 : 5;
+    } else if (op[0] == 2) {
         next.source = HPCLANG_RPL_CODE_CONSTANT;
         next.destination = HPCLANG_RPL_CODE_P;
         next.constant = op[1];
@@ -369,6 +380,142 @@ int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
     return 0;
 }
 
+int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                    uint32_t limit, unsigned p,
+                                    struct hpclang_rpl_code_memory *memory)
+{
+    if (!reader || !reader->read_nibble || !memory)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || !limit || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (p > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct instruction_cursor cursor = {.reader = reader, .at = instruction, .limit = limit};
+    unsigned size;
+    int result = instruction_size(&cursor, &size);
+    if (!result)
+        result = instruction_take(&cursor, size);
+    if (result)
+        return result;
+    const uint8_t *op = cursor.code;
+    if (op[0] != 1 || (op[1] != 4 && op[1] != 5))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned selector = op[2];
+    struct hpclang_rpl_code_memory next = {
+        .instruction = instruction,
+        .length = size,
+        .data = selector & 4 ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A,
+        .address = selector & 1 ? HPCLANG_RPL_CODE_D1 : HPCLANG_RPL_CODE_D0,
+        .load = (selector & 2) != 0,
+    };
+    if (op[1] == 5 && selector >= 8) {
+        next.nibbles = op[3] + 1u;
+    } else {
+        unsigned field = op[1] == 4 ? (selector < 8 ? 15 : 6) : op[3];
+        static const unsigned first[] = {0, 0, 2, 0, 15, 3, 0, 0};
+        static const unsigned width[] = {1, 1, 1, 3, 1, 12, 2, 16};
+        if (field >= 8 && field != 15)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        next.first = field == 15 ? 0 : field == 0 ? p : first[field];
+        next.nibbles = field == 15 ? 5 : field == 1 ? p + 1 : width[field];
+    }
+    *memory = next;
+    return 0;
+}
+
+static unsigned origin_register_width(enum hpclang_rpl_code_register reg)
+{
+    if ((unsigned)reg <= HPCLANG_RPL_CODE_R4)
+        return 16;
+    if (reg == HPCLANG_RPL_CODE_P)
+        return 1;
+    if (reg == HPCLANG_RPL_CODE_D0 || reg == HPCLANG_RPL_CODE_D1)
+        return 5;
+    return 0;
+}
+
+static int origin_field_valid(enum hpclang_rpl_code_register reg, unsigned first, unsigned count)
+{
+    unsigned width = origin_register_width(reg);
+    return count && first < width && count <= width - first;
+}
+
+int hpclang_rpl_code_origins_assign(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_assignment *assignment,
+                                    const uint32_t *next_pc)
+{
+    if (!state || !assignment)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    unsigned count = assignment->nibbles;
+    if (!origin_field_valid(assignment->destination, assignment->destination_first, count))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (assignment->source == HPCLANG_RPL_CODE_NEXT_PC) {
+        if (assignment->source_first || assignment->destination_first || count != 5 ||
+            (assignment->destination != HPCLANG_RPL_CODE_A &&
+             assignment->destination != HPCLANG_RPL_CODE_C))
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        if (!next_pc)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    } else if (assignment->source == HPCLANG_RPL_CODE_CONSTANT) {
+        if (assignment->source_first)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    } else if (!origin_field_valid(assignment->source, assignment->source_first, count)) {
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    uint32_t source[16];
+    for (unsigned i = 0; i < count; ++i)
+        source[i] = assignment->source == HPCLANG_RPL_CODE_CONSTANT ? 0
+                    : assignment->source == HPCLANG_RPL_CODE_NEXT_PC
+                        ? next_pc[i]
+                        : state->registers[assignment->source][assignment->source_first + i];
+    for (unsigned i = 0; i < count; ++i)
+        state->registers[assignment->destination][assignment->destination_first + i] = source[i];
+    return 0;
+}
+
+int hpclang_rpl_code_origins_exchange(struct hpclang_rpl_code_origins *state,
+                                      const struct hpclang_rpl_code_exchange *exchange)
+{
+    if (!state || !exchange)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!origin_field_valid(exchange->left, exchange->first, exchange->nibbles) ||
+        !origin_field_valid(exchange->right, exchange->first, exchange->nibbles))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t left[16], right[16];
+    for (unsigned i = 0; i < exchange->nibbles; ++i) {
+        left[i] = state->registers[exchange->left][exchange->first + i];
+        right[i] = state->registers[exchange->right][exchange->first + i];
+    }
+    for (unsigned i = 0; i < exchange->nibbles; ++i) {
+        state->registers[exchange->left][exchange->first + i] = right[i];
+        state->registers[exchange->right][exchange->first + i] = left[i];
+    }
+    return 0;
+}
+
+int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_memory *transfer,
+                                    uint32_t *memory, unsigned count)
+{
+    if (!state || !transfer || !memory)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if ((transfer->data != HPCLANG_RPL_CODE_A && transfer->data != HPCLANG_RPL_CODE_C) ||
+        (transfer->address != HPCLANG_RPL_CODE_D0 && transfer->address != HPCLANG_RPL_CODE_D1) ||
+        transfer->load > 1 || transfer->nibbles != count ||
+        !origin_field_valid(transfer->data, transfer->first, count))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t source[16];
+    uint32_t *registers = state->registers[transfer->data] + transfer->first;
+    for (unsigned i = 0; i < count; ++i)
+        source[i] = transfer->load ? memory[i] : registers[i];
+    for (unsigned i = 0; i < count; ++i)
+        if (transfer->load)
+            registers[i] = source[i];
+        else
+            memory[i] = source[i];
+    return 0;
+}
+
 int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
                                       uint32_t limit, unsigned p,
                                       struct hpclang_rpl_code_exchange *exchange)
@@ -387,6 +534,13 @@ int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, u
     const uint8_t *op = cursor.code;
     struct hpclang_rpl_code_exchange next = {.instruction = instruction, .length = size};
     unsigned field;
+    if (op[0] == 1 && op[1] == 3 && (op[2] & 2)) {
+        next.left = (op[2] & 4) ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A;
+        next.right = (op[2] & 1) ? HPCLANG_RPL_CODE_D1 : HPCLANG_RPL_CODE_D0;
+        next.nibbles = (op[2] & 8) ? 4 : 5;
+        *exchange = next;
+        return 0;
+    }
     if ((op[0] == 1 && op[1] == 2) || (op[0] == 8 && op[1] == 1 && op[2] == 10 && op[4] == 2)) {
         unsigned selector = op[0] == 1 ? op[2] : op[5];
         next.left = selector < 8 ? HPCLANG_RPL_CODE_A : HPCLANG_RPL_CODE_C;
