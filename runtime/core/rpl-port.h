@@ -96,6 +96,33 @@ int hpclang_rpl_catalog_plan_insert(const struct hpclang_rpl_reader *reader, uin
                                     uint32_t limit, uint32_t number,
                                     struct hpclang_rpl_catalog_insertion *plan);
 
+struct hpclang_rpl_catalog_removal
+{
+    uint32_t slot;
+    uint32_t end;
+    uint32_t count;
+    struct hpclang_rpl_library_binding binding;
+};
+
+/* Inspect the native HOME attachment prefix (DORRP, count, 13-nibble records).
+ * Caller supplies the proven HOME address and readable extent. Validate every
+ * encoded record, including records after a match. Return 1 attached, 0 absent
+ * or a negative span result. Absence is not proof of execution-reference
+ * liveness or validation of the directory's stored objects. No writes. */
+int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                      uint32_t limit, uint32_t number);
+
+/* Plan removal from the strictly ID-ordered catalog. Validate the entire table,
+ * including entries after the match, before publishing its slot and binding.
+ * Returns 1 found, 0 absent, or a negative span result; output changes only on
+ * 1. This read-only plan does not prove that the library is detached or unused.
+ * The caller must prove those conditions, revalidate the plan under stable
+ * ownership, repair references and compact memory before publishing a removal.
+ * The binding retains its native bank coordinates; no payload is dereferenced. */
+int hpclang_rpl_catalog_plan_remove(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                    uint32_t limit, uint32_t number,
+                                    struct hpclang_rpl_catalog_removal *plan);
+
 /* Enumerate every catalog entry, including banked and duplicate-ID records.
  * The record address identifies the catalog cell, not the library payload.
  * The binding is callback-local; copy it if needed. No target is dereferenced.
@@ -124,6 +151,26 @@ int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t
 int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_t first,
                                 uint32_t end, uint32_t header, uint32_t number, uint32_t command,
                                 uint32_t *target);
+
+struct hpclang_rpl_library_attachment_targets
+{
+    uint32_t present; /* Bits 0/1 distinguish present hash/messages, even at address zero. */
+    uint32_t hash;
+    uint32_t messages;
+};
+
+/* Resolve hash/message table coordinates from an identity-checked library ID
+ * header in a caller-selected stable mapping. first/end bound that mapping;
+ * targets are not dereferenced or validated as executable/table bodies.
+ * Return 1 after reading both offsets, negative on malformed/unreadable input;
+ * output changes only on 1. Zero relative offsets mean absent fields.
+ * These are bank-local coordinates, NOT ready-to-publish HOME fields: banked
+ * libraries require separately owned DOACPTR wrappers carrying the bank switch.
+ * A direct-mapped table may itself be a DOACPTR; do not unwrap it implicitly.
+ * This neither switches banks nor authorizes registration/attachment. */
+int hpclang_rpl_library_attachment_resolve(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                           uint32_t end, uint32_t header, uint32_t number,
+                                           struct hpclang_rpl_library_attachment_targets *targets);
 
 /* Resolve a library's configuration entry through its ID header. As with
  * command lookup, the caller supplies a stable selected mapping and bounds.

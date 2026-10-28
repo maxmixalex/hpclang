@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include "clock-internal.h"
 #include "exit-hooks.h"
+#include "irq.h"
+#include "runtime-stop.h"
 #include "../libc/stdio-lifetime.h"
 
 static const struct hpclang_boot_info *boot_info;
@@ -63,4 +65,13 @@ __attribute__((noreturn)) void exit(int status)
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
     return boot_info;
+}
+
+__attribute__((noreturn)) void hpclang_runtime_stop(void)
+{
+    (void)hpclang_irq_save_disable();
+    /* exit/_Exit would release ownership and resume a partially changed Stock
+     * state. Only an external reset may leave this terminal condition. */
+    for (;;)
+        __asm__ volatile("" ::: "memory");
 }

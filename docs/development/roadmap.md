@@ -1,9 +1,9 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-10-27. **M8 is incomplete; only M8.1 is accepted complete.**
+Current checkpoint: 2026-10-28. **M8 is incomplete; only M8.1 is accepted complete.**
 Docker/WSL is restored. Both-model reservation retests pass guarded recovery,
 repeat restart, absent-reservation recovery and all 16 rejection cases per model.
-Accepted main: `038b0f41` (PR #22 return-root coverage, elapsed-time PWM witness and M0–M7 overview accepted; SD Reset #15 and opt-in legacy formatting #17 retained). Local passing tests, submitted CI, CI acceptance and
+Accepted main: `f806b299` (physical span qualification #23, return-root coverage and M0–M7 overview #22, SD Reset #15 and opt-in legacy formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
@@ -117,11 +117,13 @@ candidate sanitizers/analysis/docs pass and its 59,656-byte image and launchers
 match both-model native cache round trips. Full opaque/banked
 provenance and public registration remain open.
 
-Submitted guarded dispatch decoding retains both caller-proven schemas' read dependencies without interpreting scalar type IDs as pointers. Candidate sanitizer tests, ARM analysis and strict docs pass; offline retained HP49g+/HP50g fixtures cover 42 entries and 332 observer interruptions. #24 `0e68b3b1` also corrects both prior Quality failures in prrun.py (jobs 121820222253/121820196392), with identical Python AST and full formatting/lint checks passing. All ten previous workflows and every job were inspected; only those investigated failures remain. New CI, handler identity, embedded-code provenance and complete execution references remain open.
+Submitted guarded dispatch decoding retains both caller-proven schemas' read dependencies without interpreting scalar type IDs as pointers. Sanitizer and ARM checks pass; retained two-model fixtures cover 42 entries and 332 observer interruptions. Prior Quality formatting failures were corrected without changing the Python AST. Current native CI failures and local fixes are tracked below. Complete handler identity, embedded-code provenance and execution-reference coverage remain open.
 
 Port2 startup: a real supported-ID-769 HP50g fixture now passes owned installation, guarded low-memory recovery and repeat restart, retaining 23,900 user elements. Absent-reservation/rejection cases and HP49g+ remain unrun for this binding. Earlier traces are explicitly ID1701, not ID4; 14 configured Stock libraries precede minimum supported ID769, and complete startup safety remains open.
 
-Current #24 `0e68b3b1` has two Stock object-mutation lifecycle-3 failures (jobs 121826320519/121826320547). Independent HP49g+/HP50g failure-RAM audits both confirm ENOSPC: DSKTOP 0xe0012, native USEROB fence 0xe0000 and five reserved nibbles leave only 13 nibbles of growth. The unchanged integer-to-string test needs 64. The 356,910-nibble raw stack gap is not all available to RPL. Preserve the page fence and investigate launcher growth reservation; no repair or passing lifecycle rerun is claimed. Latest exact-head audit: four workflows pass, one fails, five queued; 243 jobs succeed, two fail, 88 queue, 20 run and one skips.
+Local #24 follow-up passes all six Stock object-mutation lifecycles: three invocations per classic model and 15 per HP39 model, totaling 54 phases with settled return. The native wrapper reserves 240 bytes instead of 16 without weakening page fences. All three payloads/result addresses and six launchers remain identical after accepted-main integration. Ten fresh HP49g+/HP50g detach, reattach and cache cases also pass with the packed HOME snapshot; saved states, input hashes and every fixture package independently verify. Sanitizers, ARM analysis, envelope checks, formatting and strict docs pass. Fresh CI acceptance remains required.
+
+Prior #24 `0e68b3b1` finished with 345 successful jobs, two skipped, eight failures and one cancelled publisher. All eight failure snapshots confirm two causes: Port0 needs 64 growth nibbles with only 13 available; the test HOME snapshot requests 246,907 bytes against 229,376 total RW bytes. The fixes reserve Stock growth space and pack the complete snapshot into 123,454 bytes. Publisher annotations confirm cancellation by a higher-priority waiting ci-evidence-publisher request. All preceding workflows/jobs were inspected before this delivery; that failed head is not accepted.
 
 Current implementation and evidence:
 
@@ -195,19 +197,18 @@ Current implementation and evidence:
   pass, with ARM build/analysis and docs. Public library registration, Port1
   replace/remove and Port2 startup/reclamation remain open.
 
-- Submitted Port0 commit-failure handling passes four operation write-cut matrices, root-before-write and allocation/preflight controls, plus four public API terminal-path cases. Delivery sanitizers, ARM analysis and strict docs pass. The 62,088-byte image, both launchers and verifier inputs match four HP49g+/HP50g registered/unregistered message cases; 476 source corruptions reject. Included in #24 `0e68b3b1`; the current CI investigation is recorded above. New CI and parent acceptance remain required.
+- Submitted Port0 commit-failure handling passes four operation write-cut matrices, root-before-write and allocation/preflight controls, plus four public API terminal-path cases. Delivery sanitizers, ARM analysis and strict docs pass. The 62,088-byte image, both launchers and verifier inputs match four HP49g+/HP50g registered/unregistered message cases; 476 source corruptions reject. Included in #24 `0e68b3b1`; the current CI investigation is recorded above. Fresh delivery CI remains required; both parents are accepted.
 
 Next actions, in order:
 
 1. Complete launcher/opaque-object provenance and bank/register coverage for
    relocation plans before enabling public library management and Port1 edits.
-2. PR #22 is accepted as `038b0f41`: all nine workflows pass, with 354
-   successful jobs and two skipped. M0–M7 summaries are restored on main.
-   #23 `e26f83a4` passed all seven workflows; recheck its branch/base relationship
-   before integration. #24 remains unaccepted because of the two Port0 lifecycle
-   failures described above. Fix and retest growth reservation without weakening
-   native-page fences. Earlier unrelated PWM/watchdog and HP39 transfer failures
-   retain their documented limits; later local passes alone do not prove causes.
+2. PR #22 is accepted as `038b0f41`; M0–M7 summaries remain visible.
+   PR #23 is accepted as `f806b299`: all ten exact-head workflows pass,
+   with 373 successful jobs and one skipped. #24 integrates this accepted
+   parent and passes the local follow-up checks above; fresh CI remains required.
+   Earlier unrelated PWM/watchdog and transfer failures retain their documented
+   limits; these fixes do not establish their causes.
 3. Complete retained Port2 trusted recovery installation, authority lifecycle,
    safe startup and reclamation. Preserve the independent M8 stage requirements.
    During CI wait, UI pool/RW checks pass all six retained Stock CLI cases.

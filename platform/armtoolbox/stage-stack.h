@@ -60,4 +60,12 @@ uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_i
 unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uint32_t continuation,
                                     uint32_t *machine_stack, uint32_t cursor, uint32_t **roots);
 
+/* Invert a physical 4 KiB page through the 256-entry Stock Read map.
+ * Return 1 only for one complete, consecutive pair of 2 KiB mappings in
+ * main RAM, 0 for no overlap, -1 for partial/ambiguous/invalid mappings.
+ * On 0/-1 leave the output untouched. Only main-RAM aliases are classified;
+ * banked mappings require their own ownership proof. */
+int hpclang_stage_main_page(const uint32_t *read_map, uint32_t physical_page,
+                            uint32_t *saturn_start);
+
 #endif

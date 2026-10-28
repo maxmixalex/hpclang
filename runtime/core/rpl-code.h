@@ -41,6 +41,81 @@ struct hpclang_rpl_code_indirect
     unsigned register_c, via_memory;
 };
 
+enum hpclang_rpl_code_register
+{
+    HPCLANG_RPL_CODE_A,
+    HPCLANG_RPL_CODE_B,
+    HPCLANG_RPL_CODE_C,
+    HPCLANG_RPL_CODE_D,
+    HPCLANG_RPL_CODE_R0,
+    HPCLANG_RPL_CODE_R1,
+    HPCLANG_RPL_CODE_R2,
+    HPCLANG_RPL_CODE_R3,
+    HPCLANG_RPL_CODE_R4,
+    HPCLANG_RPL_CODE_P,
+    HPCLANG_RPL_CODE_CONSTANT
+};
+
+struct hpclang_rpl_code_literal
+{
+    uint32_t instruction, length, field;
+    enum hpclang_rpl_code_register destination;
+    unsigned nibbles;
+    uint64_t mask, value;
+};
+
+/* Decode LC/LA at a caller-proven instruction boundary with the proven P value.
+ * The loaded nibbles wrap modulo 16 from P; other register bits survive.
+ * next_register = (old_register & ~mask) | value. field is the first encoded
+ * literal nibble, not a pointer field. Constants do not establish address
+ * provenance, mapping identity or permission to relocate. Preserve guards on
+ * the full instruction and P dependency before using this in data-flow analysis.
+ * No writes; invalid/unsupported input leaves output untouched. */
+int hpclang_rpl_code_literal_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                     uint32_t limit, unsigned p,
+                                     struct hpclang_rpl_code_literal *literal);
+
+struct hpclang_rpl_code_assignment
+{
+    uint32_t instruction, length;
+    enum hpclang_rpl_code_register source, destination;
+    unsigned source_first, destination_first, nibbles;
+    uint32_t constant;
+};
+
+/* Describe one plain register copy/zero or P literal/nibble transfer. Nibble
+ * indices refer to 64-bit A/B/C/D/R0..R4 or one-nibble P. Other destination
+ * nibbles survive; source nibbles come from the pre-instruction state. Supports
+ * classic field copies and 81A register copies with standard fields (0..7,F).
+ * Exchanges, arithmetic, memory reads and custom fields remain unsupported.
+ * p must be 0..15 and is the proven P value AT the instruction, needed for
+ * P/WP fields. Interpreter-internal caches updated by P writes are not modeled.
+ * A copy propagates caller-proven provenance; it does not create address
+ * provenance from a numeric value. No mutation or relocation authorization.
+ * Error leaves output untouched. */
+int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
+                                        uint32_t instruction, uint32_t limit, unsigned p,
+                                        struct hpclang_rpl_code_assignment *assignment);
+
+struct hpclang_rpl_code_exchange
+{
+    uint32_t instruction, length;
+    enum hpclang_rpl_code_register left, right;
+    unsigned first, nibbles;
+};
+
+/* Describe a simultaneous exchange of the same field in two registers. Both
+ * sources are the pre-instruction values; preserve all nibbles outside the field.
+ * Supports A/B/C/D pairs and A/C with R0..R4, standard fields (0..7,F).
+ * Data-address registers, P exchanges and custom fields remain unsupported.
+ * p is the proven P value at this instruction. This transfers caller-proven
+ * provenance only; it does not establish addresses or authorize relocation.
+ * No writes; errors leave output untouched. Guard the instruction and P before
+ * using the result, as for assignment_inspect. */
+int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                      uint32_t limit, unsigned p,
+                                      struct hpclang_rpl_code_exchange *exchange);
+
 /* Resolve PC=A, PC=C, PC=(A), PC=(C) at a proven instruction boundary.
  * a_low/c_low must describe the registers AT that instruction, not merely an
  * earlier suspended snapshot. Only the low 20 bits are consumed. The separate

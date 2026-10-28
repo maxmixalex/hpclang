@@ -1119,6 +1119,21 @@ body, but neither reverse instruction matching nor a matching boundary proves
 that a saved scalar was produced by that call. The platform still owes the
 suspended caller's provenance contract before publishing relocation roots.
 
+The internal `rpl-code` literal inspector describes LC/LA register writes at
+proven instruction boundaries. A caller-proven P value determines a 64-bit
+write mask and positioned value, including nibble wrap; untouched register bits
+survive. The encoded literal location is retained for guards, not declared to
+be a pointer field. Numeric constants alone never establish address provenance
+or mapping identity. A later register copy may propagate an independently
+proven address fact, but these primitives do not authorize relocation.
+The exchange inspector describes simultaneous standard-field swaps between
+A/B/C/D pairs or A/C and R0..R4, including the launcher's `ACEX W` instructions.
+Both fields must be read from the pre-instruction state before either is
+replaced; bits outside the selected field survive. P/WP fields require the
+proven current P. Data-address register exchanges, P exchanges and custom
+fields remain unsupported. This is a data-flow building block, not a complete
+launcher analysis or permission to treat arbitrary register values as roots.
+
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
 A/C bit-test instruction boundaries. Its relocation planner
@@ -1262,15 +1277,69 @@ documented target adaptations, not removed application requirements.
 
 ### Startup resource admission
 
-The wrapper's native request word is `0x01c00000`, not a byte count. The
+The wrapper's native request word is `0x0fc00000`, not a byte count. The
 Launcher V3 format in HPGCC 1.1's `ARMToolbox/LibFmt.txt` and HPGCC 2.0 SP2's
 `sources/ARMToolbox/masd_source/ARMTBX_3_SOURCES.DIR` assigns bit 22 to the MMU
 packer, bit 23 to optional ARM OS RAM, and bits 24–27 to native stack-growth
-reservation in 16-byte blocks. Our word sets both flags and one stack block.
+reservation in 16-byte blocks. Our word sets both flags and all 15 stack blocks
+(240 bytes), the largest representable request. Runtime fences still bound
+each mutation; this request does not promise unlimited or unconsumed capacity.
 With the packer enabled, the low 20 bits describe space to leave for TEMPOB
 growth, not the application's pool size; this word leaves that field zero.
 Writing a 36 KiB application limit there would change native free-space policy,
 not enforce a 36 KiB allocation.
+
+The exact-head `0e68b3b1` object-mutation CI failures on HP49g+ and HP50g
+expose a concrete USEROB capacity limit on the third invocation. Independent
+reads of both captured MMU tables, boot bounds and Saturn RAM give DSKTOP
+`0xe0012`, RSKTOP `0x88de4`, USEROB fence `0xe0000` and five reserved nibbles.
+Only 13 nibbles remain for growth, despite a raw stack gap of 356,910 nibbles.
+Replacing integer 987 (14 nibbles) with the unchanged 34-character test string
+(78 nibbles) needs 64 nibbles and would lower DSKTOP to `0xdffd2`, below the
+required `0xe0005`. Both captured TLS errno cells contain ENOSPC (28). The
+native-page fence must remain intact; total free RAM is not contiguous USEROB
+capacity. The failed wrapper requested only one 16-byte stack-growth block.
+
+Reproduction artifacts are retained in `research/oct27-object-ci`: the two
+full SRAM/on-chip captures and `capacity-audit.json` with SHA-256 input identities.
+`research/oct27-object-ci-capacity.py` checks the bounds against both captures.
+The original CI jobs are 121826320519 and 121826320547. The historical Launcher
+V3 source's MMUARMJUMP subtracts the stack-growth request from DSKTOP before
+assembling main-RAM pages. The 240-byte candidate now passes the complete
+three-invocation Stock object-mutation lifecycle on both models, including
+settled return and phases 0x4f530400/401/402. All five retained CI code artifacts
+(application ELF/HPC, two launcher ELFs and stage1 ELF) match byte-for-byte;
+only the wrapping request changes. The production wrapper reproduces both
+tested packages exactly. `research/oct27-port0-reserve-identity.py` and
+`/work/oct27-port0-reserve/{code-identity,verified-results}.json` retain the
+artifact checks and six result records. All six models now pass: three invocations each on HP48gII/HP49g+/HP50g
+and 15 each on HP39g+/HP39gs/HP40gs, totaling 54 lifecycle phases with settled
+return. The independently checked structured records are retained in
+`/work/oct27-port0-reserve/verified-results.json`, separately from the subsequent
+catalog suite which reuses the harness build-output paths. The accepted-main integration preserves
+all three family payloads/result addresses and six launchers byte-for-byte;
+integration port/mutation/reference/physical-mapping sanitizer tests pass.
+New CI remains required; these local passes do not complete M8.0.
+
+The code-relocation CI failures (HP49g+ job 121826775448 and HP50g job
+121826775572, same `0e68b3b1` head) are test allocation failures before HOME
+detachment. Independent snapshots from both models agree on the following bounds. The retained PC
+`0x0122c298`, malloc return LR `0x0122c45f`, stack operands and TLS errno 12
+identify the one-byte-per-nibble HOME snapshot: 246,907 requested bytes exceed
+the complete 229,376-byte RW region. HOME is `0xc3a60`, its body begins at
+`0xc3b04`, and Port 0 begins at `0xfff7f`. The candidate packs both nibbles into
+each snapshot byte, needing 123,454 bytes for this odd-sized body, and still
+compares every native nibble after detach/reattach. ARM build, formatting and
+static analysis pass. All ten native detach/reattach/cache cases across
+HP49g+/HP50g now pass from fresh standard Stock installations. The 62,136-byte
+payload, verifier inputs and every packaged case match the saved input hashes;
+`research/oct28-packed-home-audit.py` replays all checks against the retained
+RAM/Flash without running the emulator. The replay verifies catalog bindings,
+HOME attachments, cache lookup/message behavior and original Flash preservation.
+New delivery CI is still required. Failure RAM, matching-image identity and allocation audit
+remain under `research/oct27-code-ci`; `oct27-code-ci-allocation.py` reproduces
+the address/size/errno checks. This fixture fix changes neither production
+mutation behavior nor its memory fences.
 
 The historical implementations assemble a pool from available native memory
 and optionally append an OS allocation. Their OS probing policy varies: the

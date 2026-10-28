@@ -78,6 +78,146 @@ continues to accept `RPL2` for main-RAM services but requires `RPL3` for Port 1
 creation. These records remain launcher-private; rebuild applications and
 their packaged launcher together when updating the SDK.
 
+Classic-RPL main-RAM mutation fences invert each native pool page through the
+Stock Read map. A 4 KiB physical page must have exactly one complete consecutive
+pair of 2 KiB main-RAM mappings. A missing half, duplicate alias or overlapping
+partial mapping disables publication of mutation bounds; absence from main RAM
+is distinct from an invalid partial mapping. This proof covers main-RAM aliases
+only, not arbitrary banked aliases or future mapping changes.
+
+For read-only range analysis, `hpclang_rpl_stock_visit_spans` walks a stable
+Stock Read map and reports maximal physically contiguous runs. It validates
+every touched page before callbacks, retains separate logical aliases and
+uses absolute physical nibble coordinates. This permits whole-range overlap
+checks without assuming that consecutive Saturn pages are physically adjacent.
+It does not select a bank, classify pointer values or authorize relocation.
+`hpclang_rpl_stock_spans_overlap` compares complete ranges under independently
+qualified maps, including discontinuities and aliases. Both ranges must be
+valid even when early pages overlap; adjacent or opposite-parity nibbles do
+not overlap. The result describes physical aliasing, not reference liveness.
+The profiled original-ROM switches map a full 128 KiB window even for the
+96 KiB bank 0 allocation; its tail aliases bank 1 at different Saturn addresses.
+Mapped extent is not allocation ownership, and bank IDs alone do not prove
+disjointness. Reference planning requires normalized physical identity and
+address offsets. Unused
+bank 14/15 entries select unaligned placeholder pages, which these helpers
+reject. The offline `bank_switch.py` check executes the original switches;
+it does not establish arbitrary bank lifetimes or authorize movement.
+For proven affine aliases, `hpclang_rpl_reference_plan_offset_shift` tests
+membership in the moving range using independent field/target offsets, while
+preserving native patch addresses and relative encodings. The caller must
+establish that each translation and delta applies across all old/new ranges.
+The planner rejects split fields and native encoding overflow; it does not
+resolve discontinuous mappings or bypass executable-reference obligations.
+`hpclang_rpl_catalog_plan_relocation_offsets` applies those translations to
+catalog payloads and switch-function targets independently. Its edits/guards
+keep original catalog addresses for the existing preflight/commit path; zero
+switches stay zero and nonzero function targets cannot become zero.
+`hpclang_rpl_catalog_plan_remove` validates the complete ordered catalog before
+returning a removal slot, original count/end and native library binding. Missing
+IDs and malformed or unreadable tables leave the output unchanged. This is a
+read-only prerequisite for unloading: callers must still prove detachment and
+reference liveness, revalidate under ownership, and repair references while
+compacting the table. It neither unregisters nor deletes a library record.
+The internal `hpclang_rpl_catalog_remove_repaired` commit revalidates that plan
+and its binding, validates the complete HOME attachment prefix and rejects
+still-attached IDs before any writes. A match never hides unreadable later
+records. This check does not replace execution-liveness analysis. It then
+contracts the catalog/metadata/TEMP/return-stack suffix by
+16 nibbles, applies caller-proven repairs and publishes the count last. Roots
+into the removed catalog cell prevent contraction. Supplied fields in that
+cell are rejected; surviving native/register roots and embedded fields retain
+their normal preflight checks. A commit read/write failure is `INCOMPLETE`:
+ownership must be retained, with no retry or Stock return. This is not yet a
+public unload service: detachment, execution-reference coverage and payload
+deletion remain separate obligations.
+
+`hpclang_rpl_library_attachment_resolve` checks the library ID and resolves its
+hash/message offsets within a caller-selected stable mapping. It publishes both
+coordinates together, distinguishing absent fields from present address zero.
+These coordinates are not ready-to-publish HOME fields: banked libraries use
+separately owned DOACPTR wrappers containing the target and switch identity.
+Direct-mapped table pointers are retained even when the table itself is a
+DOACPTR. Wrapper allocation/lifetime and transactional registration remain
+caller obligations; the resolver does not dereference table bodies or run code.
+
+`hpclang_rpl_mutation_visit_guarded_temp` records the allocation traversal's
+geometry, sentinel and footer reads in both validation and enumeration passes.
+These observations let the relocation plan guard the allocation boundaries that
+selected its object graph. A malformed complete chain rejects before payload
+callbacks; dependency/read/callback errors invalidate partial output. Payload
+contents still need separate guarded traversal and execution provenance. The
+native catalog/cache probe uses this traversal instead of an unguarded footer
+walk; this does not authorize public registration.
+
+Internal `hpclang_rpl_mutation_cache_acptr_insert/remove` stores 15-nibble
+DOACPTR wrappers in the main-RAM metadata cache between the catalog end and
+TEMPBOTTOM. Insertion requires the caller's expected TEMPBOTTOM and initializes
+the prologue, target and switch before publishing geometry. Removal verifies all
+three fields within the cache; the caller must independently prove the complete
+object boundary and ownership. Surviving references into the removed extent
+reject with BUSY. Shared movement uses the actual 15- or 16-nibble width for field
+boundaries, root repairs, fences and accounting. Caller-proven embedded/register
+repairs retain their original guards; preflight is write-free and commit failure
+is INCOMPLETE. These primitives neither attach HOME fields nor execute switches.
+Registration transactions, complete reference discovery, lifetime integration and
+native execution acceptance remain open.
+
+The internal `hpclang_rpl_mutation_home_attach` appends a HOME attachment using
+two caller-proven native pointer fields. It validates the complete existing
+prefix before rejecting a duplicate ID, checks count capacity and free-space
+fences, then moves the lower stack/HOME prefix down by 13 nibbles. Existing and
+new pointer targets in that prefix are repaired; directory objects remain fixed.
+The new record is written before publishing the increased count. Zero pointer
+fields are preserved. Preflight faults make no writes, while commit faults
+return INCOMPLETE and require retaining ownership without retry or Stock return.
+The caller must establish library identity, field semantics and relocation
+safety; this primitive does not run library configuration or register a binding.
+
+The internal `hpclang_rpl_mutation_home_detach` removes a matching HOME attachment
+without unregistering or freeing the library. It validates the entire attachment
+prefix and directory geometry, moves the stack/HOME prefix upward by 13 nibbles,
+repairs known roots and publishes the reduced attachment count last. Following
+directory objects retain their addresses; HOME and earlier attachment fields
+move. Duplicate matching IDs, live roots into the removed record and unreadable
+input reject before writes. Commit failures require retained ownership as above.
+Caller-proven relocation safety and execution liveness remain necessary; this
+internal primitive does not make public unloading complete.
+`hpclang_rpl_reference_edits_check_aliases` resolves complete fields before
+checking physical overlap, including different IDs/coordinates and repeated
+pages within one map. The mapped RAM replay entry performs this check before
+target I/O, then preserves the ordinary expected-or-replacement retry rules.
+Resolvers must prove contiguity and stable mappings across the entire batch;
+this adds no permission to write ROM or move objects with unresolved roots.
+
+`hpclang_rpl_dispatch_reference_visit_guarded` records the native reads used
+by the two caller-proven dispatch schemas. These include the dispatch word and
+the scalar type operand or first embedded-entry nibble. Dependency callback
+failures survive parser error conversion; partial output must be discarded.
+Type identifiers remain scalars, while execution and embedded-entry events
+retain their unresolved code obligations. The descriptor's identity and stable
+mapping are caller preconditions; observing bytes does not authenticate code.
+Host regressions check changed dependencies, every read/observer fault, invalid
+nibbles, callback errors and untouched trailing payloads. Offline checks against
+retained HP49g+/HP50g predicate fixtures cover 42 dispatch entries and 332
+observer interruptions; they do not execute a new application or close full
+execution-reference coverage.
+
+The public port adapter treats `HPCLANG_RPL_MUTATION_INCOMPLETE` as terminal.
+`hpclang_runtime_stop` masks IRQ/FIQ and retains the current mappings/ownership
+without destructors, service cleanup or Stock return. Ordinary `exit`/`_Exit`
+would release that ownership, so they are not valid commit-failure paths.
+Port1 body preparation failures remain recoverable `EIO` while its zero
+prologue still hides the record. Stable production RAM callbacks should not
+fail after preflight; the terminal path preserves the contract if they do.
+Port0 backup creation/replacement/removal and library creation observe Saturn
+write attempts and ARM-root changes, which can precede the first Saturn write.
+A subsequent failure returns `INCOMPLETE`; unchanged preflight failures retain
+their original result. The root snapshot is allocated before mutation; allocation
+failure returns `ENOMEM` without native changes. This boundary adds neither
+rollback nor coverage of previously unsupported references.
+Public Port1 replace/remove still require complete reference protection.
+
 ## Platform families and model profiles
 
 The platform family is the implementation unit for launch and low-level integration:

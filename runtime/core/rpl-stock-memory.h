@@ -35,6 +35,29 @@ int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint
 int hpclang_rpl_stock_resolve_span(const uint32_t read_map[256], uint32_t address, uint32_t span,
                                    uint32_t *physical);
 
+/* Enumerate maximal physically contiguous runs for a logical span, in logical
+ * order. Repeated physical aliases remain separate logical runs. Validate all
+ * touched pages before invoking the first callback; each run reports absolute
+ * physical NIBBLE coordinates. Same map provenance/lifetime and region bounds
+ * as resolve_span, but discontinuous pages are split rather than rejected.
+ * Nonzero callback results propagate and invalidate partial output. No target
+ * memory reads, allocation, pointer classification or mutation authorization. */
+typedef int (*hpclang_rpl_stock_span_visit_fn)(void *context, uint32_t logical, uint32_t physical,
+                                               uint32_t span);
+int hpclang_rpl_stock_visit_spans(const uint32_t read_map[256], uint32_t address, uint32_t span,
+                                  hpclang_rpl_stock_span_visit_fn visit, void *context);
+
+/* Compare complete nonempty ranges under two independently proven, stable
+ * mappings. Return 1 for any shared physical nibble, 0 for disjoint ranges,
+ * or a negative span error. Validate both complete ranges even if their first
+ * pages overlap. Logical address equality alone is neither necessary nor
+ * sufficient. No allocation or target-memory access; worst case compares
+ * 256 by 256 physical runs. This proves only aliasing, not a live reference,
+ * bank-switch provenance, write permission or relocation safety. */
+int hpclang_rpl_stock_spans_overlap(const uint32_t left_map[256], uint32_t left_address,
+                                    uint32_t left_span, const uint32_t right_map[256],
+                                    uint32_t right_address, uint32_t right_span);
+
 /* Invocation-local copy of the Stock main-RAM mapping. No Stock calls or
  * interrupt re-enabling may occur between preparation and mutation return. */
 struct hpclang_rpl_stock_memory

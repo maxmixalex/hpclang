@@ -108,6 +108,10 @@ extern "C"
      * EILSEQ, insufficient native space ENOSPC, and a non-library value EINVAL.
      * Port 2 validates all banks and appends to erased space without reclamation.
      * Other valid contexts return ENOSYS. The caller retains its snapshot.
+     * Port 0 create/replace/remove stop on failure after a native-root change
+     * or Saturn write attempt; root snapshot allocation failure returns ENOMEM.
+     * An unexpected Port 1 backend failure during record publication stops the
+     * runtime with ownership retained; it does not return a recoverable error.
      */
     int hpclang_port_library_create(uint32_t port, const struct hpclang_object *library);
 
@@ -123,7 +127,9 @@ extern "C"
      * returns EEXIST; insufficient native space returns ENOSPC. Existing port
      * objects remain at their original addresses. Supports classic Stock Port 0
      * and HP49g+/HP50g Stock Port 1/2. Port 1 requires a launcher-provided ERAM
-     * ownership boundary; older launchers without it return ENOSYS. Port 2 uses
+     * ownership boundary; older launchers without it return ENOSYS. A Port 1
+     * backend failure before publication returns EIO; a partially published
+     * record stops the runtime without cleanup or Stock return. Port 2 uses
      * erased tail space without compaction; deleted slots are not reclaimed.
      * Unrecoverable existing Flash data is rejected before writing. Returned
      * Flash IO errors leave the attempted slot absent/deleted; permanently busy or
