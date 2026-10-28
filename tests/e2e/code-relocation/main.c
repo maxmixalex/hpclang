@@ -5,6 +5,7 @@
 #include "rpl-code.h"
 volatile uint32_t hpclang_e2e_result;
 int hpclang_call_roots_probe(void);
+int hpclang_rom_banks_probe(void);
 static int word(struct hpclang_rpl_mutation_io *io, uint32_t at, unsigned width, uint32_t *out)
 {
     *out = 0;
@@ -204,7 +205,9 @@ static int run(void)
 }
 int main(void)
 {
-    int status = hpclang_call_roots_probe();
+    int status = hpclang_rom_banks_probe();
+    if (!status)
+        status = hpclang_call_roots_probe();
     if (status == -1)
         status = run();
     hpclang_e2e_result = status ? (0x46410000u | status) : 0x50415353u;

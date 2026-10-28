@@ -878,3 +878,77 @@ checker is excluded, as in its preceding analysis. Firmware identity, live mappi
 capture, complete references and production Port1 mutation remain open.
 PR #26 `d7db49e8` has ten unfinished workflows, four running/five queued jobs,
 none completed and no failures at observation. No push this turn.
+
+## Stock ROM-bank witness — 2026-10-29, validation running
+
+The code-relocation application now gates every native call with `rom-banks.c`:
+reviewed fixture geometry, all 14 populated banks and two unused entries, actual
+launcher L1 identity sections, 3,520 page-edge nibble comparisons, lower/upper
+read rejection and unchanged 64-entry Saturn bank-window mapping. The 96 KiB
+first bank keeps its declared bound. No ROM writes or Saturn bank switch occur.
+
+Fresh application/six-launcher build passes (64,184-byte payload). ARM analysis
+of witness/Stock adapter passes with fixed hardware-address checker excluded.
+Independent temporary rebuild reproduces all 16 delivery artifacts exactly;
+the temporary build was removed. Full formatting/Ruff/ShellCheck pass.
+
+Both models have passed the first original `native` call/return. Independent
+audit checks source/artifact hashes, pre-rewrite entry observations, the original
+post-call marker and unchanged full Flash images. Evidence:
+`/work/oct29-rom-bank-stock/native-entry-verified.json`, `reproduction.json`,
+and per-model input manifests. The complete 14 cases per model remain running;
+these two cases are not acceptance of the full 28-case matrix. The emulator
+runner sessions were confirmed live (HP49g+ 41099, HP50g 55869). Do not restart
+from missing final result files alone. No new push or milestone acceptance.
+
+PR #26 `d7db49e8`: one successful/nine unfinished workflows, 22 successful,
+five running and 110 queued jobs at observation, no failures.
+
+## Bank-switch calling-context probe — 2026-10-29
+
+While both Stock matrices remain live, each model has passed native,
+native-new-message, native-missing-message, native-remove, native-detach and
+native-reattach: 12 cases observed passing, not full 28-case acceptance. Tested
+runtime/application sources and artifacts remain unchanged.
+
+Separate original-ROM traces identify the Flash entries' common path at Saturn
+0x22fec, whose ARM interpreter compares P before selecting its branch. Controlled
+17-entry x 16-P x 2-carry probes run on both saved contexts (1,088 combinations).
+All 68 P=0 combinations return with the previously verified mappings. Every
+P=1 combination returns with the same physical bank-2 mapping (first page 0x80000,
+last page 0x9f800), regardless of selected entry, and leaves P=0. Other altered
+contexts include 120 CPU exceptions, four unmapped reads and 100 instruction-budget
+exhaustions. The two incoming carry values did not change the observed outcomes.
+These are deliberate context variations, not failures of valid Stock execution
+or proof of all handler semantics. They rule out authorizing a target mapping
+from a switch-table address alone; the supported calling contract is required.
+
+Evidence: `/work/oct29-bank-switch-trace.json` and
+`/work/oct29-bank-switch-p-matrix.json`, with both ROM hashes and mapping hashes.
+This corrects the scope of earlier mapping evidence to P=0. It does not add a
+requirement to support arbitrary firmware: production qualification concerns
+supported firmware and calling contexts. No runtime source change or push.
+
+CI: #26 `d7db49e8` has 54 successful/eleven running/210 queued jobs, one successful
+and nine unfinished workflows. #20 `1ce01859` has 63 successful/nine running/
+96 queued jobs, one successful and three unfinished workflows. No failures
+observed at these snapshots; no branch acceptance.
+
+The maintained `bank_switch_maps.py` now rejects saved contexts with nonzero P
+and records incoming P in its report. Both models pass all 17 reviewed switches
+and their existing FlashPtr dependency checks; P=1 and P=15 reject without a
+success report on both models. Evidence: `/work/oct29-bank-context-gate/`, including
+`context-gate-verified.json`; original fixtures remain unchanged. This is a test
+precondition, not a production firmware qualification mechanism. The separate
+full Stock matrix has reached 22/28 passing cases and remains live; no push.
+
+## Live ROM-bank reader Stock acceptance — local, 2026-10-29
+
+Both original processes finish all 14 cases each. Independent final audit reads
+all 28 saved post-call markers, distinguishes 18 original returns from ten
+rewritten-return fixtures, and verifies all 36 Flash snapshots unchanged. Current
+runtime/witness/build inputs match the test manifests and independent rebuild;
+all 16 packaged artifacts still match byte-for-byte. Report:
+`/work/oct29-rom-bank-stock/verified.json`. ARM analysis, source quality and strict
+docs passed separately. This verifies fixture-specific live mappings and bounded
+reads, not complete banked-reference coverage, firmware qualification or M8.0.

@@ -161,6 +161,11 @@ ram, flash = (args.state / "sram").read_bytes(), (args.state / "flash").read_byt
 assert len(ram) == 0x80000 and len(flash) == 0x200000
 read = native_words(ram, flash)
 cpu = 0x08000000 + (read.table - 128) * 4
+# Entry identity only selects the expected bank under the reviewed P=0
+# calling convention. Reject a different saved context instead of silently
+# treating its switch result as evidence for that convention.
+incoming_p = struct.unpack_from("<I", ram, cpu - 0x08000000 + 0x95C)[0]
+assert incoming_p == 0, "ROM bank-switch fixture requires incoming P=0"
 bases = (c.c_uint32 * 16).from_buffer_copy(ram, cpu - 0x08000000 + 0xBE0)
 count_address, directory = struct.unpack_from("<2I", flash, 0x248A0)
 assert count_address < len(flash) and directory == count_address + 1
@@ -407,7 +412,8 @@ report.write_text(
             flashptr_tables=flashptr_rows,
             flash_sha256=hashlib.sha256(flash).hexdigest(),
             sram_sha256=hashlib.sha256(ram).hexdigest(),
-            scope="Reviewed ROM switches and read mappings only; no complete reference graph or mutation authorization",
+            incoming_p=incoming_p,
+            scope="Reviewed P=0 ROM switches/read mappings; no complete reference graph or mutation authorization",
         ),
         indent=2,
     )

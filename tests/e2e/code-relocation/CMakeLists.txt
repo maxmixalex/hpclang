@@ -21,7 +21,7 @@ add_executable(hpclang_code_relocation_e2e
     ${HPCLANG_RUNTIME_EABI_SHIMS}
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
-    main.c call-roots.c "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c"
+    main.c call-roots.c rom-banks.c "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c"
     "${CMAKE_CURRENT_BINARY_DIR}/cases.h")
 target_include_directories(hpclang_code_relocation_e2e PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core" "${CMAKE_CURRENT_BINARY_DIR}"

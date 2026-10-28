@@ -114,12 +114,13 @@ Register-root follow-up `bc6596e6` is submitted in #26. All 28 fresh Stock cases
 36 unchanged Flash snapshots and 16 reproducible artifacts pass local audit;
 CI remains unfinished; branch acceptance remains open.
 
-FlashPtr guard composition is submitted in #26 (`d7db49e8`); CI is unfinished.
-Local bounded ROM-bank capture checks ARM identity sections and declared bank
-sizes; both-model integration passes all 7,952 table entries and 4,638 stale
-dependency rejections using that C reader. Host descriptors/source objects are
-controlled inputs. Live mapping qualification, complete references, public
-libraries and Port1 edits remain open. The reader follow-up is not submitted.
+FlashPtr guards are submitted in #26 (`d7db49e8`); CI is unfinished.
+Local bounded ROM-bank reader and live-mapping witness pass all 28 Stock
+cases: independent audit confirms 18 original returns, ten rewritten-return
+fixtures, 36 unchanged Flash snapshots and 16 reproduced artifacts. The maintained
+ROM-switch test explicitly requires P=0; 34 switch cases and four rejection
+controls pass. This follow-up is not submitted. Supported-firmware/calling-context
+qualification, complete references, public libraries and Port1 edits remain open.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -142,12 +143,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `d7db49e8` | **CI pending:** ten unfinished workflows (three queued, five pending, two running); four running and five queued jobs observed, none completed and no failures. Earlier HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `d7db49e8` | **CI pending:** 5 successful and 5 unfinished workflows; 131 successful, 17 running and 223 queued jobs observed, no failures. Earlier HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `1ce01859` | **CI pending after accepted #21:** four workflows and six jobs queued at observation. Historical `41e35a36` HP50g PWM failure remains unproven. Mainline integration and full lifecycle/resource acceptance remain open. |
+| #20 / `1ce01859` | **CI pending after accepted #21:** two successful and two queued workflows; 81 successful, seven running and 80 queued jobs observed, no failures. Historical `41e35a36` HP50g PWM failure remains unproven. Mainline integration and full lifecycle/resource acceptance remain open. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

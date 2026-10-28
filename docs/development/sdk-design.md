@@ -878,6 +878,14 @@ a repeated dummy page and return no usable geometry. A successful switch lookup
 alone therefore cannot qualify a target. The mapped window can also exceed a
 bank's declared size: callers must retain the geometry bound. These checks do
 not establish a complete banked-reference graph or authorize Port1 edits.
+The mapping comparison uses the fixture's `P=0` calling context. A separate
+controlled probe over both carry values and all 16 P values found that entry
+identity alone is insufficient: for `P=1`, all 17 entries in these saved contexts
+return with the same physical bank-2 mapping, while `P=0` selects the expected
+bank. Other altered contexts can fault or exceed the instruction budget. These
+are deliberately changed register contexts, not failures of valid Stock calls.
+Production qualification must establish the supported handler's calling contract
+and relevant register dependencies before treating a table match as a target map.
 For each switch it also retains all 85 table nibbles as 17 guards, verifies the
 unchanged table, rejects every individually changed nibble through the C guard
 validator, and rejects insufficient guard capacity without publishing a binding.
@@ -926,6 +934,16 @@ the Saturn bank, allocates memory or writes Flash. The caller retains geometry
 provenance, context storage and stable mappings; shape checks do not identify a
 ROM. Host tests supply explicit section descriptors and compare each captured
 read with the independently indexed ROM bytes; they do not inspect live ARM L1.
+
+The code-relocation Stock witness runs `rom-banks.c` before its existing native
+call/movement checks. For the reviewed two-model fixtures it captures the actual
+launcher L1 descriptors, validates all 14 populated ROM geometries and two unused
+entries, compares 3,520 page-edge nibble samples against physical bytes, and
+rejects reads below/after each bank. It verifies all 64 Saturn bank-window read
+map entries remain unchanged. Any failure prevents the application's normal
+return, so a passing native post-call marker also gates this witness. Firmware
+locations remain fixture-specific; this does not qualify arbitrary firmware or
+complete the production live-reference graph.
 
 The maintained installation witness exercises this capture on ARM, using the
 supported Stock 2.15 fixture's verified initializer literal-pool addresses and
