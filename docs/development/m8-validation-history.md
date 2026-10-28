@@ -1677,3 +1677,34 @@ Exact-head CI: #26 bdeb3227 has nine queued/two running workflows with 15
 successful/219 queued/five running jobs; #20 4f2ce605 has eight successful/one
 running/three queued workflows with 328 successful/15 running/46 queued/one
 skipped jobs. Neither audit shows failures, and neither head is fully accepted.
+
+## 2026-10-29 — Live Stock planning readers and new campaign
+
+`rpl-stock-view.c` provides bounded native-state-relative, physical-ROM and mapped
+Saturn nibble readers. Capture validates the complete 0xc60-byte SRAM state span
+and user-readable identity sections. Reads reject stale descriptors, unaligned
+or out-of-range physical pages, user Flash and MMIO without publishing a value.
+Immutable-ROM reads reuse assembly halfword access, including physical zero.
+The caller must preserve exclusive state/mapping lifetime and separately prove
+ROM/state identity. No native writes or bank switching occur.
+
+ASan/UBSan test 168 passes complete native-state traversal, all 256 map pages'
+first/last nibble pairs, SRAM/ROM boundaries, invalid extents/pages and individual
+descriptor-bit changes. ARM compilation/analysis and full source quality checks
+pass. The Stock witness now runs the unified planner against fourteen populated
+standard entries and two aliases, rejects two absent entries, and compares all
+0xc60 native bytes before/after. Static workspace avoids putting its snapshots
+on the application stack. The application has 11,808 static bytes and requires
+six RW pages; generated metadata includes the increase.
+
+`/work/oct29-stock-bank-plan` contains the newly built application/six launchers.
+Independent rebuilding matches 16 artifacts; seven relevant ARM units pass
+analysis. The HP49g+/HP50g 14-case matrices are running against fixed input
+manifests; the first HP50g original Stock case has passed. These new results are
+not the preceding completed 28-case ROM-profile campaign and are not complete
+matrix or production-reference acceptance.
+
+Exact-head CI remains pending with no failed jobs in this audit: #26 bdeb3227
+has two successful/nine queued workflow records and 27 successful/216 queued/
+three running jobs; #20 4f2ce605 has eight successful/two running/two queued
+workflows and 328 successful/17 running/44 queued/one skipped jobs.

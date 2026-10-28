@@ -982,3 +982,8 @@ hpclang_unit(rpl_bank_effects test_rpl_bank_effects.c
     "${HPCLANG_ROOT}/runtime/core/rpl-bank-effects.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
 target_include_directories(test_rpl_bank_effects PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rpl_stock_view test_rpl_stock_view.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-view.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c")
+target_include_directories(test_rpl_stock_view PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")

@@ -3,10 +3,72 @@
 #include "rpl-port.h"
 #include "rpl-stock-memory.h"
 #include "rpl-stock-rom.h"
+#include "rpl-stock-view.h"
+#include "rpl-bank-plan.h"
 #include "irq.h"
 
 volatile uint32_t hpclang_rom_bank_evidence[4];
 volatile uint32_t hpclang_rom_profile_evidence[4];
+volatile uint32_t hpclang_bank_plan_evidence[4];
+static struct hpclang_rpl_bank_workspace plan_workspace;
+static struct hpclang_rpl_bank_plan bank_plan;
+static uint8_t native_before[0xc60];
+
+static int plan_observe(void *context, uint32_t mapping, uint32_t address, uint8_t value)
+{
+    (void)address;
+    if (mapping < 1 || mapping > 3 || value > 15)
+        return -73;
+    ++*(unsigned *)context;
+    return 0;
+}
+
+static int plan_probe(const struct hpclang_rpl_rom_profile *profile)
+{
+    struct hpclang_rpl_stock_view view;
+    if (hpclang_rpl_stock_view_reader(&view))
+        return 0x7010;
+    const struct hpclang_rpl_reader saturn = {hpclang_rpl_stock_view_saturn, &view};
+    const struct hpclang_rpl_reader native = {hpclang_rpl_stock_view_native, &view};
+    const struct hpclang_rpl_reader rom = {hpclang_rpl_stock_view_rom, &view};
+    const struct hpclang_rpl_bank_sources sources = {&saturn, &native, &rom, profile, 1,
+                                                     2,       3,       0,    0x40000, 0x860cc};
+    for (unsigned i = 0; i < sizeof native_before; ++i)
+        native_before[i] = view.sram[view.state_offset + i];
+    unsigned accepted = 0, rejected = 0, observations = 0;
+    for (unsigned index = 0; index < 18; ++index) {
+        uint32_t entry = index == 16 ? 0x22e83u : 0x22e99u;
+        if (index < 16) {
+            entry = 0;
+            for (unsigned j = 0; j < 5; ++j) {
+                uint8_t value;
+                if (!saturn.read_nibble(saturn.context, 0x26bbbu + index * 7u + j, &value))
+                    return 0x7011;
+                entry |= (uint32_t)value << (4u * j);
+            }
+        }
+        int result = hpclang_rpl_bank_plan_prepare(&sources, entry, &plan_workspace, &bank_plan,
+                                                   plan_observe, &observations);
+        if (index == 14 || index == 15) {
+            if (result >= 0)
+                return 0x7012;
+            ++rejected;
+        } else {
+            uint32_t expected = index < 16 ? index : index == 16 ? 2u : 4u;
+            if (result || bank_plan.bank != expected || !bank_plan.geometry.bytes)
+                return 0x7013;
+            ++accepted;
+        }
+    }
+    for (unsigned i = 0; i < sizeof native_before; ++i)
+        if (native_before[i] != view.sram[view.state_offset + i])
+            return 0x7014;
+    hpclang_bank_plan_evidence[0] = accepted;
+    hpclang_bank_plan_evidence[1] = rejected;
+    hpclang_bank_plan_evidence[2] = observations;
+    hpclang_bank_plan_evidence[3] = sizeof native_before;
+    return accepted == 16 && rejected == 2 && observations ? 0 : 0x7015;
+}
 
 /* Identify the reviewed immutable image before using its layout locations. */
 static int rom_banks_probe(void)
@@ -91,7 +153,7 @@ static int rom_banks_probe(void)
     hpclang_rom_bank_evidence[1] = samples;
     hpclang_rom_bank_evidence[2] = l1[0];
     hpclang_rom_bank_evidence[3] = l1[1];
-    return tested == 14 && samples == 3520 ? 0 : 0x700c;
+    return tested == 14 && samples == 3520 ? plan_probe(profile) : 0x700c;
 }
 
 int hpclang_rom_banks_probe(void)

@@ -118,6 +118,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-bank-plan.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-rom-profile.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-rom.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-view.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-system.c"
