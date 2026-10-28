@@ -1302,3 +1302,28 @@ well as code, mutable selectors, owners and geometry; public edit gates remain.
 Exact-head CI audit: PR26 ac24c17f has eight queued/two pending workflows and
 twelve queued jobs; PR20 4f2ce605 has ten queued/two running workflows, thirteen
 queued/seven running jobs. Neither is accepted or merged.
+
+## Bank device-routing check — local, 2026-10-29
+
+`hpclang_rpl_stock_bank_route_check` checks the reviewed incoming CONFIG routing
+flags, IO overlap for five-nibble selector reads and two-nibble control writes,
+and RAM/ERAM/port priority before bank UNCONFIG. It uses native-unit snapshots;
+callers still establish handler identity and guard freshness. It neither runs
+a switch nor authorizes mutation. Unit coverage includes all 256 low flag values,
+high-bit rejection, each RAM collision, IO boundary crossings, inactive fields
+and address bounds. Rebuilt Stock-memory ASan/UBSan suite passes.
+
+Both maintained original-ROM runs pass with the C check on normal P0/P1 paths
+and reject all eight alias/canonical RAM-configuration counterexamples. Reports
+and source hashes: `/work/oct29-bank-route-check/{model}/bank-switch-maps.json`.
+Controlled HOME integration uses the same check for every resolved attachment;
+all 20 payloads per model remain resolved and separate execution edges still
+reject. The report at `/work/oct29-home-graph/attachments.json` records routing
+fields and the library hash. These saved snapshots do not prove live freshness.
+
+ARMv4T Thumb compilation and static analysis pass using the repository's existing
+`core.FixedAddressDereference` exclusion for memory-mapped hardware. The first
+ad-hoc analysis invocation omitted that exclusion and reported four existing L1
+fixed-address accesses; no new routing diagnostic occurred. Changed C/Python
+files pass formatting/Ruff. Public Port1 edits remain gated; this is a routing
+precondition, not full execution closure or firmware authentication.

@@ -16,6 +16,25 @@ struct hpclang_rpl_stock_rom_bank
     uint32_t size;
 };
 
+/* Incoming device routing for the reviewed CONFIG/DAT0/UNCONFIG sequence.
+ * Bases retain native units: IO in 64-nibble blocks, RAM devices in 4096-nibble
+ * pages. Capture and guard these fields with the selector, code and map state. */
+struct hpclang_rpl_stock_bank_route
+{
+    uint32_t flags, io, ram, eram, port;
+};
+
+/* Check only device routing under independently identified handler semantics.
+ * Require configured IO/main RAM and no pending configuration or bank device;
+ * optional ERAM/port devices may remain configured. The five-nibble selector
+ * read and bank-control write must avoid IO; UNCONFIG must not select any RAM
+ * device before the bank device. configuration is the current selector value.
+ * Zero means these routing preconditions hold, not complete switch safety.
+ * Does not read state, identify firmware, check pending interrupts/return roots,
+ * validate geometry/owners or authorize mutation. Nonzero is a span error. */
+int hpclang_rpl_stock_bank_route_check(const struct hpclang_rpl_stock_bank_route *route,
+                                       uint32_t selector, uint32_t configuration);
+
 /* Model only the reviewed Flash-selection update of Read[0x40..0x7f].
  * A zero owner selects the corresponding bank page; any nonzero owner keeps
  * the previous page. Inputs must be stable, independently qualified snapshots

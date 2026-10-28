@@ -14,6 +14,50 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
     return active_boot;
 }
 
+static void test_bank_route(void)
+{
+    struct hpclang_rpl_stock_bank_route route = {3, 4, 0x80, 0x40, 0x40};
+    assert(!hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024));
+    for (unsigned flags = 0; flags < 256; ++flags) {
+        route.flags = flags;
+        int result = hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024);
+        assert((result == 0) == ((flags & ~0x18u) == 3u));
+    }
+    route.flags = 0x1b;
+    for (unsigned i = 0; i < 3; ++i) {
+        uint32_t *base = i == 0 ? &route.ram : i == 1 ? &route.eram : &route.port;
+        uint32_t saved = *base;
+        *base = 0x7f;
+        assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+        *base = 256;
+        assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+        *base = saved;
+    }
+    /* IO overlap includes reads straddling either end of a 64-nibble block. */
+    route.io = 0x86040 >> 6;
+    for (uint32_t selector = 0x8603b; selector <= 0x86080; ++selector)
+        assert((hpclang_rpl_stock_bank_route_check(&route, selector, 0x7f024) == 0) ==
+               (selector == 0x8603b || selector == 0x86080));
+    route.io = 0x7f024 >> 6;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+    route.io = 0x7f040 >> 6;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f03f) < 0);
+    assert(!hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f03e));
+    route.flags = 3;
+    route.eram = route.port = UINT32_MAX; /* Disabled device fields are ignored. */
+    route.io = 4;
+    assert(!hpclang_rpl_stock_bank_route_check(&route, 0xffffb, 0xffffe));
+    route.flags |= 0x80000000u;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+    route.flags = 3;
+    route.io = 0x4000;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+    route.io = 4;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0xffffc, 0x7f024) < 0);
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x100000) < 0);
+    assert(hpclang_rpl_stock_bank_route_check(NULL, 0x86063, 0x7f024) < 0);
+}
+
 struct span_walk
 {
     const uint32_t *map;
@@ -323,6 +367,7 @@ static void test_bank_window_select(void)
 
 int main(void)
 {
+    test_bank_route();
     test_bank_window_select();
     test_rom_bank_reader();
     test_discontinuous_spans();

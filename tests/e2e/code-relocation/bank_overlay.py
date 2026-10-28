@@ -149,6 +149,11 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
         dependency_fn,
         c.c_void_p,
     ]
+
+    class Route(c.Structure):
+        _fields_ = [(name, c.c_uint32) for name in ("flags", "io", "ram", "eram", "port")]
+
+    lib.hpclang_rpl_stock_bank_route_check.argtypes = [c.POINTER(Route), c.c_uint32, c.c_uint32]
     programs = {}
     lib.hpclang_rpl_code_literal_inspect.argtypes = [
         c.POINTER(Reader),
@@ -256,6 +261,24 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
             config_stages.clear()
             writes.clear()
             before_flags = struct.unpack("<I", uc.mem_read(cpu + 0xB9C, 4))[0]
+            route_result = None
+            if switch != banks[16]["switch"]:
+                field = selector_operand(switch) if p == 0 else 0x860B8
+                physical = struct.unpack("<I", uc.mem_read(cpu + (field >> 12) * 4, 4))[0]
+                physical += (field & 4095) // 2
+                configuration = int.from_bytes(uc.mem_read(physical, 3), "little")
+                configuration = (configuration >> (4 * (field & 1))) & 0xFFFFF
+                route = Route(
+                    *(
+                        struct.unpack("<I", uc.mem_read(cpu + offset, 4))[0]
+                        for offset in (0xB9C, 0xBA0, 0xBA8, 0xBB8, 0xBC4)
+                    )
+                )
+                route_result = lib.hpclang_rpl_stock_bank_route_check(
+                    c.byref(route), field, configuration
+                )
+                assert (route_result == 0) == (not ram_collision)
+
             uc.emu_start(0x28828, 0x400000, count=100000)
             assert returned
             assert struct.unpack("<I", uc.mem_read(cpu + 0x95C, 4))[0] == 0
@@ -285,6 +308,7 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
                 write_pages=list(struct.unpack("<256I", uc.mem_read(cpu + 0x400, 1024))),
                 configuration_flags=[stage["flags"] for stage in config_stages],
                 write_scope_checked=bool(writes),
+                route_result=route_result,
             )
 
         if initial is not None:

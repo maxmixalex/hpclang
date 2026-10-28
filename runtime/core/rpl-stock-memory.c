@@ -6,6 +6,25 @@
 #include "rpl-port.h"
 #include "launch-services.h"
 
+int hpclang_rpl_stock_bank_route_check(const struct hpclang_rpl_stock_bank_route *route,
+                                       uint32_t selector, uint32_t configuration)
+{
+    if (!route)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (selector > 0xffffbu || configuration > 0xffffeu)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if ((route->flags & ~0x18u) != 3u || route->io > 0x3fffu || route->ram > 255u ||
+        ((route->flags & 8u) && route->eram > 255u) || ((route->flags & 16u) && route->port > 255u))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t io_first = route->io << 6, page = configuration >> 12;
+    if ((selector < io_first + 64u && io_first < selector + 5u) ||
+        (configuration < io_first + 64u && io_first < configuration + 2u) || page == route->ram ||
+        ((route->flags & 8u) && page == route->eram) ||
+        ((route->flags & 16u) && page == route->port))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    return 0;
+}
+
 static int valid_page(uint32_t page)
 {
     return !(page & 0x7ffu) &&
