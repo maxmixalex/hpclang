@@ -23,7 +23,14 @@ from unicorn import (
     UC_HOOK_MEM_WRITE,
     UC_MEM_READ,
 )
-from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
+from unicorn.arm_const import (
+    UC_ARM_REG_R0,
+    UC_ARM_REG_R1,
+    UC_ARM_REG_R4,
+    UC_ARM_REG_R5,
+    UC_ARM_REG_R7,
+    UC_ARM_REG_SP,
+)
 
 if not __debug__:
     raise RuntimeError("Verification requires assertions")
@@ -37,7 +44,14 @@ parser.add_argument(
     action="store_true",
     help="Use original legacy allocation to establish R0 (flags=1)",
 )
+parser.add_argument(
+    "--arm-return",
+    choices=("preserve", "clobber"),
+    help="Execute a controlled ARM leaf; clobber demonstrates the r0 continuation contract",
+)
 args = parser.parse_args()
+if args.arm_return:
+    args.allocated_root = True
 root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(root / "tests/e2e/port-recovery"))
 native_words = importlib.import_module("verify").native_words
@@ -265,7 +279,12 @@ rows = []
 baseline_traces = {}
 for cursor in range(8):
     for flags in (1,) if args.allocated_root else range(4):
-        for mode in ("baseline", "move") + (("stale-r0",) if flags == 1 else ()):
+        modes = (
+            ("baseline",)
+            if args.arm_return == "clobber"
+            else ("baseline", "move") + (("stale-r0",) if flags == 1 else ())
+        )
+        for mode in modes:
             uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
             uc.mem_map(0, len(flash))
             uc.mem_write(0, flash)
@@ -293,6 +312,8 @@ for cursor in range(8):
             allocation_origin_path = []
             allocation_bounds = []
             allocation_start_top = word(0x806EE)
+            arm_trace = []
+            arm_arguments = []
             allocation_reads = {}
             guard_rejections = 0
             register_guard_rejections = 0
@@ -322,11 +343,30 @@ for cursor in range(8):
                 uc.reg_write(UC_ARM_REG_R5, 0xFFFFF)
                 uc.reg_write(UC_ARM_REG_R7, 0x88BC1)
                 uc.reg_write(UC_ARM_REG_SP, 0x308000)
+                if args.arm_return:
+                    # ARMSYS returns Saturn PC in ARM r0. The other volatile
+                    # registers and ARM condition flags are not that contract.
+                    leaf = [0xE3A01022, 0xE3A02033, 0xE3A03044, 0xE3A0C055, 0xE3510022]
+                    if args.arm_return == "clobber":
+                        leaf.append(0xE3A00011)
+                    leaf.append(0xE12FFF1E)  # BX LR
+                    uc.mem_write(0x08050000, struct.pack("<" + "I" * len(leaf), *leaf))
 
                 def allocation_hook(_, at, size, user):
+                    if args.arm_return and 0x08050000 <= at < 0x08050000 + 4 * len(leaf):
+                        arm_trace.append(at)
+                        if at == 0x08050000:
+                            arm_arguments.extend(
+                                (uc.reg_read(UC_ARM_REG_R0), uc.reg_read(UC_ARM_REG_R1))
+                            )
+                            assert arm_arguments == [0x88C73, cpu]
                     if at == 0x28898:
                         pc = uc.reg_read(UC_ARM_REG_R7)
                         allocation_trace.append(pc)
+                        if args.arm_return and arm_trace:
+                            assert pc == (0x11 if args.arm_return == "clobber" else 0x88C73)
+                            uc.emu_stop()
+                            return
                         steps = (0x5BC2, 0x5BC5, 0x5BC8)
                         if allocation_origin_path and len(allocation_origin_path) < 3:
                             assert pc == steps[len(allocation_origin_path)]
@@ -386,7 +426,7 @@ for cursor in range(8):
                                 int.from_bytes(uc.mem_read(cpu + 0x92C, 4), "little") & 0xFFFFF
                                 == allocation_bounds[0]
                             )
-                        if pc == 0x88C6E or len(allocation_trace) > 30000:
+                        if (pc == 0x88C6E and not args.arm_return) or len(allocation_trace) > 30000:
                             uc.emu_stop()
 
                 def allocation_write(_, kind, at, size, value, user):
@@ -400,7 +440,29 @@ for cursor in range(8):
                 uc.emu_start(0x28828, 0x400000, count=3000000)
                 uc.hook_del(handle)
                 uc.hook_del(write_handle)
-                assert allocation_trace[-1] == 0x88C6E and 0x5B80 in allocation_trace
+                assert 0x5B80 in allocation_trace
+                if args.arm_return:
+                    assert arm_trace == [0x08050000 + 4 * i for i in range(len(leaf))]
+                    if args.arm_return == "clobber":
+                        assert allocation_trace[-1] == 0x11
+                        rows.append(
+                            dict(
+                                cursor=cursor,
+                                arm_return=args.arm_return,
+                                arm_arguments=arm_arguments,
+                                arm_trace=arm_trace,
+                                observed_saturn_pc=allocation_trace[-1],
+                                expected_saturn_pc=0x88C73,
+                            )
+                        )
+                        continue
+                    assert allocation_trace[-1] == 0x88C73
+                    assert (
+                        int.from_bytes(uc.mem_read(cpu + 0x92C, 4), "little") & 0xFFFFF
+                        == allocation_bounds[0]
+                    )
+                else:
+                    assert allocation_trace[-1] == 0x88C6E
                 initial_r0 = int.from_bytes(uc.mem_read(cpu + 0x92C, 4), "little")
                 target = initial_r0 & 0xFFFFF
                 target_word = 0x2A2C
@@ -806,6 +868,9 @@ for cursor in range(8):
             rows.append(
                 dict(
                     allocation_trace=[hex(x) for x in allocation_trace],
+                    arm_return=args.arm_return,
+                    arm_arguments=arm_arguments,
+                    arm_trace=arm_trace,
                     allocation_origin_path=allocation_origin_path,
                     allocation_bounds=allocation_bounds,
                     allocation_guard_rejections=guard_rejections,

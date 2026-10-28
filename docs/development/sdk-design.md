@@ -1251,12 +1251,27 @@ the 16 deliberately stale-R0 controls fail the exact-allocation query. These
 guards bind the recorded inputs, not unobserved launcher or caller behavior.
 Unit tests cover descriptor composition,
 overlapping copies, simultaneous exchanges, clearing constants, and unchanged
-state on invalid inputs. `/work/oct28-allocation-register-guards/return` retains current
+state on invalid inputs. `/work/oct28-arm-return/matrix` retains current
 hash-bound reports; the earlier three-step and fixed-address-step evidence
 remain in `/work/oct28-origins-return` and `/work/oct28-origin-stack`.
 Seeding R0 tokens identifies their origin; it does not by itself prove the
 incoming value is a valid object, establish the whole caller path, or authorize
 movement. The deliberately stale-R0 controls retain that distinction.
+
+`alternate_return.py --arm-return preserve` additionally executes a six-instruction
+ARM leaf through the original ARMSYS handler before the controlled relocation
+and return checks. It changes ARM r1/r2/r3/r12 and condition flags, preserves the
+incoming r0 continuation, and returns with BX LR. The observed boundary supplies
+Saturn PC `88c73` in ARM r0 and SAT_CPU in r1. This is the Stock boundary contract,
+not an ordinary C return value; stage0's saved r0 has the same role. Both models
+pass all eight cursors and three relocation/control modes (48 cases). With
+`--arm-return clobber`, a seventh instruction changes ARM r0 to `11`; all 16
+cases observe Saturn PC `11` at the next dispatch and stop before executing it.
+The combined 256-case matrix includes the preceding 192 cases and 320 pre-write
+guard rejections. These leaves establish this boundary behavior, not arbitrary
+application side effects, an installed SDK application run, or continuous
+launcher-to-application-to-Stock acceptance. The later controlled return still
+sets up its caller context explicitly.
 
 The address-adjust inspector describes D0/D1 immediate addition/subtraction
 (`16n`, `17n`, `18n`, `1cn`) with signed deltas of 1..16. It reads only instruction
