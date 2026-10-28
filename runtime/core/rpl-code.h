@@ -122,6 +122,25 @@ struct hpclang_rpl_code_memory
     unsigned first, nibbles, load;
 };
 
+struct hpclang_rpl_code_address_adjust
+{
+    uint32_t instruction, length;
+    enum hpclang_rpl_code_register address;
+    int32_t delta;
+};
+
+/* Describe D0/D1 plus or minus an immediate 1..16 at a proven instruction
+ * boundary. This is arithmetic, not a nibble copy: carries/borrows invalidate
+ * copied origin tokens. Execution wraps the address at 20 bits and replaces
+ * carry: one for overflow/underflow, zero otherwise. Any tracked carry fact
+ * must also be updated or invalidated. The caller must establish the incoming address and
+ * retain the instruction/mapping dependencies, then independently qualify the
+ * resulting address (including wrap and mapping boundaries). No data access,
+ * pointer provenance or relocation authorization. Errors preserve output. */
+int hpclang_rpl_code_address_adjust_inspect(const struct hpclang_rpl_reader *reader,
+                                            uint32_t instruction, uint32_t limit,
+                                            struct hpclang_rpl_code_address_adjust *adjust);
+
 /* Describe DAT0/DAT1 transfers to/from A/C at a proven instruction boundary.
  * load=1 reads memory into the register, load=0 writes the register to memory.
  * Memory starts at the caller-proven D0/D1 address; first selects the register

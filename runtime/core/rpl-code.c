@@ -423,6 +423,33 @@ int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uin
     return 0;
 }
 
+int hpclang_rpl_code_address_adjust_inspect(const struct hpclang_rpl_reader *reader,
+                                            uint32_t instruction, uint32_t limit,
+                                            struct hpclang_rpl_code_address_adjust *adjust)
+{
+    if (!reader || !reader->read_nibble || !adjust)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || !limit || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct instruction_cursor cursor = {.reader = reader, .at = instruction, .limit = limit};
+    int result = instruction_take(&cursor, 2);
+    if (result)
+        return result;
+    unsigned opcode = cursor.code[1];
+    if (cursor.code[0] != 1 || (opcode != 6 && opcode != 7 && opcode != 8 && opcode != 12))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if ((result = instruction_take(&cursor, 3)))
+        return result;
+    struct hpclang_rpl_code_address_adjust next = {
+        .instruction = instruction,
+        .length = 3,
+        .address = opcode == 6 || opcode == 8 ? HPCLANG_RPL_CODE_D0 : HPCLANG_RPL_CODE_D1,
+        .delta = ((int32_t)cursor.code[2] + 1) * (opcode < 8 ? 1 : -1),
+    };
+    *adjust = next;
+    return 0;
+}
+
 static unsigned origin_register_width(enum hpclang_rpl_code_register reg)
 {
     if ((unsigned)reg <= HPCLANG_RPL_CODE_R4)

@@ -127,6 +127,23 @@ class Origins(c.Structure):
     _fields_ = [("registers", (c.c_uint32 * 16) * 13)]
 
 
+class Adjustment(c.Structure):
+    _fields_ = [
+        ("instruction", c.c_uint32),
+        ("length", c.c_uint32),
+        ("address", c.c_uint32),
+        ("delta", c.c_int32),
+    ]
+
+
+lib.hpclang_rpl_code_address_adjust_inspect.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.POINTER(Adjustment),
+]
+
+
 lib.hpclang_rpl_code_origins_assign.argtypes = [
     c.POINTER(Origins),
     c.POINTER(Assignment),
@@ -339,7 +356,7 @@ for cursor in range(8):
             def hook(_, at, size, user):
                 if at == 0x28898:
                     if pending_address_step:
-                        assert bytes(uc.mem_read(cpu + 0x90C, 0x50)) == pending_address_step.pop()
+                        assert bytes(uc.mem_read(cpu + 0x90C, 0x90)) == pending_address_step.pop()
                     if pending_memory:
                         reg_at, expected_register, address, expected_memory, address_state = (
                             pending_memory.pop()
@@ -374,15 +391,28 @@ for cursor in range(8):
                         )
                         origin_path.append(pc)
                     if pc == origin_steps[3]:
-                        # This controlled fixture independently guards D1=D1-5.
-                        # Do not generalize this instruction to arbitrary arithmetic
-                        # or propagate per-nibble identity through its borrow.
+                        # Decode arithmetic separately from nibble copies. Its
+                        # borrow invalidates D1 origins and replaces carry.
                         assert len(origin_path) == 3
-                        assert [live_nibble(pc + i) for i in range(3)] == [1, 12, 4]
-                        before = bytearray(uc.mem_read(cpu + 0x90C, 0x50))
+                        adjustment = Adjustment()
+                        assert (
+                            lib.hpclang_rpl_code_address_adjust_inspect(
+                                c.byref(live_reader), pc, 3, c.byref(adjustment)
+                            )
+                            == 0
+                        )
+                        assert (adjustment.address, adjustment.delta, adjustment.length) == (
+                            12,
+                            -5,
+                            3,
+                        )
+                        before = bytearray(uc.mem_read(cpu + 0x90C, 0x90))
                         d1 = struct.unpack_from("<I", before, 0x4C)[0]
                         assert origin_address == [d1] and d1 == stack and d1 >= 5
-                        struct.pack_into("<I", before, 0x4C, d1 - 5)
+                        result = d1 + adjustment.delta
+                        assert 0 <= result <= 0xFFFFF
+                        struct.pack_into("<I", before, 0x4C, result)
+                        struct.pack_into("<I", before, 0x64, 0)
                         pending_address_step.append(bytes(before))
                         for i in range(5):
                             origins.registers[12][i] = 0

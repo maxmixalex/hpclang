@@ -1217,20 +1217,36 @@ or invalidate facts at unmodeled writes and retain all code/mapping dependencies
 
 `alternate_return.py` composes the original R0.A-to-A.A, DAT1-to-C.A,
 A.A-to-DAT1, D1=D1-5, C.A-to-DAT1 segment. Copies and transfers use these C
-operations. The fixture separately guards the exact `1c4` address instruction,
-checks the resulting D1 and unchanged A/B/C/D/R0-R4/D0, and invalidates D1
-origins rather than copying tokens through arithmetic borrow. Both stack slots
+operations; `hpclang_rpl_code_address_adjust_inspect` decodes the address step.
+The fixture checks the resulting D1, replaced carry and unchanged remaining
+register/flag/return-stack state, and invalidates D1 origins rather than copying
+tokens through arithmetic borrow. Both stack slots
 have independently checked addresses and distinct token storage.
 Across both models, all 192 controlled return cases pass: 96 follow all five
 instructions, carry R0 tokens into the original stack cell, and preserve the
 old top's tokens in the adjacent cell; the other 96 do not enter it. Original
 allocation variants are included. Unit tests cover descriptor composition,
 overlapping copies, simultaneous exchanges, clearing constants, and unchanged
-state on invalid inputs. `/work/oct28-origin-stack` retains current hash-bound
-reports; `/work/oct28-origins-return` retains the earlier three-step evidence.
+state on invalid inputs. `/work/oct28-address-adjust/return` retains current
+hash-bound reports; the earlier three-step and fixed-address-step evidence
+remain in `/work/oct28-origins-return` and `/work/oct28-origin-stack`.
 Seeding R0 tokens identifies their origin; it does not by itself prove the
 incoming value is a valid object, establish the whole caller path, or authorize
 movement. The deliberately stale-R0 controls retain that distinction.
+
+The address-adjust inspector describes D0/D1 immediate addition/subtraction
+(`16n`, `17n`, `18n`, `1cn`) with signed deltas of 1..16. It reads only instruction
+nibbles and preserves its output on errors. Execution wraps at 20 bits and
+sets carry on overflow/underflow, clearing it otherwise. Consequently both
+address-origin and carry facts need updating or invalidation. This descriptor
+does not qualify an incoming pointer, resolve aliases or authorize wrapping
+across mapping boundaries. Unit checks cover every opcode/immediate, each
+truncated/unreadable/malformed nibble and output preservation. The maintained
+`address_adjust.py` fixture verifies 1,024 cases per model against the original
+interpreter: both registers, both signs, all immediates, eight initial addresses,
+both incoming carry values, and unchanged surrounding state. Reports are in
+`/work/oct28-address-adjust/{hp49gplus,hp50g}`. The 192 return cases also pass
+using this decoder, including 96 five-step origin paths.
 
 The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
 `--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles
