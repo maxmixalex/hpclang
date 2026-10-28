@@ -24,6 +24,7 @@ parser.add_argument("--state", type=Path, required=True)
 parser.add_argument("--model", choices=("hp49gplus", "hp50g"), required=True)
 parser.add_argument("--output", type=Path, required=True)
 parser.add_argument("--cc", default="cc")
+parser.add_argument("--stage1-elf", type=Path)
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(root / "tests/e2e/port-recovery"))
@@ -75,6 +76,11 @@ ram = (args.state / "sram").read_bytes()
 mapping = native_words(ram, flash)
 cpu = 0x08000000 + (mapping.table - 128) * 4
 rows = []
+arm = None
+if args.stage1_elf:
+    from arm_stage_roots import ArmStageRoots
+
+    arm = ArmStageRoots(args.stage1_elf)
 for address in (0x90000, 0x90001, 0xFFFE0):
     for opcode in range(2, 8):
         for p in range(16):
@@ -126,6 +132,16 @@ for address in (0x90000, 0x90001, 0xFFFE0):
                 assert masks[0] == 0xFFFFF
             assert all(not roots[i] and not masks[i] for i in range(count, 10))
             assert (a.value, cv.value, bytes(stack)) == (old_a, old_c, saved_stack)
+            if arm:
+
+                def arm_read(at, width):
+                    result = c.c_uint32()
+                    return result.value if read(None, at, width, c.pointer(result)) else None
+
+                actual_roots = arm.inspect(
+                    address, saved_stack, p % 8, p & 1, old_a, old_c, arm_read
+                )
+                assert actual_roots == ([("c" if opcode & 1 else "a", 0xFFFFF)] if jumps else [])
             expected = bytearray(before)
             if opcode >= 4:
                 offset = 16 if opcode & 1 else 0
@@ -162,6 +178,14 @@ report.write_text(
             driver_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             sram_sha256=hashlib.sha256(ram).hexdigest(),
             flash_sha256=hashlib.sha256(flash).hexdigest(),
+            arm_stage_sha256=hashlib.sha256(args.stage1_elf.read_bytes()).hexdigest()
+            if arm
+            else None,
+            arm_driver_sha256=hashlib.sha256(
+                Path(__file__).with_name("arm_stage_roots.py").read_bytes()
+            ).hexdigest()
+            if arm
+            else None,
             scope="One instruction compared to ROM; no complete execution-root coverage or relocation authorization",
         ),
         indent=2,

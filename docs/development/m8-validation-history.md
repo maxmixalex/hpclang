@@ -572,3 +572,16 @@ raw/wrapped launchers now build. Fresh Stock integration uses
 /work/oct29-stage-register/app: sessions 38127 (HP49g+) and 51605 (HP50g).
 These are running, not accepted; the preceding PC-exchange 28-case audit does
 not validate this changed launcher. No new-head CI is polled in this push turn.
+
+Linked-ARM collector validation: register_roots.py now optionally executes the
+actual hpclang_stage_execution_roots symbol from the built stage1 ELF. A bounded
+read callback supplies controlled instruction bytes; the test checks returned
+cell identities/masks, untouched output slots, stack balance and unchanged
+caller inputs. All 576 two-model cases agree with the host collector and ROM
+execution. Reports include ELF and adapter hashes under
+/work/oct29-stage-register/arm/{hp49gplus,hp50g}/register-roots.json.
+This isolates the linked collector; full stage1/MMU publication and Stock return
+are not inferred from it. The pending CI change retains the code-relocation ELF
+and runs the ARM comparison in the existing isolated environment. Ruff/format
+and workflow YAML checks pass. PR26 1dc590b1 currently has ten queued workflows
+and 16 queued jobs, no completed results. Live full Stock runs continue unchanged.

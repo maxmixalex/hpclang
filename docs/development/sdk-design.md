@@ -1517,6 +1517,10 @@ cells. This is partial execution-use discovery, not complete opaque/banked
 provenance, operand relocation or public-library authorization. The maintained
 `register_roots.py` checks all six register PC operations against original ROM
 execution (288 cases/model); the host suite covers use/overwrite paths and faults.
+With `--stage1-elf`, the same gate also executes the linked Thumb collector in
+Unicorn, checking its actual ABI, root-cell identities, masks, untouched output
+slots and input preservation. CI retains the code-relocation stage1 ELF for this
+check. This isolates the collector; it does not execute the full stage1/MMU path.
 
 `pc_exchange_move.py` adds a controlled catalog-growth contrast using the pinned
 Stock caller snapshot (`--state`, `--model`, `--output`). It executes APCEX/CPCEX
