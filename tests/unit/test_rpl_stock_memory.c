@@ -13,8 +13,67 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
     return active_boot;
 }
 
+static void test_physical_spans(void)
+{
+    uint32_t map[256];
+    for (unsigned i = 0; i < 256; ++i)
+        map[i] = i * 0x800u;
+    uint32_t physical = 123;
+    /* Every nibble, including both parities and every page boundary. */
+    for (uint32_t at = 0; at < 0x100000u; ++at) {
+        assert(!hpclang_rpl_stock_resolve_span(map, at, 1, &physical));
+        assert(physical == at);
+    }
+    assert(!hpclang_rpl_stock_resolve_span(map, 0, 0x100000, &physical));
+    assert(physical == 0);
+    for (unsigned page = 0; page < 256; ++page) {
+        uint32_t saved = map[page];
+        map[page] = 0x08020000;
+        assert(!hpclang_rpl_stock_resolve_span(map, page * 4096 + 7, 4089, &physical));
+        assert(physical == 0x10040007);
+        if (page) {
+            physical = 123;
+            assert(hpclang_rpl_stock_resolve_span(map, page * 4096 - 1, 2, &physical) ==
+                   HPCLANG_RPL_SPAN_UNSUPPORTED);
+            assert(physical == 123);
+        }
+        map[page] = saved;
+    }
+    /* Two logical pages alias ERAM; switching one to Flash separates them. */
+    map[64] = map[128] = 0x08020000;
+    uint32_t alias;
+    assert(!hpclang_rpl_stock_resolve_span(map, 0x40005, 5, &physical));
+    assert(!hpclang_rpl_stock_resolve_span(map, 0x80005, 5, &alias));
+    assert(physical == alias);
+    map[64] = 0x140000;
+    assert(!hpclang_rpl_stock_resolve_span(map, 0x40005, 5, &physical));
+    assert(physical == 0x280005 && physical != alias);
+    const uint32_t bad[] = {1, 0x200000, 0x08080000, 0x49000000, UINT32_MAX};
+    for (unsigned i = 0; i < sizeof bad / sizeof bad[0]; ++i) {
+        map[64] = bad[i];
+        physical = 123;
+        assert(hpclang_rpl_stock_resolve_span(map, 0x40000, 1, &physical) ==
+               HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(physical == 123);
+    }
+    map[255] = 0x0807f800;
+    assert(!hpclang_rpl_stock_resolve_span(map, 0xfffff, 1, &physical));
+    assert(physical == 0x100fffff);
+    physical = 123;
+    assert(hpclang_rpl_stock_resolve_span(map, 0xfffff, 2, &physical) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_stock_resolve_span(map, 0, 0, &physical) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_stock_resolve_span(map, UINT32_MAX, 1, &physical) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_stock_resolve_span(map, 1, UINT32_MAX, &physical) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_stock_resolve_span(NULL, 0, 1, &physical) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_stock_resolve_span(map, 0, 1, NULL) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(physical == 123);
+}
+
 int main(void)
 {
+    test_physical_spans();
     static uint8_t port1[HPCLANG_RPL_PORT1_NIBBLES / 2u];
     struct hpclang_rpl_reader port_reader = {0};
     assert(!hpclang_rpl_stock_port2_reader(0, &port_reader));
@@ -67,6 +126,8 @@ int main(void)
     assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c1au)); /* duplicate RAM */
     map[255] = (uint32_t)last + 1u;
     assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c1au)); /* unaligned */
+    map[255] = 0x08080000u;
+    assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c1au)); /* past physical SRAM */
     map[255] = 0x0007e000u;
     assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c1au)); /* ROM page */
 

@@ -3,7 +3,7 @@
 Current checkpoint: 2026-10-27. **M8 is incomplete; only M8.1 is accepted complete.**
 Docker/WSL is restored. Both-model reservation retests pass guarded recovery,
 repeat restart, absent-reservation recovery and all 16 rejection cases per model.
-Accepted main: `88aae022` (SD Reset #15 and opt-in legacy formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
+Accepted main: `038b0f41` (PR #22 return-root coverage, elapsed-time PWM witness and M0–M7 overview accepted; SD Reset #15 and opt-in legacy formatting #17 retained). Local passing tests, submitted CI, CI acceptance and
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
@@ -112,54 +112,102 @@ Port reads, several CRUD operations, Port2 append/replacement/logical deletion a
 selected recovery/retirement flows already have evidence. Those do not complete
 native port services. The active dependency is execution-reference coverage for
 safe movement and library registration; sound compatibility is not its prerequisite.
+Submitted guarded TEMP traversal records allocation boundaries/footer dependencies;
+candidate sanitizers/analysis/docs pass and its 59,656-byte image and launchers
+match both-model native cache round trips. Full opaque/banked
+provenance and public registration remain open.
+
+Submitted guarded dispatch decoding retains both caller-proven schemas' read dependencies without interpreting scalar type IDs as pointers. Candidate sanitizer tests, ARM analysis and strict docs pass; offline retained HP49g+/HP50g fixtures cover 42 entries and 332 observer interruptions. #24 `0e68b3b1` also corrects both prior Quality failures in prrun.py (jobs 121820222253/121820196392), with identical Python AST and full formatting/lint checks passing. All ten previous workflows and every job were inspected; only those investigated failures remain. New CI, handler identity, embedded-code provenance and complete execution references remain open.
+
+Port2 startup: a real supported-ID-769 HP50g fixture now passes owned installation, guarded low-memory recovery and repeat restart, retaining 23,900 user elements. Absent-reservation/rejection cases and HP49g+ remain unrun for this binding. Earlier traces are explicitly ID1701, not ID4; 14 configured Stock libraries precede minimum supported ID769, and complete startup safety remains open.
+
+Current #24 `0e68b3b1` has two Stock object-mutation lifecycle-3 failures (jobs 121826320519/121826320547). Independent HP49g+/HP50g failure-RAM audits both confirm ENOSPC: DSKTOP 0xe0012, native USEROB fence 0xe0000 and five reserved nibbles leave only 13 nibbles of growth. The unchanged integer-to-string test needs 64. The 356,910-nibble raw stack gap is not all available to RPL. Preserve the page fence and investigate launcher growth reservation; no repair or passing lifecycle rerun is claimed. Latest exact-head audit: four workflows pass, one fails, five queued; 243 jobs succeed, two fail, 88 queue, 20 run and one skips.
 
 Current implementation and evidence:
 
-- Draft [#24](https://github.com/maxmixalex/hpclang/pull/24), `a01248cd`, submits
+- Draft [#24](https://github.com/maxmixalex/hpclang/pull/24), `0e68b3b1`, submits
   guarded internal catalog insertion/removal, proven-reference/register repairs,
   physical mapping/alias checks, Port1 commit errors and native-page fences.
   Removal revalidates bindings, contracts metadata/TEMP/return-stack storage and
   publishes count last. Sanitizers cover no-write rejection and commit failures;
-  ARM analysis and strict docs pass. A local follow-up rejects HOME-attached
+  ARM analysis and strict docs pass. The submitted follow-up rejects HOME-attached
   IDs and malformed/unreadable attachment prefixes before removal writes;
-  sanitizer and ARM checks pass. Public unload/provenance remain open.
-- The 55,488-byte delivery image and both launchers exactly match the tested
-  primary artifacts. Four fresh HP49g+/HP50g Stock cases pass insertion and
-  insertion/removal with original returns; memory, roots and bounds restore.
-  Independent checks reject 750 binding and 200 entry corruptions. Retained
-  original-ROM mapping/alias and interruption evidence is detailed in #24.
-  These results establish local verification and submission, not CI acceptance.
+  sanitizer and ARM checks pass. The preceding 56,016-byte build matches four
+  original Stock cases on HP49g+/HP50g, including BUSY/no-write rejection for
+  genuinely attached library 275. Internal HOME detachment now moves its prefix
+  while preserving directory-object addresses; sanitizer fault tests and ARM
+  analysis pass. Both HP49g+/HP50g native detachment cases now return to Stock
+  with the directory body and surviving attachments preserved; 372 binding,
+  100 entry and 66 attachment corruption controls reject. The preceding 56,800-byte
+  candidate and both launchers match those two tested detachment cases; candidate
+  sanitizers and strict docs pass. Public unload/provenance and CI remain open.
+- Submitted HOME attachment now appends caller-proven fields, repairs the moving
+  prefix and publishes count last. Sanitizers cover empty/populated tables,
+  attach/detach round trips, eight no-write rejection cases and every commit
+  write boundary. ARM analysis/docs pass. Both HP49g+/HP50g native reattachment
+  cases return to Stock with directory contents and all attachment fields intact;
+  372 binding, 100 entry and 72 attachment corruption controls reject.
+  The 57,680-byte candidate and both launchers match the tested reattachment
+  artifacts; candidate sanitizers/docs pass. Submitted identity-checked hash/message
+  resolution matches 24 original HOME records after real ROM bank switches;
+  312 header corruptions reject, with sanitizers/ARM analysis/docs passing.
+  Submitted DOACPTR cache insertion/removal now initializes 15-nibble objects before
+  publishing geometry and rejects live references on removal. Sanitizers cover
+  round trips, adjacent objects, exact field boundaries and every write cut; ARM
+  analysis/docs pass. HP49g+/HP50g native cache round trips allocate and
+  attach two wrappers, reject removal while attached, reclaim them and restore
+  original fields/cache/roots before Stock return. Independent controls reject
+  372 bindings, 100 entry records and 72 attachment fields. The delivery image
+  and both launchers match the tested 59,280-byte build; candidate checks pass.
+  Submitted ROM name lookup through new wrappers now matches unmodified Stock on
+  both models; 62 corrupt program encodings reject. Removing HOME's hash pointer
+  on HP50g yields an unresolved global name instead of the library command.
+  Message compatibility also passes on both models with 108 corruption controls,
+  but clearing/redirecting HOME's message field still returns the original message.
+  This does not prove use of the new message wrapper. A new Port0 library now
+  returns its unique message on both models only while its catalog record exists;
+  all four registered/unregistered cases pass, with 476 source corruptions rejected.
+  The submitted 59,352-byte image and launchers match those cases and also pass
+  fresh command-name lookup on both models. Candidate analysis/lint/docs pass.
+  Built-in message routing, lifetime/transaction integration, configuration,
+  public registration/provenance and CI acceptance remain open.
 - Original-ROM checks cover selected transfers, descriptors, MMU preparation
-  and returns. The PrRUN-prefix check reaches helper `0x1596fc`, skips its body
-  and simulates continuation; it does not prove complete launcher execution.
+  and returns. Submitted PrRUN helper execution now runs real SVC allocation/free
+  services to stage0: 32 two-model baseline/move cases, 16 legacy prefix cases
+  and eight corrupt-input controls pass. The direct helper branch grows the
+  pool from 78 to 98 pages. Submitted stage0 rejection now executes the original
+  free service and real interpreter return: 48 invalid-pool cases, 32 baseline
+  cases and two omitted-free controls pass. Submitted stage0-to-stage1 entry now
+  passes 16 two-model/cursor cases and six copy/clear/ABI omission controls;
+  every image/zero-tail byte must be written. Translation uses modeled physical
+  page aliases. Normal application execution/exit and the helper MMU branch
+  remain open; this entry check neither executes nor simulates a return.
+  Candidate-local reruns pass; this private-state matrix is separate from CI,
+  whose ordinary fixture is rejected by the pinned cache-layout check.
   Native-entry observations and original Stock returns provide separate evidence.
-  See the [maintained checks](https://github.com/maxmixalex/hpclang/blob/a01248cd/docs/development/e2e.md#offline-original-rom-threaded-return-check)
+  See the [maintained checks](https://github.com/maxmixalex/hpclang/blob/0e68b3b1/docs/development/e2e.md#offline-original-rom-threaded-return-check)
   for exact preconditions, controls and remaining opaque/banked-reference gaps.
 - Recovery retests retain guarded/repeated/absent recovery and 16 rejection
   cases per model, with measured admission/recovery bounds. Port1 append retains
-  109 write-failure boundaries and two success cases. These do not complete
-  public library registration, Port1 replace/remove or Port2 startup/reclamation.
+  109 write-failure boundaries and two success cases. The submitted public adapter
+  now stops on incomplete native publication rather than returning a normal error;
+  ten publication cuts, two recoverable body faults and both exit regressions
+  pass, with ARM build/analysis and docs. Public library registration, Port1
+  replace/remove and Port2 startup/reclamation remain open.
+
+- Submitted Port0 commit-failure handling passes four operation write-cut matrices, root-before-write and allocation/preflight controls, plus four public API terminal-path cases. Delivery sanitizers, ARM analysis and strict docs pass. The 62,088-byte image, both launchers and verifier inputs match four HP49g+/HP50g registered/unregistered message cases; 476 source corruptions reject. Included in #24 `0e68b3b1`; the current CI investigation is recorded above. New CI and parent acceptance remain required.
 
 Next actions, in order:
 
 1. Complete launcher/opaque-object provenance and bank/register coverage for
    relocation plans before enabling public library management and Port1 edits.
-2. Accept submitted branches only after their full CI gates pass. #22 `8d92524e`
-   passed all three workflows/jobs; integrating accepted main resolves its roadmap
-   conflict. Merge-head `7a1a496b` fails HP48gII Direct immediate-return PWM:
-   captured foreground time is 2,357 us before its alarm deadline. The fixture
-   now imports #23's elapsed-time PWM wait; the same HP48gII test passes locally
-   with settled return. Fresh CI is required. #23 `e26f83a4` passes all seven workflows. #24 `a01248cd` includes their watchdog/PWM
-   fixture updates and the clang-format 22 correction for both prior Quality failures.
-   All ten preceding-head workflows/jobs were inspected without failures; one
-   Quality run passed and other gates remained pending. New-head CI is not yet
-   accepted. Earlier #24 failed HP39gs
-   Direct system-services-immediate with PWM code `0x46417b03`; the merged
-   candidate now passes that exact model/suite with settled return. Original
-   cause remains unproven because the old artifact lacks internal diagnostics.
-   Earlier HP39 transfer stalls remain separate acceptance gates. #18/#20 also
-   retain unresolved PWM failures; #23 had three pre-test LFS HTTP 502 failures.
-   #17 is accepted: all 11 workflows passed before merge as `88aae022`.
+2. PR #22 is accepted as `038b0f41`: all nine workflows pass, with 354
+   successful jobs and two skipped. M0–M7 summaries are restored on main.
+   #23 `e26f83a4` passed all seven workflows; recheck its branch/base relationship
+   before integration. #24 remains unaccepted because of the two Port0 lifecycle
+   failures described above. Fix and retest growth reservation without weakening
+   native-page fences. Earlier unrelated PWM/watchdog and HP39 transfer failures
+   retain their documented limits; later local passes alone do not prove causes.
 3. Complete retained Port2 trusted recovery installation, authority lifecycle,
    safe startup and reclamation. Preserve the independent M8 stage requirements.
    During CI wait, UI pool/RW checks pass all six retained Stock CLI cases.
@@ -174,7 +222,7 @@ failures. Do not poll newly pushed CI in the same turn or merge incomplete gates
 Private saved-state/ROM interpreter checks supplement full Stock tests; they do
 not establish hardware behavior or complete milestone acceptance.
 
-Keep this page concise. Put reproducible checks in tests and link their reports
+Keep M0–M7 summaries and their acceptance links on this page. Keep this page concise. Put reproducible checks in tests and link their reports
 from the relevant PR. Keep historical evidence in the frozen archive; do not
 append per-turn experiment narration to the roadmap or board. Record only
 current decisions, meaningful state changes, blockers and next acceptance gates.
