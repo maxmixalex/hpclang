@@ -1191,6 +1191,17 @@ bound their reads. External targets remain for bank-qualified resolution, and
 opaque/execution entries remain explicit unresolved obligations. A successful
 structural walk therefore does not certify a complete relocation graph.
 
+`hpclang_rpl_reference_visit_graph()` adds a bounded worklist across explicitly
+qualified mappings. It deduplicates exact mapping/address/bound/prologue tuples,
+including nodes still queued, so cycles terminate without confusing equal numeric
+addresses in different mappings. Inline/compact children keep their source mapping.
+Every other edge requires the caller's resolver to supply a bounded target, prove
+it terminal, or reject it; a missing resolver cannot silently drop opaque or
+execution obligations. Parser-read dependencies retain their mapping identity;
+resolver reads need separate dependency capture. Counts publish only on success,
+and any failure invalidates partial callbacks/workspace. This supplies scheduling,
+not complete root discovery, handler identity or permission to mutate.
+
 `hpclang_rpl_reference_edits_begin()` and `edits_add()` merge separately
 discovered fields into a caller-owned, sorted batch. Identical edits consume
 one slot, including unchanged fields retained for preflight. Conflicting old

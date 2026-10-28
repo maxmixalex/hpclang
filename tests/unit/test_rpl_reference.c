@@ -2039,8 +2039,174 @@ static void flashptr_guard_composition(unsigned special)
     }
 }
 
+struct graph_fixture
+{
+    struct image images[2];
+    uint32_t edges, dependencies[2][128], fail_mapping, fail_address;
+    int visit_error, mode;
+};
+
+static int graph_image_read(void *context, uint32_t mapping, uint32_t address, uint8_t *value)
+{
+    struct graph_fixture *fixture = context;
+    return mapping < 2 && read_nibble(&fixture->images[mapping], address, value);
+}
+
+static int graph_edge(void *context, const struct hpclang_rpl_reference_graph_node *source,
+                      const struct hpclang_rpl_reference *edge)
+{
+    struct graph_fixture *fixture = context;
+    assert(source->mapping < 2);
+    (void)edge;
+    ++fixture->edges;
+    return fixture->visit_error;
+}
+
+static int graph_dependency(void *context, uint32_t mapping, uint32_t address, uint8_t value)
+{
+    struct graph_fixture *fixture = context;
+    assert(mapping < 2 && address < 128 && value < 16);
+    ++fixture->dependencies[mapping][address];
+    return mapping == fixture->fail_mapping && address == fixture->fail_address ? -77 : 0;
+}
+
+static int graph_resolve(void *context, const struct hpclang_rpl_reference_graph_node *source,
+                         const struct hpclang_rpl_reference *edge,
+                         struct hpclang_rpl_reference_graph_node *target)
+{
+    struct graph_fixture *fixture = context;
+    if (fixture->mode == 1)
+        return 0; /* Explicitly tested terminal policy, not the default. */
+    if (fixture->mode == 2)
+        return 1; /* Deliberately fails to initialize target. */
+    if (fixture->mode == 3)
+        return 2; /* Invalid resolver result. */
+    assert(edge->kind == HPCLANG_RPL_REFERENCE_DIRECT);
+    assert(edge->target == (source->mapping ? 0x22222u : 0x11111u));
+    *target = (struct hpclang_rpl_reference_graph_node){1u - source->mapping, {0, 15, 0}};
+    return 1;
+}
+
+static void mapped_graph_traversal(void)
+{
+    struct graph_fixture fixture = {.fail_mapping = UINT32_MAX, .fail_address = UINT32_MAX};
+    for (unsigned mapping = 0; mapping < 2; ++mapping) {
+        fixture.images[mapping] = (struct image){.size = 20, .fail = UINT32_MAX};
+        put(&fixture.images[mapping], 0, 0x2d9d, 5);
+        put(&fixture.images[mapping], 5, mapping ? 0x22222 : 0x11111, 5);
+        put(&fixture.images[mapping], 10, 0x312b, 5);
+    }
+    struct image original[2];
+    memcpy(original, fixture.images, sizeof original);
+    const struct hpclang_rpl_reference_reader reader = {graph_image_read, &fixture};
+    struct hpclang_rpl_reference_graph_node roots[2] = {{0, {0, 15, 0}}, {0, {0, 15, 0}}};
+    struct hpclang_rpl_reference_graph_node workspace[4];
+    uint32_t visited = 99;
+    assert(!hpclang_rpl_reference_visit_graph(&reader, roots, 2, workspace, 4, 4, graph_edge,
+                                              graph_resolve, graph_dependency, &fixture, &visited));
+    assert(visited == 2 &&
+           fixture.edges == 2); /* Same addresses, distinct mappings; cycle closes. */
+    for (unsigned mapping = 0; mapping < 2; ++mapping)
+        for (unsigned at = 0; at < 15; ++at)
+            assert(fixture.dependencies[mapping][at]);
+    assert(!memcmp(original, fixture.images, sizeof original));
+    roots[1].object.limit = 20;
+    assert(!hpclang_rpl_reference_visit_graph(&reader, roots, 2, workspace, 4, 4, graph_edge,
+                                              graph_resolve, graph_dependency, &fixture, &visited));
+    assert(visited == 3); /* Different bounds are not incorrectly coalesced. */
+    roots[1] = roots[0];
+    visited = 99;
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 1, 4, graph_edge,
+                                             graph_resolve, graph_dependency, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(visited == 99);
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 1, graph_edge,
+                                             graph_resolve, graph_dependency, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge, NULL,
+                                             graph_dependency, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    fixture.fail_mapping = 1;
+    fixture.fail_address = 5;
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge,
+                                             graph_resolve, graph_dependency, &fixture,
+                                             &visited) == -77);
+    fixture.fail_mapping = UINT32_MAX;
+    fixture.images[1].fail = 0;
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge,
+                                             graph_resolve, graph_dependency, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    fixture.images[1].fail = UINT32_MAX;
+    fixture.images[1].data[0] = 16;
+    uint32_t observed = fixture.dependencies[1][0];
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge,
+                                             graph_resolve, graph_dependency, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(fixture.dependencies[1][0] == observed);
+    fixture.images[1] = original[1];
+    fixture.visit_error = 7;
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge,
+                                             graph_resolve, graph_dependency, &fixture,
+                                             &visited) == 7);
+    fixture.visit_error = 0;
+    for (int mode = 2; mode <= 3; ++mode) {
+        fixture.mode = mode;
+        assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge,
+                                                 graph_resolve, graph_dependency, &fixture,
+                                                 &visited) ==
+               (mode == 2 ? HPCLANG_RPL_SPAN_BOUNDS : HPCLANG_RPL_SPAN_MALFORMED));
+        assert(visited == 99);
+    }
+    fixture.mode = 1;
+    assert(!hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge,
+                                              graph_resolve, graph_dependency, &fixture, &visited));
+    assert(visited == 1);
+    /* Structural descendants retain their mapping; compact ACPTRs still expose
+     * both payload and switch-code obligations to the resolution policy. */
+    fixture.images[0] = (struct image){.size = 45, .fail = UINT32_MAX};
+    put(&fixture.images[0], 0, 0x2a74, 5);
+    put(&fixture.images[0], 5, 0x29e8, 5);
+    put(&fixture.images[0], 10, 30, 5);
+    put(&fixture.images[0], 15, 0x2baa, 5);
+    put(&fixture.images[0], 20, 1, 5);
+    put(&fixture.images[0], 25, 1, 5);
+    put(&fixture.images[0], 30, 0x4001c, 5);
+    put(&fixture.images[0], 35, 0x23c21, 5);
+    put(&fixture.images[0], 40, 0x312b, 5);
+    roots[0].object.limit = 45;
+    fixture.edges = 0;
+    assert(!hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge,
+                                              graph_resolve, graph_dependency, &fixture, &visited));
+    assert(visited == 3 && fixture.edges == 4);
+    assert(workspace[2].mapping == 0 && workspace[2].object.body_prologue == 0x2baa);
+    visited = 99;
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge, NULL,
+                                             graph_dependency, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    fixture.images[0] = (struct image){.size = 12, .fail = UINT32_MAX};
+    put(&fixture.images[0], 0, 0x2dcc, 5);
+    put(&fixture.images[0], 5, 7, 5);
+    roots[0].object.limit = 12;
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge, NULL,
+                                             graph_dependency, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(visited == 99);
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 0, workspace, 4, 4, graph_edge,
+                                             graph_resolve, graph_dependency, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge,
+                                             graph_resolve, NULL, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    roots[0].object = (struct hpclang_rpl_reference_node){0xfffff, 2, 0};
+    assert(hpclang_rpl_reference_visit_graph(&reader, roots, 1, workspace, 4, 4, graph_edge,
+                                             graph_resolve, graph_dependency, &fixture,
+                                             &visited) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(visited == 99);
+}
+
 int main(void)
 {
+    mapped_graph_traversal();
     flashptr_guard_composition(0);
     flashptr_guard_composition(1);
     identified_dispatch_references();

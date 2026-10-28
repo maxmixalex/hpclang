@@ -1011,3 +1011,21 @@ they do not implement production root discovery or enable the public API.
 The complete rpl_mutation ASan/UBSan suite passes (40.40 s), as do full tracked
 clang-format/Ruff/ShellCheck checks. Prior stock-memory sanitizer, ARM analysis
 and original-ROM mapping comparisons retain their separate scope.
+
+Mapping/guard batch submitted as `dc6fbd39` in #26. Prior-head CI inspected; new-head CI not polled in the push turn. No merge or milestone acceptance.
+
+## Mapped reference graph scheduler — local, 2026-10-29
+
+`hpclang_rpl_reference_visit_graph` composes immediate structural parsing with
+bounded cross-mapping scheduling. Exact mapping/address/bound/prologue tuples
+deduplicate queued and visited nodes. Inline/compact descendants stay in their
+mapping; other edges require an explicit resolver, with missing policies rejected
+instead of silently dropping code or banked obligations. Valid parser reads carry
+their mapping to the dependency callback. Success counts publish only after the
+scan completes; errors invalidate all partial output. It closes only supplied
+roots under the supplied policy, not production root coverage or mutation safety.
+ASan/UBSan reference tests pass for cross-mapping cycles, duplicate roots,
+different bounds, compact ACPTR payload/switch edges, opaque rejection, exhausted
+capacity/budget, failed/invalid reads, callback failures and malformed resolver
+outputs. ARMv4T Thumb compilation/static analysis and clang-format checks pass.
+Actual Stock root classification and qualified resolution remain integration work.
