@@ -635,6 +635,8 @@ static void register_assignments(void)
         {"80cf", 2, HPCLANG_RPL_CODE_P, HPCLANG_RPL_CODE_C, 0, 15, 1, 0},
         {"80d2", 0, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_P, 2, 0, 1, 0},
         {"2f", 0, HPCLANG_RPL_CODE_CONSTANT, HPCLANG_RPL_CODE_P, 0, 0, 1, 15},
+        {"81b4", 0, HPCLANG_RPL_CODE_NEXT_PC, HPCLANG_RPL_CODE_A, 0, 0, 5, 0x80004},
+        {"81b5", 15, HPCLANG_RPL_CODE_NEXT_PC, HPCLANG_RPL_CODE_C, 0, 0, 5, 0x80004},
     };
     for (unsigned i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
         struct image image = {
@@ -676,8 +678,9 @@ static void register_assignments(void)
         assert(hpclang_rpl_code_assignment_inspect(&reader, image.address, image.size, 16,
                                                    &value) == HPCLANG_RPL_SPAN_MALFORMED);
     }
-    const char *unknown[] = {"12c", "dc",  "81af2c", "81a81c", "140", "fa",  "80b26", "132",
-                             "133", "136", "137",    "13a",    "13b", "13e", "13f"};
+    const char *unknown[] = {"12c", "dc",   "81af2c", "81a81c", "140", "fa",  "80b26",
+                             "132", "133",  "136",    "137",    "13a", "13b", "13e",
+                             "13f", "81b2", "81b3",   "81b6",   "81b7"};
     for (unsigned i = 0; i < sizeof unknown / sizeof unknown[0]; ++i) {
         struct image image = {
             .address = 0x80000, .size = (uint32_t)strlen(unknown[i]), .fail = UINT32_MAX};
@@ -861,6 +864,26 @@ static void literal_loads(void)
     assert(!memcmp(&value, &untouched, sizeof value));
 }
 
+static void pc_capture_bounds(void)
+{
+    for (unsigned destination = 4; destination <= 5; ++destination) {
+        struct image image = {{8, 1, 11, destination}, 0xffffb, 4, UINT32_MAX};
+        struct hpclang_rpl_reader reader = {read_nibble, &image};
+        struct hpclang_rpl_code_assignment value, unchanged;
+        memset(&unchanged, 0xa5, sizeof unchanged);
+        value = unchanged;
+        assert(hpclang_rpl_code_assignment_inspect(&reader, image.address, 4, 0, &value) == 0);
+        assert(value.source == HPCLANG_RPL_CODE_NEXT_PC && value.constant == 0xfffff);
+        for (image.address = 0xffffc; image.address < 0x100000; ++image.address) {
+            value = unchanged;
+            assert(hpclang_rpl_code_assignment_inspect(&reader, image.address,
+                                                       0x100000 - image.address, 0,
+                                                       &value) == HPCLANG_RPL_SPAN_BOUNDS);
+            assert(!memcmp(&value, &unchanged, sizeof value));
+        }
+    }
+}
+
 int main(void)
 {
     exhaustive();
@@ -875,5 +898,6 @@ int main(void)
     register_assignments();
     literal_loads();
     register_exchanges();
+    pc_capture_bounds();
     return 0;
 }

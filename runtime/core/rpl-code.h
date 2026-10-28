@@ -55,7 +55,8 @@ enum hpclang_rpl_code_register
     HPCLANG_RPL_CODE_P,
     HPCLANG_RPL_CODE_CONSTANT,
     HPCLANG_RPL_CODE_D0,
-    HPCLANG_RPL_CODE_D1
+    HPCLANG_RPL_CODE_D1,
+    HPCLANG_RPL_CODE_NEXT_PC
 };
 
 struct hpclang_rpl_code_literal
@@ -91,6 +92,12 @@ struct hpclang_rpl_code_assignment
  * classic field copies and 81A register copies with standard fields (0..7,F).
  * D0/D1=A/C copies five low nibbles; D0/D1=AS/CS copies four, preserving
  * the fifth address nibble. Source A/C remains unchanged.
+ * A=PC/C=PC copy the following instruction address into five low nibbles.
+ * Their source is NEXT_PC and constant holds instruction+4 in the instruction
+ * reader's mapping, not an arbitrary literal or a physical address. Preserve
+ * that mapping and the instruction dependency when propagating this fact.
+ * Captures whose next PC leaves the 20-bit address space are rejected.
+ * PC exchanges and control transfers are not plain assignments.
  * Exchanges, arithmetic, memory reads and custom fields remain unsupported.
  * p must be 0..15 and is the proven P value AT the instruction, needed for
  * P/WP fields. Interpreter-internal caches updated by P writes are not modeled.

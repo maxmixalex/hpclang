@@ -318,7 +318,14 @@ int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
     const uint8_t *op = cursor.code;
     struct hpclang_rpl_code_assignment next = {.instruction = instruction, .length = size};
     unsigned field = 7;
-    if (op[0] == 1 && op[1] == 3 && !(op[2] & 2)) {
+    if (op[0] == 8 && op[1] == 1 && op[2] == 11 && (op[3] == 4 || op[3] == 5)) {
+        if (instruction > 0xffffbu)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        next.source = HPCLANG_RPL_CODE_NEXT_PC;
+        next.destination = op[3] == 4 ? HPCLANG_RPL_CODE_A : HPCLANG_RPL_CODE_C;
+        next.nibbles = 5;
+        next.constant = instruction + 4;
+    } else if (op[0] == 1 && op[1] == 3 && !(op[2] & 2)) {
         next.source = (op[2] & 4) ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A;
         next.destination = (op[2] & 1) ? HPCLANG_RPL_CODE_D1 : HPCLANG_RPL_CODE_D0;
         next.nibbles = (op[2] & 8) ? 4 : 5;

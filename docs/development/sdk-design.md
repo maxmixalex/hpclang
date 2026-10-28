@@ -1174,6 +1174,19 @@ D0/D1=AS/CS copy four and preserve the fifth address nibble; the source remains
 unchanged. P exchanges and custom fields remain unsupported. This is a data-flow building block, not a complete
 launcher analysis or permission to treat arbitrary register values as roots.
 
+`A=PC` and `C=PC` now expose `NEXT_PC` as their assignment source, with
+`instruction+4` in the descriptor's constant field. This distinguishes an
+execution address in the instruction reader's mapping from an arbitrary
+literal. Only the low five nibbles change; PC exchanges remain unsupported.
+An address-space-crossing next PC is rejected. The maintained `pc_capture.py`
+driver compares the C decoder with one synthetic instruction executed by the
+original ARM Saturn interpreter: 192 cases across HP49g+/HP50g, both registers,
+three instruction locations and every P value pass, preserving all unrelated
+registers, flags and machine-stack cells. Reports and source/input hashes are
+under `/work/oct28-pc-capture/<model>`. The earlier extreme-boundary probe reached
+an unmapped interpreter fetch; it does not prove wrap semantics. These checks
+establish capture semantics, not launcher reachability or relocation permission.
+
 The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
 `--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles
 the current C decoders and executes the original ARM Saturn interpreter. The
