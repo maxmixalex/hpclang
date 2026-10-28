@@ -1269,18 +1269,20 @@ and repair/pinning. Latest four reports and final SRAM are retained under
 `/work/oct28-dispatch-capacity-maintained/{rom,ram}/`.
 
 `dispatch_repaired.py` consumes the RAM contrast SRAM via `--prepared-sram`,
-plus `--state`, `--model` and `--output`. It calls the current C catalog-grow
-transaction through `threaded-return.c`, then resumes original ROM at `3727d`.
+plus `--state`, `--model` and `--output`. The current C catalog-grow transaction
+checks both reviewed ROM windows through its mapped read-only guard channel,
+then resumes original ROM at `3727d`. `dispatch_identity.py` supplies the same
+fixed expected bytes to this test and the identity-bound interpreter test.
 Both models reach the expected type comparison after a 16-nibble move when R1
 is repaired (with or without A repair). Omitting R1, including repairing A
-alone, produces an observed wrong dispatch after seven instructions, not a
-timeout. The restore instruction overwrites A from R1. Four positive and four
-negative cases preserve non-address register bits during the transaction and
-check the moved data root. Reports include runtime/shim/driver/input hashes.
-This controlled fixture supplies address provenance and stops before catalog
-publication or Stock return; it is not complete reference discovery, public
-registration, or a hook that repairs registers during Stock GC. Results:
-`/work/oct28-dispatch-repaired-maintained/<model>/results.json`.
+alone, yields an observed wrong dispatch after seven instructions, not timeout.
+The restore instruction overwrites A from R1. Four positive and four negative
+execution cases check register bits and the moved data root. Fourteen injected
+ROM-read change/unavailable/invalid cases reject before any RAM/register write,
+including faults at the final identity byte. Reports retain code/profile/input
+hashes. This supplies caller provenance and stops before catalog publication or
+Stock return; it is not complete discovery, public registration, or a Stock-GC
+repair hook. Results: `/work/oct28-dispatch-repaired-guarded/<model>/results.json`.
 
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and

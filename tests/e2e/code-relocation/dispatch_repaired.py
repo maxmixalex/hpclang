@@ -4,6 +4,7 @@ Input is the RAM contrast output from dispatch_capacity.py; this validates
 caller-proven repairs, not automatic discovery or Stock GC interception.
 """
 
+from dispatch_identity import IDENTITY_WINDOWS
 from pathlib import Path
 import argparse
 import hashlib
@@ -68,15 +69,47 @@ subprocess.run(
     ],
     check=True,
 )
+MappedRead = c.CFUNCTYPE(
+    c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint8)
+)
+
+
+class MappedReader(c.Structure):
+    _fields_ = [("read", MappedRead), ("context", c.c_void_p)]
+
+
+class Guard(c.Structure):
+    _fields_ = [
+        (name, c.c_uint32) for name in ("mapping", "field", "expected", "width")
+    ]
+
+
+guards = []
+for address, raw in IDENTITY_WINDOWS.items():
+    for offset in range(0, len(raw), 5):
+        part = raw[offset : offset + 5]
+        guards.append(
+            Guard(
+                2,
+                address + offset,
+                sum(v << (4 * i) for i, v in enumerate(part)),
+                len(part),
+            )
+        )
+guard_array = (Guard * len(guards))(*guards)
 lib = c.CDLL(str(out / "geometry.so"))
-lib.bank_catalog_grow_dispatch.argtypes = [
+lib.bank_catalog_grow_dispatch_guarded.argtypes = [
     c.POINTER(c.c_uint8),
     c.POINTER(c.c_uint32),
     c.POINTER(c.c_uint32),
     c.c_uint,
     c.POINTER(c.c_uint32),
+    c.POINTER(MappedReader),
+    c.POINTER(Guard),
+    c.c_uint32,
 ]
 rows = []
+rejections = []
 for model in (args.model,):
     flash = (args.state / "flash").read_bytes()
     saved = args.prepared_sram.read_bytes()
@@ -96,10 +129,79 @@ for model in (args.model,):
             c.c_uint32(0xC6D00000 | header + 5),
             c.c_uint32(),
         )
-        status = lib.bank_catalog_grow_dispatch(
-            array, c.byref(a), c.byref(r1), mask, c.byref(writes)
+        reads = []
+        fault_address = None
+        fault_kind = None
+
+        @MappedRead
+        def read_guard(_, identity, address, value):
+            if identity != 2 or address >= 0x80000:
+                return 0
+            reads.append(address)
+            if address == fault_address and fault_kind == "unavailable":
+                return 0
+            value[0] = (
+                16
+                if address == fault_address and fault_kind == "invalid"
+                else mapping(address, 1) ^ (1 if address == fault_address else 0)
+            )
+            return 1
+
+        guard_reader = MappedReader(read_guard, None)
+        if mask == 3:
+            for fault_address, fault_kind in (
+                (0x37258, "changed"),
+                (0x3727D, "changed"),
+                (0x372D7, "changed"),
+                (0x351CC, "changed"),
+                (0x352CB, "changed"),
+                (0x352CB, "unavailable"),
+                (0x352CB, "invalid"),
+            ):
+                reads.clear()
+                result = lib.bank_catalog_grow_dispatch_guarded(
+                    array,
+                    c.byref(a),
+                    c.byref(r1),
+                    mask,
+                    c.byref(writes),
+                    c.byref(guard_reader),
+                    guard_array,
+                    len(guards),
+                )
+                assert result < 0 and writes.value == 0
+                assert bytes(array) == before
+                assert a.value == (0xA5B00000 | header + 5) and r1.value == (
+                    0xC6D00000 | header + 5
+                )
+                assert fault_address in reads
+                rejections.append(
+                    dict(
+                        model=model,
+                        address=fault_address,
+                        kind=fault_kind,
+                        status=result,
+                        zero_writes=True,
+                    )
+                )
+            fault_address = fault_kind = None
+        reads.clear()
+        status = lib.bank_catalog_grow_dispatch_guarded(
+            array,
+            c.byref(a),
+            c.byref(r1),
+            mask,
+            c.byref(writes),
+            c.byref(guard_reader),
+            guard_array,
+            len(guards),
         )
         assert status == 0, (model, mask, status)
+        assert reads == [
+            address + i
+            for address, raw in IDENTITY_WINDOWS.items()
+            for i in range(len(raw))
+        ]
         changed = bytes(array)
         for at in range(0x80000, 0x100000, 2):
             physical = mapping.physical(at)
@@ -194,10 +296,13 @@ sources = [base / n for n in names] + [
     root / "platform/armtoolbox/stage-stack.c",
     root / "tests/e2e/code-relocation/threaded-return.c",
     Path(__file__),
+    Path(__file__).with_name("dispatch_identity.py"),
     Path(importlib.import_module("verify").__file__),
 ]
 report = dict(
     cases=rows,
+    commit_guard_rejections=rejections,
+    identity_nibbles=sum(len(raw) for raw in IDENTITY_WINDOWS.values()),
     scope="Controlled catalog geometry transaction without catalog publication; original interpreter stopped at comparison or wrong dispatch. Does not establish full reference closure or public registration.",
     sources={
         str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -210,3 +315,9 @@ report = dict(
     binary_sha256=hashlib.sha256((out / "geometry.so").read_bytes()).hexdigest(),
 )
 (out / "results.json").write_text(json.dumps(report, indent=2) + "\n")
+
+print(
+    "PASS",
+    len(rejections),
+    "changed/unavailable/invalid ROM guard preflight rejections",
+)

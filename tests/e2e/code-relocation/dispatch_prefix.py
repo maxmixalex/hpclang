@@ -1,5 +1,6 @@
 """Execute the reviewed predicate prefix in the original ARM Saturn interpreter."""
 
+from dispatch_identity import IDENTITY_WINDOWS
 from pathlib import Path
 import argparse
 import subprocess
@@ -71,7 +72,8 @@ class Reader(c.Structure):
 
 class Exchange(c.Structure):
     _fields_ = [
-        (k, c.c_uint32) for k in ("instruction", "length", "left", "right", "first", "nibbles")
+        (k, c.c_uint32)
+        for k in ("instruction", "length", "left", "right", "first", "nibbles")
     ]
 
 
@@ -102,7 +104,11 @@ class Edge(c.Structure):
 
 
 class Identity(c.Structure):
-    _fields_ = [("address", c.c_uint32), ("length", c.c_uint32), ("nibbles", c.POINTER(c.c_uint8))]
+    _fields_ = [
+        ("address", c.c_uint32),
+        ("length", c.c_uint32),
+        ("nibbles", c.POINTER(c.c_uint8)),
+    ]
 
 
 Dependency = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
@@ -140,14 +146,7 @@ for name, kind in [("exchange", Exchange), ("assignment", Assignment)]:
     ]
 # Reviewed inspection windows, not complete handler/callee coverage.
 # These constants must not be learned from the snapshot being classified.
-IDENTITY_WINDOWS = {
-    0x37258: bytes.fromhex(
-        "0801080f00040c0f040f00010407010c040104050800080c08010a0f0001080f0f000f050008010a0f0101060f0d0f0c080207030d000d02060e000009090207030d000d020e060c0f040a030c0f04050300060702010000070d0a070a000008010b0106040800080c0c040d060c040c040c0a030407000103030c0a010c0401"
-    ),
-    0x351CC: bytes.fromhex(
-        "01030201060401040601030200060104070103070104030103050007080a020201050f02050202080f020d0706000402020200030401080a030001040508010b0106040800080c080f020d07060004020e02000304000c0a030001040508010b0106040800080c050b01080f020d070600040b010200030401080a03000d0a0800080c080f020d07060004090e08000b04000c0a03000d0a0800080c0d06020503080e0d0d05000c0f010c04080a02050c050b0d05080205030607070f0e08020503060e080f0c0a0602000100000b0605000006000000000000000000000000000c0a0602000100000c06050000000000020c02050307090000080a08020006"
-    ),
-}
+
 
 TRACE = [
     0x351CC,
@@ -167,7 +166,9 @@ RAM = 0x08000000
 HEADER, SLOT, OBJECT, D0 = 0x90000, 0x91000, 0x92000, 0x93000
 
 
-def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, identify=True):
+def execute(
+    model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, identify=True
+):
     result_slot = SLOT - 5 if args.duplicate_entry else SLOT
     state = args.state
     flash = bytearray((state / "flash").read_bytes())
@@ -184,7 +185,9 @@ def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, i
             pos = at + n
             physical = mapping.physical(pos)
             shift = 4 * (pos & 1)
-            assert RAM <= physical < RAM + len(ram) and not cpu <= physical < cpu + 0xD00
+            assert (
+                RAM <= physical < RAM + len(ram) and not cpu <= physical < cpu + 0xD00
+            )
             i = physical - RAM
             ram[i] = (ram[i] & ~(15 << shift)) | (((value >> (4 * n)) & 15) << shift)
 
@@ -323,8 +326,14 @@ def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, i
         assert word(0x954) == D0 and word(0x958) == result_slot and word(0x95C) == p, (
             "address restoration"
         )
-        assert reg(0) >> 20 == int.from_bytes(ram[offset + 0x90C : offset + 0x914], "little") >> 20
-        assert reg(2) >> 20 == int.from_bytes(ram[offset + 0x91C : offset + 0x924], "little") >> 20
+        assert (
+            reg(0) >> 20
+            == int.from_bytes(ram[offset + 0x90C : offset + 0x914], "little") >> 20
+        )
+        assert (
+            reg(2) >> 20
+            == int.from_bytes(ram[offset + 0x91C : offset + 0x924], "little") >> 20
+        )
         for first, last in ((0x914, 0x91C), (0x924, 0x954)):
             expected = bytearray(ram[offset + first : offset + last])
             if args.duplicate_entry and first == 0x924:
@@ -339,7 +348,9 @@ def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, i
         for at in (HEADER, HEADER + 5, SLOT, OBJECT):
             for n in range(5):
                 physical = mapping.physical(at + n)
-                assert uc.mem_read(physical, 1) == ram[physical - RAM : physical - RAM + 1]
+                assert (
+                    uc.mem_read(physical, 1) == ram[physical - RAM : physical - RAM + 1]
+                )
 
     def hook(_, at, size, user):
         if at != 0x28898:
@@ -357,7 +368,9 @@ def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, i
         )
         if args.duplicate_entry:
             expected_trace = DUP_TRACE + expected_trace
-        assert len(trace) < len(expected_trace) and pc == expected_trace[len(trace)], hex(pc)
+        assert len(trace) < len(expected_trace) and pc == expected_trace[len(trace)], (
+            hex(pc)
+        )
         trace.append(pc)
         if args.duplicate_entry and pc == DUP_TRACE[0]:
             check_entry(HEADER, 0x37258, 0)
@@ -397,7 +410,9 @@ def execute(model, cursor, wanted, actual, p, fault=None, carry=0, capacity=1, i
         if pc == 0x351E3:
             value = Assignment()
             assert (
-                lib.hpclang_rpl_code_assignment_inspect(c.byref(reader), pc, 3, p, c.byref(value))
+                lib.hpclang_rpl_code_assignment_inspect(
+                    c.byref(reader), pc, 3, p, c.byref(value)
+                )
                 == 0
             )
             mask = (1 << (4 * value.nibbles)) - 1
@@ -501,7 +516,14 @@ for model in (args.model,):
         + (("duplicate-depth",) if args.duplicate_entry else ())
     ):
         try:
-            execute(model, 3, 0x2933 if fault == "false-result" else 0x2A2C, 0x2A2C, 15, fault)
+            execute(
+                model,
+                3,
+                0x2933 if fault == "false-result" else 0x2A2C,
+                0x2A2C,
+                15,
+                fault,
+            )
         except AssertionError as error:
             assert str(error) == "handler identity", str(error)
             identity_negatives.append(dict(model=model, fault=fault, reason=str(error)))
@@ -519,7 +541,9 @@ for model in (args.model,):
             )
         except AssertionError as error:
             assert str(error) == (
-                "predicate result" if fault.endswith("result") else "address restoration"
+                "predicate result"
+                if fault.endswith("result")
+                else "address restoration"
             ), str(error)
             negatives.append(dict(model=model, fault=fault, reason=str(error)))
         else:
@@ -540,6 +564,9 @@ report = dict(
         else ""
     )
     + "Temporary scalar RSTK slot is cleared, seven others preserved. No unrestricted caller/startup proof or relocation permission.",
+    identity_profile_sha256=hashlib.sha256(
+        Path(__file__).with_name("dispatch_identity.py").read_bytes()
+    ).hexdigest(),
     identity_windows={
         hex(at): hashlib.sha256(raw).hexdigest() for at, raw in IDENTITY_WINDOWS.items()
     },
@@ -547,7 +574,9 @@ report = dict(
         name: hashlib.sha256((args.state / name).read_bytes()).hexdigest()
         for name in ("sram", "flash")
     },
-    sources={name: hashlib.sha256((base / name).read_bytes()).hexdigest() for name in names},
+    sources={
+        name: hashlib.sha256((base / name).read_bytes()).hexdigest() for name in names
+    },
     headers={
         name: hashlib.sha256((base / name).read_bytes()).hexdigest()
         for name in ("rpl-code.h", "rpl-reference.h", "rpl-object-span.h")
