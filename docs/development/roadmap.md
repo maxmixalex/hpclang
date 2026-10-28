@@ -99,7 +99,7 @@ M7 acceptance does not imply those capabilities are implemented.
 | M8.1 Installable SDK | **Accepted complete** | Preserve installed external C/C++ builds, relocatability, packaging and reproducibility |
 | M8.2 Declarative C UI core | Implemented substantially; stage open | Complete whole-application resource/lifecycle acceptance and pending CI; original design reviewed, six host UI regressions pass locally |
 | M8.3 Components/renderers | Implemented substantially; stage open | Complete reusable components, renderer/theme independence and six-model interaction/resource acceptance |
-| M8.4 HPGCC source adapters | SD Reset #15 and opt-in legacy formatting #17 accepted; stage open | Complete retained historical application/API coverage, documented migrations and pending branch acceptance |
+| M8.4 HPGCC source adapters | SD Reset #15, opt-in formatting #17 and async/KOS tone gates #25 accepted; stage open | Complete retained historical application/API coverage, documented migrations and pending branch acceptance |
 | M8.5 Modern C++/migration | Implemented in part; stage open | Complete ownership/error/lifetime contracts, migration tooling/guidance and public downstream examples |
 | M8.6 Applications/release | Stage open | Nontrivial integrated apps, clean SDK use, cross-family resource/return checks, documentation and release acceptance |
 
@@ -110,7 +110,7 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-PC-exchange batch `1dc590b1` is submitted in #26. All 28 fresh Stock cases,
+Register-root follow-up `bc6596e6` is submitted in #26. All 28 fresh Stock cases,
 36 unchanged Flash snapshots and 16 reproducible artifacts pass local audit;
 CI remains unfinished; branch acceptance remains open.
 
@@ -142,10 +142,10 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `1dc590b1` | **Prior-head CI failure remains unresolved:** HP39g+ pre-entry Kermit transfer (job 123048995027). Exact-CI-artifact local reproduction passes lifecycle/settled return with unchanged Flash; historical cause remains unproven. Latest audit: 79 successful, 13 running, 182 queued and one failed job. Register-root follow-up passes full local integration and is ready for submission. |
+| #26 / `bc6596e6` | **CI pending:** 12 unfinished workflows; 26 successful, eleven running and 169 queued jobs observed, no failures. Prior-head HP39g+ pre-entry Kermit failure (job 123048995027) remains unexplained despite an exact-artifact local pass. Local integration is verified; branch acceptance remains open. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `969ade88` | **CI pending:** three unfinished workflows; 277 successful, 39 queued and three running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |
+| #21 / `969ade88` | **CI pending:** two unfinished workflows; 277 successful, 39 queued and three running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. #21 follow-up 10e05bc0 now submits pre-cleanup IRQ/timing/ownership diagnostics. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports state. Diagnostic coverage is not a claimed fix. |
 

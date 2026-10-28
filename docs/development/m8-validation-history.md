@@ -701,3 +701,38 @@ failure is not reproduced; its cause remains unproven, not fixed by this pass.
 Pre-push 1dc590b1 audit: 79 successful, 13 running, 182 queued and one failed job;
 two successful workflows/eight unfinished. PR21: 277 successful, three running,
 39 queued jobs; five workflows pass/two unfinished. No branch acceptance.
+
+Register-root follow-up submitted as bc6596e6ecc0a185b24c29b8eb644314c5693505; new-head CI not polled in the push turn. Prior-head transfer failure remains unresolved; no merge or milestone acceptance.
+
+## 2026-10-29 — Submitted CI observation and finished-build cleanup
+
+First post-push bc6596e6 audit finds 12 unfinished workflows (five queued,
+two pending, five running); jobs: two successful, ten running, ten queued,
+no failures observed. Prior-head Kermit failure remains unexplained. Corrected
+the PR21 summary to two unfinished workflows, matching its five successful
+workflows and recorded 277 successful/three running/39 queued jobs.
+
+After confirming no process uses either finished register/underflow build,
+removed only /work/oct29-stage-register/app/cmake and
+/work/oct29-stage-underflow/app/cmake. Freed 5,159,204 logical bytes; all 2,051
+remaining files retain their hashes, including tested artifacts, saved states,
+reproduction reports and audits. Report: /work/oct29-cmake-cleanup.json.
+No source or hardware data changed; CMake directories can be regenerated.
+
+## 2026-10-29 — Reconcile already-accepted tone compatibility gates
+
+M8.4 status audit finds hpgcc-compat.md still described async/KOS tone gates as
+local/unsubmitted despite accepted PR25 head 752b8999. Both Runtime runs
+40709124150/40709112604 contain all 27 required jobs each: normal/exit/_Exit
+across three Direct families and six Stock models. All 54 pass. Reviewed
+source proves async/KOS checks precede PASS and exit cleanup is observed before
+launcher restoration. All 36 selected runtime/header/test blobs match accepted
+main and current M8.0 branch. Six original HP39-family Direct/HP40gs Stock logs
+also confirm actual target execution. Audit report:
+research/oct29-sound-acceptance-audit.json; retained logs:
+research/oct29-sound-accepted-logs. This records existing acceptance, not new
+runtime behavior. It covers all six models including 39/40 tone/beep playback,
+not PCM/WAV decoding or physical audibility. M8.4 as a whole stays open and
+M8.0 remains the mainline. Historical flaky/failed jobs are not declared fixed.
+PR26 bc6596e6 observation: 12 unfinished workflows; 26 successful, eleven
+running and 169 queued jobs, no failures. No push/merge this turn.

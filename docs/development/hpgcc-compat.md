@@ -1543,7 +1543,7 @@ tones or verify real asynchronous timing and permitted preemption. The adapter
 must apply this completion/preemption policy to the owned asynchronous service
 described below; blocking `hpclang_sound_play` alone does not implement it.
 
-Current asynchronous sound implementation (local, not yet CI accepted):
+Current asynchronous tone implementation (emulator gates accepted in #25):
 `hpclang_sound_start`, `hpclang_sound_status` and `hpclang_sound_stop` now use
 PWM2 output plus an interrupt-only watchdog deadline. Stock can already own
 PWM3/PWM4, so the production service does not assume either channel is free.
@@ -1571,10 +1571,22 @@ fixtures inspect real cleanup before power, launcher or host restoration can
 hide missing releases. A negative control that skips cleanup fails at that
 boundary. Runtime CI now schedules both exit variants across all six Stock
 models and all three Direct families, retaining the blocking-exit suite.
-These gates are configured locally, not yet submitted or accepted. Native
-emulator results do not establish audible output from physical hardware.
+These gates pass on accepted head `752b8999`, merged in #25 as `3c484673`.
+Both [PR Runtime](https://github.com/maxmixalex/hpclang/actions/runs/40709124150)
+and [push Runtime](https://github.com/maxmixalex/hpclang/actions/runs/40709112604)
+pass all three variants (`system-services`, `system-services-exit` and
+`system-services-immediate`): three Direct families covering six models and
+six individual Stock models, 54 jobs across the two runs. The test executes
+async and KOS assertions before its PASS marker; exit wrappers inspect cleanup
+before launcher restoration. Relevant runtime, headers and test source blobs
+match accepted main. Earlier unrelated or intermittent CI failures retain their
+own investigation status; these passes do not prove their causes fixed.
 
-`kos.h` now exposes a locally implemented sound subset, `kos_beep` and
+HP39g+, HP39gs and HP40gs are included in these tone gates. This is square-wave
+tone/beep playback, not a PCM/WAV file player. Native emulator results do not
+establish audible output from physical hardware.
+
+`kos.h` exposes the accepted tone compatibility subset, `kos_beep` and
 `kos_CheckBeepEnd`. `kos_beep` accepts Hz in 1..15000 and nonzero milliseconds;
 the identical validation instructions in all six ROMs establish these bounds
 and the historical invalid-argument return of -51. The adapter also sets
@@ -1608,7 +1620,8 @@ client identity. All six Direct models pass native KOS waiting-duration,
 actual PWM replacement/rejection, busy-loop autonomous completion and restored
 hardware checks. All six Stock models also pass. Both KOS-entry normal exit
 and immediate exit pass all six Direct/Stock models locally, including hardware
-restoration before launcher return. CI acceptance remains pending.
+restoration before launcher return. These emulator gates are accepted in #25;
+other M8.4 historical API/application coverage remains open.
 
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
