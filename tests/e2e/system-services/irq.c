@@ -8,6 +8,37 @@
 #define REG(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
 volatile uint32_t hpclang_e2e_irq_hits;
+/* Failure-only snapshot, taken before foreground cleanup changes ownership.
+ * Keep PWM diagnostics distinct from watchdog observations (0x7b00). */
+volatile struct
+{
+    uint64_t last_time, deadline, foreground_time;
+    uint32_t version, hits, finished, error, alarm_owned, tone_owned, saved_errno;
+    uint32_t tcon, tcfg0, tcfg1, tcntb4, tcnto4, srcpnd, intpnd, intmask, first_failure;
+} hpclang_e2e_pwm_observation;
+_Static_assert(sizeof(hpclang_e2e_pwm_observation) == 88, "PWM diagnostic layout");
+extern volatile uint32_t hpclang_e2e_result;
+
+static void report_failure(void)
+{
+    static uint32_t report[24];
+    report[0] = 0x7b10;
+    report[1] = 22;
+    uint8_t *destination = (uint8_t *)(report + 2);
+    volatile const uint8_t *source = (volatile const uint8_t *)&hpclang_e2e_pwm_observation;
+    for (unsigned i = 0; i < sizeof(hpclang_e2e_pwm_observation); ++i)
+        destination[i] = source[i];
+    uint32_t offset = (uint32_t)(uintptr_t)report - 0x01100000u;
+    uint64_t start, now;
+    if (hpclang_time_read_us_masked(&start))
+        return;
+    hpclang_e2e_result = 0x4d100000u | offset;
+    while (hpclang_e2e_result != (0x4d200000u | offset)) {
+        if (hpclang_time_read_us_masked(&now) || now - start > 2000000u)
+            break;
+    }
+}
+
 static volatile unsigned irq_finished, irq_error;
 static uint64_t irq_deadline, irq_last_time;
 static struct hpclang_sound_playback playback;
@@ -82,6 +113,7 @@ unsigned hpclang_e2e_irq_test(void)
     for (unsigned i = 0; i < 7; ++i)
         audio_before[i] = REG(audio_addresses[i]);
     unsigned failure = 0;
+    hpclang_e2e_pwm_observation.first_failure = 0;
     hpclang_e2e_irq_hits = 0;
     irq_finished = irq_error = 0;
     irq_stack[0] = 0x51ac7ead;
@@ -137,6 +169,30 @@ unsigned hpclang_e2e_irq_test(void)
     if (hpclang_e2e_irq_hits < 2 || !irq_finished || irq_error || irq_last_time < irq_deadline ||
         playback.alarm.owned || playback.tone.owned || errno != EDOM)
         failure = 3;
+    if (failure) {
+        hpclang_e2e_pwm_observation.version = 1;
+        hpclang_e2e_pwm_observation.last_time = irq_last_time;
+        hpclang_e2e_pwm_observation.deadline = irq_deadline;
+        hpclang_e2e_pwm_observation.hits = hpclang_e2e_irq_hits;
+        hpclang_e2e_pwm_observation.finished = irq_finished;
+        hpclang_e2e_pwm_observation.error = irq_error;
+        hpclang_e2e_pwm_observation.alarm_owned = playback.alarm.owned;
+        hpclang_e2e_pwm_observation.tone_owned = playback.tone.owned;
+        hpclang_e2e_pwm_observation.saved_errno = (uint32_t)errno;
+        hpclang_e2e_pwm_observation.tcon = REG(0x07600008);
+        hpclang_e2e_pwm_observation.tcfg0 = REG(0x07600000);
+        hpclang_e2e_pwm_observation.tcfg1 = REG(0x07600004);
+        hpclang_e2e_pwm_observation.tcntb4 = REG(0x0760003c);
+        hpclang_e2e_pwm_observation.tcnto4 = REG(0x07600040);
+        hpclang_e2e_pwm_observation.srcpnd = REG(0x07100000);
+        hpclang_e2e_pwm_observation.intpnd = REG(0x07100010);
+        hpclang_e2e_pwm_observation.intmask = REG(0x07100008);
+        hpclang_e2e_pwm_observation.first_failure = failure;
+        uint64_t now = 0;
+        (void)hpclang_time_read_us_masked(&now);
+        hpclang_e2e_pwm_observation.foreground_time = now;
+        errno = (int)hpclang_e2e_pwm_observation.saved_errno;
+    }
     REG(0x07100008) = UINT32_MAX;
     REG(0x08000018) = vector;
     hpclang_irq_bank_exchange(&bank);
@@ -156,6 +212,8 @@ unsigned hpclang_e2e_irq_test(void)
     if ((REG(0x07100000) & source) != source || REG(0x07100004) != mode ||
         REG(0x07100008) != mask || REG(0x08000018) != vector)
         failure = 6;
+    if (hpclang_e2e_pwm_observation.first_failure)
+        report_failure();
     hpclang_irq_restore(cpsr);
     return failure;
 }
