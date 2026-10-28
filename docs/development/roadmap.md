@@ -113,12 +113,11 @@ revision-driven canvas. A superficially similar imperative API is not completion
 Guarded references, bounded ROM readers, mapped-graph scheduling and bank-alias
 primitives/regressions are submitted in #26 (`d0471894`); CI is pending. Earlier 28 Stock cases remain scoped to their recorded reader build.
 
-Under the controlled saved profiles, both HOME scans schedule 20 attachments
-and resolve the first ACPTR payload (bank 2, 7291 nibbles), then reject its
-separate execution reference. Selector guards reject 340 stale-nibble changes.
-Local P=0 program inspection now derives selector and shared-body addresses,
-checks the complete reviewed instruction shape and observes 45 code nibbles per
-entry. Both maintained ROM regressions pass, including configuration side effects.
+Under the controlled saved profiles, all 20 attachment payloads per model now
+resolve through inspected P=0 code, dynamic selector matching, validated geometry
+and owner-aware mapping. Every separate execution reference remains unresolved.
+Combined code/data guards reject 520 stale-nibble changes in maintained tests.
+These follow-ups are local; original-ROM configuration regressions also pass.
 Production firmware/handler identity, owner/geometry freshness, complete payload
 and execution coverage, public libraries and Port1 edits remain open.
 

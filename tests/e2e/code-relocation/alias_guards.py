@@ -14,6 +14,9 @@ def verify_alias_selectors(lib, read):
     class MappedReader(c.Structure):
         _fields_ = [("read", mapped_fn), ("context", c.c_void_p)]
 
+    class Program(c.Structure):
+        _fields_ = [(name, c.c_uint32) for name in ("selector", "dispatch", "body")]
+
     class Guard(c.Structure):
         _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
 
@@ -29,6 +32,16 @@ def verify_alias_selectors(lib, read):
         c.POINTER(Reader),
         *([c.c_uint32] * 3),
         c.POINTER(c.c_uint32),
+        dependency_fn,
+        c.c_void_p,
+    ]
+    lib.hpclang_rpl_code_bank_entry_inspect.argtypes = [
+        c.POINTER(Reader),
+        c.c_uint32,
+        c.c_uint32,
+        c.c_uint32,
+        c.c_uint,
+        c.POINTER(Program),
         dependency_fn,
         c.c_void_p,
     ]
@@ -61,12 +74,11 @@ def verify_alias_selectors(lib, read):
 
     reader, mapped_reader = Reader(nibble, None), MappedReader(mapped, None)
     rows = []
-    # The original-ROM trace establishes D0=selectors+5*selector for these
-    # entry points. This test composes data guards; it is not a code identity
-    # profile and does not make the public runtime accept these addresses.
+    # Derive D0 from validated program syntax on every capture. Code and mutable
+    # data share one guard set. Interpreter/device identity remains external.
     for switch, selector, expected in ((0x22E83, 1, 2), (0x22E99, 3, 4)):
-        guards, builder = (Guard * 17)(), Builder()
-        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 17) == 0
+        guards, builder = (Guard * 32)(), Builder()
+        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 32) == 0
         observed = []
 
         @dependency_fn
@@ -75,18 +87,27 @@ def verify_alias_selectors(lib, read):
             return lib.hpclang_rpl_reference_guards_observe(c.byref(builder), 1, address, value)
 
         bank = c.c_uint32(99)
-        assert (
-            lib.hpclang_rpl_flashptr_bank_guarded(
-                c.byref(reader), 0x8605E, 0x860CC, selector, c.byref(bank), observe, None
+
+        def resolve():
+            program = Program()
+            result = lib.hpclang_rpl_code_bank_entry_inspect(
+                c.byref(reader), 0, 0x40000, switch, 0, c.byref(program), observe, None
             )
-            == 1
-        )
-        assert bank.value == expected and len(observed) == 85 and builder.count == 17
+            if result:
+                return result
+            assert program.selector == 0x8605E + selector * 5
+            return lib.hpclang_rpl_flashptr_bank_guarded(
+                c.byref(reader), program.selector, 0x860CC, 0, c.byref(bank), observe, None
+            )
+
+        assert resolve() == 1
+        dependencies = sorted(set(observed))
+        assert bank.value == expected and len(dependencies) == 130 and builder.count <= 32
         assert (
             lib.hpclang_rpl_reference_guards_validate(c.byref(mapped_reader), guards, builder.count)
             == 0
         )
-        for address in observed:
+        for address in dependencies:
             changed[address] = read(address, 1) ^ 1
             assert (
                 lib.hpclang_rpl_reference_guards_validate(
@@ -106,13 +127,8 @@ def verify_alias_selectors(lib, read):
             < 0
         )
         observed.clear()
-        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 17) == 0
-        assert (
-            lib.hpclang_rpl_flashptr_bank_guarded(
-                c.byref(reader), 0x8605E, 0x860CC, selector, c.byref(bank), observe, None
-            )
-            == 1
-        )
+        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 32) == 0
+        assert resolve() == 1
         assert bank.value == alternate
         assert (
             lib.hpclang_rpl_reference_guards_validate(c.byref(mapped_reader), guards, builder.count)
@@ -129,8 +145,8 @@ def verify_alias_selectors(lib, read):
                 selector=selector,
                 original_bank=expected,
                 changed_bank=alternate,
-                stale_nibble_rejections=85,
-                guards=17,
+                stale_nibble_rejections=len(dependencies),
+                guards=builder.count,
             )
         )
     return rows

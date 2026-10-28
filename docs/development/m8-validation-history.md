@@ -1243,3 +1243,24 @@ static analysis, clang-format and Ruff pass. This is a bounded syntactic path
 proof, not interpreter/device authentication: CONFIG routing, mutable data,
 owner/geometry freshness, pending IRQs and return roots remain caller obligations.
 It does not enable public Port1 edits or close complete execution coverage.
+
+## Program-to-selector composition and all HOME attachments — local, 2026-10-29
+
+Maintained `alias_guards.py` now derives each selector field by C program inspection
+on every capture, then matches its current five-nibble value against all native
+bank configurations. Code and data observations enter one mapping-qualified guard
+set. Each case covers 45 unique code and 85 data nibbles; both models/two entries
+reject all 520 individual stale changes. Legitimate alternate selections invalidate
+old guards, resolve afresh and then reject restoration under the new guards.
+Both full maintained model runs pass; reports and source hashes are in
+`/work/oct29-composed-bank-program/{model}/bank-switch-maps.json`.
+The controlled HOME integration now uses this inspected-program selector instead
+of a fixed alias-to-selector mapping. All 20 attachment payloads per model resolve
+through validated geometry and the owner-aware C window predictor to bounded
+objects. Each independent wrapper traversal still rejects its separate EXECUTION
+edge and leaves success counts unpublished. Whole HOME traversal likewise rejects
+its first such obligation. SRAM/Flash files remain unchanged. Details, all payload
+bounds and remaining execution edges are in `/work/oct29-home-graph/attachments.json`.
+This covers the captured no-ERAM/no-owner-overlay context; firmware interpreter
+identity, configuration routing, capture freshness and full root closure remain
+production prerequisites. No public edit capability is enabled by these results.
