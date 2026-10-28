@@ -691,6 +691,14 @@ static void register_exchanges(void)
         const char *code;
         unsigned p, left, right, first, width;
     } cases[] = {
+        {"132", 0, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_D0, 0, 5},
+        {"133", 15, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_D1, 0, 5},
+        {"136", 0, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_D0, 0, 5},
+        {"137", 15, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_D1, 0, 5},
+        {"13a", 0, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_D0, 0, 4},
+        {"13b", 15, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_D1, 0, 4},
+        {"13e", 0, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_D0, 0, 4},
+        {"13f", 15, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_D1, 0, 4},
         {"dc", 0, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_B, 0, 5},
         {"dd", 0, HPCLANG_RPL_CODE_B, HPCLANG_RPL_CODE_C, 0, 5},
         {"de", 0, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_C, 0, 5},
@@ -743,8 +751,9 @@ static void register_exchanges(void)
         assert(hpclang_rpl_code_exchange_inspect(&reader, image.address, image.size, 16, &value) ==
                HPCLANG_RPL_SPAN_MALFORMED);
     }
-    const char *unknown[] = {"10c",    "db",  "81af1c", "81a82c", "125", "12f",
-                             "81af2d", "140", "130",    "80ff",   "fa",  "80b26"};
+    const char *unknown[] = {"10c", "db",  "81af1c", "81a82c", "125",  "12f", "81af2d",
+                             "140", "130", "131",    "134",    "135",  "138", "139",
+                             "13c", "13d", "80ff",   "fa",     "80b26"};
     for (unsigned i = 0; i < sizeof unknown / sizeof unknown[0]; ++i) {
         struct image image = {
             .address = 0x80000, .size = (uint32_t)strlen(unknown[i]), .fail = UINT32_MAX};

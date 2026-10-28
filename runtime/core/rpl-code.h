@@ -53,7 +53,9 @@ enum hpclang_rpl_code_register
     HPCLANG_RPL_CODE_R3,
     HPCLANG_RPL_CODE_R4,
     HPCLANG_RPL_CODE_P,
-    HPCLANG_RPL_CODE_CONSTANT
+    HPCLANG_RPL_CODE_CONSTANT,
+    HPCLANG_RPL_CODE_D0,
+    HPCLANG_RPL_CODE_D1
 };
 
 struct hpclang_rpl_code_literal
@@ -107,7 +109,9 @@ struct hpclang_rpl_code_exchange
 /* Describe a simultaneous exchange of the same field in two registers. Both
  * sources are the pre-instruction values; preserve all nibbles outside the field.
  * Supports A/B/C/D pairs and A/C with R0..R4, standard fields (0..7,F).
- * Data-address registers, P exchanges and custom fields remain unsupported.
+ * Also supports A/C with 20-bit D0/D1: EX swaps low five nibbles, XS low four;
+ * preserve the fifth D0/D1 nibble for XS and all higher A/C nibbles.
+ * P exchanges and custom fields remain unsupported.
  * p is the proven P value at this instruction. This transfers caller-proven
  * provenance only; it does not establish addresses or authorize relocation.
  * No writes; errors leave output untouched. Guard the instruction and P before

@@ -1145,8 +1145,9 @@ The exchange inspector describes simultaneous standard-field swaps between
 A/B/C/D pairs or A/C and R0..R4, including the launcher's `ACEX W` instructions.
 Both fields must be read from the pre-instruction state before either is
 replaced; bits outside the selected field survive. P/WP fields require the
-proven current P. Data-address register exchanges, P exchanges and custom
-fields remain unsupported. This is a data-flow building block, not a complete
+proven current P. A/C exchanges with D0/D1 are also decoded: EX swaps five low nibbles,
+XS swaps four while preserving the fifth address nibble; higher A/C nibbles
+survive. P exchanges and custom fields remain unsupported. This is a data-flow building block, not a complete
 launcher analysis or permission to treat arbitrary register values as roots.
 
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,

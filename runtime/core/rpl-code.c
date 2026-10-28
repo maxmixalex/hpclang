@@ -387,6 +387,13 @@ int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, u
     const uint8_t *op = cursor.code;
     struct hpclang_rpl_code_exchange next = {.instruction = instruction, .length = size};
     unsigned field;
+    if (op[0] == 1 && op[1] == 3 && (op[2] & 2)) {
+        next.left = (op[2] & 4) ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A;
+        next.right = (op[2] & 1) ? HPCLANG_RPL_CODE_D1 : HPCLANG_RPL_CODE_D0;
+        next.nibbles = (op[2] & 8) ? 4 : 5;
+        *exchange = next;
+        return 0;
+    }
     if ((op[0] == 1 && op[1] == 2) || (op[0] == 8 && op[1] == 1 && op[2] == 10 && op[4] == 2)) {
         unsigned selector = op[0] == 1 ? op[2] : op[5];
         next.left = selector < 8 ? HPCLANG_RPL_CODE_A : HPCLANG_RPL_CODE_C;
