@@ -1626,3 +1626,31 @@ Exact-head audit: #26 bdeb3227 has eight queued/two running/one pending workflow
 16 queued/two running jobs; #20 4f2ce605 has seven successful/five queued workflow
 records and 303 successful/18 running/68 queued/one skipped jobs. No failed jobs
 appear in either audit; both deliveries remain unaccepted.
+
+## 2026-10-29 — Unified runtime bank planning
+
+`rpl-bank-plan.c` composes the formerly test-orchestrated sequence: bounded P=0
+program inspection, unique configuration-table lookup, guarded selector read,
+routing checks, profile-derived geometry capture and full effects prediction.
+The three coordinate spaces carry explicit distinct mapping IDs. The selected
+table index must also agree with reviewed control-bit semantics. Caller-owned
+scratch storage keeps intermediate plans private; only complete success changes
+output. The caller still supplies an identified ROM profile, qualified code,
+native state/configuration table and exclusive lifetime. This API does not
+execute the switch or classify its EXECUTION edge as terminal.
+
+Both maintained runs pass under `/work/oct29-bank-runtime-plan/{model}`. For two
+aliases and their alternate configurations, the new C plan matches the prior
+staged implementation's program, selected bank, configuration, geometry and full
+effects. All 144 failure controls (callback errors at eight stages, mapping-ID
+collision and swapped configuration-table rows) preserve output. The existing
+20,096 stale-nibble controls, 672 original-handler effects comparisons, ROM
+identity and attachment suites continue to pass. ARMv4T compilation/static
+analysis and full tracked-source formatting/Ruff/ShellCheck pass; the final
+Python counterexample additions also pass repository formatting/Ruff.
+Production/HOME single-call integration and complete execution roots remain open.
+
+CI remains pending: #26 bdeb3227 has eight queued/two running/one pending
+workflows and 13 queued/five running jobs; #20 4f2ce605 has seven successful/five
+queued workflow records and 310 successful/16 running/63 queued/one skipped jobs.
+No failed job appeared in this exact-head audit.

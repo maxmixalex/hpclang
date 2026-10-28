@@ -116,11 +116,14 @@ primitives/regressions and program/selector follow-ups are submitted in #26; CI 
 Under the controlled saved profiles, all 20 attachment payloads per model resolve
 through inspected P=0 code, dynamic selectors, captured bank geometry, device
 routing and full read-map prediction. Separate execution edges still reject.
-A local integration now guards code, selectors, routing, read/write maps,
-sentinel/caches, bank/overlay fields and ROM/native geometry together. Each
-alias retains 5,024 nibble dependencies; all 20,096 individual stale changes
-reject across both models. Controlled HOME uses the full effects capture and
-predictor; separate execution obligations remain unresolved.
+A local runtime planning API now composes code inspection, unique bank lookup,
+routing checks, geometry capture and full effect prediction in one call. It
+publishes only complete results and rejects table/control-bit disagreement.
+Two aliases and their alternate selectors match the independent staged path on
+both models; 144 failure controls preserve output. Each alias retains 5,024
+nibble dependencies; all 20,096 individual stale changes reject. Controlled
+HOME uses the prior full-effects composition; single-call HOME integration and
+separate execution obligations remain open.
 The submitted read-map predictor passes its original-handler comparisons.
 The submitted runtime predictor covers read/write maps, the sentinel and overlay
 caches. It agrees with 672 original-handler executions across both models;
@@ -161,12 +164,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `bdeb3227` | **CI pending:** eight queued, two running and one pending workflows; sixteen queued and two running jobs, none failed. Full bank-effects alias/HOME integration is a local follow-up. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `bdeb3227` | **CI pending:** eight queued, two running and one pending workflows; thirteen queued and five running jobs, none failed. Unified bank planning is a local follow-up. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `4f2ce605` | **CI pending:** seven successful and five queued workflow records; jobs report 303 successful, eighteen running, 68 queued and one skipped. Current main integration still requires fresh CI acceptance. |
+| #20 / `4f2ce605` | **CI pending:** seven successful and five queued workflow records; jobs report 310 successful, sixteen running, 63 queued and one skipped. Current main integration still requires fresh CI acceptance. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

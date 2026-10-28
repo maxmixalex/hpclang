@@ -72,6 +72,45 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
         c.c_void_p,
     ]
 
+    from rom_profile import Profile
+
+    class Sources(c.Structure):
+        _fields_ = [(name, c.POINTER(Reader)) for name in ("saturn", "native", "rom")]
+        _fields_ += [("profile", c.POINTER(Profile))]
+        _fields_ += [
+            (name, c.c_uint32)
+            for name in (
+                "saturn_mapping",
+                "native_mapping",
+                "rom_mapping",
+                "code_first",
+                "code_end",
+                "configurations",
+            )
+        ]
+
+    class Plan(c.Structure):
+        _fields_ = [
+            ("program", Program),
+            ("bank", c.c_uint32),
+            ("configuration", c.c_uint32),
+            ("geometry", Geometry),
+            ("effects", Effects),
+        ]
+
+    class Workspace(c.Structure):
+        _fields_ = [("prior", Effects), ("banks", Geometry * 16), ("next", Plan)]
+
+    plan_dependency = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.c_uint8)
+    lib.hpclang_rpl_bank_plan_prepare.argtypes = [
+        c.POINTER(Sources),
+        c.c_uint32,
+        c.POINTER(Workspace),
+        c.POINTER(Plan),
+        plan_dependency,
+        c.c_void_p,
+    ]
+
     class Guard(c.Structure):
         _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
 
@@ -254,6 +293,87 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
                         window.overlay_physical + 0x800,
                     ]
                 assert list(predicted) == expected_pages
+            native_reader, rom_reader = Reader(native, None), Reader(physical_rom, None)
+            qualified = Profile(**profile)
+            sources = Sources(
+                c.pointer(reader),
+                c.pointer(native_reader),
+                c.pointer(rom_reader),
+                c.pointer(qualified),
+                1,
+                2,
+                3,
+                0,
+                0x40000,
+                0x860CC,
+            )
+            workspace, plan = Workspace(), Plan()
+
+            @plan_dependency
+            def plan_observe(_, mapping, address, value):
+                observed.append((mapping, address))
+                return lib.hpclang_rpl_reference_guards_observe(
+                    c.byref(builder), mapping, address, value
+                )
+
+            assert (
+                lib.hpclang_rpl_bank_plan_prepare(
+                    c.byref(sources), switch, c.byref(workspace), c.byref(plan), plan_observe, None
+                )
+                == 0
+            )
+            assert bytes(plan.program) == bytes(program) and plan.bank == bank.value
+            assert plan.configuration == value and bytes(plan.geometry) == bytes(
+                geometries[bank.value]
+            )
+            assert bytes(plan.effects) == bytes(selected)
+            for fault_mapping, fault_address in (
+                (1, switch),
+                (1, program.selector),
+                (2, 0xB9C * 2),
+                (3, profile["geometry_operands"] * 2),
+                (2, 0),
+                (2, 0x400 * 2),
+                (2, 0x404 * 2),
+                (2, 0xC4C * 2),
+            ):
+                for fault in (-73, 73):
+
+                    @plan_dependency
+                    def fail(_, mapping, address, value):
+                        return fault if (mapping, address) == (fault_mapping, fault_address) else 0
+
+                    c.memset(c.byref(plan), 0xA5, c.sizeof(plan))
+                    untouched = bytes(plan)
+                    status = lib.hpclang_rpl_bank_plan_prepare(
+                        c.byref(sources), switch, c.byref(workspace), c.byref(plan), fail, None
+                    )
+                    assert status < 0 and (status == -73 if fault < 0 else status != 73)
+                    assert bytes(plan) == untouched
+            # A unique table match alone cannot override the control-bit meaning.
+            saved_changes = changed.copy()
+            other = 4 if bank.value == 2 else 2
+            for i in range(5):
+                changed[(1, 0x860CC + bank.value * 5 + i)] = read(0x860CC + other * 5 + i, 1)
+                changed[(1, 0x860CC + other * 5 + i)] = read(0x860CC + bank.value * 5 + i, 1)
+            accept = plan_dependency(lambda *_: 0)
+            assert (
+                lib.hpclang_rpl_bank_plan_prepare(
+                    c.byref(sources), switch, c.byref(workspace), c.byref(plan), accept, None
+                )
+                < 0
+            )
+            assert bytes(plan) == untouched
+            changed.clear()
+            changed.update(saved_changes)
+            sources.native_mapping = sources.saturn_mapping
+            assert (
+                lib.hpclang_rpl_bank_plan_prepare(
+                    c.byref(sources), switch, c.byref(workspace), c.byref(plan), plan_observe, None
+                )
+                < 0
+            )
+            assert bytes(plan) == untouched
             return 1
 
         assert resolve() == 1
@@ -309,6 +429,8 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
                 changed_bank=alternate,
                 stale_nibble_rejections=len(dependencies),
                 guards=builder.count,
+                runtime_plan=True,
+                prepare_failure_controls=36,
             )
         )
     return rows
