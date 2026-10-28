@@ -133,7 +133,7 @@ All prior artifact-specific evidence and limitations are retained in
 | --- | --- |
 | #25 / `752b8999` | **Submitted; CI pending.** Exact-head audit sees 295 successful, 20 running and 39 queued jobs; no failures observed. Not accepted. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `00d5ddf1` | UI pool/RW checks pass six retained Stock fixtures locally. HP39g+ immediate retest passes; earlier watchdog failure cause, full CI and total system peaks remain open. |
+| #21 / `01e1d2cf` | **Artifact-transfer fix submitted; fresh CI pending.** All 12 prior UI failures omitted `launchers/memory.json`; six-model transfer/verification replay and omission controls pass. Earlier watchdog cause and whole-system peaks remain open. |
 | #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; cause unproven. |
 
