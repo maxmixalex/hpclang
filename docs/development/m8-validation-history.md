@@ -462,3 +462,17 @@ files were removed automatically. Full Stock sessions 85305 and 76272 remain
 live, each having passed 11 of 14 cases through gosub-rtnsxm. No complete-suite
 claim is made yet. PR26 exact-head audit: 30 successful, seven running and
 219 queued jobs, no reported failures; no push this turn.
+
+## 2026-10-29 — Incoming-carry batch local integration complete
+
+Both Stock processes finished successfully: 14 cases/model, 28 total, including
+18 original library returns and ten controlled rewritten call returns. Independent
+audit checks exact case sets, pre-rewrite entry observations, all 36 saved Flash
+images unchanged, input hashes and current-source byte-identical launcher
+reproduction. Reports: /work/oct29-carry-launch-e2e/{verified.json,launcher-reproduction.json}.
+The new interpreter CI gate also passes 192 cases against these fresh Stock
+snapshots, in addition to the retained fixture and clean-venv checks.
+Pre-push fb261f17 audit: 57 successful, 15 running, 316 queued jobs; three
+passed and nine unfinished workflows, no reported failures. These are not
+accepted gates. Bounded root discovery and controlled internal library tests
+do not establish full opaque/banked coverage, public management or M8.0 completion.
