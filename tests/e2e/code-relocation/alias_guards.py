@@ -3,7 +3,7 @@
 import ctypes as c
 
 
-def verify_alias_selectors(lib, read, ram, cpu):
+def verify_alias_selectors(lib, read, ram, cpu, banks):
     read_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.POINTER(c.c_uint8))
     mapped_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint8))
     dependency_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
@@ -27,6 +27,26 @@ def verify_alias_selectors(lib, read, ram, cpu):
         c.c_void_p,
     ]
     lib.hpclang_rpl_stock_bank_route_check.argtypes = [c.POINTER(Route), c.c_uint32, c.c_uint32]
+
+    class Window(c.Structure):
+        _fields_ = [("pages", c.c_uint32 * 64), ("owners", c.c_uint8 * 64)]
+
+    lib.hpclang_rpl_stock_bank_window_capture.argtypes = [
+        c.POINTER(Reader),
+        c.POINTER(Window),
+        dependency_fn,
+        c.c_void_p,
+    ]
+
+    class Geometry(c.Structure):
+        _fields_ = [("physical", c.c_uint32), ("bytes", c.c_uint32)]
+
+    lib.hpclang_rpl_stock_bank_window_select.argtypes = [
+        c.POINTER(c.c_uint32),
+        c.POINTER(c.c_uint8),
+        c.POINTER(Geometry),
+        c.POINTER(c.c_uint32),
+    ]
 
     class Guard(c.Structure):
         _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
@@ -102,8 +122,8 @@ def verify_alias_selectors(lib, read, ram, cpu):
     # Derive D0 from validated program syntax on every capture. Code and mutable
     # data share one guard set. Interpreter/device identity remains external.
     for switch, selector, expected in ((0x22E83, 1, 2), (0x22E99, 3, 4)):
-        guards, builder = (Guard * 48)(), Builder()
-        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 48) == 0
+        guards, builder = (Guard * 192)(), Builder()
+        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 192) == 0
         observed = []
 
         @dependency_fn
@@ -131,6 +151,17 @@ def verify_alias_selectors(lib, read, ram, cpu):
             )
             if result != 1:
                 return result
+            window = Window()
+            result = lib.hpclang_rpl_stock_bank_window_capture(
+                c.byref(Reader(native, None)), c.byref(window), observe_native, None
+            )
+            if result:
+                return result
+            for i in range(64):
+                assert window.pages[i] == sum(
+                    state_value((0x100 + i * 4) * 2 + j) << (4 * j) for j in range(8)
+                )
+                assert window.owners[i] == ram[cpu - 0x08000000 + 0x848 + i]
             route = Route()
             result = lib.hpclang_rpl_stock_bank_route_capture(
                 c.byref(Reader(native, None)), c.byref(route), observe_native, None
@@ -142,11 +173,24 @@ def verify_alias_selectors(lib, read, ram, cpu):
                 for i in range(5)
             )
             result = lib.hpclang_rpl_stock_bank_route_check(c.byref(route), program.selector, value)
-            return result if result else 1
+            if result:
+                return result
+            geometry = Geometry(banks[bank.value]["physical"], banks[bank.value]["valid_bytes"])
+            predicted = (c.c_uint32 * 64)()
+            result = lib.hpclang_rpl_stock_bank_window_select(
+                window.pages, window.owners, c.byref(geometry), predicted
+            )
+            if result:
+                return result
+            assert list(predicted) == [
+                window.pages[i] if window.owners[i] else banks[bank.value]["pages"][i]
+                for i in range(64)
+            ]
+            return 1
 
         assert resolve() == 1
         dependencies = sorted(set(observed))
-        assert bank.value == expected and len(dependencies) == 170 and builder.count <= 48
+        assert bank.value == expected and len(dependencies) == 810 and builder.count <= 192
         assert (
             lib.hpclang_rpl_reference_guards_validate(c.byref(mapped_reader), guards, builder.count)
             == 0
@@ -173,7 +217,7 @@ def verify_alias_selectors(lib, read, ram, cpu):
             < 0
         )
         observed.clear()
-        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 48) == 0
+        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 192) == 0
         assert resolve() == 1
         assert bank.value == alternate
         assert (

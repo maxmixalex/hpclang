@@ -75,6 +75,38 @@ static void test_bank_route_capture(void)
     assert(hpclang_rpl_stock_bank_route_capture(&reader, &route, NULL, &fixture) < 0);
 }
 
+static void test_bank_window_capture(void)
+{
+    struct route_fixture fixture = {0};
+    struct hpclang_rpl_stock_bank_window window, expected;
+    for (unsigned i = 0; i < 64; ++i) {
+        expected.pages[i] = 0x08020000u + i * 0x800u;
+        expected.owners[i] = (uint8_t)(i * 3);
+        for (unsigned j = 0; j < 4; ++j)
+            fixture.bytes[0x100 + i * 4 + j] = (uint8_t)(expected.pages[i] >> (8u * j));
+        fixture.bytes[0x848 + i] = expected.owners[i];
+    }
+    struct hpclang_rpl_reader reader = {route_read, &fixture};
+    assert(!hpclang_rpl_stock_bank_window_capture(&reader, &window, route_observe, &fixture));
+    assert(!memcmp(&window, &expected, sizeof window));
+    assert(fixture.reads == 640 && fixture.observations == 640);
+    for (unsigned mode = 1; mode <= 4; ++mode) {
+        for (unsigned stop = 1; stop <= 640; ++stop) {
+            fixture.mode = mode;
+            fixture.stop = stop;
+            fixture.reads = fixture.observations = 0;
+            memset(&window, 0xa5, sizeof window);
+            struct hpclang_rpl_stock_bank_window before = window;
+            int result =
+                hpclang_rpl_stock_bank_window_capture(&reader, &window, route_observe, &fixture);
+            assert(result == (mode == 1   ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                              : mode == 3 ? -73
+                                          : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(fixture.reads == stop && !memcmp(&window, &before, sizeof window));
+        }
+    }
+}
+
 static void test_bank_route(void)
 {
     struct hpclang_rpl_stock_bank_route route = {3, 4, 0x80, 0x40, 0x40};
@@ -430,6 +462,7 @@ int main(void)
 {
     test_bank_route();
     test_bank_route_capture();
+    test_bank_window_capture();
     test_bank_window_select();
     test_rom_bank_reader();
     test_discontinuous_spans();

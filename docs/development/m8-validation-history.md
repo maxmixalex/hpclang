@@ -1348,3 +1348,25 @@ pass; reports and source hashes are in
 format/Ruff and diff checks pass. Capture is not concurrency exclusion or firmware
 identity; callers still need exclusive lifetime and complete mapping/geometry/
 owner/root coverage. No production edit gate is removed.
+
+## Upper bank-window state guards — local, 2026-10-29
+
+`hpclang_rpl_stock_bank_window_capture` captures Read[0x40..0x7f] and its
+64 owner bytes through the qualified CPU-state reader, observing all 640
+nibbles and publishing only on complete success. It shares checked word reading
+with route capture. The unit suite covers 2,560 per-position read/invalid-data/
+callback failures with unchanged output, plus exact page/owner capture.
+Rebuilt Stock-memory ASan/UBSan, ARMv4T compile/static analysis and changed-file
+format/Ruff pass.
+
+Maintained alias composition now predicts pages from the captured window and
+retains the window dependencies alongside routing, code and selector guards.
+Each case has 166 guards covering 810 nibbles; four cases across both models
+reject all 3,240 individual stale changes. Both complete maintained model runs
+pass; reports/source hashes: `/work/oct29-bank-window-guards/{model}/bank-switch-maps.json`.
+Controlled HOME resolution also consumes both C captures, records native-state
+dependencies under a separate mapping ID, and still resolves all 20 payloads per
+model while rejecting separate execution edges. Its saved-profile report remains
+`/work/oct29-home-graph/attachments.json`. This does not cover lower mappings,
+write maps, geometry freshness, handler identity or complete execution roots.
+Exclusive lifetime remains a caller obligation; no public edit gate is removed.

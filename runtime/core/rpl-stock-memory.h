@@ -49,6 +49,23 @@ int hpclang_rpl_stock_bank_route_capture(const struct hpclang_rpl_reader *state,
 int hpclang_rpl_stock_bank_route_check(const struct hpclang_rpl_stock_bank_route *route,
                                        uint32_t selector, uint32_t configuration);
 
+struct hpclang_rpl_stock_bank_window
+{
+    uint32_t pages[64];
+    uint8_t owners[64];
+};
+
+/* Capture Read[0x40..0x7f] and its owner bytes in the SAME CPU-state coordinate
+ * system and with the same lifetime/dependency contract as route_capture.
+ * Observe all 640 nibbles, including pages currently hidden by an owner. Publish
+ * only on complete success. Values are captured, not authenticated or validated;
+ * window_select checks usable page geometry, while owner meaning remains a
+ * caller obligation. This is not a snapshot of lower pages or write mappings. */
+int hpclang_rpl_stock_bank_window_capture(const struct hpclang_rpl_reader *state,
+                                          struct hpclang_rpl_stock_bank_window *window,
+                                          hpclang_rpl_reference_dependency_fn dependency,
+                                          void *context);
+
 /* Model only the reviewed Flash-selection update of Read[0x40..0x7f].
  * A zero owner selects the corresponding bank page; any nonzero owner keeps
  * the previous page. Inputs must be stable, independently qualified snapshots

@@ -6,6 +6,48 @@
 #include "rpl-port.h"
 #include "launch-services.h"
 
+static int state_word(const struct hpclang_rpl_reader *state, uint32_t at, unsigned width,
+                      uint32_t *word, hpclang_rpl_reference_dependency_fn dependency, void *context)
+{
+    uint32_t next = 0;
+    for (unsigned j = 0; j < width; ++j) {
+        uint8_t value;
+        if (!state->read_nibble(state->context, at + j, &value))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (value > 15)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        int result = dependency(context, at + j, value);
+        if (result)
+            return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        next |= (uint32_t)value << (4u * j);
+    }
+    *word = next;
+    return 0;
+}
+
+int hpclang_rpl_stock_bank_window_capture(const struct hpclang_rpl_reader *state,
+                                          struct hpclang_rpl_stock_bank_window *window,
+                                          hpclang_rpl_reference_dependency_fn dependency,
+                                          void *context)
+{
+    if (!state || !state->read_nibble || !window || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct hpclang_rpl_stock_bank_window next;
+    for (unsigned i = 0; i < 64; ++i) {
+        int result =
+            state_word(state, (0x100u + 4u * i) * 2u, 8, &next.pages[i], dependency, context);
+        if (result)
+            return result;
+        uint32_t owner;
+        result = state_word(state, (0x848u + i) * 2u, 2, &owner, dependency, context);
+        if (result)
+            return result;
+        next.owners[i] = (uint8_t)owner;
+    }
+    *window = next;
+    return 0;
+}
+
 int hpclang_rpl_stock_bank_route_capture(const struct hpclang_rpl_reader *state,
                                          struct hpclang_rpl_stock_bank_route *route,
                                          hpclang_rpl_reference_dependency_fn dependency,
@@ -14,20 +56,11 @@ int hpclang_rpl_stock_bank_route_capture(const struct hpclang_rpl_reader *state,
     if (!state || !state->read_nibble || !route || !dependency)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     static const uint32_t offsets[] = {0xb9c, 0xba0, 0xba8, 0xbb8, 0xbc4};
-    uint32_t words[5] = {0};
+    uint32_t words[5];
     for (unsigned i = 0; i < 5; ++i) {
-        for (unsigned j = 0; j < 8; ++j) {
-            uint32_t at = offsets[i] * 2u + j;
-            uint8_t value;
-            if (!state->read_nibble(state->context, at, &value))
-                return HPCLANG_RPL_SPAN_UNAVAILABLE;
-            if (value > 15)
-                return HPCLANG_RPL_SPAN_MALFORMED;
-            int result = dependency(context, at, value);
-            if (result)
-                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
-            words[i] |= (uint32_t)value << (4u * j);
-        }
+        int result = state_word(state, offsets[i] * 2u, 8, &words[i], dependency, context);
+        if (result)
+            return result;
     }
     *route =
         (struct hpclang_rpl_stock_bank_route){words[0], words[1], words[2], words[3], words[4]};
