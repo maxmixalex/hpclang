@@ -1602,3 +1602,27 @@ successful/two running/217 queued jobs, with no failed jobs. #20 4f2ce605 has
 seven successful/five queued workflow records and 300 successful/18 running/71
 queued/one skipped jobs. Neither head is accepted. Historical unexplained
 pre-entry Kermit/PWM failures remain recorded separately.
+
+## 2026-10-29 — Full effects in alias and controlled HOME resolution
+
+The maintained alias composition now uses `hpclang_rpl_bank_effects_capture`
+and `hpclang_rpl_bank_effects_select`, recording write-map/sentinel/cache
+observations alongside program, selector, routing, geometry and read-map state.
+Each alias records 5,024 unique nibble dependencies in 1,011 bounded guards.
+Across two aliases and two models, all 20,096 individual stale-nibble changes
+invalidate the old result. Legitimate alternate selectors invalidate old guards,
+resolve a fresh bank, then invalidate again when restored. Both full maintained
+runs pass at `/work/oct29-bank-effects-alias/{model}/bank-switch-maps.json`,
+including the 672 original-handler effects comparisons and 96 absent-bank cases.
+
+The research HOME integration consumes the same full effects captures/predictor.
+`/work/oct29-home-graph/attachments-effects.json` retains source/library hashes:
+all 20 attachment payloads per model resolve and their separate EXECUTION edges
+still reject without publishing a completed graph. Saved SRAM/Flash remain
+unchanged. This is controlled integration, not the production public Port1 gate.
+Formatting and Ruff pass for the changed maintained test.
+
+Exact-head audit: #26 bdeb3227 has eight queued/two running/one pending workflows,
+16 queued/two running jobs; #20 4f2ce605 has seven successful/five queued workflow
+records and 303 successful/18 running/68 queued/one skipped jobs. No failed jobs
+appear in either audit; both deliveries remain unaccepted.
