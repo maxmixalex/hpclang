@@ -122,14 +122,14 @@ int bank_catalog_grow_r0_guarded(uint8_t *nibbles, uint32_t *entry, uint32_t *r0
                                  unsigned repair_r0, uint32_t *writes,
                                  const struct hpclang_rpl_reference_reader *guard_reader,
                                  const struct hpclang_rpl_reference_guard *guards,
-                                 uint32_t guard_count)
+                                 uint32_t guard_count, uint32_t expected_r0)
 {
     struct fixture f = {nibbles, 0};
     uint32_t *roots[] = {entry};
     const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
     struct hpclang_rpl_mutation_io io = {
         read_nibble, write_nibble, &f, 0x100000, 0x80000, 0, roots, 1, 0x8611d, display, 4};
-    const struct hpclang_rpl_register_repair reg = {r0, *r0};
+    const struct hpclang_rpl_register_repair reg = {r0, expected_r0};
     const struct hpclang_rpl_catalog_repairs repairs = {
         .main_mapping = 1,
         .registers = repair_r0 ? &reg : NULL,
@@ -146,7 +146,7 @@ int bank_catalog_grow_r0_guarded(uint8_t *nibbles, uint32_t *entry, uint32_t *r0
 int bank_catalog_grow_r0(uint8_t *nibbles, uint32_t *entry, uint32_t *r0, unsigned repair_r0,
                          uint32_t *writes)
 {
-    return bank_catalog_grow_r0_guarded(nibbles, entry, r0, repair_r0, writes, NULL, NULL, 0);
+    return bank_catalog_grow_r0_guarded(nibbles, entry, r0, repair_r0, writes, NULL, NULL, 0, *r0);
 }
 
 /* Controlled DUP continuation: A.A and R1.A point inside one TEMP allocation.

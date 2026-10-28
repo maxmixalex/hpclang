@@ -116,6 +116,7 @@ lib.bank_catalog_grow_r0_guarded.argtypes = [
     c.POINTER(MappedReader),
     c.POINTER(Guard),
     c.c_uint32,
+    c.c_uint32,
 ]
 
 
@@ -294,6 +295,7 @@ for cursor in range(8):
             allocation_start_top = word(0x806EE)
             allocation_reads = {}
             guard_rejections = 0
+            register_guard_rejections = 0
             post_move_allocation = None
 
             @Read
@@ -494,6 +496,7 @@ for cursor in range(8):
                                 c.byref(guard_reader),
                                 guards,
                                 len(guards),
+                                initial_r0,
                             )
                             < 0
                         )
@@ -501,6 +504,32 @@ for cursor in range(8):
                         assert (probe_entry.value, probe_r0.value) == (entry.value, r0.value)
                         guard.expected ^= 1
                         guard_rejections += 1
+                    for change in (1, 0x100000):
+                        probe_entry, probe_r0, probe_writes = (
+                            c.c_uint32(entry.value),
+                            c.c_uint32(initial_r0 ^ change),
+                            c.c_uint32(),
+                        )
+                        assert (
+                            lib.bank_catalog_grow_r0_guarded(
+                                data,
+                                c.byref(probe_entry),
+                                c.byref(probe_r0),
+                                1,
+                                c.byref(probe_writes),
+                                c.byref(guard_reader),
+                                guards,
+                                len(guards),
+                                initial_r0,
+                            )
+                            < 0
+                        )
+                        assert not probe_writes.value and bytes(data) == before_move
+                        assert (probe_entry.value, probe_r0.value) == (
+                            entry.value,
+                            initial_r0 ^ change,
+                        )
+                        register_guard_rejections += 1
                 assert (
                     lib.bank_catalog_grow_r0_guarded(
                         data,
@@ -511,6 +540,7 @@ for cursor in range(8):
                         c.byref(guard_reader),
                         guards,
                         len(guards),
+                        initial_r0,
                     )
                     == 0
                 )
@@ -779,6 +809,7 @@ for cursor in range(8):
                     allocation_origin_path=allocation_origin_path,
                     allocation_bounds=allocation_bounds,
                     allocation_guard_rejections=guard_rejections,
+                    register_guard_rejections=register_guard_rejections,
                     post_move_allocation=post_move_allocation,
                     target=hex(target),
                     cursor=cursor,
