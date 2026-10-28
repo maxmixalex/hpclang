@@ -127,6 +127,30 @@ class Origins(c.Structure):
     _fields_ = [("registers", (c.c_uint32 * 16) * 13)]
 
 
+class Exchange(c.Structure):
+    _fields_ = [
+        (name, c.c_uint32)
+        for name in ("instruction", "length", "left", "right", "first", "nibbles")
+    ]
+
+
+lib.bank_temp_allocation.argtypes = [c.POINTER(Reader), c.c_uint32, c.POINTER(c.c_uint32)]
+lib.hpclang_rpl_object_span.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.POINTER(c.c_uint32),
+]
+lib.hpclang_rpl_code_exchange_inspect.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.c_uint,
+    c.POINTER(Exchange),
+]
+lib.hpclang_rpl_code_origins_exchange.argtypes = [c.POINTER(Origins), c.POINTER(Exchange)]
+
+
 class Adjustment(c.Structure):
     _fields_ = [
         ("instruction", c.c_uint32),
@@ -246,6 +270,17 @@ for cursor in range(8):
                 )
 
             allocation_trace = []
+            allocation_origins = Origins()
+            allocation_origin_path = []
+            allocation_bounds = []
+            allocation_start_top = word(0x806EE)
+
+            @Read
+            def allocation_read(_, at, value):
+                value[0] = uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
+                return 1
+
+            allocation_reader = Reader(allocation_read, None)
             target = 0x88D67
             initial_r0 = 0x34588D67
             target_word = 0x312B
@@ -268,17 +303,119 @@ for cursor in range(8):
                     if at == 0x28898:
                         pc = uc.reg_read(UC_ARM_REG_R7)
                         allocation_trace.append(pc)
+                        steps = (0x5BC2, 0x5BC5, 0x5BC8)
+                        if allocation_origin_path and len(allocation_origin_path) < 3:
+                            assert pc == steps[len(allocation_origin_path)]
+                        if pc in steps:
+                            if pc == steps[0]:
+                                first = int.from_bytes(uc.mem_read(cpu + 0x954, 4), "little")
+                                extent = c.c_uint32()
+                                assert first == allocation_start_top + 1
+                                assert (
+                                    lib.bank_temp_allocation(
+                                        c.byref(allocation_reader), first, c.byref(extent)
+                                    )
+                                    == 0
+                                )
+                                assert word(0x806EE) == allocation_start_top + extent.value + 6
+                                allocation_bounds.extend((first, extent.value))
+                                for i in range(5):
+                                    allocation_origins.registers[11][i] = 0x100 + i
+                            if pc == steps[1]:
+                                copy = Assignment()
+                                assert (
+                                    lib.hpclang_rpl_code_assignment_inspect(
+                                        c.byref(allocation_reader), pc, 3, 0, c.byref(copy)
+                                    )
+                                    == 0
+                                )
+                                assert (copy.source, copy.destination, copy.nibbles) == (0, 11, 5)
+                                assert (
+                                    lib.hpclang_rpl_code_origins_assign(
+                                        c.byref(allocation_origins), c.byref(copy), None
+                                    )
+                                    == 0
+                                )
+                            else:
+                                exchange = Exchange()
+                                assert (
+                                    lib.hpclang_rpl_code_exchange_inspect(
+                                        c.byref(allocation_reader), pc, 3, 0, c.byref(exchange)
+                                    )
+                                    == 0
+                                )
+                                assert (
+                                    exchange.left,
+                                    exchange.right,
+                                    exchange.first,
+                                    exchange.nibbles,
+                                ) == ((0, 11, 0, 5) if pc == steps[0] else (0, 4, 0, 16))
+                                assert (
+                                    lib.hpclang_rpl_code_origins_exchange(
+                                        c.byref(allocation_origins), c.byref(exchange)
+                                    )
+                                    == 0
+                                )
+                            allocation_origin_path.append(pc)
+                        elif len(allocation_origin_path) == 3:
+                            assert (
+                                int.from_bytes(uc.mem_read(cpu + 0x92C, 4), "little") & 0xFFFFF
+                                == allocation_bounds[0]
+                            )
                         if pc == 0x88C6E or len(allocation_trace) > 30000:
                             uc.emu_stop()
 
+                def allocation_write(_, kind, at, size, value, user):
+                    if len(allocation_origin_path) == 3 and allocation_trace[-1] != 0x5BC8:
+                        assert not (at < cpu + 0x934 and at + size > cpu + 0x92C), (
+                            "unmodeled R0 write after qualification"
+                        )
+
+                write_handle = uc.hook_add(UC_HOOK_MEM_WRITE, allocation_write)
                 handle = uc.hook_add(UC_HOOK_CODE, allocation_hook)
                 uc.emu_start(0x28828, 0x400000, count=3000000)
                 uc.hook_del(handle)
+                uc.hook_del(write_handle)
                 assert allocation_trace[-1] == 0x88C6E and 0x5B80 in allocation_trace
                 initial_r0 = int.from_bytes(uc.mem_read(cpu + 0x92C, 4), "little")
                 target = initial_r0 & 0xFFFFF
                 target_word = 0x2A2C
                 assert word(target) == target_word and word(target + 5) >= 69
+                assert len(allocation_origin_path) == 3 and target == allocation_bounds[0]
+                assert list(allocation_origins.registers[4])[:5] == [0x100 + i for i in range(5)]
+                span = c.c_uint32()
+                assert (
+                    lib.hpclang_rpl_object_span(
+                        c.byref(allocation_reader), target, allocation_bounds[1], c.byref(span)
+                    )
+                    == 0
+                )
+                assert span.value == allocation_bounds[1]
+                # The TEMP query qualifies exact starts, never coincidental
+                # interior values. Unreadable chain metadata cannot leave a
+                # partially qualified output behind.
+                for candidate in (target - 1, target + 1, target + allocation_bounds[1] - 1):
+                    extent = c.c_uint32(0x12345678)
+                    assert (
+                        lib.bank_temp_allocation(
+                            c.byref(allocation_reader), candidate, c.byref(extent)
+                        )
+                        == -7
+                    )
+                    assert extent.value == 0x12345678
+                for unreadable in (0x806EE, word(0x806E9), word(0x806EE) - 5):
+
+                    @Read
+                    def failing_read(context, at, value):
+                        return 0 if at == unreadable else allocation_read(context, at, value)
+
+                    failing_reader = Reader(failing_read, None)
+                    extent = c.c_uint32(0x12345678)
+                    assert (
+                        lib.bank_temp_allocation(c.byref(failing_reader), target, c.byref(extent))
+                        < 0
+                    )
+                    assert extent.value == 0x12345678
                 assert int.from_bytes(uc.mem_read(cpu + 0x93C, 4), "little") & 0xFFF == 1
             put(0x8076B, 0x88D67)
             entry = c.c_uint32(0x88C73)
@@ -374,7 +511,11 @@ for cursor in range(8):
                         # Caller-owned symbolic labels for R0.A; numeric values
                         # never establish these labels or qualify a target map.
                         for i in range(5):
-                            origins.registers[4][i] = 0x100 + i
+                            origins.registers[4][i] = (
+                                allocation_origins.registers[4][i]
+                                if args.allocated_root
+                                else 0x100 + i
+                            )
                         copy = Assignment()
                         assert (
                             lib.hpclang_rpl_code_assignment_inspect(
@@ -532,6 +673,8 @@ for cursor in range(8):
             rows.append(
                 dict(
                     allocation_trace=[hex(x) for x in allocation_trace],
+                    allocation_origin_path=allocation_origin_path,
+                    allocation_bounds=allocation_bounds,
                     target=hex(target),
                     cursor=cursor,
                     flags=flags,

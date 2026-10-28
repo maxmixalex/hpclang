@@ -9,6 +9,49 @@ struct fixture
     uint8_t *nibbles;
     uint32_t writes;
 };
+
+struct allocation_query
+{
+    uint32_t address, extent;
+};
+
+static int allocation_match(void *context, uint32_t first, uint32_t nibbles)
+{
+    struct allocation_query *query = context;
+    if (first == query->address)
+        query->extent = nibbles;
+    return 0;
+}
+
+static int reject_write(void *context, uint32_t at, uint8_t value)
+{
+    (void)context;
+    (void)at;
+    (void)value;
+    return 0;
+}
+
+/* Read-only fixture query: validate the entire TEMP chain before qualifying an
+ * exact allocation start. Containment or matching bytes are not sufficient. */
+int bank_temp_allocation(const struct hpclang_rpl_reader *reader, uint32_t address,
+                         uint32_t *extent)
+{
+    if (!reader || !extent)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct hpclang_rpl_mutation_io io = {.read_nibble = reader->read_nibble,
+                                         .write_nibble = reject_write,
+                                         .context = reader->context,
+                                         .temp_limit = 0x100000,
+                                         .user_limit = 0x80000};
+    struct allocation_query query = {address, 0};
+    int result = hpclang_rpl_mutation_visit_temp(&io, allocation_match, &query);
+    if (result)
+        return result;
+    if (!query.extent)
+        return HPCLANG_RPL_MUTATION_NOT_FOUND;
+    *extent = query.extent;
+    return 0;
+}
 static int read_nibble(void *context, uint32_t at, uint8_t *out)
 {
     struct fixture *f = context;

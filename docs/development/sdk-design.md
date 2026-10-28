@@ -1224,10 +1224,21 @@ tokens through arithmetic borrow. Both stack slots
 have independently checked addresses and distinct token storage.
 Across both models, all 192 controlled return cases pass: 96 follow all five
 instructions, carry R0 tokens into the original stack cell, and preserve the
-old top's tokens in the adjacent cell; the other 96 do not enter it. Original
-allocation variants are included. Unit tests cover descriptor composition,
+old top's tokens in the adjacent cell; the other 96 do not enter it. The 48
+original-allocation variants additionally qualify the new TEMP allocation
+through the current C whole-chain visitor, requiring its exact start at the
+preceding TEMPTOP plus one and the corresponding new TEMPTOP. They compose
+`AD0EX`, `D0=A`, `AR0EX` at `5bc2/5bc5/5bc8` using the C exchange/assignment
+operations, then reject any later write to R0 before allocation return, even
+if a write preserves its numeric value. The completed object's parsed span
+must equal the allocation extent. These qualified R0 tokens feed the return
+segment instead of fresh symbolic seeds. Interior/adjacent candidates and
+unreadable chain metadata are rejected with query output unchanged (six checks
+per allocated case). This covers the exercised no-GC allocation path; it does
+not establish every allocator/launcher path or safe execution across native ARM.
+Unit tests cover descriptor composition,
 overlapping copies, simultaneous exchanges, clearing constants, and unchanged
-state on invalid inputs. `/work/oct28-address-adjust/return` retains current
+state on invalid inputs. `/work/oct28-allocation-origin/return` retains current
 hash-bound reports; the earlier three-step and fixed-address-step evidence
 remain in `/work/oct28-origins-return` and `/work/oct28-origin-stack`.
 Seeding R0 tokens identifies their origin; it does not by itself prove the
