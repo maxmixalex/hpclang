@@ -120,7 +120,9 @@ read dependencies. Sanitizer tests and ARM compile/analysis pass. Actual root
 classification, firmware/calling-context qualification, complete reference
 resolution, public libraries and Port1 edits remain open. Both saved HOME states resolve 20 attachment
 objects. Local original-ROM regression now covers two additional switch entries
-(banks 2/4), including ERAM precedence and bank-2 exit. Production switch identity,
+(banks 2/4), including ERAM precedence and bank-2 exit. An internal guarded
+alias lookup now validates supplied identity ranges before canonical lookup;
+sanitizer tests and ARM analysis pass locally. Production identity profiles,
 payload resolution and complete execution coverage remain open.
 
 The active dependencies are complete execution-reference handling for safe

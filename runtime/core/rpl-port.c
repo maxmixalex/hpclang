@@ -488,6 +488,58 @@ int hpclang_rpl_bank_lookup_guarded(const struct hpclang_rpl_reader *reader, uin
     return result;
 }
 
+int hpclang_rpl_bank_alias_lookup_guarded(const struct hpclang_rpl_reader *reader,
+                                          uint32_t flash_table, uint32_t eram_entry,
+                                          uint32_t requested_switch, uint32_t alias,
+                                          uint32_t canonical,
+                                          const struct hpclang_rpl_bank_identity_range *ranges,
+                                          uint32_t range_count,
+                                          struct hpclang_rpl_bank_binding *binding,
+                                          hpclang_rpl_bank_dependency_fn dependency, void *context)
+{
+    if (!reader || !reader->read_nibble || !ranges || !range_count || !binding || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (requested_switch >= 0x100000u || alias >= 0x100000u || canonical >= 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (requested_switch != alias)
+        return 0;
+    unsigned covered = 0;
+    for (uint32_t i = 0; i < range_count; ++i) {
+        const struct hpclang_rpl_bank_identity_range *range = &ranges[i];
+        if (!range->nibbles)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (!range->length || range->address >= 0x100000u ||
+            range->length > 0x100000u - range->address)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        if (alias >= range->address && alias - range->address < range->length)
+            covered |= 1;
+        if (canonical >= range->address && canonical - range->address < range->length)
+            covered |= 2;
+        for (uint32_t j = 0; j < range->length; ++j)
+            if (range->nibbles[j] > 15u)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    if (covered != 3)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    for (uint32_t i = 0; i < range_count; ++i) {
+        const struct hpclang_rpl_bank_identity_range *range = &ranges[i];
+        for (uint32_t j = 0; j < range->length; ++j) {
+            uint8_t value;
+            if (!reader->read_nibble(reader->context, range->address + j, &value))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (value > 15u)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            if (value != range->nibbles[j])
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            int result = dependency(context, range->address + j, value);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
+    }
+    return hpclang_rpl_bank_lookup_guarded(reader, flash_table, eram_entry, canonical, binding,
+                                           dependency, context);
+}
+
 int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t address,
                               uint32_t limit, const struct hpclang_rpl_reader *rom,
                               uint32_t flash_table, uint32_t eram_entry,

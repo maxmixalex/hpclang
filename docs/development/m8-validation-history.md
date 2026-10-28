@@ -1084,3 +1084,20 @@ observed mappings in captured calling contexts, not a generic address-based
 alias rule, complete handler semantics or production firmware authentication.
 The runtime resolver still rejects the additional entries pending qualified
 identity integration; safe reference movement and M8.0 remain incomplete.
+
+## Guarded bank-alias lookup primitive — local, 2026-10-29
+
+`hpclang_rpl_bank_alias_lookup_guarded` validates caller-supplied independent
+identity ranges covering alias and canonical entry addresses, records every
+matching nibble dependency, then resolves the canonical entry through the full
+validated table. No ROM address or arithmetic alias rule is built in. Expected
+ranges must cover the caller-reviewed equivalence proof, including shared code
+and metadata; the primitive cannot establish semantic completeness itself.
+ASan/UBSan `rpl_port` passes: every identity-nibble mutation and read failure,
+all 105 identity/table dependency interruptions, positive callback rejection,
+missing canonical coverage, duplicate/absent canonical entry, invalid expected
+or observed nibbles, range overflow and missing callbacks preserve output.
+ARMv4T Thumb compilation/static analysis and clang-format pass. This internal
+primitive is not yet a production firmware profile or a complete ACPTR graph
+resolver. Existing execution obligations, owner-aware mapping, ROM geometry and
+transaction guards remain required. No Port1 edit capability is enabled by it.

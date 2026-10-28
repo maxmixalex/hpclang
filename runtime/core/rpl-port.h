@@ -240,6 +240,32 @@ struct hpclang_rpl_banked_target
     uint32_t offset;
 };
 
+struct hpclang_rpl_bank_identity_range
+{
+    uint32_t address, length;
+    const uint8_t *nibbles;
+};
+
+/* Match a separately reviewed switch alias to a canonical table entry. Expected
+ * ranges must be independent immutable evidence, not a copy of the current
+ * reader. They must include both entry addresses and all code/data needed by
+ * the caller's equivalence proof. This routine checks bytes, not completeness
+ * of that proof or machine-code semantics. Calling-context assumptions, page
+ * owners, geometry, firmware identity and executable references remain caller
+ * obligations. No fixed ROM addresses or alias arithmetic are inferred.
+ * Returns 1 for a validated alias and canonical binding, 0 for a different
+ * requested switch/absent canonical entry, negative on mismatch/error. Output
+ * changes only on 1; discard partial dependencies on any other result. Positive
+ * dependency errors become MALFORMED. All inputs/read mappings stay stable. */
+int hpclang_rpl_bank_alias_lookup_guarded(const struct hpclang_rpl_reader *reader,
+                                          uint32_t flash_table, uint32_t eram_entry,
+                                          uint32_t requested_switch, uint32_t alias,
+                                          uint32_t canonical,
+                                          const struct hpclang_rpl_bank_identity_range *ranges,
+                                          uint32_t range_count,
+                                          struct hpclang_rpl_bank_binding *binding,
+                                          hpclang_rpl_bank_dependency_fn dependency, void *context);
+
 struct hpclang_rpl_flashptr
 {
     uint32_t selector, index;
