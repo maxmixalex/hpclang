@@ -1152,6 +1152,21 @@ D0/D1=AS/CS copy four and preserve the fifth address nibble; the source remains
 unchanged. P exchanges and custom fields remain unsupported. This is a data-flow building block, not a complete
 launcher analysis or permission to treat arbitrary register values as roots.
 
+The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
+`--state`, `--model` and `--output`. It compiles the current C decoders and runs
+the original ARM Saturn interpreter from predicate entry `351cc` to just before
+comparison at `351e8`. On both retained predicate and standard Stock snapshots,
+128 controlled-entry cases and eight changed-code controls pass. D0/D1 and P
+are restored; the temporary machine-stack cell contains the scalar type ID
+(including address-like `90001`), is cleared on pop, and leaves seven other cells
+unchanged. Decoder-predicted register transitions match actual execution; source
+objects remain unchanged and writes stay within CPU state/the ARM stack.
+The result binds ROM/RAM, decoder sources/headers, reader and driver hashes.
+This is a local prefix check after OS setup, with no IRQ, stopping before the
+comparison and continuation. It does not prove the whole handler, unrestricted
+caller provenance, Stock startup or permission to relocate. The older individual
+D0/D1 checks retain 4,096 x48 comparisons and 128 saved-ROM instruction checks.
+
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
 A/C bit-test instruction boundaries. Its relocation planner
