@@ -194,3 +194,14 @@ before application entry, not in UI or resource-budget assertions. These are
 observed symptoms, not proof of the underlying transport cause. Raw logs and
 artifacts are retained under local `research/oct29-pr18-*`; all three failures
 remain open. No timeout change or rerun is counted as a fix.
+
+The follow-up packet audit reconstructs both directional byte streams from the
+retained socat logs, checks every logged chunk length, and validates Kermit
+CRC-16 against a captured NAK before evaluating frames. It checks 2,194 HP40gs
+and 1,345 HP39g+ data/ACK/NAK frames without a length, sequence or CRC failure.
+The final HP40gs Timeout frame has sequence byte `0x0e` and type `F`; HP39g+ has
+sequence byte `0x88` and type `E`. Both lengths and CRCs are valid despite the
+invalid sequence fields. This is observation at the PTY bridge, not proof that
+all bytes reach the firmware unchanged or that a firmware/timing cause is known.
+Raw-stream hashes, parsed final frames and the independent CRC audit are in
+local `research/oct29-pr18-packet-audit.{py,json}`. No runtime fix is claimed.
