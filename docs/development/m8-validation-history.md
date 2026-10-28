@@ -302,3 +302,28 @@ resolve this failure. PWM failure 3 combines IRQ count/completion/error,
 deadline, ownership and errno predicates. Saved JSON/images do not retain
 those individual fields, so no single cause is established; targeted PWM
 observations are required before treating it as a deadline-loop failure.
+
+### 2026-10-29 — PWM IRQ failure observations (local #21 follow-up)
+
+Commit 10e05bc0 on m8-ui-lifecycle-ci adds failure-only PWM snapshot tag 0x7b10
+(22 words / 88 bytes), distinct from watchdog tag 0x7b00. It captures IRQ
+count, completion/error, timing, alarm/tone ownership, errno and timer/interrupt
+registers before foreground cleanup, then uses the existing memory-checkpoint
+protocol. Existing CI uploads already retain these JSON records. Original
+waiting behavior and failure predicates are unchanged; no historical fix claim.
+
+Fresh system-services-exit builds pass Direct HP49g+ and HP50g execution and
+settled return. A separate masked-IRQ build fails as expected with 0x46417b03
+and emits the snapshot: hits=0, finished=0, error=0, alarm_owned=1,
+tone_owned=1, errno=33, first_failure=3; last_time=5184259,
+deadline=5284259, foreground_time=5376968 microseconds. This establishes
+observation coverage for missing IRQ delivery, not the original CI root cause.
+Artifacts, source snapshot, results and hashes are retained under
+/work/oct29-pwm-diagnostic. After confirming processes had exited and no live
+file/cwd references used the targets, removed temporary source and intermediate
+build trees (313222274 logical bytes); retained ELF/HPC/launchers and evidence.
+The follow-up is local/unpushed. #21 publisher 122976703588 remains queued.
+
+Mainline Stock integration continues in the original two live processes;
+each model has passed through native-cache-lookup (eight cases). No runtime
+source was changed during that run. Remaining cases have not yet been accepted.

@@ -136,7 +136,7 @@ All prior artifact-specific evidence and limitations are retained in
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `01e1d2cf` | **All 12 UI jobs across six models pass**, with resource logs independently checked. Exact-head audit: 294 successful, one intentional publisher skip, one push publisher queued. This PR targets #20 (`m8-resource-observer`), whose PWM IRQ failure remains unresolved; publication alone does not permit main acceptance. Whole-system peaks remain open. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; cause unproven. |
+| #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. Local #21 follow-up `10e05bc0` records pre-cleanup IRQ/timing/ownership state. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports diagnostics. Not pushed; this is diagnostic coverage, not a claimed fix. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head
