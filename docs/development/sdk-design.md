@@ -1147,7 +1147,9 @@ Both fields must be read from the pre-instruction state before either is
 replaced; bits outside the selected field survive. P/WP fields require the
 proven current P. A/C exchanges with D0/D1 are also decoded: EX swaps five low nibbles,
 XS swaps four while preserving the fifth address nibble; higher A/C nibbles
-survive. P exchanges and custom fields remain unsupported. This is a data-flow building block, not a complete
+survive. Plain D0/D1=A/C assignments likewise copy five low nibbles, while
+D0/D1=AS/CS copy four and preserve the fifth address nibble; the source remains
+unchanged. P exchanges and custom fields remain unsupported. This is a data-flow building block, not a complete
 launcher analysis or permission to treat arbitrary register values as roots.
 
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,

@@ -86,9 +86,11 @@ struct hpclang_rpl_code_assignment
 };
 
 /* Describe one plain register copy/zero or P literal/nibble transfer. Nibble
- * indices refer to 64-bit A/B/C/D/R0..R4 or one-nibble P. Other destination
+ * indices refer to 64-bit A/B/C/D/R0..R4, 20-bit D0/D1 or one-nibble P. Other destination
  * nibbles survive; source nibbles come from the pre-instruction state. Supports
  * classic field copies and 81A register copies with standard fields (0..7,F).
+ * D0/D1=A/C copies five low nibbles; D0/D1=AS/CS copies four, preserving
+ * the fifth address nibble. Source A/C remains unchanged.
  * Exchanges, arithmetic, memory reads and custom fields remain unsupported.
  * p must be 0..15 and is the proven P value AT the instruction, needed for
  * P/WP fields. Interpreter-internal caches updated by P writes are not modeled.

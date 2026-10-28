@@ -615,6 +615,14 @@ static void register_assignments(void)
         const char *code;
         unsigned p, source, destination, source_first, first, width, constant;
     } cases[] = {
+        {"130", 15, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_D0, 0, 0, 5, 0},
+        {"131", 15, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_D1, 0, 0, 5, 0},
+        {"134", 15, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_D0, 0, 0, 5, 0},
+        {"135", 15, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_D1, 0, 0, 5, 0},
+        {"138", 15, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_D0, 0, 0, 4, 0},
+        {"139", 15, HPCLANG_RPL_CODE_A, HPCLANG_RPL_CODE_D1, 0, 0, 4, 0},
+        {"13c", 15, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_D0, 0, 0, 4, 0},
+        {"13d", 15, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_D1, 0, 0, 4, 0},
         {"db", 0, HPCLANG_RPL_CODE_D, HPCLANG_RPL_CODE_C, 0, 0, 5, 0},
         {"10c", 0, HPCLANG_RPL_CODE_C, HPCLANG_RPL_CODE_R4, 0, 0, 16, 0},
         {"110", 0, HPCLANG_RPL_CODE_R0, HPCLANG_RPL_CODE_A, 0, 0, 16, 0},
@@ -668,7 +676,8 @@ static void register_assignments(void)
         assert(hpclang_rpl_code_assignment_inspect(&reader, image.address, image.size, 16,
                                                    &value) == HPCLANG_RPL_SPAN_MALFORMED);
     }
-    const char *unknown[] = {"12c", "dc", "81af2c", "81a81c", "140", "fa", "80b26"};
+    const char *unknown[] = {"12c", "dc",  "81af2c", "81a81c", "140", "fa",  "80b26", "132",
+                             "133", "136", "137",    "13a",    "13b", "13e", "13f"};
     for (unsigned i = 0; i < sizeof unknown / sizeof unknown[0]; ++i) {
         struct image image = {
             .address = 0x80000, .size = (uint32_t)strlen(unknown[i]), .fail = UINT32_MAX};

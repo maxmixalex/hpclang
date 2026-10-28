@@ -318,7 +318,11 @@ int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
     const uint8_t *op = cursor.code;
     struct hpclang_rpl_code_assignment next = {.instruction = instruction, .length = size};
     unsigned field = 7;
-    if (op[0] == 2) {
+    if (op[0] == 1 && op[1] == 3 && !(op[2] & 2)) {
+        next.source = (op[2] & 4) ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A;
+        next.destination = (op[2] & 1) ? HPCLANG_RPL_CODE_D1 : HPCLANG_RPL_CODE_D0;
+        next.nibbles = (op[2] & 8) ? 4 : 5;
+    } else if (op[0] == 2) {
         next.source = HPCLANG_RPL_CODE_CONSTANT;
         next.destination = HPCLANG_RPL_CODE_P;
         next.constant = op[1];
