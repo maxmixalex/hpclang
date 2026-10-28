@@ -135,7 +135,7 @@ All prior artifact-specific evidence and limitations are retained in
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `01e1d2cf` | **Artifact-transfer fix partially verified remotely; full CI pending.** Eight successful UI job logs across HP39g+/39gs/40gs/48gII/49g+ confirm stack, heap, pool and linked-image budget checks. Remaining UI jobs, earlier watchdog cause and whole-system peaks remain open. |
-| #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
+| #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails at runtime (recorded PWM IRQ `0x46417b03`). HP40gs Stock UI and HP39g+ Stock notebook stop before application entry: directory transfer completes, then payload progress stalls for 90 s with NAKs/retries. Exact causes remain unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; cause unproven. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),

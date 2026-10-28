@@ -180,3 +180,17 @@ by size/SHA-256 before removal and rechecked the retained copy afterward.
 Source snapshots, ROM/state evidence, reports and final artifacts remain.
 The file manifest and deletion results are retained at
 `/work/oct29-duplicate-cache-cleanup.json` and in local `research/`.
+
+## PR18 failed-job inventory correction — 2026-10-29
+
+Exact head `439339b1` has three failed jobs, not only the previously recorded
+HP49g+ Direct system-services failure (job `121201126584`). Logs and artifacts
+for HP40gs Stock UI (`121233146923`, artifact `12613417322`) and HP39g+ Stock
+notebook (`121229660722`, artifact `12611744808`) show completed directory
+transactions followed by 90 seconds without acknowledged payload progress.
+HP40gs stops at send window 46 with three NAKs/four retries; HP39g+ stops at
+window 40 with three NAKs/five retries. Both fail at the host transfer gate
+before application entry, not in UI or resource-budget assertions. These are
+observed symptoms, not proof of the underlying transport cause. Raw logs and
+artifacts are retained under local `research/oct29-pr18-*`; all three failures
+remain open. No timeout change or rerun is counted as a fix.
