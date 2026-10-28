@@ -77,8 +77,8 @@ static void audio_write(void *context, enum hpclang_sound_reg reg, uint32_t valu
 }
 static const struct hpclang_sound_bus audio = {audio_read, audio_write, 0};
 
-/* Only the actual IRQ entry calls this. The foreground below executes no
- * clock or SDK calls until completion. Preserve the interrupted errno. */
+/* Only the actual IRQ entry advances playback. Foreground clock sampling
+ * cannot complete the session or release its resources. Preserve errno. */
 void hpclang_e2e_irq_dispatch(void)
 {
     int saved_errno = errno;
@@ -162,9 +162,21 @@ unsigned hpclang_e2e_irq_test(void)
     REG(0x07100008) = ~UINT32_C(0x4000);
     errno = EDOM;
     hpclang_irq_restore((cpsr | 0x40u) & ~0x80u);
-    /* A bounded busy loop: delivery cannot depend on SDK service calls. */
-    for (volatile unsigned i = 0; i < 20000000 && !irq_finished; ++i)
-        __asm__ volatile("nop");
+    /* Fixed instruction counts can expire before the 100 ms deadline on CI.
+     * Only IRQ dispatch advances playback. Read time between busy batches,
+     * allowing one second for delivery; bound a broken clock by batch count. */
+    for (unsigned batch = 0; batch < 200000 && !irq_finished; ++batch) {
+        for (volatile unsigned i = 0; i < 1024; ++i)
+            __asm__ volatile("nop");
+        uint32_t wait_cpsr = hpclang_irq_save_disable();
+        uint64_t now = 0;
+        int saved_errno = errno;
+        int clock_error = hpclang_time_read_us_masked(&now);
+        errno = saved_errno;
+        hpclang_irq_restore(wait_cpsr);
+        if (clock_error || (now >= irq_deadline && now - irq_deadline >= 1000000))
+            break;
+    }
     hpclang_irq_save_disable();
     if (hpclang_e2e_irq_hits < 2 || !irq_finished || irq_error || irq_last_time < irq_deadline ||
         playback.alarm.owned || playback.tone.owned || errno != EDOM)
