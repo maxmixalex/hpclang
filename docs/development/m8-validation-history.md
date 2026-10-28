@@ -1264,3 +1264,16 @@ bounds and remaining execution edges are in `/work/oct29-home-graph/attachments.
 This covers the captured no-ERAM/no-owner-overlay context; firmware interpreter
 identity, configuration routing, capture freshness and full root closure remain
 production prerequisites. No public edit capability is enabled by these results.
+
+## Program/selector delivery validation — 2026-10-29
+
+Follow-ups through `efeec80a` pass full tracked-file clang-format, Ruff and
+ShellCheck, strict documentation build, and rebuilt ASan/UBSan `rpl_code`,
+`rpl_port`, `rpl_reference` and `rpl_stock_memory` suites (four of four).
+Pre-push exact-head workflow/job audit of PR26 `d0471894` records five successful
+and five queued workflows, 178 successful/19 running/174 queued jobs, no observed
+failures. PR20 `4f2ce605` remains at twelve queued workflows/twenty queued jobs.
+These are unfinished CI results, not acceptance. Follow-up delivery retains all
+public Port1 and complete execution-reference gates. No new-head CI is polled in
+the push turn. Full source-quality logs remain at `/work/oct28-pr25-format-fix`,
+and documentation log at `/work/oct29-current-docs-check.log`.

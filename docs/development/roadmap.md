@@ -111,13 +111,14 @@ revision-driven canvas. A superficially similar imperative API is not completion
 ## Current work: M8.0
 
 Guarded references, bounded ROM readers, mapped-graph scheduling and bank-alias
-primitives/regressions are submitted in #26 (`d0471894`); CI is pending. Earlier 28 Stock cases remain scoped to their recorded reader build.
+primitives/regressions and program/selector follow-ups are submitted in #26; CI is pending. Earlier 28 Stock cases remain scoped to their recorded reader build.
 
 Under the controlled saved profiles, all 20 attachment payloads per model now
 resolve through inspected P=0 code, dynamic selector matching, validated geometry
 and owner-aware mapping. Every separate execution reference remains unresolved.
 Combined code/data guards reject 520 stale-nibble changes in maintained tests.
-These follow-ups are local; original-ROM configuration regressions also pass.
+Follow-up local validation passes, including original-ROM configuration regressions;
+submission is not CI acceptance.
 Production firmware/handler identity, owner/geometry freshness, complete payload
 and execution coverage, public libraries and Port1 edits remain open.
 
@@ -142,7 +143,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `d0471894` | **CI pending:** 1 successful and 9 unfinished workflows; 83 successful, 20 running and 234 queued jobs, no failures observed. Historical HP39g+ pre-entry Kermit failure remains unexplained. D0/D1 and configuration-effect follow-ups are local. |
+| #26 / branch head | **Follow-up submitted; CI pending.** Pre-push audit of `d0471894`: five successful and five queued workflows; 178 successful, 19 running and 174 queued jobs, no failures observed. Historical HP39g+ pre-entry Kermit failure remains unexplained. New-head CI is not polled in the push turn. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
