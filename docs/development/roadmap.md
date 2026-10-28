@@ -116,7 +116,7 @@ startup safety and reclamation. Sound compatibility is independent.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
-| Native references and libraries | #24 accepted catalog/HOME/cache repairs. #25 contains guarded dispatch and PC capture; CI remains pending. Local follow-up passes 304 cases and 480 pre-write rejections across both models, including 48 continuous allocation/ARM-leaf/move/return cases with actual boundary registers and stacks retained. Not yet pushed; installed SDK application execution, general launcher and GC paths remain unproven. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
+| Native references and libraries | #24 accepted catalog/HOME/cache repairs. #25 contains guarded dispatch and PC capture; CI remains pending. Local follow-up passes 304 cases and 480 pre-write rejections across both models, including 48 continuous allocation/ARM-leaf/move/return cases with actual boundary registers and stacks retained. Current-source report hashes and four sanitizer integration suites pass (36.90 s). Not yet pushed; installed SDK application execution, general launcher and GC paths remain unproven. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
 | Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Accepted in #24; retain lifecycle regressions |
 | Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
 | Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Submitted in #25; CI acceptance pending. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
@@ -131,7 +131,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #25 / `752b8999` | **Submitted; CI pending.** Exact-head audit sees 295 successful, 20 running and 39 queued jobs; no failures observed. Not accepted. |
+| #25 / `752b8999` | **Submitted; CI pending.** Exact-head audit sees 342 successful and 12 running jobs; no failures observed. Not accepted. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `01e1d2cf` | **Artifact-transfer fix submitted; fresh CI pending.** All 12 prior UI failures omitted `launchers/memory.json`; six-model transfer/verification replay and omission controls pass. Earlier watchdog cause and whole-system peaks remain open. |
 | #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
