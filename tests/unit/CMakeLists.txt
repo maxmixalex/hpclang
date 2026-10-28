@@ -761,6 +761,7 @@ target_include_directories(test_object PRIVATE
 
 hpclang_unit(rpl_mutation
     test_rpl_mutation.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-recovery-reservation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"

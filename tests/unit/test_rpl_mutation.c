@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <hpclang/bootstrap.h>
 
 #include "object-snapshot.h"
 #include "rpl-mutation.h"
@@ -11,6 +12,7 @@
 #include "rpl-port-mutation.h"
 #include "rpl-port.h"
 #include "rpl-backup.h"
+#include "rpl-stock-memory.h"
 #include "stage-stack.h"
 
 enum
@@ -35,6 +37,11 @@ static uint32_t writes;
 static uint32_t watched_field, watched_writes;
 static uint32_t rejected_write, rejected_commit_read;
 static uint32_t write_trace[8192];
+
+const struct hpclang_boot_info *hpclang_boot_info(void)
+{
+    return NULL;
+}
 
 #ifdef HPCLANG_TEST_WRAP_ALLOC
 void *__real_malloc(size_t size);
@@ -1888,6 +1895,101 @@ struct port1_guard_fixture
     uint32_t start, end, calls;
     int result;
 };
+
+/* One explicitly supplied reference, not production root discovery. Exercise
+ * the real edit guard with predicted page mappings and physical alias checks. */
+struct port1_mapped_reference
+{
+    uint32_t map[256], port_map[256], target, span, calls;
+    uint8_t owners[64];
+    struct hpclang_rpl_rom_bank bank;
+};
+
+static int check_port1_mapped_reference(void *context, uint32_t start, uint32_t end)
+{
+    struct port1_mapped_reference *reference = context;
+    ++reference->calls;
+    uint32_t selected[256];
+    memcpy(selected, reference->map, sizeof selected);
+    int result = hpclang_rpl_stock_bank_window_select(reference->map + 64, reference->owners,
+                                                      &reference->bank, selected + 64);
+    if (result)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+    result = hpclang_rpl_stock_spans_overlap(selected, reference->target, reference->span,
+                                             reference->port_map, start, end - start);
+    return result < 0 ? HPCLANG_RPL_MUTATION_MALFORMED
+           : result   ? HPCLANG_RPL_MUTATION_BUSY
+                      : HPCLANG_RPL_MUTATION_OK;
+}
+
+static void test_port1_mapping_guard(void)
+{
+    for (unsigned remove = 0; remove < 2; ++remove)
+        for (unsigned mode = 0; mode < 6; ++mode) {
+            struct hpclang_rpl_mutation_io io = setup(1);
+            const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+            put_word(0x82000, 5, 0x029bf);
+            put_word(0x82005, 2, 'A');
+            uint8_t *packed = NULL;
+            uint32_t span;
+            assert(!hpclang_rpl_backup_encode(&reader, 0x82000, 7, (const uint8_t *)"DATA", 4,
+                                              &packed, &span));
+            assert(!hpclang_rpl_port1_create_backup(&io, 256, packed, span));
+            free(packed);
+            put_word(0x82005, 2, 'B');
+            assert(!hpclang_rpl_backup_encode(&reader, 0x82000, 7, (const uint8_t *)"DATA", 4,
+                                              &packed, &span));
+            struct port1_mapped_reference reference = {
+                .target = 0x40000, .span = 1, .bank = {0x48000, 0x18000}};
+            for (unsigned i = 0; i < 256; ++i) {
+                reference.map[i] = i * 0x800u;
+                reference.port_map[i] = 0x08000000u + i * 0x800u;
+            }
+            for (unsigned i = 0; i < 64; ++i) {
+                reference.map[64 + i] = 0x08020000u + i * 0x800u;
+                reference.port_map[i] = 0x08020000u + i * 0x800u;
+            }
+            int expected = HPCLANG_RPL_MUTATION_BUSY;
+            if (mode == 0) {
+                /* Same logical address, physically disjoint after selection. */
+                expected = HPCLANG_RPL_MUTATION_OK;
+            } else if (mode == 1) {
+                reference.owners[0] = 2; /* ERAM survives Flash selection. */
+            } else if (mode == 2) {
+                reference.target = 0x80000;
+                reference.map[128] = 0x08020000; /* A differently addressed alias. */
+            } else if (mode == 3) {
+                reference.target = 0x40fff;
+                reference.span = 2;
+                reference.owners[1] = 2;
+                reference.map[65] = 0x08020000; /* Mixed span's second page aliases. */
+            } else if (mode == 4) {
+                reference.owners[0] = reference.owners[63] = 2;
+                reference.map[127] = 1; /* Late invalid input cannot hide behind a hit. */
+                expected = HPCLANG_RPL_MUTATION_UNSUPPORTED;
+            } else {
+                reference.target = 0xfffff;
+                reference.span = 2;
+                expected = HPCLANG_RPL_MUTATION_MALFORMED;
+            }
+            const struct hpclang_rpl_port1_guard guard = {check_port1_mapped_reference, &reference};
+            uint8_t before[256];
+            memcpy(before, memory, sizeof before);
+            uint32_t before_writes = writes;
+            int result = remove ? hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA",
+                                                                  4, &guard)
+                                : hpclang_rpl_port1_replace_backup(&io, 256, packed, span, &guard);
+            assert(result == expected && reference.calls == 1);
+            if (expected) {
+                assert(writes == before_writes);
+                assert(!memcmp(before, memory, sizeof before));
+            } else {
+                assert(writes > before_writes);
+                assert(memcmp(before, memory, sizeof before));
+            }
+            free(packed);
+        }
+}
 
 static int check_port1_fixture(void *context, uint32_t start, uint32_t end)
 {
@@ -4307,6 +4409,7 @@ int main(void)
     test_port1_library_append();
     test_port1_append_publication_failures();
     test_port1_edit_owned_suffix();
+    test_port1_mapping_guard();
     test_port0_commit_failures();
     test_port0_create_library();
     test_library_table_reference_preservation();

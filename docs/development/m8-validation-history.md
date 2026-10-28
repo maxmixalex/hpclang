@@ -999,3 +999,15 @@ with the original ROM page-for-page. Reports and source hashes are under
 No public Port1 edit path is enabled; complete reference integration is open.
 The prior 28 Stock call tests remain evidence for submitted `f9f50972`, not a
 claim that this new internal helper has been exercised by a public Stock caller.
+
+## Port1 physical mapping guard composition — local, 2026-10-29
+
+Twelve controlled cases compose the C bank-window predictor, physical overlap
+resolver and actual internal Port1 replacement/removal guard. ERAM-covered,
+differently addressed and mixed-page aliases reject as BUSY without writes;
+invalid late pages and out-of-bounds references reject without writes. Disjoint
+Flash targets allow each operation. These tests provide one explicit reference;
+they do not implement production root discovery or enable the public API.
+The complete rpl_mutation ASan/UBSan suite passes (40.40 s), as do full tracked
+clang-format/Ruff/ShellCheck checks. Prior stock-memory sanitizer, ARM analysis
+and original-ROM mapping comparisons retain their separate scope.
