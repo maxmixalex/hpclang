@@ -5,7 +5,7 @@ Docker/WSL is restored. Earlier ID1701 two-model reservation retests pass guarde
 recovery, repeat restart, absent recovery and 16 rejection cases per model.
 Supported ID769 reservation matrices now pass on both models; full startup
 safety and M8.0 remain incomplete.
-Accepted main: `fee4e4b9` (native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
+Accepted main: `3c484673` (native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
@@ -116,10 +116,10 @@ startup safety and reclamation. Sound compatibility is independent.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
-| Native references and libraries | #24 accepted catalog/HOME/cache repairs. #25 and #26 remain pending acceptance. Local follow-up moves D0/D1 arithmetic-origin invalidation into production; the updated two-model matrix passes 304 return cases and 480 pre-write rejections with current source hashes. Sanitized decoder/origin tests, ARM analysis and source quality checks pass. This follow-up is not yet pushed. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
+| Native references and libraries | #25 accepted guarded dispatch/origin foundations; #26 remains pending acceptance. Local follow-up moves D0/D1 arithmetic-origin invalidation into production; the updated two-model matrix passes 304 return cases and 480 pre-write rejections with current source hashes. Sanitized decoder/origin tests, ARM analysis and source quality checks pass. This follow-up is not yet pushed. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
 | Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Accepted in #24; retain lifecycle regressions |
 | Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
-| Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Submitted in #25; CI acceptance pending. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
+| Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Accepted in #25. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
 
 Guarded ID769 tests retain 23,900 user elements. Earlier complete two-model
 matrices used ID1701. Fourteen configured Stock libraries precede supported
@@ -131,14 +131,14 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `45f12b1e` | **Submitted as a draft stacked on #25; CI pending.** Allocation-origin/continuous-return validation and address arithmetic, plus relocation CI budget and LFS publication fixes. Local checks pass; fresh CI has not been polled. Retarget after #25 is accepted and merged. |
-| #25 / `752b8999` | **Functional CI passed; evidence publication pending.** All 354 functional/build/quality jobs pass; the PR publisher is intentionally skipped, and push publisher `122945280951` is queued. Not merged or accepted yet. |
+| #26 / `45f12b1e` | **Submitted draft; CI pending; now based on main after #25 acceptance.** Pre-follow-up audit: nine successful, four running and 94 queued jobs, no failures. Arithmetic-origin invalidation is locally verified and prepared for the next push. |
+| #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `01e1d2cf` | **Artifact-transfer fix submitted; fresh CI pending.** All 12 prior UI failures omitted `launchers/memory.json`; six-model transfer/verification replay and omission controls pass. Earlier watchdog cause and whole-system peaks remain open. |
 | #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; cause unproven. |
 
-Accepted deliveries: #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
+Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head
 `0e68b3b1` failed eight jobs: four insufficient Stock-growth reservations and
 four oversized test snapshots. All eight saved states were investigated; the
