@@ -119,16 +119,17 @@ routing and full read-map prediction. Separate execution edges still reject.
 Mapping-qualified guards cover code, selectors, routing, read pages/owners,
 bank/overlay fields and ROM/native geometry; 11,744 stale-nibble changes reject.
 The submitted read-map predictor passes its original-handler comparisons.
-A local follow-up now checks complete SRAM effects and permitted write locations
-in 672 original-handler executions across both models, plus 96 absent-bank
-rejections. It covers unchanged selectors and independent overlay repair/cache
-branches. This is local test evidence, not production execution qualification,
-CI acceptance or milestone completion.
+A local runtime predictor now covers read/write maps, the sentinel and overlay
+caches. It agrees with 672 original-handler executions across both models;
+96 absent-bank cases reject without publishing output. Complete SRAM/write-scope
+checks cover unchanged selectors and independent overlay repair/cache branches.
+Sanitizer unit tests and ARM analysis pass. Guarded capture and production
+execution-edge integration remain open; this is not CI or milestone acceptance.
 A local SHA-256 profile check now identifies the two reviewed immutable ROM
 images and supplies layout locations; mutable user Flash is excluded. Maintained
 composition and controlled HOME use that result. A local read-only physical
 backend now identifies ROM with IRQ/FIQ masked in the Stock witness. Both models
-pass the first five call/catalog cases; independent checks confirm the first
+pass all nine native call/catalog cases; independent checks confirm the first
 original return per model, unchanged Flash and 16 reproducible build artifacts.
 Saved SRAM independently confirms each ROM profile and 14 banks/3,520 samples.
 The complete 28-case matrix is still running. Production exclusive integration,

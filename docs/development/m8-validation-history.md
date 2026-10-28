@@ -1530,3 +1530,25 @@ pass. This qualifies the tested populated-bank handler's SRAM effects under six
 controlled contexts, not all register/interrupt/configuration behavior or a
 production execution-edge resolver. The separate live Stock profile matrix
 continues against its unchanged application/source manifest.
+
+## 2026-10-29 — Runtime bank-effects predictor
+
+`rpl-bank-effects.c` adds a pure runtime prediction API for the reviewed populated
+bank handler. It composes existing read-map validation with selector/sentinel,
+conditional write-map and saved overlay-cache updates. Equal selectors preserve
+all captured state. Write/cache words remain opaque values, never dereferenced
+or certified as writable. Error returns preserve output; exact input/output
+aliasing is supported. A caller still needs independently qualified snapshots,
+guarded capture, exclusive lifetime and complete execution-reference semantics.
+
+The maintained tests compile this runtime implementation and compare every
+predicted field with original ARM execution under all six contexts on both
+models: 672 matches, including in-place prediction, and 96 absent-bank failures
+with untouched output. Full reports and source hashes are retained under
+`/work/oct29-runtime-bank-effects/{hp49gplus,hp50g}/bank-switch-maps.json`.
+ASan/UBSan unit test 167 passes null/invalid-page rejection, no-op preservation,
+last legal overlay pair (254/255), cache/write values and in-place operation.
+ARMv4T Thumb compilation/static analysis pass. The first build exposed a missing
+complete geometry-type include; adding `rpl-port.h` fixed it before all passes.
+The separate live Stock matrix uses its previously reproduced application;
+this predictor is not yet part of that application or a production resolver.

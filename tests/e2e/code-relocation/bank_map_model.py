@@ -52,6 +52,22 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
             (name, c.c_uint32) for name in ("lower", "upper", "overlay_page", "overlay_physical")
         ]
 
+    class Effects(c.Structure):
+        _fields_ = [
+            ("map", State),
+            ("sentinel", c.c_uint32),
+            ("writes", c.c_uint32 * 256),
+            ("cache", c.c_uint32 * 4),
+        ]
+
+    lib.hpclang_rpl_bank_effects_select.argtypes = [
+        c.POINTER(Effects),
+        c.POINTER(Geometry),
+        c.c_uint32,
+        c.c_uint32,
+        c.POINTER(Effects),
+    ]
+
     lib.hpclang_rpl_stock_bank_map_select.argtypes = [
         c.POINTER(State),
         c.POINTER(Geometry),
@@ -111,11 +127,31 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
                 result = lib.hpclang_rpl_stock_bank_map_select(
                     c.byref(state), geometry, lower, upper, predicted
                 )
+                effects = Effects()
+                effects.map = state
+                effects.sentinel = struct.unpack("<I", uc.mem_read(cpu + 0x400, 4))[0]
+                effects.writes[:] = struct.unpack("<256I", uc.mem_read(cpu + 0x404, 1024))
+                effects.cache[:] = struct.unpack("<4I", uc.mem_read(cpu + 0xC4C, 16))
+                selected = Effects()
+                c.memset(c.byref(selected), 0xA5, c.sizeof(selected))
+                untouched = bytes(selected)
+                status = lib.hpclang_rpl_bank_effects_select(
+                    c.byref(effects), geometry, lower, upper, c.byref(selected)
+                )
                 if not banks[upper]["populated"]:
                     assert result < 0 and list(predicted) == [0xDEADBEEF] * 256
+                    assert status < 0 and bytes(selected) == untouched
                     results.append(dict(context=context, lower=lower, upper=upper, rejected=True))
                     continue
-                assert result == 0
+                assert result == 0 and status == 0
+                inplace = Effects.from_buffer_copy(bytes(effects))
+                assert (
+                    lib.hpclang_rpl_bank_effects_select(
+                        c.byref(inplace), geometry, lower, upper, c.byref(inplace)
+                    )
+                    == 0
+                )
+                assert bytes(inplace) == bytes(selected)
                 for register, value in (
                     (UC_ARM_REG_R0, cpu),
                     (UC_ARM_REG_R1, (lower << 5) | (upper << 1)),
@@ -152,7 +188,24 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
                 uc.emu_start(0x248DC, 0x400000, count=100000)
                 assert returned
                 actual = list(struct.unpack("<256I", uc.mem_read(cpu, 1024)))
-                assert actual == list(predicted), (context, lower, upper)
+                assert actual == list(predicted) == list(selected.map.pages), (
+                    context,
+                    lower,
+                    upper,
+                )
+                assert selected.sentinel == struct.unpack("<I", uc.mem_read(cpu + 0x400, 4))[0]
+                assert list(selected.writes) == list(
+                    struct.unpack("<256I", uc.mem_read(cpu + 0x404, 1024))
+                )
+                assert list(selected.cache) == list(
+                    struct.unpack("<4I", uc.mem_read(cpu + 0xC4C, 16))
+                )
+                assert (selected.map.lower, selected.map.upper) == (lower, upper)
+                assert list(selected.map.owners) == list(state.owners)
+                assert (selected.map.overlay_page, selected.map.overlay_physical) == (
+                    state.overlay_page,
+                    state.overlay_physical,
+                )
                 assert struct.unpack("<2I", uc.mem_read(cpu + 0xBCC, 8)) == (lower, upper)
                 assert bytes(uc.mem_read(0, len(flash))) == flash
                 assert bytes(uc.mem_read(0x08000000, len(ram))) == expected, (
@@ -168,6 +221,7 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
                         upper=upper,
                         rejected=False,
                         complete_sram_effects=True,
+                        runtime_effects_match=True,
                         state_write_events=len(writes),
                         unchanged_selectors=(lower, upper) == (state.lower, state.upper),
                     )
