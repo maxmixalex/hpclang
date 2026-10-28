@@ -131,7 +131,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #25 / `752b8999` | **Submitted; CI pending.** Exact-head audit sees 352 successful, two running and one queued job; no failures observed. The completed HP49g+/HP50g code-relocation jobs each took 24 min 46 s against a 25 min limit. A local follow-up gives this suite 35 min; YAML validation passes. Not accepted. |
+| #25 / `752b8999` | **Functional CI passed; evidence publication pending.** All 354 functional/build/quality jobs pass; the PR publisher is intentionally skipped, and push publisher `122945280951` is queued. Not merged or accepted yet. Local follow-up retains the full relocation matrix with a 35 min job limit. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `01e1d2cf` | **Artifact-transfer fix submitted; fresh CI pending.** All 12 prior UI failures omitted `launchers/memory.json`; six-model transfer/verification replay and omission controls pass. Earlier watchdog cause and whole-system peaks remain open. |
 | #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
