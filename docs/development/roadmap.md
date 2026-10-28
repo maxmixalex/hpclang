@@ -122,9 +122,11 @@ submission is not CI acceptance.
 A local C routing check now accepts the reviewed normal paths and rejects the
 RAM-configuration counterexample in maintained two-model tests. Controlled HOME
 resolution retains all 20 payloads per model with this additional check.
-Routing fields and upper-window read maps/owners now have failure-atomic capture
-and mapping-qualified guards, consumed by the controlled HOME resolver. Lower
-maps, geometry provenance and the complete live-state adapter remain unfinished.
+Routing fields and upper-window maps/owners have failure-atomic capture/guards.
+A full read-map predictor now covers all four quadrants, unchanged-selector
+returns and two-page overlays; 336 original-handler executions agree across
+both models. Controlled HOME uses it; full-state capture, geometry provenance
+and the production adapter remain unfinished.
 Production handler identity, device-routing/owner/geometry freshness, complete
 execution coverage, public libraries and Port1 edits remain open.
 
@@ -149,12 +151,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `ac24c17f` | **CI pending:** three running and seven queued workflows; 23 successful, three running and 136 queued jobs. Routing/window guard follow-ups pass locally and are not yet submitted. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `ac24c17f` | **CI pending:** two running and eight queued workflows; 24 successful, two running and 153 queued jobs. Routing/window/full-map follow-ups pass locally and are not yet submitted. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `4f2ce605` | **CI pending:** three successful, three running and six queued workflows; 70 successful, seventeen running and 267 queued jobs. Current main integration still requires fresh CI acceptance. |
+| #20 / `4f2ce605` | **CI pending:** four successful, one running and seven queued workflows; 108 successful, eighteen running and 262 queued jobs. Current main integration still requires fresh CI acceptance. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

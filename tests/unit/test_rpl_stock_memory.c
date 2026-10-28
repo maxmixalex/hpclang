@@ -107,6 +107,45 @@ static void test_bank_window_capture(void)
     }
 }
 
+static void test_bank_map(void)
+{
+    struct hpclang_rpl_rom_bank banks[16] = {0};
+    for (unsigned i = 0; i < 14; ++i)
+        banks[i] = (struct hpclang_rpl_rom_bank){0x40000u + i * 0x20000u, 0x20000u};
+    struct hpclang_rpl_stock_bank_map state = {.lower = 1, .upper = 2};
+    for (unsigned i = 0; i < 256; ++i) {
+        state.pages[i] = 0x08020000u + (i % 64) * 0x800u;
+        state.owners[i] = (uint8_t)(i % 3 ? 0 : 2);
+    }
+    uint32_t out[256], before[256];
+    memset(before, 0xa5, sizeof before);
+    memcpy(out, before, sizeof out);
+    for (unsigned i = 0; i < 256; ++i) {
+        uint32_t saved = state.pages[i];
+        state.pages[i] = 0x200000u;
+        assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, out) < 0);
+        assert(!memcmp(out, before, sizeof out));
+        state.pages[i] = saved;
+    }
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 4, 5, out) < 0);
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 16, out) < 0);
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 14, out) < 0);
+    state.overlay_page = 255;
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, out) < 0);
+    state.overlay_page = 63;
+    state.overlay_physical = 0x0807f800u;
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, out) < 0);
+    assert(!memcmp(out, before, sizeof out));
+    state.overlay_physical = 0x08060000u;
+    assert(!hpclang_rpl_stock_bank_map_select(&state, banks, 1, 2, out));
+    assert(!memcmp(out, state.pages, sizeof out)); /* No-op skips overlay restore. */
+    assert(!hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, out));
+    assert(out[63] == 0x08060000u && out[64] == 0x08060800u);
+    assert(!hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, state.pages));
+    assert(!memcmp(out, state.pages, sizeof out)); /* In-place publication. */
+    assert(hpclang_rpl_stock_bank_map_select(NULL, banks, 3, 5, out) < 0);
+}
+
 static void test_bank_route(void)
 {
     struct hpclang_rpl_stock_bank_route route = {3, 4, 0x80, 0x40, 0x40};
@@ -463,6 +502,7 @@ int main(void)
     test_bank_route();
     test_bank_route_capture();
     test_bank_window_capture();
+    test_bank_map();
     test_bank_window_select();
     test_rom_bank_reader();
     test_discontinuous_spans();

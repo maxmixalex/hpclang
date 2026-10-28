@@ -1370,3 +1370,30 @@ model while rejecting separate execution edges. Its saved-profile report remains
 `/work/oct29-home-graph/attachments.json`. This does not cover lower mappings,
 write maps, geometry freshness, handler identity or complete execution roots.
 Exclusive lifetime remains a caller obligation; no public edit gate is removed.
+
+## Full bank read-map prediction — local, 2026-10-29
+
+Review of the original ARM handler at 0x248dc reveals an unchanged-selector early
+return, four owner-sensitive read-map quadrants, and a final optional two-page
+overlay driven by CPU+0xc48/0xc5c. The earlier upper-window helper never modeled
+those whole-handler effects. `hpclang_rpl_stock_bank_map_select` now predicts
+Read[0..255], preserving old maps on unchanged selectors and applying overlay
+restoration after other updates. It rejects absent banks and unsupported page/
+overlay geometry without publishing output, and supports in-place output.
+
+Maintained `bank_map_model.py` runs the original handler for four lower banks by
+fourteen populated upper banks under baseline, owner-modified and crossing-
+overlay contexts, on both models: 336 executions return and agree on all 256
+read pages and bank selectors with unchanged Flash. Another 48 cases reject
+absent upper banks without running them. Reports and source hashes are in
+`/work/oct29-full-bank-maps/{model}/bank-switch-maps.json`. The full maintained
+suite passes on both models. Unit tests cover all 256 malformed-page positions,
+invalid selectors/overlays/banks, no-op overlay behavior and in-place results;
+ASan/UBSan, ARMv4T compile/analysis and changed-source format/Ruff pass.
+
+Controlled HOME now uses this complete read-map predictor and distinct mapping
+IDs for lower/upper pairs; all 20 payloads per model still resolve, while separate
+execution edges remain rejected. The saved snapshot is not a production state
+guard: full-map/overlay capture, geometry provenance and handler identity remain
+open. The predictor does not model write-map/sentinel/cache side effects or
+authorize mutation.

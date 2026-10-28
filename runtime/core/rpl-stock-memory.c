@@ -112,6 +112,42 @@ int hpclang_rpl_stock_bank_window_select(const uint32_t previous[64], const uint
     return 0;
 }
 
+int hpclang_rpl_stock_bank_map_select(const struct hpclang_rpl_stock_bank_map *state,
+                                      const struct hpclang_rpl_rom_bank *banks, uint32_t lower,
+                                      uint32_t upper, uint32_t selected[256])
+{
+    if (!state || !banks || !selected)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (lower > 3 || upper > 15 || state->lower > 3 || state->upper > 15 ||
+        state->overlay_page > 254)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    for (unsigned i = 0; i < 256; ++i)
+        if (!valid_page(state->pages[i]))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (state->overlay_page &&
+        (!valid_page(state->overlay_physical) || !valid_page(state->overlay_physical + 0x800u)))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t result[256];
+    for (unsigned quadrant = 0; quadrant < 4; ++quadrant) {
+        unsigned at = quadrant * 64u;
+        int status = hpclang_rpl_stock_bank_window_select(state->pages + at, state->owners + at,
+                                                          &banks[quadrant & 1u ? upper : lower],
+                                                          result + at);
+        if (status)
+            return status;
+    }
+    if (lower == state->lower && upper == state->upper) {
+        for (unsigned i = 0; i < 256; ++i)
+            result[i] = state->pages[i];
+    } else if (state->overlay_page) {
+        result[state->overlay_page] = state->overlay_physical;
+        result[state->overlay_page + 1u] = state->overlay_physical + 0x800u;
+    }
+    for (unsigned i = 0; i < 256; ++i)
+        selected[i] = result[i];
+    return 0;
+}
+
 int hpclang_rpl_stock_resolve_span(const uint32_t read_map[256], uint32_t address, uint32_t span,
                                    uint32_t *physical)
 {

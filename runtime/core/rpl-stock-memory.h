@@ -82,6 +82,26 @@ int hpclang_rpl_stock_bank_window_select(const uint32_t previous[64], const uint
                                          const struct hpclang_rpl_rom_bank *bank,
                                          uint32_t selected[64]);
 
+struct hpclang_rpl_stock_bank_map
+{
+    uint32_t pages[256];
+    uint8_t owners[256];
+    uint32_t lower, upper, overlay_page, overlay_physical;
+};
+
+/* Predict the complete Read[0..255] result of the reviewed bank-control handler.
+ * Equal bank selectors preserve the previous map. Otherwise update all four
+ * quadrants respecting page owners, then restore the optional two-page overlay.
+ * banks points to sixteen entries; it and all state fields require independently
+ * qualified, guarded snapshots.
+ * Reject absent banks, invalid physical pages and unsupported overlay bounds.
+ * No writes; output is unchanged on failure and may alias state->pages.
+ * This models read maps only: sentinel/write-map/cache updates, configuration
+ * routing, interpreter identity and complete execution effects remain external. */
+int hpclang_rpl_stock_bank_map_select(const struct hpclang_rpl_stock_bank_map *state,
+                                      const struct hpclang_rpl_rom_bank *banks, uint32_t lower,
+                                      uint32_t upper, uint32_t selected[256]);
+
 /* Read a separately proven ROM bank in native 0x40000-based coordinates,
  * bounded by its actual declared byte size, not the entire bank-switch window.
  * Capture checks Flash extent and every touched ARM identity section for user
