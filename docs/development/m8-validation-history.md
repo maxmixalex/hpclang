@@ -436,3 +436,20 @@ session 50816 under /work/oct29-pwm-elapsed; no fix acceptance yet. This is
 independent work during live M8.0 integration sessions 85305 and 76272.
 PR26 fb261f17 has 24 successful/135 queued jobs, two passed/ten queued
 workflows at observation; no failure reported.
+
+## 2026-10-29 — Elapsed PWM wait fix submitted
+
+PR21 969ade88 replaces the fixed instruction-count wait with masked-clock
+sampling between busy batches, allowing one second past the playback deadline.
+Only IRQ dispatch advances playback; all completion/ownership/errno checks
+remain. Fresh six-model normal Direct and HP39gs/HP40gs immediate runs pass
+with settled Stock return. Masked-IRQ HP39gs/HP50g controls still fail 7b03,
+with zero IRQs, no completion, retained ownership/errno and observed time at
+least one second beyond the deadline. Source formatting and artifact audit pass.
+Evidence: /work/oct29-pwm-elapsed, including artifact-hashes.json; temporary
+source/objects were removed after process checks (315892726 logical bytes).
+Previous exact head 10e05bc0 was checked before push: 63 successful, nine
+running, 244 queued and the two diagnosed PWM failures. New CI is unobserved.
+This local fix does not retrospectively prove the cause of parent #20 or
+PR18 historical failures, which lacked these captures. No branch acceptance
+or M8 completion is claimed.
