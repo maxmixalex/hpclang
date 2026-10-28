@@ -1153,19 +1153,24 @@ unchanged. P exchanges and custom fields remain unsupported. This is a data-flow
 launcher analysis or permission to treat arbitrary register values as roots.
 
 The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
-`--state`, `--model` and `--output`. It compiles the current C decoders and runs
-the original ARM Saturn interpreter from predicate entry `351cc` to just before
-comparison at `351e8`. On both retained predicate and standard Stock snapshots,
-128 controlled-entry cases and eight changed-code controls pass. D0/D1 and P
-are restored; the temporary machine-stack cell contains the scalar type ID
-(including address-like `90001`), is cleared on pop, and leaves seven other cells
-unchanged. Decoder-predicted register transitions match actual execution; source
-objects remain unchanged and writes stay within CPU state/the ARM stack.
+`--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles
+the current C decoders and executes the original ARM Saturn interpreter. The
+prefix mode checks entry `351cc` through the comparison boundary `351e8`:
+128 controlled-entry cases and eight changed-code controls pass across both
+models and both retained-predicate/standard-Stock snapshots. D0/D1 and P restore;
+the temporary machine-stack slot contains the scalar type ID (including
+address-like `90001`), then clears on pop while seven other slots survive.
+
+The extended mode continues through the true/false branches, native Boolean
+writeback and next RPL dispatch. Its 256 cases cover both initial carry values;
+16 modified-code controls reject incorrect address restoration or true/false
+constants. Only the expected Boolean stack slot may change outside CPU state;
+the complete remaining native RAM is compared byte-for-byte. D0 advances five
+nibbles to the next thread entry and the interpreter reaches its expected target.
 The result binds ROM/RAM, decoder sources/headers, reader and driver hashes.
-This is a local prefix check after OS setup, with no IRQ, stopping before the
-comparison and continuation. It does not prove the whole handler, unrestricted
-caller provenance, Stock startup or permission to relocate. The older individual
-D0/D1 checks retain 4,096 x48 comparisons and 128 saved-ROM instruction checks.
+These are controlled entries after OS setup, with no IRQ, not an unrestricted
+caller/startup proof or permission to relocate. The individual D0/D1 checks
+retain 4,096 x48 comparisons and 128 saved-ROM instruction checks.
 
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and

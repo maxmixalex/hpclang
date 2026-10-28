@@ -17,6 +17,11 @@ parser.add_argument("--state", type=Path, required=True)
 parser.add_argument("--model", choices=("hp49gplus", "hp50g"), required=True)
 parser.add_argument("--output", type=Path, required=True)
 parser.add_argument("--cc", default="cc")
+parser.add_argument(
+    "--through-dispatch",
+    action="store_true",
+    help="continue through Boolean writeback and the next RPL dispatch",
+)
 args = parser.parse_args()
 if not __debug__:
     raise RuntimeError("Verification requires assertions enabled")
@@ -105,7 +110,7 @@ RAM = 0x08000000
 HEADER, SLOT, OBJECT, D0 = 0x90000, 0x91000, 0x92000, 0x93000
 
 
-def execute(model, cursor, wanted, actual, p, fault=None):
+def execute(model, cursor, wanted, actual, p, fault=None, carry=0):
     state = args.state
     flash = bytearray((state / "flash").read_bytes())
     ram = bytearray((state / "sram").read_bytes())
@@ -129,6 +134,9 @@ def execute(model, cursor, wanted, actual, p, fault=None):
     put(HEADER + 5, wanted)
     put(SLOT, OBJECT)
     put(OBJECT, actual)
+    if args.through_dispatch:
+        put(D0, 0x94000)
+        put(0x94000, 0x94005)
     for at in range(0x90C, 0x954, 4):
         setword(at, 0xA5000000 + at)
     setword(0x90C, 0xA5100000 | HEADER)
@@ -136,16 +144,22 @@ def execute(model, cursor, wanted, actual, p, fault=None):
     setword(0x954, D0)
     setword(0x958, SLOT)
     setword(0x95C, p)
+    setword(0x970, carry)
     setword(0xC24, 0)
     for i in range(8):
         setword(0x978 + 4 * i, 0x70000 + i * 0x10)
     setword(0x998, cursor)
     if fault:
-        at = 0x351CE if fault == "first-exchange" else 0x351E5
+        at, mask = {
+            "first-exchange": (0x351CE, 2),
+            "restore-stack-address": (0x351E5, 4),
+            "true-result": (0x35201, 1),
+            "false-result": (0x35221, 1),
+        }[fault]
         physical = mapping.physical(at)
         shift = 4 * (at & 1)
         assert physical < len(flash)
-        flash[physical] ^= (2 if fault == "first-exchange" else 4) << shift
+        flash[physical] ^= mask << shift
     uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
     uc.mem_map(0, len(flash))
     uc.mem_write(0, bytes(flash))
@@ -176,11 +190,38 @@ def execute(model, cursor, wanted, actual, p, fault=None):
     scalar = []
     checked = []
 
+    def check_prefix():
+        assert word(0x954) == D0 and word(0x958) == SLOT and word(0x95C) == p, "address restoration"
+        assert reg(0) >> 20 == int.from_bytes(ram[offset + 0x90C : offset + 0x914], "little") >> 20
+        assert reg(2) >> 20 == int.from_bytes(ram[offset + 0x91C : offset + 0x924], "little") >> 20
+        for first, last in ((0x914, 0x91C), (0x924, 0x954)):
+            assert uc.mem_read(cpu + first, last - first) == ram[offset + first : offset + last]
+        assert reg(0) & 0xFFFFF == actual and reg(2) & 0xFFFFF == wanted
+        assert word(0x998) == cursor and word(0x978 + cursor * 4) == 0
+        for i in range(8):
+            if i != cursor:
+                assert word(0x978 + i * 4) == 0x70000 + i * 0x10
+        assert len(scalar) == 1 and len(checked) == 4
+        for at in (HEADER, HEADER + 5, SLOT, OBJECT):
+            for n in range(5):
+                physical = mapping.physical(at + n)
+                assert uc.mem_read(physical, 1) == ram[physical - RAM : physical - RAM + 1]
+
     def hook(_, at, size, user):
         if at != 0x28898:
             return
         pc = uc.reg_read(UC_ARM_REG_R7)
-        assert len(trace) < len(TRACE) and pc == TRACE[len(trace)], hex(pc)
+        expected_trace = (
+            TRACE
+            + (
+                [0x351FD, 0x351FF, 0x35206, 0x35209, 0x94005]
+                if wanted == actual
+                else [0x351ED, 0x3521D, 0x3521F, 0x35226, 0x35229, 0x94005]
+            )
+            if args.through_dispatch
+            else TRACE
+        )
+        assert len(trace) < len(expected_trace) and pc == expected_trace[len(trace)], hex(pc)
         trace.append(pc)
         for index, value in pending.items():
             assert reg(index) == value, (hex(pc), index, hex(reg(index)), hex(value))
@@ -190,6 +231,11 @@ def execute(model, cursor, wanted, actual, p, fault=None):
             assert word(0x978 + cursor * 4) == wanted
             scalar.append(word(0x978 + cursor * 4))
         if pc == TRACE[-1]:
+            check_prefix()
+            if not args.through_dispatch:
+                uc.emu_stop()
+            return
+        if args.through_dispatch and pc == 0x94005:
             uc.emu_stop()
             return
         if pc in (0x351CC, 0x351D5, 0x351DD):
@@ -221,29 +267,48 @@ def execute(model, cursor, wanted, actual, p, fault=None):
             checked.append(pc)
 
     def write(_, access, at, size, value, user):
-        assert cpu <= at and at + size <= cpu + 0xD00 or 0x300000 <= at and at + size <= 0x310000, (
-            "unexpected memory write"
-        )
+        assert (
+            cpu <= at
+            and at + size <= cpu + 0xD00
+            or 0x300000 <= at
+            and at + size <= 0x310000
+            or args.through_dispatch
+            and (mapping.physical(SLOT) & ~3) <= at
+            and at + size <= (mapping.physical(SLOT) & ~3) + 8
+        ), "unexpected memory write"
 
     uc.hook_add(UC_HOOK_MEM_WRITE, write)
     uc.hook_add(UC_HOOK_CODE, hook)
     uc.emu_start(0x28828, 0x400000, count=100000)
-    assert trace == TRACE
-    assert word(0x954) == D0 and word(0x958) == SLOT and word(0x95C) == p, "address restoration"
-    assert reg(0) >> 20 == int.from_bytes(ram[offset + 0x90C : offset + 0x914], "little") >> 20
-    assert reg(2) >> 20 == int.from_bytes(ram[offset + 0x91C : offset + 0x924], "little") >> 20
-    for first, last in ((0x914, 0x91C), (0x924, 0x954)):
-        assert uc.mem_read(cpu + first, last - first) == ram[offset + first : offset + last]
-    assert reg(0) & 0xFFFFF == actual and reg(2) & 0xFFFFF == wanted
-    assert word(0x998) == cursor and word(0x978 + cursor * 4) == 0
-    for i in range(8):
-        if i != cursor:
-            assert word(0x978 + i * 4) == 0x70000 + i * 0x10
-    assert len(scalar) == 1 and len(checked) == 4
-    for at in (HEADER, HEADER + 5, SLOT, OBJECT):
+    if args.through_dispatch:
+        assert trace[-1] == 0x94005, "next RPL dispatch"
+        assert word(0x954) == D0 + 5 and word(0x958) == SLOT and word(0x95C) == 0
+        assert reg(0) & 0xFFFFF == 0x94000
+        expected_result = 0x3A81 if wanted == actual else 0x3AC0
+        value = sum(
+            (uc.mem_read(mapping.physical(SLOT + n), 1)[0] >> (4 * ((SLOT + n) & 1)) & 15)
+            << (4 * n)
+            for n in range(5)
+        )
+        assert value == expected_result, "predicate result"
+        expected_ram = bytearray(ram)
         for n in range(5):
-            physical = mapping.physical(at + n)
-            assert uc.mem_read(physical, 1) == ram[physical - RAM : physical - RAM + 1]
+            physical = mapping.physical(SLOT + n) - RAM
+            shift = 4 * ((SLOT + n) & 1)
+            expected_ram[physical] = (expected_ram[physical] & ~(15 << shift)) | (
+                (expected_result >> (4 * n) & 15) << shift
+            )
+        after = bytes(uc.mem_read(RAM, len(ram)))
+        assert (
+            after[:offset] == expected_ram[:offset]
+            and after[offset + 0xD00 :] == expected_ram[offset + 0xD00 :]
+        ), "unexpected native mutation"
+        assert word(0x998) == cursor and word(0x978 + 4 * cursor) == 0
+        for i in range(8):
+            if i != cursor:
+                assert word(0x978 + 4 * i) == 0x70000 + i * 0x10
+    else:
+        assert trace == TRACE
     return dict(
         model=model,
         cursor=cursor,
@@ -252,6 +317,9 @@ def execute(model, cursor, wanted, actual, p, fault=None):
         actual=actual,
         scalar=scalar[0],
         decoder_transitions=len(checked),
+        initial_carry=carry,
+        saturn_trace=trace,
+        through_dispatch=args.through_dispatch,
     )
 
 
@@ -262,19 +330,32 @@ for model in (args.model,):
         for i, (wanted, actual) in enumerate(
             ((0x2A2C, 0x2A2C), (0x2933, 0x2A2C), (0x90001, 0x90001), (0x90001, 0x2A2C))
         ):
-            rows.append(execute(model, cursor, wanted, actual, (cursor * 2 + i) % 16))
-    for fault in ("first-exchange", "restore-stack-address"):
+            for carry in (0, 1) if args.through_dispatch else (0,):
+                rows.append(
+                    execute(model, cursor, wanted, actual, (cursor * 2 + i) % 16, carry=carry)
+                )
+    for fault in ("first-exchange", "restore-stack-address") + (
+        ("true-result", "false-result") if args.through_dispatch else ()
+    ):
         try:
-            execute(model, 3, 0x2A2C, 0x2A2C, 15, fault)
+            execute(model, 3, 0x2933 if fault == "false-result" else 0x2A2C, 0x2A2C, 15, fault)
         except AssertionError as error:
-            assert str(error) == "address restoration", str(error)
+            assert str(error) == (
+                "predicate result" if fault.endswith("result") else "address restoration"
+            ), str(error)
             negatives.append(dict(model=model, fault=fault, reason=str(error)))
         else:
             raise AssertionError("corrupt handler accepted")
 report = dict(
     cases=rows,
     negative_controls=negatives,
-    scope="Original ARM interpreter, controlled registers/data and no IRQ; stops before predicate comparison. The temporary scalar RSTK slot is cleared, seven others preserved. This is not full handler/startup verification or relocation permission.",
+    scope="Original ARM interpreter, controlled registers/data and no IRQ. "
+    + (
+        "Includes comparison, Boolean writeback and next RPL dispatch. "
+        if args.through_dispatch
+        else "Stops before comparison. "
+    )
+    + "Temporary scalar RSTK slot is cleared, seven others preserved. No unrestricted caller/startup proof or relocation permission.",
     inputs={
         name: hashlib.sha256((args.state / name).read_bytes()).hexdigest()
         for name in ("sram", "flash")
