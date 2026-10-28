@@ -3,6 +3,7 @@
 #include <hpclang/bootstrap.h>
 #include "rpl-stock-memory.h"
 #include "saturn-view.h"
+#include "launch-services.h"
 
 /* Public object tests model Saturn as unpacked nibbles. The RAM mapping
    capture and packed-byte backend have their own independent unit tests. */
@@ -39,6 +40,7 @@ int hpclang_rpl_stock_mutation_io(struct hpclang_rpl_mutation_io *io,
         .stack_reserve_nibbles = bounds->stack_reserve_nibbles,
         .native_roots = bounds->native_roots,
         .native_root_count = bounds->native_root_count,
+        .native_root_masks = hpclang_launch_native_root_masks(bounds),
     };
     return 1;
 }

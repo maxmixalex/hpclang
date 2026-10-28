@@ -1320,6 +1320,13 @@ root/mask arrays stable and disjoint from writable state. Catalog plans retain
 full-word expected values, so high-bit changes still fail guards and overlapping
 register repairs coalesce only when both expected and replacement words agree.
 This interface carries proven addresses; it does not discover register roots.
+The private launch descriptor has an RPL4 extension for these masks. Runtime
+services read that field only after checking its version; RPL2/RPL3 descriptors
+retain full-word semantics without accessing the extension. Port1 fences work
+with RPL3 and RPL4. The current launcher initializes the extension to NULL and
+continues publishing RPL3 for its whole-word roots, preserving older embedded
+runtimes. A launcher adding proven partial-word roots must publish RPL4 and be
+paired with a runtime that supports it; this change does not qualify new roots.
 
 The production `hpclang_rpl_mutation_find_temp` query now supplies exact TEMP
 payload-start lookup; the native return fixture delegates to it rather than

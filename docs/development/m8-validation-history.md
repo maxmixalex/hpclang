@@ -227,3 +227,29 @@ This is not automatic register provenance or installed-SDK execution coverage.
   checks pass. Follow-up is local, not CI accepted.
 - Previous #26 head `8c2bb27f`: 96 successful, ten running and 248 queued jobs;
   no failures observed. No new push during this turn.
+
+### 2026-10-29 — Versioned launcher root-mask plumbing (local)
+
+RPL4 adds the optional native-root mask pointer after the RPL3 ERAM fence.
+Production Stock mutation IO forwards masks only for RPL4. Exact-sized RPL2
+and RPL3 allocations under ASan prove that absent fields are not accessed.
+Port1 capabilities/fences accept both RPL3 and RPL4. The current launcher
+initializes the field to NULL but still publishes RPL3 for whole-word roots,
+preserving compatibility with old embedded runtimes. No new registers are
+classified as pointers; adding partial-word roots requires proven semantics
+and a paired RPL4-aware runtime.
+
+- Six affected sanitizer suites passed in 17.07 s: device, object_store, port,
+  object, rpl_stock_memory and port_memory. Added public stack/Port checks then
+  passed in 13.41 s. The public stack test uses the host nibble-backend adapter
+  and verifies a 13-nibble shift with high bits preserved only for RPL4.
+- ARM code-relocation application rebuilt/linked; six raw launcher packages
+  compiled/linked in `/work/oct29-root-mask-launch/launchers`.
+  This packaging check used the retained payload and is not execution evidence
+  for a newly packaged SDK application or whole-Stock E2E.
+- Full-source formatting, Ruff and shell checks passed. ARM analysis of port.c
+  passed. rpl-stock-memory.c initially reported three existing fixed MMU-address
+  accesses; with only core.FixedAddressDereference disabled for that hardware
+  backend, remaining analysis passed. No unqualified analyzer-clean claim.
+- #26 exact head 8c2bb27f: 105 successful, 12 running, 237 queued; no observed
+  failures. Follow-up remains local; no new push this turn.

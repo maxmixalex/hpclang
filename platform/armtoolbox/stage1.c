@@ -1403,12 +1403,15 @@ static int stage_rpl_memory_bounds(const void *saturn_state, volatile const uint
     if (temp_limit < rsktop || user_limit > dsktop)
         return 0;
 
+    /* Existing roots use whole-word addresses. Keep the RPL3 prefix readable
+     * by older embedded runtimes; publish RPL4 only when masks are needed. */
     bounds->magic = HPCLANG_RPL_BOUNDS_MAGIC;
     bounds->temp_limit = temp_limit;
     bounds->user_limit = user_limit;
     bounds->stack_reserve_nibbles = 0u;
     bounds->native_roots = NULL;
     bounds->native_root_count = 0u;
+    bounds->native_root_masks = NULL;
     bounds->port1_limit = 0u;
     if (!hpclang_stage_port1_limit(model, pool_l2, pool_pages, &bounds->port1_limit))
         bounds->magic = HPCLANG_RPL_BOUNDS_MAGIC_V2;

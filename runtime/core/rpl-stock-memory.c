@@ -252,6 +252,7 @@ int hpclang_rpl_stock_mutation_io(struct hpclang_rpl_mutation_io *io,
         .stack_reserve_nibbles = bounds->stack_reserve_nibbles,
         .native_roots = bounds->native_roots,
         .native_root_count = bounds->native_root_count,
+        .native_root_masks = hpclang_launch_native_root_masks(bounds),
         .library_table = boot->model >= HPCLANG_MODEL_HP48GII && boot->model <= HPCLANG_MODEL_HP50G
                              ? 0x8611du
                              : 0u,
