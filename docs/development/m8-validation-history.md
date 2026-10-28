@@ -533,3 +533,15 @@ ELF debug paths are not compared across build directories. Evidence:
 This proves artifact reproduction, not completed Stock integration: both live
 matrices have passed their first four native cases and continue on the original
 sessions. No follow-up push or milestone acceptance is claimed.
+
+Both PC-exchange Stock matrices completed successfully: 28/28 cases, 18 original
+library returns and ten deliberately rewritten call returns. The independent
+audit validates exact case sets, pre-rewrite entry observations, all 36 saved
+Flash images, current input hashes and the independently reproduced artifacts.
+Evidence: `/work/oct29-pc-exchange/verified.json`, `reproduction.json` and each
+model's `result.json`/input manifest. Sessions 68139 and 74211 are terminal success.
+This completes local integration for this batch, not automatic register-root
+discovery, complete execution safety, public management or M8.0 acceptance.
+Pre-push f66b3b97 audit: four workflows pass/eight unfinished; 85 successful,
+ten running, 197 queued jobs and one intentional skip, no failures reported.
+The follow-up is submitted without observing its new CI in the push turn.
