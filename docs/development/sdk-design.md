@@ -1197,6 +1197,21 @@ not complete handler extents or successful GC execution. Reproduction:
 `research/oct28-dispatch-capacity-callees.py`; local artifacts:
 `/work/oct28-dispatch-capacity-callees/windows.json` and per-model disassembly.
 
+A subsequent exploratory run retains each model's original predicate-test
+heap, restores B/D0/D1 from Stock system slots, and forces D.A to zero before
+entering the ROM wrapper at `37258`. Both models execute 12,205 Saturn
+instructions through `05f0f`/`0613e`, return through `3727d`, and reach `351cc`.
+All 20 original Boolean/empty-string stack values survive; the duplicated top,
+ROM continuation in A.A/R1.A, D0 and machine-stack cursor are checked.
+The return-stack boundary falls from 556530 to 554981 while all 20 user-stack
+object addresses remain unchanged. This is evidence for the forced slow path,
+not actual low-memory execution, moved user-object references, or relocation
+of a RAM-resident continuation. The latter remains necessary for public
+movement acceptance. Script: `research/oct28-capacity-stock-probe.py`; input
+and script hashes, trace tail and per-slot checks are retained in
+`/work/oct28-capacity-stock-probe/<model>.json`. No interpreter instruction or
+allocator was stubbed; IRQs were disabled and the caller machine stack cleared.
+
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
 A/C bit-test instruction boundaries. Its relocation planner
