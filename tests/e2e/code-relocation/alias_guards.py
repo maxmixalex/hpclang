@@ -28,12 +28,15 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
     ]
     lib.hpclang_rpl_stock_bank_route_check.argtypes = [c.POINTER(Route), c.c_uint32, c.c_uint32]
 
-    class Window(c.Structure):
-        _fields_ = [("pages", c.c_uint32 * 64), ("owners", c.c_uint8 * 64)]
+    class MapState(c.Structure):
+        _fields_ = [("pages", c.c_uint32 * 256), ("owners", c.c_uint8 * 256)]
+        _fields_ += [
+            (name, c.c_uint32) for name in ("lower", "upper", "overlay_page", "overlay_physical")
+        ]
 
-    lib.hpclang_rpl_stock_bank_window_capture.argtypes = [
+    lib.hpclang_rpl_stock_bank_map_capture.argtypes = [
         c.POINTER(Reader),
-        c.POINTER(Window),
+        c.POINTER(MapState),
         dependency_fn,
         c.c_void_p,
     ]
@@ -41,12 +44,16 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
     class Geometry(c.Structure):
         _fields_ = [("physical", c.c_uint32), ("bytes", c.c_uint32)]
 
-    lib.hpclang_rpl_stock_bank_window_select.argtypes = [
-        c.POINTER(c.c_uint32),
-        c.POINTER(c.c_uint8),
+    lib.hpclang_rpl_stock_bank_map_select.argtypes = [
+        c.POINTER(MapState),
         c.POINTER(Geometry),
+        c.c_uint32,
+        c.c_uint32,
         c.POINTER(c.c_uint32),
     ]
+    geometries = (Geometry * 16)(
+        *(Geometry(row["physical"] or 0, row["valid_bytes"]) for row in banks[:16])
+    )
 
     class Guard(c.Structure):
         _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
@@ -122,8 +129,8 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
     # Derive D0 from validated program syntax on every capture. Code and mutable
     # data share one guard set. Interpreter/device identity remains external.
     for switch, selector, expected in ((0x22E83, 1, 2), (0x22E99, 3, 4)):
-        guards, builder = (Guard * 192)(), Builder()
-        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 192) == 0
+        guards, builder = (Guard * 640)(), Builder()
+        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 640) == 0
         observed = []
 
         @dependency_fn
@@ -151,17 +158,15 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
             )
             if result != 1:
                 return result
-            window = Window()
-            result = lib.hpclang_rpl_stock_bank_window_capture(
+            window = MapState()
+            result = lib.hpclang_rpl_stock_bank_map_capture(
                 c.byref(Reader(native, None)), c.byref(window), observe_native, None
             )
             if result:
                 return result
-            for i in range(64):
-                assert window.pages[i] == sum(
-                    state_value((0x100 + i * 4) * 2 + j) << (4 * j) for j in range(8)
-                )
-                assert window.owners[i] == ram[cpu - 0x08000000 + 0x848 + i]
+            for i in range(256):
+                assert window.pages[i] == sum(state_value(i * 8 + j) << (4 * j) for j in range(8))
+                assert window.owners[i] == ram[cpu - 0x08000000 + 0x808 + i]
             route = Route()
             result = lib.hpclang_rpl_stock_bank_route_capture(
                 c.byref(Reader(native, None)), c.byref(route), observe_native, None
@@ -175,22 +180,33 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
             result = lib.hpclang_rpl_stock_bank_route_check(c.byref(route), program.selector, value)
             if result:
                 return result
-            geometry = Geometry(banks[bank.value]["physical"], banks[bank.value]["valid_bytes"])
-            predicted = (c.c_uint32 * 64)()
-            result = lib.hpclang_rpl_stock_bank_window_select(
-                window.pages, window.owners, c.byref(geometry), predicted
+            predicted = (c.c_uint32 * 256)()
+            lower = (value >> 5) & 3
+            result = lib.hpclang_rpl_stock_bank_map_select(
+                c.byref(window), geometries, lower, bank.value, predicted
             )
             if result:
                 return result
-            assert list(predicted) == [
-                window.pages[i] if window.owners[i] else banks[bank.value]["pages"][i]
-                for i in range(64)
-            ]
+            if (lower, bank.value) == (window.lower, window.upper):
+                assert list(predicted) == list(window.pages)
+            else:
+                expected_pages = [
+                    window.pages[i]
+                    if window.owners[i]
+                    else banks[bank.value if (i // 64) & 1 else lower]["pages"][i % 64]
+                    for i in range(256)
+                ]
+                if window.overlay_page:
+                    expected_pages[window.overlay_page : window.overlay_page + 2] = [
+                        window.overlay_physical,
+                        window.overlay_physical + 0x800,
+                    ]
+                assert list(predicted) == expected_pages
             return 1
 
         assert resolve() == 1
         dependencies = sorted(set(observed))
-        assert bank.value == expected and len(dependencies) == 810 and builder.count <= 192
+        assert bank.value == expected and len(dependencies) == 2762 and builder.count <= 640
         assert (
             lib.hpclang_rpl_reference_guards_validate(c.byref(mapped_reader), guards, builder.count)
             == 0
@@ -217,7 +233,7 @@ def verify_alias_selectors(lib, read, ram, cpu, banks):
             < 0
         )
         observed.clear()
-        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 192) == 0
+        assert lib.hpclang_rpl_reference_guards_begin(c.byref(builder), guards, 640) == 0
         assert resolve() == 1
         assert bank.value == alternate
         assert (

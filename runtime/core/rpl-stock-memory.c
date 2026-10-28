@@ -112,6 +112,35 @@ int hpclang_rpl_stock_bank_window_select(const uint32_t previous[64], const uint
     return 0;
 }
 
+int hpclang_rpl_stock_bank_map_capture(const struct hpclang_rpl_reader *state,
+                                       struct hpclang_rpl_stock_bank_map *map,
+                                       hpclang_rpl_reference_dependency_fn dependency,
+                                       void *context)
+{
+    if (!state || !state->read_nibble || !map || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct hpclang_rpl_stock_bank_map next;
+    for (unsigned i = 0; i < 256; ++i) {
+        int result = state_word(state, i * 8u, 8, &next.pages[i], dependency, context);
+        if (result)
+            return result;
+        uint32_t owner;
+        result = state_word(state, (0x808u + i) * 2u, 2, &owner, dependency, context);
+        if (result)
+            return result;
+        next.owners[i] = (uint8_t)owner;
+    }
+    static const uint32_t offsets[] = {0xbcc, 0xbd0, 0xc48, 0xc5c};
+    uint32_t *fields[] = {&next.lower, &next.upper, &next.overlay_page, &next.overlay_physical};
+    for (unsigned i = 0; i < 4; ++i) {
+        int result = state_word(state, offsets[i] * 2u, 8, fields[i], dependency, context);
+        if (result)
+            return result;
+    }
+    *map = next;
+    return 0;
+}
+
 int hpclang_rpl_stock_bank_map_select(const struct hpclang_rpl_stock_bank_map *state,
                                       const struct hpclang_rpl_rom_bank *banks, uint32_t lower,
                                       uint32_t upper, uint32_t selected[256])

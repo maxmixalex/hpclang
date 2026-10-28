@@ -1397,3 +1397,26 @@ execution edges remain rejected. The saved snapshot is not a production state
 guard: full-map/overlay capture, geometry provenance and handler identity remain
 open. The predictor does not model write-map/sentinel/cache side effects or
 authorize mutation.
+
+## Complete read-map state capture — local, 2026-10-29
+
+`hpclang_rpl_stock_bank_map_capture` observes all 256 read pages, 256 owner bytes,
+prior lower/upper banks and two-page overlay fields: 2,592 native-state nibbles.
+It publishes output only after complete success. Unit tests cover 10,368
+per-position read/invalid-nibble/negative-callback/positive-callback failures
+with unchanged output, plus exact full-width field capture. Rebuilt ASan/UBSan
+Stock-memory tests, ARMv4T compile/static analysis and changed-source format/Ruff
+pass.
+
+Maintained alias composition now feeds this capture into the full map predictor.
+Together with routing/code/selector observations, each case retains 558 guards
+covering 2,762 nibbles; both models/two entries reject all 11,048 stale changes.
+Both full maintained model runs pass, including the 336 original-handler map
+comparisons and 48 absent-bank rejections. Reports/source hashes are in
+`/work/oct29-full-map-guards/{model}/bank-switch-maps.json`.
+Controlled HOME also uses the full C capture instead of direct field assembly;
+all 20 payloads per model resolve and execution edges remain rejected. Report:
+`/work/oct29-home-graph/attachments.json`. This captures read-map prerequisites,
+not all interpreter execution state: geometry, handler identity, write/cache
+effects, complete roots and the production exclusive-lifetime adapter remain.
+No public edit capability is enabled.

@@ -16,7 +16,7 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
 
 struct route_fixture
 {
-    uint8_t bytes[0xc20];
+    uint8_t bytes[0xc60];
     unsigned reads, observations, stop, mode;
 };
 
@@ -103,6 +103,43 @@ static void test_bank_window_capture(void)
                               : mode == 3 ? -73
                                           : HPCLANG_RPL_SPAN_MALFORMED));
             assert(fixture.reads == stop && !memcmp(&window, &before, sizeof window));
+        }
+    }
+}
+
+static void test_bank_map_capture(void)
+{
+    struct route_fixture fixture = {0};
+    struct hpclang_rpl_stock_bank_map map, expected = {0};
+    for (unsigned i = 0; i < 256; ++i) {
+        expected.pages[i] = 0x08000000u + i * 0x800u;
+        expected.owners[i] = (uint8_t)i;
+        for (unsigned j = 0; j < 4; ++j)
+            fixture.bytes[i * 4 + j] = (uint8_t)(expected.pages[i] >> (8u * j));
+        fixture.bytes[0x808 + i] = (uint8_t)i;
+    }
+    expected.lower = fixture.bytes[0xbcc] = 1;
+    expected.upper = fixture.bytes[0xbd0] = 2;
+    expected.overlay_page = fixture.bytes[0xc48] = 63;
+    expected.overlay_physical = 0x08060000;
+    fixture.bytes[0xc5e] = 6;
+    fixture.bytes[0xc5f] = 8;
+    struct hpclang_rpl_reader reader = {route_read, &fixture};
+    assert(!hpclang_rpl_stock_bank_map_capture(&reader, &map, route_observe, &fixture));
+    assert(!memcmp(&map, &expected, sizeof map));
+    assert(fixture.reads == 2592 && fixture.observations == 2592);
+    for (unsigned mode = 1; mode <= 4; ++mode) {
+        for (unsigned stop = 1; stop <= 2592; ++stop) {
+            fixture.mode = mode;
+            fixture.stop = stop;
+            fixture.reads = fixture.observations = 0;
+            memset(&map, 0xa5, sizeof map);
+            struct hpclang_rpl_stock_bank_map before = map;
+            int result = hpclang_rpl_stock_bank_map_capture(&reader, &map, route_observe, &fixture);
+            assert(result == (mode == 1   ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                              : mode == 3 ? -73
+                                          : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(fixture.reads == stop && !memcmp(&map, &before, sizeof map));
         }
     }
 }
@@ -503,6 +540,7 @@ int main(void)
     test_bank_route_capture();
     test_bank_window_capture();
     test_bank_map();
+    test_bank_map_capture();
     test_bank_window_select();
     test_rom_bank_reader();
     test_discontinuous_spans();

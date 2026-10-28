@@ -89,6 +89,17 @@ struct hpclang_rpl_stock_bank_map
     uint32_t lower, upper, overlay_page, overlay_physical;
 };
 
+/* Capture all 256 read pages/owners, prior bank selectors and overlay fields.
+ * Same state-relative nibble coordinates and exclusive-lifetime contract as
+ * route_capture. All 2592 observed nibbles must retain the native-state mapping
+ * ID when accumulated into commit guards. No partial output on failure; values
+ * require separate semantic validation. This does not capture write maps,
+ * geometry, interpreter code or all state needed for execution qualification. */
+int hpclang_rpl_stock_bank_map_capture(const struct hpclang_rpl_reader *state,
+                                       struct hpclang_rpl_stock_bank_map *map,
+                                       hpclang_rpl_reference_dependency_fn dependency,
+                                       void *context);
+
 /* Predict the complete Read[0..255] result of the reviewed bank-control handler.
  * Equal bank selectors preserve the previous map. Otherwise update all four
  * quadrants respecting page owners, then restore the optional two-page overlay.
