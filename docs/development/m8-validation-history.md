@@ -342,3 +342,28 @@ Fresh mainline Stock integration passed all nine library cases on both models;
 GOSUB and RTNSXM cases also pass on both, while the three remaining
 call-return cases per model continue in the original processes. A local draft of the mainline follow-up PR body is prepared, but
 mainline code has not been pushed pending completion of that validation.
+
+### 2026-10-29 — Fresh mainline Stock call/catalog integration complete
+
+Both original processes completed successfully without restart: all 14 maintained
+call_roots cases per model pass, 28 total. Independent post-run audit checks the
+exact case sets, each original entry observation, all unchanged saved Flash
+bytes, return flags and source/artifact manifest hashes. Eighteen library cases
+retain original returns; ten call fixtures deliberately rewrite controlled
+return code. Reports: /work/oct29-native-launch-e2e/{hp49gplus,hp50g}/result.json,
+per-model inputs manifests and verified.json. Runner/auditor:
+research/oct29-native-launch-e2e.py and oct29-native-launch-audit.py.
+The compiled runtime/platform/include/code-relocation sources remain unchanged
+from 6d786f55; later changes are unit regressions and tracking documentation.
+
+This uses newly built ARM code and launchers through actual USB/Stock execution,
+not the private host-mutation matrix. It covers default RPL3 launch roots;
+explicit RPL4/low-field integration remains limited to host/controlled-fixture
+checks. It does not establish arbitrary caller or exhausted-stack GC coverage,
+public library management completion or hardware acceptance.
+
+Before submitting the follow-up, audited #26 exact head 8c2bb27f: three workflows
+successful, five queued; 167 successful jobs, 18 running and 169 queued, no
+failures. Earlier incomplete CI is not accepted as passing. The planned push
+includes guarded TEMP lookup, masked roots, versioned launch support and their
+regressions, and requires new CI. No merge or milestone completion.
