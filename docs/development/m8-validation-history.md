@@ -1481,3 +1481,21 @@ possible ROM versions. Physical-reader permission/identity, exclusion while
 using the result, CPU-state identity and complete handler/root coverage remain
 production obligations. Firmware matching alone does not enable public edits;
 performance on calculator hardware has not yet been measured.
+
+## 2026-10-29 — Physical ROM-profile backend, local validation in progress
+
+The read-only Stock ROM backend captures both identity section descriptors and
+checks them before each bounded block read. Assembly halfword loads support
+physical address zero; the caller must mask IRQ/FIQ and prohibit Stock calls or
+mapping/Flash changes throughout capture/read/profile use. Host sanitizer checks
+cover odd/even boundaries, invalid ranges and every descriptor bit becoming stale.
+ARM analysis passes for the backend, identity, memory reader and Stock witness.
+No Flash programming is performed.
+
+The mandatory Stock ROM-bank witness identifies the immutable image before using
+its geometry locations. `/work/oct29-stock-rom-profile/reproduction.json` records
+16 independently rebuilt, byte-identical artifacts and source hashes;
+`native-entry-verified.json` checks both original first-case returns and unchanged
+Flash. Both models passed their first three call/catalog cases; the complete
+14-case-per-model campaign remains running and unaccepted. These local results
+do not establish CI acceptance, production reference safety or M8.0 completion.

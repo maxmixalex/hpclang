@@ -974,3 +974,6 @@ target_include_directories(test_win_box_reference PRIVATE "${HPCLANG_ROOT}/runti
 
 hpclang_unit(rpl_rom_profile test_rpl_rom_profile.c "${HPCLANG_ROOT}/runtime/core/rpl-rom-profile.c")
 target_include_directories(test_rpl_rom_profile PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rpl_stock_rom test_rpl_stock_rom.c "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c")
+target_include_directories(test_rpl_stock_rom PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")

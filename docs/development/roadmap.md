@@ -123,9 +123,13 @@ both models, including no-op selection and two-page overlays. These checks pass
 locally and are submitted as a follow-up; they are not CI or milestone acceptance.
 A local SHA-256 profile check now identifies the two reviewed immutable ROM
 images and supplies layout locations; mutable user Flash is excluded. Maintained
-composition and controlled HOME use that result. Live physical-reader/exclusive
-integration, complete handler effects/execution roots, public libraries and Port1
-edits remain open; a matching image alone does not authorize mutation.
+composition and controlled HOME use that result. A local read-only physical
+backend now identifies ROM with IRQ/FIQ masked in the Stock witness. Both models
+pass the first three call/catalog cases; independent checks confirm the first
+original return per model, unchanged Flash and 16 reproducible build artifacts.
+The complete 28-case matrix is still running. Production exclusive integration,
+complete handler effects/execution roots, public libraries and Port1 edits remain
+open; a matching image alone does not authorize mutation.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,

@@ -2,32 +2,44 @@
 #include <hpclang/target.h>
 #include "rpl-port.h"
 #include "rpl-stock-memory.h"
+#include "rpl-stock-rom.h"
+#include "irq.h"
 
 volatile uint32_t hpclang_rom_bank_evidence[4];
+volatile uint32_t hpclang_rom_profile_evidence[4];
 
-/* Fixture-specific initializer locations, already checked against original
- * HP49g+/HP50g ROM execution. This witness does not identify arbitrary firmware. */
-int hpclang_rom_banks_probe(void)
+/* Identify the reviewed immutable image before using its layout locations. */
+static int rom_banks_probe(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     if (!boot || (boot->model != HPCLANG_MODEL_HP49GPLUS && boot->model != HPCLANG_MODEL_HP50G))
         return 0x7001;
+    struct hpclang_rpl_stock_rom rom;
+    const struct hpclang_rpl_rom_profile *profile;
+    if (hpclang_rpl_stock_rom_reader(&rom))
+        return 0x700d;
+    if (hpclang_rpl_rom_profile_identify(hpclang_rpl_stock_rom_read, &rom, boot->model, &profile))
+        return 0x700e;
+    hpclang_rom_profile_evidence[0] = profile->model;
+    hpclang_rom_profile_evidence[1] = profile->immutable_bytes;
+    hpclang_rom_profile_evidence[2] = profile->geometry_operands;
+    hpclang_rom_profile_evidence[3] = profile->geometry_bases;
     uintptr_t state = boot->saturn_state;
-    if (state < 0x08000000u || state > 0x08080000u - 0xbe0u - 64u || (state & 3u))
+    if (state < 0x08000000u || state > 0x08080000u - profile->geometry_bases - 64u || (state & 3u))
         return 0x7002;
     const volatile uint32_t *l1 = (void *)0x07f00000u;
     if ((l1[0] & 0xfff00803u) != 0x802u)
         return 0x7003;
-    const volatile uint32_t *locations = (void *)0x248a0u;
+    const volatile uint32_t *locations = (void *)(uintptr_t)profile->geometry_operands;
     uint32_t count_at = locations[0], directory = locations[1];
-    if (!count_at || count_at >= 0x200000u || directory != count_at + 1u)
+    if (!count_at || count_at >= profile->flash_bytes || directory != count_at + 1u)
         return 0x7004;
     uint32_t count = *(const volatile uint8_t *)(uintptr_t)count_at;
-    if (count != 14 || count > 0x200000u - directory)
+    if (count != 14 || count > profile->flash_bytes - directory)
         return 0x7005;
     uint8_t sizes[16];
     uint32_t bases[16], saved_map[64];
-    const volatile uint32_t *native_bases = (void *)(state + 0xbe0u);
+    const volatile uint32_t *native_bases = (void *)(state + profile->geometry_bases);
     const volatile uint32_t *read_map = (void *)state;
     for (unsigned i = 0; i < count; ++i)
         sizes[i] = *(const volatile uint8_t *)(uintptr_t)(directory + i);
@@ -38,8 +50,8 @@ int hpclang_rom_banks_probe(void)
     unsigned tested = 0, samples = 0;
     for (unsigned index = 0; index < 16; ++index) {
         struct hpclang_rpl_rom_bank bank = {0xdead, 0xbeef};
-        int result =
-            hpclang_rpl_rom_bank_layout(sizes, count, directory, 0x200000u, bases, index, &bank);
+        int result = hpclang_rpl_rom_bank_layout(sizes, count, directory, profile->flash_bytes,
+                                                 bases, index, &bank);
         if (index >= count) {
             if (result || bank.physical != 0xdead || bank.bytes != 0xbeef)
                 return 0x7006;
@@ -80,4 +92,12 @@ int hpclang_rom_banks_probe(void)
     hpclang_rom_bank_evidence[2] = l1[0];
     hpclang_rom_bank_evidence[3] = l1[1];
     return tested == 14 && samples == 3520 ? 0 : 0x700c;
+}
+
+int hpclang_rom_banks_probe(void)
+{
+    uint32_t irq = hpclang_irq_save_disable();
+    int result = rom_banks_probe();
+    hpclang_irq_restore(irq);
+    return result;
 }
