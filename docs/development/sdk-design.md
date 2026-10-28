@@ -1197,35 +1197,32 @@ not complete handler extents or successful GC execution. Reproduction:
 `research/oct28-dispatch-capacity-callees.py`; local artifacts:
 `/work/oct28-dispatch-capacity-callees/windows.json` and per-model disassembly.
 
-A subsequent exploratory run retains each model's original predicate-test
-heap, restores B/D0/D1 from Stock system slots, and forces D.A to zero before
-entering the ROM wrapper at `37258`. Both models execute 12,205 Saturn
-instructions through `05f0f`/`0613e`, return through `3727d`, and reach `351cc`.
-All 20 original Boolean/empty-string stack values survive; the duplicated top,
-ROM continuation in A.A/R1.A, D0 and machine-stack cursor are checked.
-The return-stack boundary falls from 556530 to 554981 while all 20 user-stack
-object addresses remain unchanged. This is evidence for the forced slow path,
-not actual low-memory execution, moved user-object references, or relocation
-of a RAM-resident continuation. The latter remains necessary for public
-movement acceptance. Script: `research/oct28-capacity-stock-probe.py`; input
-and script hashes, trace tail and per-slot checks are retained in
-`/work/oct28-capacity-stock-probe/<model>.json`. No interpreter instruction or
-allocator was stubbed; IRQs were disabled and the caller machine stack cleared.
+The maintained `tests/e2e/code-relocation/dispatch_capacity.py` runs the
+original interpreter with the retained ten-predicate Stock fixture. Invoke it
+with `--state <snapshot> --model hp49gplus|hp50g --output <directory>`;
+add `--ram-interior` for the unsafe movable-entry contrast. Unicorn is required;
+this is a local fixture test, not part of ordinary CI. Reports distinguish
+`ROM continuation preserved` from `stale RAM continuation reproduced` and
+record input, driver and native-reader hashes. Neither mode claims real
+low-memory or public relocation acceptance. IRQs are disabled and caller
+machine-stack frames cleared; no allocator or Saturn instruction is stubbed.
 
-The RAM-interior contrast fixture exposes an unresolved execution constraint.
-A modeled 32-nibble TEMP DOCSTR envelope contains the same inline dispatch;
-its footer chain is validated and a separate data-stack object-start root is
-installed. On both models, original ROM collection relocates that object from
-556486 to 554937 and repairs the data-stack root, but A.A/R1.A remain at 556501
-instead of the required 554952. The original 20 stack values remain intact.
-Reaching the predicate handler therefore does not prove a safe continuation:
-old payload bytes can still be readable after collection. This is an unsupported
-execution fixture, not a supported Stock application or hpclang allocator bug
-claim. Public relocation requires an explicit continuation repair/pinning
-contract or a proven native launch convention; ROM-resident success cannot
-justify arbitrary movable RAM entries. Reproducer:
-`research/oct28-capacity-ram-probe.py`; per-model negative findings, base/variant
-driver hashes and final SRAM: `/work/oct28-capacity-ram-probe/`.
+The ROM mode forces D.A=0, executes 12,205 Saturn instructions through collection
+and DUP, and checks all 20 user values, the duplicated top, A.A/R1.A continuation,
+D0 and machine-stack cursor. The return-stack boundary falls from 556530 to
+554981; the user objects remain at their original addresses.
+
+The RAM mode models a 32-nibble TEMP DOCSTR envelope with an explicit data-stack
+root and a validated footer chain. Collection moves it from 556486 to 554937
+and repairs that root, but leaves A.A/R1.A at 556501 instead of 554952. Both
+models reproduce this while preserving the original 20 user values. Old payload
+bytes remain readable, so reaching the next handler is insufficient proof.
+This diagnoses an unsupported Stock execution fixture; it does not establish
+a defect in hpclang's caller-proven register repairs for catalog transactions.
+Those repairs do not intercept Stock collection. Public movable entries still
+require a proven native launch convention or explicit continuation ownership
+and repair/pinning. Latest four reports and final SRAM are retained under
+`/work/oct28-dispatch-capacity-maintained/{rom,ram}/`.
 
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
