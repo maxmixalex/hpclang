@@ -259,6 +259,14 @@ int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_
 int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t selectors,
                               uint32_t banks, uint32_t selector, uint32_t *bank);
 
+/* Observe the selected configuration and all physical-bank configurations,
+ * including nonmatches needed to exclude ambiguity. Same dependency/error
+ * contract as bank_lookup_guarded; output changes only on a unique match.
+ * Does not qualify the source FlashPtr, table mapping or selected bank geometry. */
+int hpclang_rpl_flashptr_bank_guarded(const struct hpclang_rpl_reader *reader, uint32_t selectors,
+                                      uint32_t banks, uint32_t selector, uint32_t *bank,
+                                      hpclang_rpl_bank_dependency_fn dependency, void *context);
+
 /* Look up one index in a caller-mapped native ROM bank header. Validate the
  * 0F bank identity and declared table count within the 0x40000..0x80000 window.
  * bank is the resolved physical-bank index, not the FlashPtr selector. The
@@ -269,6 +277,14 @@ int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t 
  * as a ROM pointer table, dereferences the result, or executes native code. */
 int hpclang_rpl_flashptr_lookup(const struct hpclang_rpl_reader *mapped, uint32_t header,
                                 uint32_t bank, uint32_t index, uint32_t *target);
+
+/* Retain identity, count and selected target nibbles as lookup dependencies.
+ * Same callback/error contract as bank_lookup_guarded. This does not observe
+ * the source FlashPtr or configuration tables, authenticate mapping/geometry,
+ * or dereference the target. Keep those proofs and dependencies separately. */
+int hpclang_rpl_flashptr_lookup_guarded(const struct hpclang_rpl_reader *mapped, uint32_t header,
+                                        uint32_t bank, uint32_t index, uint32_t *target,
+                                        hpclang_rpl_bank_dependency_fn dependency, void *context);
 
 /* Resolve a count-prefixed table after the caller has validated its mapping
  * and format. first/end bound the readable native bank window; table points

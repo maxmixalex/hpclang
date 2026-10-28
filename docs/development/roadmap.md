@@ -114,11 +114,11 @@ Register-root follow-up `bc6596e6` is submitted in #26. All 28 fresh Stock cases
 36 unchanged Flash snapshots and 16 reproducible artifacts pass local audit;
 CI remains unfinished; branch acceptance remains open.
 
-Local guarded bank/ACPTR resolution retains source and switch-table dependencies
-under separate mapping identities. Both-model ROM tables with controlled ACPTRs
-pass 3,400 stale-data rejections; sanitizer units and ARM compilation/analysis
-pass. Delivery candidate only. Complete reference coverage, public library
-management and Port1 edits remain open.
+Bank/ACPTR guards are submitted in #26 (`abf9135c`); CI is unfinished.
+Local FlashPtr configuration and ordinary target-table guards pass sanitizer
+composition/failure tests and ARM analysis. Source-object and special-table
+dependencies, complete reference coverage, public libraries and Port1 edits
+remain open. This FlashPtr follow-up is not submitted.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -141,7 +141,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `bc6596e6` | **CI pending:** four workflows successful, eight unfinished; 128 successful, 19 running and 241 queued jobs observed, no failures. Prior-head HP39g+ pre-entry Kermit failure (job 123048995027) remains unexplained despite an exact-artifact local pass. Local integration is verified; branch acceptance remains open. |
+| #26 / `abf9135c` | **CI pending:** ten unfinished workflows (six queued, two pending, two running); five running and seven queued jobs observed, no completed jobs or failures. Earlier HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI pending:** two unfinished workflows; 277 successful, 39 queued and three running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |

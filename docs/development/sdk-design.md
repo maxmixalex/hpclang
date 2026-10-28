@@ -886,6 +886,16 @@ Controlled ACPTR objects combined with these ROM tables produce 20 guards for
 addresses, and changes in either stream reject validation. These constructed
 objects test dependency composition, not discovery of all live Stock pointers.
 
+For ordinary FlashPtr tables, `hpclang_rpl_flashptr_bank_guarded()` retains the
+selected logical configuration and every physical-bank configuration needed to
+exclude ambiguous matches. `hpclang_rpl_flashptr_lookup_guarded()` retains the
+bank header identity, table count and selected target. Callers preserve separate
+mapping identities while accumulating both streams in one guard builder. Errors
+leave output unchanged; callback errors follow the bank-lookup contract. These
+entries do not capture the source FlashPtr, authenticate the mapping or geometry,
+dereference targets, or cover the special count-prefixed table format. Those
+dependencies and proof obligations must be supplied before mutation is allowed.
+
 The maintained installation witness exercises this capture on ARM, using the
 supported Stock 2.15 fixture's verified initializer literal-pool addresses and
 state layout. Its existing missing-library and matched-installation invocations

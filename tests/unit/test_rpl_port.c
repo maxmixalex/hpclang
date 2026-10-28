@@ -857,8 +857,76 @@ static int mapped_nibble(void *context, uint32_t address, uint8_t *value)
     return read_nibble(context, address - 0x40000u, value);
 }
 
+static int observe_mapped_bank(void *context, uint32_t address, uint8_t value)
+{
+    assert(address >= 0x40000u);
+    return observe_bank(context, address - 0x40000u, value);
+}
+
+static void test_guarded_flashptr(void)
+{
+    for (unsigned stage = 0; stage < 2; ++stage) {
+        struct image image = {.count = 160, .fail_at = UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {stage ? mapped_nibble : read_nibble, &image};
+        hpclang_rpl_bank_dependency_fn observe = stage ? observe_mapped_bank : observe_bank;
+        if (stage) {
+            put_word(&image, 0, 0x20f, 4);
+            put_word(&image, 29, 2, 5);
+            put_word(&image, 39, 0x6f8e, 5);
+        } else {
+            for (unsigned i = 0; i < 16; ++i)
+                put_word(&image, 80 + 5 * i, 0x70000 + i, 5);
+            put_word(&image, 5, 0x70002, 5);
+        }
+        const unsigned count = stage ? 14 : 85;
+        for (unsigned fault = 0; fault < 5; ++fault) {
+            for (unsigned stop = 1; stop <= count; ++stop) {
+                /* Lookup reads identity, count, selected target; configuration
+                 * resolution reads selector 1 and every physical-bank cell. */
+                unsigned at = stage ? (stop <= 4   ? stop - 1
+                                       : stop <= 9 ? stop + 24
+                                                   : stop + 29)
+                                    : (stop <= 5 ? stop + 4 : stop + 74);
+                uint8_t saved = image.data[at];
+                struct bank_observations observations = {.image = &image};
+                if (fault == 1 || fault == 2) {
+                    observations.stop = stop;
+                    observations.positive = fault == 2;
+                } else if (fault == 3) {
+                    image.fail_at = at;
+                } else if (fault == 4) {
+                    image.data[at] = 16;
+                }
+                uint32_t output = 99;
+                int result = stage ? hpclang_rpl_flashptr_lookup_guarded(
+                                         &reader, 0x40000, 2, 1, &output, observe, &observations)
+                                   : hpclang_rpl_flashptr_bank_guarded(&reader, 0, 80, 1, &output,
+                                                                       observe, &observations);
+                if (!fault) {
+                    assert(result == 1 && output == (stage ? 0x6f8e : 2));
+                    assert(observations.count == count);
+                    for (unsigned p = 0; p < 160; ++p) {
+                        int expected = stage ? (p < 4 || (p >= 29 && p < 34) || (p >= 39 && p < 44))
+                                             : ((p >= 5 && p < 10) || p >= 80);
+                        assert(observations.seen[p] == expected);
+                    }
+                } else {
+                    int expected = fault == 1   ? -79
+                                   : fault == 3 ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                                                : HPCLANG_RPL_SPAN_MALFORMED;
+                    assert(result == expected && output == 99);
+                    assert(observations.count == stop - (fault >= 3));
+                }
+                image.fail_at = UINT32_MAX;
+                image.data[at] = saved;
+            }
+        }
+    }
+}
+
 static void test_flashptr_bank(void)
 {
+    test_guarded_flashptr();
     struct image image = {.count = 160, .fail_at = UINT32_MAX};
     const struct hpclang_rpl_reader reader = {read_nibble, &image};
     for (uint32_t i = 0; i < 16u; ++i)

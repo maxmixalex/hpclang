@@ -780,3 +780,25 @@ all live Stock pointers or production Port1 mutation safety.
 Pre-delivery PR #26 head `bc6596e6`: four workflows pass, eight unfinished;
 128 jobs successful, 19 running, 241 queued, no failures observed. The earlier
 pre-entry transfer failure remains unexplained. No CI acceptance is claimed.
+
+## Guarded ordinary FlashPtr tables — 2026-10-29, local only
+
+Configuration matching now exposes all 85 consumed nibbles (selected logical
+configuration plus all 16 physical configurations). Ordinary header lookup
+exposes 14 nibbles (identity, count and selected target). Callback failures,
+including positive errors, preserve output. Units inject negative/positive
+callback errors, unavailable reads and invalid nibbles at all 99 positions:
+396 rejection cases pass with unchanged output and exact dependency coverage.
+
+The C guard-builder integration combines both streams into 20 guards under
+separate mapping identities. All 99 changed dependencies reject validation;
+221 unobserved cells do not affect it. Capacity 19 rejects the lookup and
+invalidates the builder without publishing a target. ASan/UBSan port/reference
+units and ARMv4T compilation/static analysis pass. The initial analyzer warning
+about temporary outputs was addressed using invalid sentinels plus explicit
+success-range checks. No complete Stock pointer graph or mutation safety is
+claimed; source FlashPtr, special tables and geometry remain separate obligations.
+
+PR #26 head `abf9135c` observed ten unfinished workflows: six queued, two pending,
+two running; five running and seven queued jobs, none completed and no failures.
+This is not acceptance. No push was made in this turn.

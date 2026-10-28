@@ -649,6 +649,44 @@ int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t 
     return found;
 }
 
+int hpclang_rpl_flashptr_bank_guarded(const struct hpclang_rpl_reader *reader, uint32_t selectors,
+                                      uint32_t banks, uint32_t selector, uint32_t *bank,
+                                      hpclang_rpl_bank_dependency_fn dependency, void *context)
+{
+    if (!reader || !reader->read_nibble || !bank || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {reader, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    uint32_t next = UINT32_MAX;
+    int result = hpclang_rpl_flashptr_bank(&observed, selectors, banks, selector, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1 && next >= 16u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result == 1)
+        *bank = next;
+    return result;
+}
+
+int hpclang_rpl_flashptr_lookup_guarded(const struct hpclang_rpl_reader *mapped, uint32_t header,
+                                        uint32_t bank, uint32_t index, uint32_t *target,
+                                        hpclang_rpl_bank_dependency_fn dependency, void *context)
+{
+    if (!mapped || !mapped->read_nibble || !target || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {mapped, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    uint32_t next = UINT32_MAX;
+    int result = hpclang_rpl_flashptr_lookup(&observed, header, bank, index, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1 && (!next || next >= 0x80000u))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result == 1)
+        *target = next;
+    return result;
+}
+
 static int library(const struct hpclang_rpl_reader *reader, uint32_t limit,
                    struct hpclang_rpl_port_entry *entry, uint32_t *name_address)
 {
