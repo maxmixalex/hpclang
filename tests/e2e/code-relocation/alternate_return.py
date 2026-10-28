@@ -321,8 +321,10 @@ for cursor in range(8):
             origins = Origins()
             origin_path = []
             origin_memory = (c.c_uint32 * 5)(*[0x200 + i for i in range(5)])
+            preserved_top = (c.c_uint32 * 5)()
             origin_address = []
-            origin_steps = (0x88C8E + delta, 0x88C94 + delta, 0x88C97 + delta)
+            pending_address_step = []
+            origin_steps = tuple(pc + delta for pc in (0x88C8E, 0x88C94, 0x88C97, 0x88C9A, 0x88C9D))
 
             def live_nibble(at):
                 return uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
@@ -336,6 +338,8 @@ for cursor in range(8):
 
             def hook(_, at, size, user):
                 if at == 0x28898:
+                    if pending_address_step:
+                        assert bytes(uc.mem_read(cpu + 0x90C, 0x50)) == pending_address_step.pop()
                     if pending_memory:
                         reg_at, expected_register, address, expected_memory, address_state = (
                             pending_memory.pop()
@@ -347,7 +351,7 @@ for cursor in range(8):
                         assert bytes(uc.mem_read(cpu + 0x954, 8)) == address_state
                     pc = uc.reg_read(UC_ARM_REG_R7)
                     trace.append(pc)
-                    if origin_path and len(origin_path) < 3:
+                    if origin_path and len(origin_path) < len(origin_steps):
                         assert pc == origin_steps[len(origin_path)], "unmodeled origin-path step"
                     if pc == origin_steps[0]:
                         # Caller-owned symbolic labels for R0.A; numeric values
@@ -369,6 +373,20 @@ for cursor in range(8):
                             == 0
                         )
                         origin_path.append(pc)
+                    if pc == origin_steps[3]:
+                        # This controlled fixture independently guards D1=D1-5.
+                        # Do not generalize this instruction to arbitrary arithmetic
+                        # or propagate per-nibble identity through its borrow.
+                        assert len(origin_path) == 3
+                        assert [live_nibble(pc + i) for i in range(3)] == [1, 12, 4]
+                        before = bytearray(uc.mem_read(cpu + 0x90C, 0x50))
+                        d1 = struct.unpack_from("<I", before, 0x4C)[0]
+                        assert origin_address == [d1] and d1 == stack and d1 >= 5
+                        struct.pack_into("<I", before, 0x4C, d1 - 5)
+                        pending_address_step.append(bytes(before))
+                        for i in range(5):
+                            origins.registers[12][i] = 0
+                        origin_path.append(pc)
                     if pc == 0x3130 or len(trace) > 120:
                         uc.emu_stop()
                         return
@@ -389,24 +407,33 @@ for cursor in range(8):
                             "<I", address_state, 4 * (transfer.address - 11)
                         )[0]
                         assert 0 <= address < address + transfer.nibbles <= 0x100000
-                        if pc in origin_steps[1:]:
+                        if pc in (origin_steps[1], origin_steps[2], origin_steps[4]):
                             assert len(origin_path) == origin_steps.index(pc)
                             assert transfer.nibbles == 5 and transfer.first == 0
                             if pc == origin_steps[1]:
                                 assert transfer.load == 1 and transfer.data == 2
+                                assert address == stack
                                 origin_address.append(address)
-                            else:
+                            elif pc == origin_steps[2]:
                                 assert transfer.load == 0 and transfer.data == 0
                                 assert origin_address == [address]
+                            else:
+                                assert transfer.load == 0 and transfer.data == 2
+                                assert origin_address == [address + 5]
+                                assert address == stack - 5
+                            tokens = preserved_top if pc == origin_steps[4] else origin_memory
                             assert (
                                 lib.hpclang_rpl_code_origins_memory(
-                                    c.byref(origins), c.byref(transfer), origin_memory, 5
+                                    c.byref(origins), c.byref(transfer), tokens, 5
                                 )
                                 == 0
                             )
                             origin_path.append(pc)
                             if len(origin_path) == 3:
                                 assert list(origin_memory) == [0x100 + i for i in range(5)]
+                            if len(origin_path) == 5:
+                                assert list(origin_memory) == [0x100 + i for i in range(5)]
+                                assert list(preserved_top) == [0x200 + i for i in range(5)]
                         reg_at = cpu + 0x90C + 8 * transfer.data
                         register = int.from_bytes(uc.mem_read(reg_at, 8), "little")
                         values = [live_nibble(address + i) for i in range(transfer.nibbles)]
@@ -443,7 +470,8 @@ for cursor in range(8):
             uc.emu_start(0x28828, 0x400000, count=30000)
             assert trace[-1] == 0x3130 and cursor_steps == [1, 7, 1, 7, 7]
             assert memory_checks and not pending_memory
-            assert len(origin_path) == (3 if flags == 1 else 0)
+            assert not pending_address_step
+            assert len(origin_path) == (5 if flags == 1 else 0)
             assert 0x88CA2 + delta in trace and 0x88CA9 + delta in trace
             assert word(0x806F8) == stack - (5 if flags == 1 else 0)
             assert word(0x8076B) == 0x88D67 + delta
@@ -481,6 +509,11 @@ for cursor in range(8):
                     r0_read=used,
                     memory_transfers=memory_checks,
                     r0_origin_path=origin_path,
+                    stack_origin_slots=(
+                        {str(stack): list(origin_memory), str(stack - 5): list(preserved_top)}
+                        if flags == 1
+                        else {}
+                    ),
                     writes=writes.value,
                     stack_peak=1,
                     stack_final=-1,

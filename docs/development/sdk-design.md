@@ -1215,13 +1215,19 @@ checked before changes. These are abstract origins, not numeric execution,
 pointer classification or a general control-flow interpreter. Callers must stop
 or invalidate facts at unmodeled writes and retain all code/mapping dependencies.
 
-`alternate_return.py` now composes the original three-instruction R0.A-to-A.A,
-DAT1-to-C.A, A.A-to-DAT1 segment using these C operations. Across both models,
-all 192 controlled return cases pass: 96 follow that segment and carry exactly
-the R0 nibble tokens into its stack cell; the other 96 do not enter it. Original
+`alternate_return.py` composes the original R0.A-to-A.A, DAT1-to-C.A,
+A.A-to-DAT1, D1=D1-5, C.A-to-DAT1 segment. Copies and transfers use these C
+operations. The fixture separately guards the exact `1c4` address instruction,
+checks the resulting D1 and unchanged A/B/C/D/R0-R4/D0, and invalidates D1
+origins rather than copying tokens through arithmetic borrow. Both stack slots
+have independently checked addresses and distinct token storage.
+Across both models, all 192 controlled return cases pass: 96 follow all five
+instructions, carry R0 tokens into the original stack cell, and preserve the
+old top's tokens in the adjacent cell; the other 96 do not enter it. Original
 allocation variants are included. Unit tests cover descriptor composition,
 overlapping copies, simultaneous exchanges, clearing constants, and unchanged
-state on invalid inputs. `/work/oct28-origins-return` retains hash-bound reports.
+state on invalid inputs. `/work/oct28-origin-stack` retains current hash-bound
+reports; `/work/oct28-origins-return` retains the earlier three-step evidence.
 Seeding R0 tokens identifies their origin; it does not by itself prove the
 incoming value is a valid object, establish the whole caller path, or authorize
 movement. The deliberately stale-R0 controls retain that distinction.
