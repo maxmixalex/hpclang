@@ -114,7 +114,7 @@ startup safety and reclamation. Sound compatibility is independent.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
-| Native references and libraries | #24 implements guarded catalog/HOME/cache edits, register repairs, physical mappings, TEMP traversal and terminal handling of partial publication; local D0/D1 rules pass sanitizer/ARM and emulator checks; 896 original-interpreter cases and 44 changed-code controls pass, including DUP/inline-entry composition with existing stack capacity | Complete launcher/opaque/banked provenance, handler identity, library configuration and public management; Port1 replace/remove remain unavailable |
+| Native references and libraries | #24 implements guarded catalog/HOME/cache edits, register repairs, physical mappings, TEMP traversal and terminal handling of partial publication; local D0/D1 rules pass sanitizer/ARM and emulator checks; 896 original-interpreter cases and 44 changed-code controls pass, including DUP/inline-entry composition with existing stack capacity | Complete launcher/opaque/banked provenance, handler identity including exhausted-stack memory traversal, library configuration and public management; Port1 replace/remove remain unavailable |
 | Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Remote CI acceptance |
 | Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
 | Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Not pushed or CI accepted; HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
@@ -129,7 +129,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #24 / `6ff8a1e9` | Submitted. Latest CI snapshot: seven workflows successful, five queued; 158 jobs successful, 17 running, 214 queued and one skipped. Not accepted. Local explicit-ID follow-up is not pushed. |
+| #24 / `6ff8a1e9` | Submitted. Latest CI snapshot: seven workflows successful, two running, three queued; 185 jobs successful, 13 running, 191 queued and one skipped. Not accepted. Local explicit-ID follow-up is not pushed. |
 | #21 / `00d5ddf1` | UI pool/RW checks pass six retained Stock fixtures locally. HP39g+ immediate retest passes; earlier watchdog failure cause, full CI and total system peaks remain open. |
 | #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; cause unproven. |

@@ -1184,6 +1184,19 @@ modes this gives 896 cases and 44 controls. The allocation/GC branch at exhauste
 capacity is deliberately outside this result, and remains an open handler
 obligation rather than permission for public relocation.
 
+Inspection of both retained ROMs identifies the exhausted-capacity dependency:
+`05f0f` calls `0679b`, `0613e`, and `067d2` before decrementing the replenished
+capacity. The first/last routines save/restore D0, D1, B.A and D.A through
+system slots `8076b`, `806f8`, `806f3`, and `80e9b`. The inspected `0613e`
+prefix pops its return address into `80fad`, follows the chain rooted at
+`806ee`, and writes six-nibble entries at `06184`. Consequently, setting the
+synthetic test's capacity to zero is not a valid heap fixture. Exhaustion
+coverage requires a coherent Stock heap and continuation roots, with movement
+and write-set assertions. These inspection windows establish dependencies,
+not complete handler extents or successful GC execution. Reproduction:
+`research/oct28-dispatch-capacity-callees.py`; local artifacts:
+`/work/oct28-dispatch-capacity-callees/windows.json` and per-model disassembly.
+
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
 A/C bit-test instruction boundaries. Its relocation planner
