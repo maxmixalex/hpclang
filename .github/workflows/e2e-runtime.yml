@@ -378,6 +378,18 @@ jobs:
           fi
           bash tests/e2e/harness/run-family.sh stock "$FAMILY" "build/e2e/$APPLICATION" "build/assets/$APPLICATION"
 
+      - name: Verify suspended return roots against original interpreter
+        if: matrix.suite.mode == 'code-relocation'
+        run: |
+          bash tools/install-ci-packages.sh gcc python3-venv
+          python3 -m venv build/relocation-venv
+          build/relocation-venv/bin/pip install --disable-pip-version-check \
+            -r tests/e2e/code-relocation/requirements.txt
+          build/relocation-venv/bin/python tests/e2e/code-relocation/incoming_carry.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry"
+
       - name: Verify suite-specific evidence
         if: matrix.suite.verifier != ''
         env:
@@ -427,6 +439,7 @@ jobs:
             build/stock-${{ matrix.model.family }}-targets.txt
             build/*-stock-media.img
             build/*-code-relocation/**
+            build/*-incoming-carry/**
             build/e2e/${{ matrix.suite.artifact }}/e2e.hpc
             build/e2e/${{ matrix.suite.artifact }}/e2e.stock-*.json
             build/e2e/${{ matrix.suite.artifact }}/launchers/memory.json

@@ -398,3 +398,16 @@ Fresh application and six launchers built at /work/oct29-carry-launch-e2e;
 two-model full Stock call/catalog integration is running, not yet passed.
 PR21 exact head 10e05bc0 has 17 successful, six running and 170 queued jobs
 across seven unfinished workflows at observation; no failure reported.
+
+## 2026-10-29 — Incoming-carry CI integration (local)
+
+The Stock code-relocation job now prepares a dedicated Python virtual environment
+with unicorn==2.1.4 and runs incoming_carry.py against its target snapshot.
+Reports are included in the existing evidence upload. Other suites and Direct
+jobs do not acquire this dependency. Workflow YAML/Stock-only placement and
+ShellCheck pass. A fresh local venv reproduces all 192 two-model cases with only
+the declared Python dependency. The workflow change is not yet submitted.
+Full Stock integration sessions 85305 (HP49g+) and 76272 (HP50g) remain live;
+both have reported the first native catalog case passed, not the complete suite.
+Exact-head PR26 fb261f17 now has 21 successful, three running and 118 queued
+jobs; 12 workflows remain unfinished. No failure or acceptance is reported.

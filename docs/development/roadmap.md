@@ -1,6 +1,6 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-10-28. **M8 is incomplete; only M8.1 is accepted complete.**
+Current checkpoint: 2026-10-29. **M8 is incomplete; only M8.1 is accepted complete.**
 Docker/WSL is restored. Earlier ID1701 two-model reservation retests pass guarded
 recovery, repeat restart, absent recovery and 16 rejection cases per model.
 Supported ID769 reservation matrices now pass on both models; full startup
@@ -110,7 +110,7 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-Incoming-carry root discovery passes 192 controlled original-interpreter cases across HP49g+/HP50g, sanitizer tests and six launcher builds. Fresh full Stock call/catalog integration is running for both models; the previous 28-case result predates this follow-up.
+Incoming-carry root discovery passes 192 controlled original-interpreter cases across HP49g+/HP50g, sanitizer tests and six launcher builds. Its Stock code-relocation CI gate is implemented locally and reproduced in a clean virtual environment. Fresh full Stock call/catalog integration is running for both models; the previous 28-case result predates this follow-up.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -118,7 +118,7 @@ startup safety and reclamation. Sound compatibility is independent.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
-| Native references and libraries | #25 accepted; #26 follow-up submitted. Guarded TEMP lookup and masked roots pass 304 controlled return cases/480 rejections, sanitizer/API checks and ARM builds. Fresh HP49g+/HP50g Stock call/catalog integration passes all 28 cases, with source/artifact hashes and unchanged Flash independently checked. This exercises default RPL3; explicit RPL4 masks retain host/controlled-fixture coverage only. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
+| Native references and libraries | #25 accepted; #26 follow-up submitted. Guarded TEMP lookup and masked roots pass 304 controlled return cases/480 rejections, sanitizer/API checks and ARM builds. The preceding build passes all 28 HP49g+/HP50g Stock call/catalog cases, with source/artifact hashes and unchanged Flash independently checked. This exercises default RPL3; explicit RPL4 masks retain host/controlled-fixture coverage only. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
 | Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Accepted in #24; retain lifecycle regressions |
 | Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
 | Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Accepted in #25. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
@@ -133,7 +133,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `fb261f17` | **CI pending:** 12 workflows, six running and six queued; 13 successful, seven running and 59 queued jobs at observation, no failures reported. Incoming-carry follow-up passes local sanitizer tests and six launcher builds; original-interpreter integration and submission remain pending. |
+| #26 / `fb261f17` | **CI pending:** 12 workflows (three running, nine queued); 21 successful, three running and 118 queued jobs at observation, no failures reported. Local incoming-carry follow-up passes 192 interpreter cases and clean-environment reproduction; full Stock integration is running. Follow-up and its CI gate are not yet pushed. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `10e05bc0` | **CI pending:** seven workflows (three running, four queued); 17 successful, six running and 170 queued jobs at observation, no failures reported. This PR targets unresolved #20; PWM diagnostic coverage is not a claimed fix. |
