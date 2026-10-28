@@ -1120,3 +1120,19 @@ The alias API contract now explicitly requires mutable selector dependencies.
 Production profiles must validate these data, shared handler semantics and
 calling context; address or code-only matching must not authorize relocation.
 Ruff, clang-format and diff checks pass. No production alias is enabled yet.
+
+## Alias selector guard composition — local, 2026-10-29
+
+Maintained `alias_guards.py`, invoked and source-hashed by `bank_switch_maps.py`,
+uses the existing guarded FlashPtr selector matcher for the alias D0 fields
+established by original-ROM tracing. Both saved models resolve selectors 1/3 to
+banks 2/4 through unique configuration matches, retaining 85 observed nibbles
+in 17 mapping-qualified guards per case. All 340 individual stale-nibble changes
+are rejected. A legitimate alternate-bank configuration rejects the old guard
+set, resolves to the alternate bank on recapture, and passes its new guards;
+restoring the original configuration rejects the new guards. This composes data
+resolution with transaction preflight primitives; it does not itself execute a
+transaction or authenticate the switch code. Owner mappings and execution/payload
+closure remain separate requirements. Both full maintained bank-switch scripts
+pass, including original-ROM overlay/selector counterexamples. Reports are in
+`/work/oct29-alias-guards/{model}/bank-switch-maps.json`.

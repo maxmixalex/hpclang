@@ -14,6 +14,7 @@ from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_AR
 
 from flashptr_guards import verify_flashptr
 from bank_overlay import verify_attachment_switches, verify_overlay
+from alias_guards import verify_alias_selectors
 
 if not __debug__:
     raise RuntimeError("Assertions required")
@@ -53,6 +54,7 @@ sources = {
         Path(__file__),
         Path(__file__).with_name("flashptr_guards.py"),
         Path(__file__).with_name("bank_overlay.py"),
+        Path(__file__).with_name("alias_guards.py"),
     ]
 }
 shared = args.output / "bank-switch-maps.so"
@@ -404,6 +406,7 @@ for index in range(17):
 flashptr_rows = verify_flashptr(lib, read, flash, rows)
 overlay_rows = verify_overlay(lib, ram, flash, cpu, rows)
 attachment_rows = verify_attachment_switches(ram, flash, cpu, rows)
+alias_selector_rows = verify_alias_selectors(lib, read)
 assert all(
     hashlib.sha256(Path(p).read_bytes()).hexdigest() == value for p, value in sources.items()
 )
@@ -416,6 +419,7 @@ report.write_text(
             flashptr_tables=flashptr_rows,
             overlay_sequences=overlay_rows,
             attachment_switch_sequences=attachment_rows,
+            alias_selector_guards=alias_selector_rows,
             flash_sha256=hashlib.sha256(flash).hexdigest(),
             sram_sha256=hashlib.sha256(ram).hexdigest(),
             incoming_p=incoming_p,
