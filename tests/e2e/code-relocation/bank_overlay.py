@@ -3,7 +3,7 @@
 import ctypes as c
 import struct
 
-from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE
+from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE, UC_HOOK_MEM_WRITE
 from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
 
 
@@ -169,28 +169,74 @@ def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
         ):
             uc.reg_write(reg, value)
         returned = []
+        config_stages = []
+        writes = []
 
         def stop(_, pc, size, user):
+            if pc == 0x28898:
+                native_pc = uc.reg_read(UC_ARM_REG_R7)
+                if native_pc in (0x23063, 0x23066, 0x2306F, 0x23075):
+                    config_stages.append(
+                        dict(
+                            pc=native_pc,
+                            flags=struct.unpack("<I", uc.mem_read(cpu + 0xB9C, 4))[0],
+                            d0=struct.unpack("<I", uc.mem_read(cpu + 0x954, 4))[0],
+                            c_low=struct.unpack("<I", uc.mem_read(cpu + 0x91C, 4))[0] & 0xFFFFF,
+                        )
+                    )
             if pc == 0x28898 and uc.reg_read(UC_ARM_REG_R7) == 0x3130:
                 returned.append(True)
                 uc.emu_stop()
 
         uc.hook_add(UC_HOOK_CODE, stop)
 
+        def record_write(_, access, address, size, value, user):
+            # Reviewed interpreter-state window and controlled ARM stack only.
+            # This is a bounded regression, not a proof for unexecuted paths.
+            assert (cpu <= address and address + size <= cpu + 0xC20) or (
+                0x300000 <= address and address + size <= 0x310000
+            ), (hex(address), size)
+            writes.append((address, size))
+
+        uc.hook_add(UC_HOOK_MEM_WRITE, record_write)
+
         def call(switch, p):
             for offset, value in ((0x998, 1), (0x978, 0x3130), (0x95C, p), (0x970, 0)):
                 uc.mem_write(cpu + offset, struct.pack("<I", value))
             uc.reg_write(UC_ARM_REG_R7, switch)
             returned.clear()
+            config_stages.clear()
+            writes.clear()
+            before_flags = struct.unpack("<I", uc.mem_read(cpu + 0xB9C, 4))[0]
             uc.emu_start(0x28828, 0x400000, count=100000)
             assert returned
             assert struct.unpack("<I", uc.mem_read(cpu + 0x95C, 4))[0] == 0
             assert bytes(uc.mem_read(0, len(flash))) == flash
+            if switch != banks[16]["switch"]:
+                assert [stage["pc"] for stage in config_stages] == [
+                    0x23063,
+                    0x23066,
+                    0x2306F,
+                    0x23075,
+                ]
+                assert not before_flags & 0x24
+                assert [stage["flags"] for stage in config_stages] == [
+                    before_flags,
+                    before_flags | 0x20,
+                    before_flags | 4,
+                    before_flags,
+                ]
+                assert config_stages[0]["c_low"] == 0xFF000
+                assert config_stages[2]["d0"] == config_stages[2]["c_low"]
+                assert 0x7F000 <= config_stages[2]["d0"] < 0x80000
             return dict(
                 pages=list(struct.unpack("<256I", uc.mem_read(cpu, 1024))),
                 owners=list(uc.mem_read(cpu + 0x808, 256)),
                 flags=struct.unpack("<I", uc.mem_read(cpu + 0xB9C, 4))[0],
                 banks=list(struct.unpack("<2I", uc.mem_read(cpu + 0xBCC, 8))),
+                write_pages=list(struct.unpack("<256I", uc.mem_read(cpu + 0x400, 1024))),
+                configuration_flags=[stage["flags"] for stage in config_stages],
+                write_scope_checked=bool(writes),
             )
 
         if initial is not None:

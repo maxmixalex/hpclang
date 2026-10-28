@@ -118,6 +118,7 @@ and resolve the first ACPTR payload (bank 2, 7291 nibbles), then reject its
 separate execution reference. Selector guards reject 340 stale-nibble changes.
 Local D0/D1 literal decoding now derives selector fields from entry instructions;
 192 original-interpreter cases and both maintained bank regressions pass.
+Local switch tests also check temporary configuration state and bounded write effects.
 Production firmware/handler identity, owner/geometry freshness, complete payload
 and execution coverage, public libraries and Port1 edits remain open.
 
@@ -142,12 +143,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `d0471894` | **CI pending:** 0 successful and 10 unfinished workflows; 0 successful, 3 running and 7 queued jobs, no failures observed. Historical HP39g+ pre-entry Kermit failure remains unexplained. D0/D1 literal decoding is local. |
+| #26 / `d0471894` | **CI pending:** 1 successful and 9 unfinished workflows; 83 successful, 20 running and 234 queued jobs, no failures observed. Historical HP39g+ pre-entry Kermit failure remains unexplained. D0/D1 and configuration-effect follow-ups are local. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `1ce01859` | **CI pending:** 3 successful and 1 unfinished workflows; 168 successful, 1 running and 0 queued jobs, no failures observed. Historical HP50g PWM failure remains unproven; mainline and lifecycle acceptance remain open. |
+| #20 / `4f2ce605` | **CI pending:** 0 successful and 12 unfinished workflows; 0 successful, 0 running and 20 queued jobs, no failures observed. Previous head passed four workflows/169 jobs; current main integration requires fresh CI acceptance. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

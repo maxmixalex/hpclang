@@ -1177,3 +1177,50 @@ all normal, alternate-selector and ERAM scenarios pass on both models. Reports:
 `/work/oct29-address-literals/{model}/bank-switch-maps.json`. ARMv4T Thumb compile,
 static analysis, clang-format and Ruff pass. Shared handler control flow and
 production identity/transaction integration remain incomplete.
+
+## Resource observer main integration — local, 2026-10-29
+
+PR20 head 1ce01859 passes all four workflows and 169 jobs, including publication.
+GitHub reports conflicts with accepted main 3c484673 in roadmap and PWM IRQ test.
+The local merge retains main's accepted IRQ/watchdog implementations unchanged
+(both files byte-identical to main), which already include elapsed-time waits,
+clock-error handling and failure preservation. Observer capture, independent
+capacity verifier, UI lifecycle checks and workflow evidence remain present.
+The roadmap keeps M0-M7 summaries and current compact status; branch-specific
+historical evidence remains in prior commits, sdk-design and the history archive.
+Six snapshot tests, seven verifier tests and five UI memory tests pass (18 total),
+as do full tracked-file format/Ruff/ShellCheck and strict docs. Logs are retained
+in `/work/oct29-resource-integration-quality` and `/work/oct29-resource-docs-check.log`.
+The merged version requires fresh CI; neither parent CI nor this integration
+completes M8.2/M8.3 or proves unsampled peak capacity.
+
+## Shared bank-switch body inventory — local, 2026-10-29
+
+The bounded 0x22fec..0x23077 shared-body inventory decodes 31 instructions on
+both captured ROMs. Existing descriptors identify P-dependent branches, setting
+P=0, reading five nibbles from DAT0 into C, copying C.A to D0 and writing C.B
+through DAT0. The path also contains CONFIG/UNCONFIG and return instructions;
+those mapping/device effects must not be treated as ordinary RAM writes or
+silently skipped. `/work/oct29-switch-body/report.json` records code bytes,
+descriptors and source/ROM hashes. This diagnostic framing does not establish
+complete semantics or mutation safety. During the concrete #26 CI wait, PR20
+integration was prepared and pushed as 4f2ce605 after its prior full CI acceptance.
+
+## Shared switch configuration effects — local, 2026-10-29
+
+Original-ROM instruction-boundary traces retain C, D0, all read/write map cells,
+configuration flags and ARM writes. In the tested shared path, the first CONFIG
+uses C.A=0xff000 and sets flag 0x20; the second consumes the selected 0x7f000-page
+configuration value and replaces that temporary flag with 0x4. The DAT0 byte
+store invokes the bank mapping handler; UNCONFIG restores the original flags.
+`verify_attachment_switches` now asserts this sequence for aliases and standard
+entries under baseline, bank-0 and ERAM initial states, including changed-selector
+counterexamples. It compares all Write[] cells as well as Read[] and rejects any
+emulated ARM write outside the reviewed interpreter-state window (cpu..cpu+0xc20)
+and controlled ARM stack. Flash remains unchanged. Both maintained model runs
+pass; report flags, write-scope checks, maps and source hashes are retained in
+`/work/oct29-config-effects/{model}/bank-switch-maps.json`. Expanded exploratory
+trace: `/work/oct29-bank-alias-trace.json`. This bounds observed effects, not all
+possible configurations, pending interrupts or production handler identity.
+The memory-store descriptor alone is insufficient to classify the store as RAM;
+configuration routing must be retained in production reference analysis.
