@@ -118,8 +118,8 @@ Local launcher follow-up discovers bounded A/C execution uses and conditionally
 publishes RPL4 masks; Port1 accepts RPL4. A reproduced stack-underflow
 misclassification is fixed by clearing consumed private stack cells. The fix
 passes 16 ROM/linked-ARM regressions, existing register/movement tests, sanitizers,
-ARM analysis/build and artifact reproduction. Fresh full Stock integration is
-running. All 34 native bank switches pass ROM mapping/geometry checks, including
+ARM analysis/build, artifact reproduction, full source checks and strict docs.
+Fresh full Stock integration is running. All 34 native bank switches pass ROM mapping/geometry checks, including
 unused-bank rejection; full reference coverage and public management remain open.
 
 The active dependencies are complete execution-reference handling for safe
@@ -143,7 +143,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `1dc590b1` | **CI pending:** two successful workflows and eight unfinished; 42 successful, seven running and 207 queued jobs at observation, no failures. Local register-root/underflow fixes remain unsubmitted; fresh Stock integration is running. |
+| #26 / `1dc590b1` | **CI failure under investigation:** HP39g+ Stock object-mutation stalls before application entry during Kermit transfer (job 123048995027). 62 successful, 15 running, 197 queued and one failed job observed; workflows remain unfinished. All 949 audited data/ACK/NAK frames pass framing/CRC checks; exact-artifact local reproduction is running. Local register-root/underflow fixes remain unsubmitted. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI pending:** three unfinished workflows; 254 successful, 51 queued and 13 running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |

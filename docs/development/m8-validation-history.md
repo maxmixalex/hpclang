@@ -656,3 +656,30 @@ The test is wired into the existing code-relocation CI/evidence path locally;
 it is not submitted or CI-accepted. This proves mapping behavior on these
 fixtures, not firmware discovery, complete banked roots or public Port1 edits.
 Full Stock sessions 33856/94548 remain live, each through seven successful cases.
+
+## 2026-10-29 — PR26 HP39g+ pre-entry transfer failure
+
+Exact-head 1dc590b1 audit finds job 123048995027 in run 40751033469 failed:
+Stock object-mutation/hp39gplus. Directory transfer completed; payload stalled
+at send-window 46 with repeated NAK/resends, followed by device Timeout and the
+90-second no-progress watchdog. Stock JSON has object_store_phase=0, no pass or
+return. This is pre-entry transfer failure, not evidence of object-mutation
+execution failure. Source cause remains unproven. All 949 audited data/ACK/NAK
+frames have valid lengths, sequence fields and CRCs at the socat boundary. The
+device's final Timeout frame has a high-bit sequence byte but valid CRC.
+Logs, RAM and application artifacts are retained under
+research/oct29-pr26-object-mutation-failure; packet audit is
+research/oct29-pr26-packet-audit.json. Exact application/assets/emulator from the
+failed run are being replayed in /work/oct29-pr26-object-ci (session 14864).
+Shell and sequence CRLF setup failures occurred before a scheduled test and
+were corrected separately; their logs remain, not counted as reproductions.
+Application/assets/emulator hashes are checked. Other observation counts:
+62 successful, 15 running and 197 queued jobs; two workflows successful and
+eight unfinished. No new push or CI acceptance is claimed.
+
+Delivery checks after d84f3062 pass full tracked-file formatting, Ruff and
+ShellCheck (session 24666 terminal), plus strict Zensical build. Temporary
+normalized sources and generated site are removed; logs retained at
+/work/oct28-pr25-format-fix and /work/oct29-current-docs-check.log.
+Stock sessions 33856/94548 have each completed eleven cases and remain live;
+exact CI-artifact HP39g+ reproduction session 14864 also remains live.
