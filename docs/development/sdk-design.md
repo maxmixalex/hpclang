@@ -1172,6 +1172,18 @@ These are controlled entries after OS setup, with no IRQ, not an unrestricted
 caller/startup proof or permission to relocate. The individual D0/D1 checks
 retain 4,096 x48 comparisons and 128 saved-ROM instruction checks.
 
+With `--through-dispatch --duplicate-entry`, execution starts at `37258`:
+DUP preserves the original stack-top object, consumes one existing stack slot,
+and enters the embedded predicate. The C structural decoder's two wrapper
+edges and single predicate edge agree with the actual interpreter entry; the
+scalar type operand is never emitted as a pointer. Capacity values 1 and 16,
+both carry inputs, all eight machine-stack cursors and all P values are covered.
+Across both models and both snapshot families, 512 cases and 20 changed-code
+controls pass, including a wrong stack-step control. Together with the existing
+modes this gives 896 cases and 44 controls. The allocation/GC branch at exhausted
+capacity is deliberately outside this result, and remains an open handler
+obligation rather than permission for public relocation.
+
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
 A/C bit-test instruction boundaries. Its relocation planner
