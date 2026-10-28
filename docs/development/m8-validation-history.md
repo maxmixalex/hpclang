@@ -1577,3 +1577,28 @@ The preceding remote heads remain pending with no failed job in this audit:
 running/104 queued jobs; #20 4f2ce605 has seven successful/five queued workflow
 records and 297 successful/17 running/75 queued/one skipped jobs. Workflow/job
 snapshots are reported independently; neither head is fully accepted.
+
+## 2026-10-29 — Complete physical ROM-profile Stock matrix
+
+Both live runs under `/work/oct29-stock-rom-profile` finish all 14 cases and
+validate unchanged application/source input hashes. Independent `verified.json`
+checks 28 post-call markers, 18 original returns, ten fixture-rewritten returns,
+36 unchanged Flash snapshots and 16 reproduced artifacts. The expanded
+`profile-memory-all-verified.json` independently translates each ELF evidence
+symbol through its saved original pool table: all 28 cases report the expected
+ROM model/layout, 14 populated banks and 3,520 samples. Saved SRAM and artifact
+hashes accompany the evidence.
+
+A fresh independent rebuild from the current tracked source (including the new
+bank-effects module) matches all 16 original HPC1/stage/metadata/launcher artifacts
+byte-for-byte; unused bank-effects code is not exercised by this Stock witness.
+The updated reproduction manifest records current source hashes, and its temporary
+build is removed. The effects capture/predictor remains separately covered by
+sanitizers, ARM analysis and the 672 original-handler comparisons. This closes
+this local Stock campaign, not M8.0 or production execution-reference acceptance.
+
+Pre-push audit: #26 b5891517 has one successful/nine queued workflows and 16
+successful/two running/217 queued jobs, with no failed jobs. #20 4f2ce605 has
+seven successful/five queued workflow records and 300 successful/18 running/71
+queued/one skipped jobs. Neither head is accepted. Historical unexplained
+pre-entry Kermit/PWM failures remain recorded separately.
