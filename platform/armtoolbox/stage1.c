@@ -1647,9 +1647,13 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
              * its next-push cursor at 0x998. Stop at any unclassified instruction. */
             uint32_t *cpu = (uint32_t *)saturn_state;
             const struct hpclang_stage_stack_io io = {(void *)saturn_state, stage_stack_read, NULL};
-            rpl_bounds.native_root_count += hpclang_stage_return_roots(
+            /* Carry belongs to this same suspended SAT_CPU. Preserve unknown
+             * semantics for noncanonical values instead of guessing a branch. */
+            uint32_t saved_carry = cpu[0x970u / sizeof(uint32_t)];
+            int carry = saved_carry <= 1u ? (int)saved_carry : -1;
+            rpl_bounds.native_root_count += hpclang_stage_return_roots_with_carry(
                 &io, *(uint32_t *)stock_frame, cpu + 0x978u / sizeof(uint32_t),
-                cpu[0x998u / sizeof(uint32_t)], native_roots + 2);
+                cpu[0x998u / sizeof(uint32_t)], carry, native_roots + 2);
         }
         /* Do not publish Saturn's machine return stack as unconditional roots:
          * RSTK=C can also save numbers. Operations that move TEMP code must

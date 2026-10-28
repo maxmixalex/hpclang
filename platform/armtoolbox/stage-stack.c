@@ -32,17 +32,17 @@ uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_i
     return *root < RPL_MAIN_END ? root : NULL;
 }
 
-unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uint32_t continuation,
-                                    uint32_t *machine_stack, uint32_t cursor, uint32_t **roots)
+unsigned hpclang_stage_return_roots_with_carry(const struct hpclang_stage_stack_io *io,
+                                               uint32_t continuation, uint32_t *machine_stack,
+                                               uint32_t cursor, int carry, uint32_t **roots)
 {
-    if (!roots || !io || !io->read || !machine_stack || cursor >= 8u)
+    if (!roots || !io || !io->read || !machine_stack || cursor >= 8u || carry < -1 || carry > 1)
         return 0;
     unsigned count = 0;
     uint32_t stack[8];
     for (unsigned i = 0; i < 8u; ++i)
         stack[i] = machine_stack[i];
     unsigned original = 255u;
-    int carry = -1; /* Initial interpreter flags have not been established. */
     /* Track call-generated continuations separately: a push overwrites that
      * cell's original value, which must never be reported as a consumed root. */
     for (unsigned steps = 0; count < 8u && steps < 64u; ++steps) {
@@ -119,6 +119,13 @@ unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uin
         }
     }
     return count;
+}
+
+unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uint32_t continuation,
+                                    uint32_t *machine_stack, uint32_t cursor, uint32_t **roots)
+{
+    return hpclang_stage_return_roots_with_carry(io, continuation, machine_stack, cursor, -1,
+                                                 roots);
 }
 
 int hpclang_stage_stack_hide(const struct hpclang_stage_stack_io *io, uintptr_t stage0_code,

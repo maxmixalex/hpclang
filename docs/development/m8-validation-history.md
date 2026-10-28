@@ -367,3 +367,19 @@ successful, five queued; 167 successful jobs, 18 running and 169 queued, no
 failures. Earlier incomplete CI is not accepted as passing. The planned push
 includes guarded TEMP lookup, masked roots, versioned launch support and their
 regressions, and requires new CI. No merge or milestone completion.
+
+## 2026-10-29 — Suspended carry in launcher return discovery (local)
+
+The launcher now supplies canonical SAT_CPU carry at offset 0x970 on supported
+HP49g+/HP50g layouts; noncanonical values stay unknown. The existing entry point
+retains unknown-carry behavior. Tests cover 144 combinations of stack cursor,
+condition, incoming carry and conditional-return/forward/backward branch, plus
+432 instruction-read faults, invalid carry, no stack mutation and no writes.
+ASan/UBSan stage_stack passes (0.31 s); all six raw launchers build successfully.
+This is bounded root discovery, not complete execution-reference coverage.
+Original-interpreter integration for the changed launcher is pending; earlier
+28-case Stock evidence applies to the previous source only.
+
+Exact-head #26 fb261f17 CI observation: 12 workflows (six running, six queued),
+13 successful jobs, seven running and 59 queued; no failures reported.
+No CI acceptance or M8 milestone completion is claimed.
