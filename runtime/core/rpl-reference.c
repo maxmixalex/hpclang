@@ -12,6 +12,7 @@ struct traversal
 
 static int plan_shift(const struct hpclang_rpl_reference *reference, uint32_t first, uint32_t end,
                       int32_t delta, int field_mapping, int target_mapping, int qualified,
+                      int32_t field_offset, int32_t target_offset,
                       struct hpclang_rpl_reference_patch *patch)
 {
     if (!reference || !patch)
@@ -42,13 +43,19 @@ static int plan_shift(const struct hpclang_rpl_reference *reference, uint32_t fi
     uint32_t field = reference->field, target = reference->target;
     if (field > 0xffffbu || target >= 0x100000u)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    int field_moves = field_mapping && field >= first && field < end;
-    if ((field_moves && end - field < 5) || (field_mapping && field < first && first - field < 5))
+    int64_t located_field = (int64_t)field + field_offset;
+    int64_t located_target = (int64_t)target + target_offset;
+    int field_moves = field_mapping && located_field >= first && located_field < end;
+    if ((field_moves && end - located_field < 5) ||
+        (field_mapping && located_field < first && first - located_field < 5))
         return HPCLANG_RPL_SPAN_BOUNDS;
-    uint32_t shifted_field = (uint32_t)((int64_t)field + (field_moves ? delta : 0));
-    uint32_t shifted_target =
-        (uint32_t)((int64_t)target +
-                   (target_mapping && target >= first && target < end ? delta : 0));
+    int target_moves = target_mapping && located_target >= first && located_target < end;
+    int64_t next_field = (int64_t)field + (field_moves ? delta : 0);
+    int64_t next_target = (int64_t)target + (target_moves ? delta : 0);
+    if (next_field < 0 || next_field > 0xffffb || next_target < 0 || next_target > 0xfffff)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t shifted_field = (uint32_t)next_field;
+    uint32_t shifted_target = (uint32_t)next_target;
     int relative = reference->kind == HPCLANG_RPL_REFERENCE_DIRECT && reference->auxiliary;
     uint32_t old_value = relative ? (target - field) & 0xfffffu : target;
     uint32_t value = relative ? (shifted_target - shifted_field) & 0xfffffu : shifted_target;
@@ -62,7 +69,7 @@ int hpclang_rpl_reference_plan_shift(const struct hpclang_rpl_reference *referen
                                      uint32_t end, int32_t delta,
                                      struct hpclang_rpl_reference_patch *patch)
 {
-    return plan_shift(reference, first, end, delta, 1, 1, 0, patch);
+    return plan_shift(reference, first, end, delta, 1, 1, 0, 0, 0, patch);
 }
 
 int hpclang_rpl_reference_plan_qualified_shift(
@@ -73,13 +80,25 @@ int hpclang_rpl_reference_plan_qualified_shift(
     if (!mappings)
         return HPCLANG_RPL_SPAN_MALFORMED;
     return plan_shift(reference, first, end, delta, mappings->field == mappings->moving,
-                      mappings->target == mappings->moving, 1, patch);
+                      mappings->target == mappings->moving, 1, 0, 0, patch);
 }
 
-int hpclang_rpl_reference_plan_execution_shift(
-    const struct hpclang_rpl_reference *reference,
-    const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
-    int32_t delta, struct hpclang_rpl_reference_patch *patch)
+int hpclang_rpl_reference_plan_offset_shift(const struct hpclang_rpl_reference *reference,
+                                            const struct hpclang_rpl_reference_mappings *mappings,
+                                            int32_t field_offset, int32_t target_offset,
+                                            uint32_t first, uint32_t end, int32_t delta,
+                                            struct hpclang_rpl_reference_patch *patch)
+{
+    if (!mappings)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    return plan_shift(reference, first, end, delta, mappings->field == mappings->moving,
+                      mappings->target == mappings->moving, 1, field_offset, target_offset, patch);
+}
+
+static int plan_execution_shift(const struct hpclang_rpl_reference *reference,
+                                const struct hpclang_rpl_reference_mappings *mappings,
+                                uint32_t first, uint32_t end, int32_t delta, int32_t field_offset,
+                                int32_t target_offset, struct hpclang_rpl_reference_patch *patch)
 {
     if (!reference || !patch || reference->kind != HPCLANG_RPL_REFERENCE_EXECUTION ||
         reference->extent || reference->auxiliary || !reference->target)
@@ -87,14 +106,22 @@ int hpclang_rpl_reference_plan_execution_shift(
     struct hpclang_rpl_reference address = *reference;
     address.kind = HPCLANG_RPL_REFERENCE_DIRECT;
     struct hpclang_rpl_reference_patch next;
-    int result =
-        hpclang_rpl_reference_plan_qualified_shift(&address, mappings, first, end, delta, &next);
+    int result = hpclang_rpl_reference_plan_offset_shift(&address, mappings, field_offset,
+                                                         target_offset, first, end, delta, &next);
     if (result == 1) {
         if (!next.value)
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
         *patch = next;
     }
     return result;
+}
+
+int hpclang_rpl_reference_plan_execution_shift(
+    const struct hpclang_rpl_reference *reference,
+    const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
+    int32_t delta, struct hpclang_rpl_reference_patch *patch)
+{
+    return plan_execution_shift(reference, mappings, first, end, delta, 0, 0, patch);
 }
 
 static int emit(struct traversal *walk, enum hpclang_rpl_reference_kind kind, uint32_t field,
@@ -302,6 +329,50 @@ static int edits_metadata(const struct hpclang_rpl_reference_edit *edits, uint32
                 return HPCLANG_RPL_SPAN_MALFORMED;
     }
     return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_reference_edits_check_aliases(const struct hpclang_rpl_reference_edit *edits,
+                                              uint32_t count,
+                                              hpclang_rpl_reference_field_location_fn resolve,
+                                              void *context)
+{
+    if (!count)
+        return 0;
+    if (!edits || !resolve)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    int result = edits_metadata(edits, count);
+    if (result)
+        return result;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t physical;
+        result = resolve(context, edits[i].mapping, edits[i].field, edits[i].width, &physical);
+        if (result)
+            return result;
+        if (physical > UINT32_MAX - (edits[i].width - 1))
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        for (uint32_t j = 0; j < i; ++j) {
+            uint32_t previous;
+            result = resolve(context, edits[j].mapping, edits[j].field, edits[j].width, &previous);
+            if (result)
+                return result;
+            if (previous > UINT32_MAX - (edits[j].width - 1))
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            if ((uint64_t)physical < (uint64_t)previous + edits[j].width &&
+                (uint64_t)previous < (uint64_t)physical + edits[i].width)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+        }
+    }
+    return 0;
+}
+
+int hpclang_rpl_reference_edits_replay_mapped(const struct hpclang_rpl_reference_writer *writer,
+                                              const struct hpclang_rpl_reference_edit *edits,
+                                              uint32_t count,
+                                              hpclang_rpl_reference_field_location_fn resolve,
+                                              void *context)
+{
+    int result = hpclang_rpl_reference_edits_check_aliases(edits, count, resolve, context);
+    return result ? result : hpclang_rpl_reference_edits_replay(writer, edits, count);
 }
 
 int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_reader *reader,
@@ -775,6 +846,104 @@ int hpclang_rpl_reference_visit_nested(const struct hpclang_rpl_reader *reader,
     return 0;
 }
 
+struct guarded_reference_scan
+{
+    const struct hpclang_rpl_reader *reader;
+    hpclang_rpl_reference_dependency_fn dependency;
+    void *context;
+    int error;
+};
+
+static int guarded_reference_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct guarded_reference_scan *scan = context;
+    if (scan->error || !scan->reader->read_nibble(scan->reader->context, address, value))
+        return 0;
+    if (*value <= 15) {
+        scan->error = scan->dependency(scan->context, address, *value);
+        if (scan->error)
+            return 0;
+    }
+    return 1;
+}
+
+int hpclang_rpl_reference_visit_guarded_nested(const struct hpclang_rpl_reader *reader,
+                                               const struct hpclang_rpl_reference_node *root,
+                                               struct hpclang_rpl_reference_node *workspace,
+                                               uint32_t capacity, uint32_t node_budget,
+                                               hpclang_rpl_reference_visit_fn visit,
+                                               hpclang_rpl_reference_dependency_fn dependency,
+                                               void *context)
+{
+    if (!reader || !reader->read_nibble || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct guarded_reference_scan scan = {reader, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {guarded_reference_read, &scan};
+    int result = hpclang_rpl_reference_visit_nested(&observed, root, workspace, capacity,
+                                                    node_budget, visit, context);
+    return scan.error ? scan.error : result;
+}
+
+int hpclang_rpl_dispatch_reference_visit_guarded(
+    const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_dispatch_descriptor *descriptor, hpclang_rpl_reference_visit_fn visit,
+    hpclang_rpl_reference_dependency_fn dependency, void *context)
+{
+    if (!reader || !reader->read_nibble || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct guarded_reference_scan scan = {reader, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {guarded_reference_read, &scan};
+    int result =
+        hpclang_rpl_dispatch_reference_visit(&observed, address, limit, descriptor, visit, context);
+    return scan.error ? scan.error : result;
+}
+
+int hpclang_rpl_dispatch_reference_visit_identified(
+    const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_dispatch_descriptor *descriptor,
+    const struct hpclang_rpl_dispatch_identity_range *ranges, uint32_t range_count,
+    hpclang_rpl_reference_visit_fn visit, hpclang_rpl_reference_dependency_fn dependency,
+    void *context)
+{
+    if (!reader || !reader->read_nibble || !descriptor || !ranges || !range_count || !visit ||
+        !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    int contains_entry = 0;
+    for (uint32_t i = 0; i < range_count; ++i) {
+        const struct hpclang_rpl_dispatch_identity_range *range = &ranges[i];
+        if (!range->nibbles)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (!range->length || range->address >= 0x100000u ||
+            range->length > 0x100000u - range->address)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        if (descriptor->dispatch >= range->address &&
+            descriptor->dispatch - range->address < range->length)
+            contains_entry = 1;
+        for (uint32_t j = 0; j < range->length; ++j)
+            if (range->nibbles[j] > 15u)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    if (!contains_entry)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    for (uint32_t i = 0; i < range_count; ++i) {
+        const struct hpclang_rpl_dispatch_identity_range *range = &ranges[i];
+        for (uint32_t j = 0; j < range->length; ++j) {
+            uint8_t value;
+            if (!reader->read_nibble(reader->context, range->address + j, &value))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (value > 15u)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            if (value != range->nibbles[j])
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            int result = dependency(context, range->address + j, value);
+            if (result)
+                return result;
+        }
+    }
+    return hpclang_rpl_dispatch_reference_visit_guarded(reader, address, limit, descriptor, visit,
+                                                        dependency, context);
+}
+
 struct catalog_plan_state
 {
     const struct hpclang_rpl_catalog_move *move;
@@ -782,6 +951,8 @@ struct catalog_plan_state
     void *context;
     struct hpclang_rpl_catalog_reference_plan *plan;
     uint32_t count, visited;
+    hpclang_rpl_catalog_location_fn locate;
+    int32_t catalog_offset;
 };
 
 static int catalog_plan_visit(void *context, uint32_t record, uint32_t number,
@@ -790,18 +961,20 @@ static int catalog_plan_visit(void *context, uint32_t record, uint32_t number,
     struct catalog_plan_state *state = context;
     if (state->visited >= state->count)
         return HPCLANG_RPL_SPAN_MALFORMED;
-    struct hpclang_rpl_catalog_mappings mappings;
-    int result = state->resolve(state->context, binding, &mappings);
+    struct hpclang_rpl_catalog_locations locations = {0};
+    int result = state->locate ? state->locate(state->context, binding, &locations)
+                               : state->resolve(state->context, binding, &locations.mappings);
     if (result)
         return result;
     const struct hpclang_rpl_catalog_move *move = state->move;
     const struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_DIRECT, record + 3,
                                                binding->address, 0, 0};
-    const struct hpclang_rpl_reference_mappings maps = {move->catalog_mapping, mappings.payload,
-                                                        move->moving_mapping};
+    const struct hpclang_rpl_reference_mappings maps = {
+        move->catalog_mapping, locations.mappings.payload, move->moving_mapping};
     struct hpclang_rpl_reference_patch patch;
-    result = hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, move->first, move->end,
-                                                        move->delta, &patch);
+    result = hpclang_rpl_reference_plan_offset_shift(&edge, &maps, state->catalog_offset,
+                                                     locations.payload_offset, move->first,
+                                                     move->end, move->delta, &patch);
     if (result < 0)
         return result;
     uint32_t index = 2 * state->visited;
@@ -813,9 +986,10 @@ static int catalog_plan_visit(void *context, uint32_t record, uint32_t number,
         const struct hpclang_rpl_reference switch_edge = {HPCLANG_RPL_REFERENCE_EXECUTION,
                                                           record + 8, bank_switch, 0, 0};
         const struct hpclang_rpl_reference_mappings switch_maps = {
-            move->catalog_mapping, mappings.bank_switch, move->moving_mapping};
-        result = hpclang_rpl_reference_plan_execution_shift(&switch_edge, &switch_maps, move->first,
-                                                            move->end, move->delta, &patch);
+            move->catalog_mapping, locations.mappings.bank_switch, move->moving_mapping};
+        result =
+            plan_execution_shift(&switch_edge, &switch_maps, move->first, move->end, move->delta,
+                                 state->catalog_offset, locations.bank_switch_offset, &patch);
         if (result < 0)
             return result;
         if (result == 1)
@@ -831,10 +1005,11 @@ static int catalog_plan_visit(void *context, uint32_t record, uint32_t number,
     return 0;
 }
 
-int hpclang_rpl_catalog_plan_relocation(const struct hpclang_rpl_reader *reader, uint32_t address,
-                                        uint32_t limit, const struct hpclang_rpl_catalog_move *move,
-                                        hpclang_rpl_catalog_mapping_fn resolve, void *context,
-                                        struct hpclang_rpl_catalog_reference_plan *plan)
+static int catalog_plan_relocation(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                   uint32_t limit, const struct hpclang_rpl_catalog_move *move,
+                                   hpclang_rpl_catalog_mapping_fn resolve, void *context,
+                                   struct hpclang_rpl_catalog_reference_plan *plan,
+                                   hpclang_rpl_catalog_location_fn locate, int32_t catalog_offset)
 {
     if (!plan)
         return HPCLANG_RPL_SPAN_MALFORMED;
@@ -853,9 +1028,10 @@ int hpclang_rpl_catalog_plan_relocation(const struct hpclang_rpl_reader *reader,
     if (count > (limit - 3) / 16 || plan->edit_capacity < 2 * count ||
         plan->guard_capacity < 1 + 2 * count)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    if (!plan->guards || (count && (!plan->edits || !resolve)))
+    if (!plan->guards || (count && (!plan->edits || (!resolve && !locate))))
         return HPCLANG_RPL_SPAN_MALFORMED;
-    struct catalog_plan_state state = {move, resolve, context, plan, count, 0};
+    struct catalog_plan_state state = {move,  resolve, context, plan,
+                                       count, 0,       locate,  catalog_offset};
     plan->guards[0] =
         (struct hpclang_rpl_reference_guard){move->catalog_mapping, address, count, 3};
     result = hpclang_rpl_catalog_visit(reader, address, limit, catalog_plan_visit, &state);
@@ -866,4 +1042,24 @@ int hpclang_rpl_catalog_plan_relocation(const struct hpclang_rpl_reader *reader,
     plan->edit_count = 2 * count;
     plan->guard_count = 1 + 2 * count;
     return 0;
+}
+
+int hpclang_rpl_catalog_plan_relocation(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                        uint32_t limit, const struct hpclang_rpl_catalog_move *move,
+                                        hpclang_rpl_catalog_mapping_fn resolve, void *context,
+                                        struct hpclang_rpl_catalog_reference_plan *plan)
+{
+    return catalog_plan_relocation(reader, address, limit, move, resolve, context, plan, NULL, 0);
+}
+
+int hpclang_rpl_catalog_plan_relocation_offsets(const struct hpclang_rpl_reader *reader,
+                                                uint32_t address, uint32_t limit,
+                                                const struct hpclang_rpl_catalog_move *move,
+                                                int32_t catalog_offset,
+                                                hpclang_rpl_catalog_location_fn resolve,
+                                                void *context,
+                                                struct hpclang_rpl_catalog_reference_plan *plan)
+{
+    return catalog_plan_relocation(reader, address, limit, move, NULL, context, plan, resolve,
+                                   catalog_offset);
 }

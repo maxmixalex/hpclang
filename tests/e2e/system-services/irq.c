@@ -8,22 +8,22 @@
 #define REG(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
 volatile uint32_t hpclang_e2e_irq_hits;
-/* Failure-only snapshot, taken before foreground cleanup changes ownership.
- * Keep PWM diagnostics distinct from watchdog observations (0x7b00). */
-volatile struct
+/* Capture the compound PWM failure before foreground cleanup changes ownership.
+ * The distinct checkpoint separates this probe from the watchdog diagnostic. */
+struct pwm_observation
 {
+    uint32_t version, hits, finished, error, alarm_owned, tone_owned, wait_errno, failure;
     uint64_t last_time, deadline, foreground_time;
-    uint32_t version, hits, finished, error, alarm_owned, tone_owned, saved_errno;
-    uint32_t tcon, tcfg0, tcfg1, tcntb4, tcnto4, srcpnd, intpnd, intmask, first_failure;
-} hpclang_e2e_pwm_observation;
-_Static_assert(sizeof(hpclang_e2e_pwm_observation) == 88, "PWM diagnostic layout");
+    uint32_t clock_error, audio_mismatch;
+};
+volatile struct pwm_observation hpclang_e2e_pwm_observation;
+_Static_assert(sizeof(struct pwm_observation) == 64, "diagnostic word layout");
 extern volatile uint32_t hpclang_e2e_result;
-
 static void report_failure(void)
 {
-    static uint32_t report[24];
-    report[0] = 0x7b10;
-    report[1] = 22;
+    static uint32_t report[18];
+    report[0] = 0x7b01;
+    report[1] = 16;
     uint8_t *destination = (uint8_t *)(report + 2);
     volatile const uint8_t *source = (volatile const uint8_t *)&hpclang_e2e_pwm_observation;
     for (unsigned i = 0; i < sizeof(hpclang_e2e_pwm_observation); ++i)
@@ -33,12 +33,12 @@ static void report_failure(void)
     if (hpclang_time_read_us_masked(&start))
         return;
     hpclang_e2e_result = 0x4d100000u | offset;
-    while (hpclang_e2e_result != (0x4d200000u | offset)) {
+    for (unsigned spin = 0; spin < 20000000 && hpclang_e2e_result != (0x4d200000u | offset);
+         ++spin) {
         if (hpclang_time_read_us_masked(&now) || now - start > 2000000u)
             break;
     }
 }
-
 static volatile unsigned irq_finished, irq_error;
 static uint64_t irq_deadline, irq_last_time;
 static struct hpclang_sound_playback playback;
@@ -77,8 +77,8 @@ static void audio_write(void *context, enum hpclang_sound_reg reg, uint32_t valu
 }
 static const struct hpclang_sound_bus audio = {audio_read, audio_write, 0};
 
-/* Only the actual IRQ entry advances playback. Foreground clock sampling
- * cannot complete the session or release its resources. Preserve errno. */
+/* Only the actual IRQ entry calls this. The foreground below executes no
+ * clock or SDK calls until completion. Preserve the interrupted errno. */
 void hpclang_e2e_irq_dispatch(void)
 {
     int saved_errno = errno;
@@ -113,7 +113,7 @@ unsigned hpclang_e2e_irq_test(void)
     for (unsigned i = 0; i < 7; ++i)
         audio_before[i] = REG(audio_addresses[i]);
     unsigned failure = 0;
-    hpclang_e2e_pwm_observation.first_failure = 0;
+    hpclang_e2e_pwm_observation = (struct pwm_observation){.version = 1};
     hpclang_e2e_irq_hits = 0;
     irq_finished = irq_error = 0;
     irq_stack[0] = 0x51ac7ead;
@@ -125,7 +125,7 @@ unsigned hpclang_e2e_irq_test(void)
                     ((source | REG(0x07100010)) & 0x4000u);
     register_writes = 0;
     errno = 0;
-    if (hpclang_time_read_us_masked(&irq_last_time) || irq_last_time > UINT64_MAX - 100000) {
+    if (hpclang_time_read_us_masked(&irq_last_time) || irq_last_time > UINT64_MAX - 1100000) {
         hpclang_irq_restore(cpsr);
         return 7;
     }
@@ -156,62 +156,59 @@ unsigned hpclang_e2e_irq_test(void)
     hpclang_e2e_irq_snapshot(&before);
     struct hpclang_irq_bank bank = {(uintptr_t)(irq_stack + 256), 0, 0};
     hpclang_irq_bank_exchange(&bank);
-    if (bank.stack != before.stack || bank.link != before.link || bank.status != before.status)
+    if (!failure &&
+        (bank.stack != before.stack || bank.link != before.link || bank.status != before.status))
         failure = 2;
     REG(0x08000018) = (uintptr_t)hpclang_e2e_irq_handler;
     REG(0x07100008) = ~UINT32_C(0x4000);
     errno = EDOM;
     hpclang_irq_restore((cpsr | 0x40u) & ~0x80u);
-    /* Fixed instruction counts can expire before the 100 ms deadline on CI.
-     * Only IRQ dispatch advances playback. Read time between busy batches,
-     * allowing one second for delivery; bound a broken clock by batch count. */
+    /* A fixed instruction count can finish before the 100 ms alarm deadline.
+     * Only the IRQ advances playback; foreground clock samples bound the wait,
+     * with one second of delivery margin and a cap for a stalled clock. */
+    int wait_clock_error = 0;
     for (unsigned batch = 0; batch < 200000 && !irq_finished; ++batch) {
         for (volatile unsigned i = 0; i < 1024; ++i)
             __asm__ volatile("nop");
         uint32_t wait_cpsr = hpclang_irq_save_disable();
         uint64_t now = 0;
         int saved_errno = errno;
-        int clock_error = hpclang_time_read_us_masked(&now);
+        wait_clock_error = hpclang_time_read_us_masked(&now);
         errno = saved_errno;
         hpclang_irq_restore(wait_cpsr);
-        if (clock_error || (now >= irq_deadline && now - irq_deadline >= 1000000))
+        if (wait_clock_error || now >= irq_deadline + 1000000)
             break;
     }
     hpclang_irq_save_disable();
-    if (hpclang_e2e_irq_hits < 2 || !irq_finished || irq_error || irq_last_time < irq_deadline ||
-        playback.alarm.owned || playback.tone.owned || errno != EDOM)
+    int wait_errno = errno;
+    uint64_t foreground_time = 0;
+    int clock_error = hpclang_time_read_us_masked(&foreground_time) || wait_clock_error;
+    errno = wait_errno;
+    hpclang_e2e_pwm_observation.hits = hpclang_e2e_irq_hits;
+    hpclang_e2e_pwm_observation.finished = irq_finished;
+    hpclang_e2e_pwm_observation.error = irq_error;
+    hpclang_e2e_pwm_observation.alarm_owned = playback.alarm.owned;
+    hpclang_e2e_pwm_observation.tone_owned = playback.tone.owned;
+    hpclang_e2e_pwm_observation.wait_errno = (uint32_t)wait_errno;
+    hpclang_e2e_pwm_observation.last_time = irq_last_time;
+    hpclang_e2e_pwm_observation.deadline = irq_deadline;
+    hpclang_e2e_pwm_observation.foreground_time = foreground_time;
+    hpclang_e2e_pwm_observation.clock_error = (uint32_t)clock_error;
+    for (unsigned i = 0; i < 7; ++i)
+        if (REG(audio_addresses[i]) != audio_before[i])
+            hpclang_e2e_pwm_observation.audio_mismatch |= 1u << i;
+    if (!failure && (clock_error || hpclang_e2e_irq_hits < 2 || !irq_finished || irq_error ||
+                     irq_last_time < irq_deadline || playback.alarm.owned || playback.tone.owned ||
+                     errno != EDOM))
         failure = 3;
-    if (failure) {
-        hpclang_e2e_pwm_observation.version = 1;
-        hpclang_e2e_pwm_observation.last_time = irq_last_time;
-        hpclang_e2e_pwm_observation.deadline = irq_deadline;
-        hpclang_e2e_pwm_observation.hits = hpclang_e2e_irq_hits;
-        hpclang_e2e_pwm_observation.finished = irq_finished;
-        hpclang_e2e_pwm_observation.error = irq_error;
-        hpclang_e2e_pwm_observation.alarm_owned = playback.alarm.owned;
-        hpclang_e2e_pwm_observation.tone_owned = playback.tone.owned;
-        hpclang_e2e_pwm_observation.saved_errno = (uint32_t)errno;
-        hpclang_e2e_pwm_observation.tcon = REG(0x07600008);
-        hpclang_e2e_pwm_observation.tcfg0 = REG(0x07600000);
-        hpclang_e2e_pwm_observation.tcfg1 = REG(0x07600004);
-        hpclang_e2e_pwm_observation.tcntb4 = REG(0x0760003c);
-        hpclang_e2e_pwm_observation.tcnto4 = REG(0x07600040);
-        hpclang_e2e_pwm_observation.srcpnd = REG(0x07100000);
-        hpclang_e2e_pwm_observation.intpnd = REG(0x07100010);
-        hpclang_e2e_pwm_observation.intmask = REG(0x07100008);
-        hpclang_e2e_pwm_observation.first_failure = failure;
-        uint64_t now = 0;
-        (void)hpclang_time_read_us_masked(&now);
-        hpclang_e2e_pwm_observation.foreground_time = now;
-        errno = (int)hpclang_e2e_pwm_observation.saved_errno;
-    }
     REG(0x07100008) = UINT32_MAX;
     REG(0x08000018) = vector;
     hpclang_irq_bank_exchange(&bank);
     hpclang_e2e_irq_snapshot(&after);
-    if (before.stack != after.stack || before.link != after.link || before.status != after.status)
+    if (!failure &&
+        (before.stack != after.stack || before.link != after.link || before.status != after.status))
         failure = 4;
-    if (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi)
+    if (!failure && (irq_stack[0] != 0x51ac7ead || REG(0x08000008) != swi))
         failure = 5;
     /* Preserve an earlier delivery/ownership failure; otherwise identify the
      * exact audio register before foreground cleanup could repair it. */
@@ -221,10 +218,11 @@ unsigned hpclang_e2e_irq_test(void)
     hpclang_sound_playback_stop(&audio, &bus, &playback);
     REG(0x07100004) = mode;
     REG(0x07100008) = mask;
-    if ((REG(0x07100000) & source) != source || REG(0x07100004) != mode ||
-        REG(0x07100008) != mask || REG(0x08000018) != vector)
+    if (!failure && ((REG(0x07100000) & source) != source || REG(0x07100004) != mode ||
+                     REG(0x07100008) != mask || REG(0x08000018) != vector))
         failure = 6;
-    if (hpclang_e2e_pwm_observation.first_failure)
+    hpclang_e2e_pwm_observation.failure = failure;
+    if (failure)
         report_failure();
     hpclang_irq_restore(cpsr);
     return failure;

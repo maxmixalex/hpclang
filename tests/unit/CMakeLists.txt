@@ -262,6 +262,36 @@ hpclang_unit(hpgcc_line test_hpgcc_line.c "${HPCLANG_ROOT}/runtime/core/hpgcc-li
 target_include_directories(test_hpgcc_line PRIVATE "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(hpgcc_format test_hpgcc_format.c "${HPCLANG_ROOT}/runtime/core/hpgcc-format.c")
+target_include_directories(test_hpgcc_format PRIVATE "${HPCLANG_ROOT}/runtime/core")
+target_link_libraries(test_hpgcc_format PRIVATE m)
+hpclang_unit(hpgcc_printf test_hpgcc_printf.c "${HPCLANG_ROOT}/runtime/core/hpgcc-format.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-printf.c")
+target_include_directories(test_hpgcc_printf PRIVATE "${HPCLANG_ROOT}/runtime/core")
+target_link_libraries(test_hpgcc_printf PRIVATE m)
+foreach(language IN ITEMS c cpp)
+    foreach(selection IN ITEMS default off on)
+        set(format_test hpgcc_format_header_${language}_${selection})
+        hpclang_unit(${format_test} test_hpgcc_format_header.${language}
+            "${HPCLANG_ROOT}/runtime/core/hpgcc-format.c"
+            "${HPCLANG_ROOT}/runtime/core/hpgcc-printf.c")
+        target_include_directories(test_${format_test} PRIVATE "${HPCLANG_ROOT}/include")
+        target_link_libraries(test_${format_test} PRIVATE m)
+        if(selection STREQUAL "off")
+            target_compile_definitions(test_${format_test} PRIVATE HPCLANG_HPGCC_LEGACY_FORMAT=0)
+        elseif(selection STREQUAL "on")
+            target_compile_definitions(test_${format_test} PRIVATE HPCLANG_HPGCC_LEGACY_FORMAT=1)
+        endif()
+    endforeach()
+endforeach()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    hpclang_unit(hpgcc_format_stream test_hpgcc_format_stream.c
+        "${HPCLANG_ROOT}/runtime/core/hpgcc-format.c"
+        "${HPCLANG_ROOT}/runtime/core/hpgcc-printf.c")
+    target_include_directories(test_hpgcc_format_stream PRIVATE "${HPCLANG_ROOT}/include")
+    target_link_libraries(test_hpgcc_format_stream PRIVATE m)
+endif()
+
 hpclang_unit(hpgcc_input test_hpgcc_input.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-input.c"
     "${HPCLANG_ROOT}/runtime/core/input-mode.c"
@@ -721,6 +751,7 @@ target_include_directories(test_object PRIVATE
 
 hpclang_unit(rpl_mutation
     test_rpl_mutation.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-recovery-reservation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"

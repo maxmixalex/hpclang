@@ -150,6 +150,83 @@ int hpclang_rpl_catalog_plan_insert(const struct hpclang_rpl_reader *reader, uin
     return 1;
 }
 
+struct catalog_removal_search
+{
+    struct hpclang_rpl_catalog_removal plan;
+    uint32_t number;
+    uint32_t previous;
+    int found;
+};
+
+int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                      uint32_t limit, uint32_t number)
+{
+    if (!reader || !reader->read_nibble)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (home < 0x80000u || home >= 0x100000u || limit > 0x100000u - home || limit < 8)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t prologue, count;
+    int result = word(reader, home, 5, &prologue);
+    if (result)
+        return result;
+    if (prologue != 0x2a96u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    result = word(reader, home + 5, 3, &count);
+    if (result)
+        return result;
+    if (count > (limit - 8) / 13)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    int found = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t record = home + 8 + 13 * i, id, ignored;
+        result = word(reader, record, 3, &id);
+        if (!result)
+            result = word(reader, record + 3, 5, &ignored);
+        if (!result)
+            result = word(reader, record + 8, 5, &ignored);
+        if (result)
+            return result;
+        found |= id == number;
+    }
+    return found;
+}
+
+static int catalog_removal_visit(void *context, uint32_t record, uint32_t number,
+                                 const struct hpclang_rpl_library_binding *binding)
+{
+    struct catalog_removal_search *search = context;
+    if (search->plan.count && number <= search->previous)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    search->previous = number;
+    ++search->plan.count;
+    search->plan.end = record + 16u;
+    if (number == search->number) {
+        search->found = 1;
+        search->plan.slot = record;
+        search->plan.binding = *binding;
+    }
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_catalog_plan_remove(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                    uint32_t limit, uint32_t number,
+                                    struct hpclang_rpl_catalog_removal *plan)
+{
+    if (!reader || !reader->read_nibble || !plan)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct catalog_removal_search search = {.number = number};
+    int result = hpclang_rpl_catalog_visit(reader, address, limit, catalog_removal_visit, &search);
+    if (result)
+        return result;
+    if (search.found)
+        *plan = search.plan;
+    return search.found;
+}
+
 int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t address,
                                uint32_t limit, uint32_t number,
                                struct hpclang_rpl_library_binding *binding)
@@ -238,6 +315,41 @@ int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_
     if (resolved < first || resolved >= end)
         return HPCLANG_RPL_SPAN_BOUNDS;
     *target = resolved;
+    return 1;
+}
+
+int hpclang_rpl_library_attachment_resolve(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                           uint32_t end, uint32_t header, uint32_t number,
+                                           struct hpclang_rpl_library_attachment_targets *targets)
+{
+    if (!reader || !reader->read_nibble || !targets)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (end > 0x100000u || first >= end || header < first || header > end || end - header < 23u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t id;
+    int result = word(reader, header, 3, &id);
+    if (result)
+        return result;
+    if (id != number)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_library_attachment_targets next = {0};
+    uint32_t *values[2] = {&next.hash, &next.messages};
+    for (unsigned i = 0; i < 2; ++i) {
+        uint32_t field = header + 3 + 5 * i, relative;
+        result = word(reader, field, 5, &relative);
+        if (result)
+            return result;
+        if (!relative)
+            continue;
+        uint32_t target = (field + relative) & 0xfffffu;
+        if (target < first || target >= end)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        next.present |= 1u << i;
+        *values[i] = target;
+    }
+    *targets = next;
     return 1;
 }
 
