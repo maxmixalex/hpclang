@@ -1172,6 +1172,24 @@ These are controlled entries after OS setup, with no IRQ, not an unrestricted
 caller/startup proof or permission to relocate. The individual D0/D1 checks
 retain 4,096 x48 comparisons and 128 saved-ROM instruction checks.
 
+The internal `hpclang_rpl_dispatch_reference_visit_identified` binds a
+caller-reviewed schema to exact handler/dependency nibble ranges before
+emitting edges. At least one range contains the dispatch entry. Successful
+reads of matched code and object fields become commit-guard dependencies;
+code mismatches, malformed/unreadable input and callback errors reject without
+object edges during identity checking. Expected bytes must be independently
+reviewed, and the caller must establish full semantic/callee coverage and a
+stable shared mapping. This is neither automatic ROM authentication nor proof
+that a matching prefix makes an arbitrary RAM continuation safe.
+
+ASan/UBSan reference tests cover disjoint ranges, byte changes before/after
+capture, unavailable/invalid input, dependency failures and metadata bounds.
+ARM compilation and static analysis pass. Four retained ROM identity windows
+match across HP49g+/HP50g; all 768 single-nibble changes reject before edges.
+These windows are inspection extents, not claimed complete handler bodies.
+Evidence: `/work/oct28-dispatch-identity/results.json`, reproduced by
+`research/oct28-dispatch-identity-native.py`.
+
 With `--through-dispatch --duplicate-entry`, execution starts at `37258`:
 DUP preserves the original stack-top object, consumes one existing stack slot,
 and enters the embedded predicate. The C structural decoder's two wrapper

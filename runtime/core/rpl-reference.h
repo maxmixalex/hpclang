@@ -194,6 +194,30 @@ int hpclang_rpl_dispatch_reference_visit_guarded(
     const struct hpclang_rpl_dispatch_descriptor *descriptor, hpclang_rpl_reference_visit_fn visit,
     hpclang_rpl_reference_dependency_fn dependency, void *context);
 
+struct hpclang_rpl_dispatch_identity_range
+{
+    uint32_t address, length;
+    const uint8_t *nibbles;
+};
+
+/* Bind a caller-reviewed descriptor to exact expected handler/dependency bytes
+ * before emitting any object edges. At least one nonempty range must contain
+ * descriptor->dispatch. All ranges and the object share the reader's stable
+ * mapping; record every matched nibble through dependency for commit guards.
+ * Expected bytes must come from an independently reviewed identity, not a fresh
+ * copy of the input being classified. The caller proves semantic coverage of
+ * the ranges, including callees and data; matching a prefix alone is not proof
+ * of a complete handler. This does not infer provenance or authorize movement.
+ * A mismatch returns UNSUPPORTED without edges. Invalid bytes/ranges and read
+ * or callback errors propagate; discard partial dependencies on any error.
+ * Keep descriptor, ranges, expected storage and mapping immutable throughout. */
+int hpclang_rpl_dispatch_reference_visit_identified(
+    const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_dispatch_descriptor *descriptor,
+    const struct hpclang_rpl_dispatch_identity_range *ranges, uint32_t range_count,
+    hpclang_rpl_reference_visit_fn visit, hpclang_rpl_reference_dependency_fn dependency,
+    void *context);
+
 struct hpclang_rpl_reference_patch
 {
     uint32_t field; /* Old address: apply before moving the containing bytes. */
