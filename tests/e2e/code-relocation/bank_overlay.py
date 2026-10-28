@@ -1,18 +1,29 @@
 """Check ERAM overlay precedence and exit behavior in the reviewed Stock ROMs."""
 
+import ctypes as c
 import struct
 
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE
 from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
 
 
-def verify_overlay(ram, flash, cpu, banks):
+def verify_overlay(lib, ram, flash, cpu, banks):
     """Do not infer payload validity or caller qualification from these maps."""
     results = []
     eram = tuple(0x08020000 + i * 0x800 for i in range(64))
     original = ram[cpu - 0x08000000 : cpu - 0x08000000 + 1024]
     initial_bank = struct.unpack_from("<I", ram, cpu - 0x08000000 + 0xBD0)[0]
     assert initial_bank == 2
+
+    class Geometry(c.Structure):
+        _fields_ = [("physical", c.c_uint32), ("bytes", c.c_uint32)]
+
+    lib.hpclang_rpl_stock_bank_window_select.argtypes = [
+        c.POINTER(c.c_uint32),
+        c.POINTER(c.c_uint8),
+        c.POINTER(Geometry),
+        c.POINTER(c.c_uint32),
+    ]
     for selected in range(16):
         uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
         for address, data in ((0, flash), (0x08000000, ram)):
@@ -35,6 +46,23 @@ def verify_overlay(ram, flash, cpu, banks):
         uc.hook_add(UC_HOOK_CODE, stop)
         stages = []
         for index, p in ((16, 0), (selected, 0), (16, 1), (selected, 1)):
+            predicted = None
+            if index != 16:
+                # The reviewed P=1 exit selects bank 2; the C function models
+                # the page update, not the entry/exit handler's control flow.
+                target = banks[2 if p else index]
+                geometry = Geometry(target["physical"] or 0, target["valid_bytes"])
+                previous = (c.c_uint32 * 64).from_buffer_copy(uc.mem_read(cpu + 0x100, 256))
+                owners = (c.c_uint8 * 64).from_buffer_copy(uc.mem_read(cpu + 0x848, 64))
+                candidate = (c.c_uint32 * 64)(*([0xDEAD] * 64))
+                result = lib.hpclang_rpl_stock_bank_window_select(
+                    previous, owners, c.byref(geometry), candidate
+                )
+                if target["populated"]:
+                    assert result == 0
+                    predicted = list(candidate)
+                else:
+                    assert result < 0 and list(candidate) == [0xDEAD] * 64
             for offset, value in ((0x998, 1), (0x978, 0x3130), (0x95C, p), (0x970, 0)):
                 uc.mem_write(cpu + offset, struct.pack("<I", value))
             uc.reg_write(UC_ARM_REG_R7, banks[index]["switch"])
@@ -44,6 +72,8 @@ def verify_overlay(ram, flash, cpu, banks):
             mapping = bytes(uc.mem_read(cpu, 1024))
             assert mapping[:256] == original[:256] and mapping[512:] == original[512:]
             pages = struct.unpack_from("<64I", mapping, 256)
+            if predicted is not None:
+                assert list(pages) == predicted
             assert struct.unpack("<I", uc.mem_read(cpu + 0x95C, 4))[0] == 0
             # Reviewed interpreter state, not a portable runtime layout. The
             # Flash selector and visible page ownership are separate state.
@@ -58,6 +88,7 @@ def verify_overlay(ram, flash, cpu, banks):
                     mapping_flags=flags,
                     flash_bank=flash_bank,
                     read_owners=read_owners,
+                    c_prediction_matched=predicted is not None,
                 )
             )
         assert [stage["mapping_flags"] & 8 for stage in stages] == [8, 8, 0, 0]

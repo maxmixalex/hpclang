@@ -12,6 +12,26 @@ static int valid_page(uint32_t page)
            (page <= 0x200000u - 0x800u || (page >= 0x08000000u && page <= 0x08080000u - 0x800u));
 }
 
+int hpclang_rpl_stock_bank_window_select(const uint32_t previous[64], const uint8_t owners[64],
+                                         const struct hpclang_rpl_rom_bank *bank,
+                                         uint32_t selected[64])
+{
+    if (!previous || !owners || !bank || !selected)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!bank->bytes || bank->bytes > 0x20000u || (bank->bytes & 1023u) ||
+        (bank->physical & 0x7ffu) || bank->physical > 0x200000u - 0x20000u)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t result[64];
+    for (unsigned i = 0; i < 64; ++i) {
+        result[i] = owners[i] ? previous[i] : bank->physical + i * 0x800u;
+        if (!valid_page(result[i]))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    for (unsigned i = 0; i < 64; ++i)
+        selected[i] = result[i];
+    return 0;
+}
+
 int hpclang_rpl_stock_resolve_span(const uint32_t read_map[256], uint32_t address, uint32_t span,
                                    uint32_t *physical)
 {

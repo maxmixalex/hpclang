@@ -264,8 +264,66 @@ static void test_rom_bank_reader(void)
         assert(bytes[i] == (uint8_t)(i * 37u + 11u));
 }
 
+static void test_bank_window_select(void)
+{
+    uint32_t previous[64], selected[64], untouched[64];
+    uint8_t owners[64] = {0};
+    struct hpclang_rpl_rom_bank bank = {0x48000u, 0x18000u};
+    for (unsigned i = 0; i < 64; ++i) {
+        previous[i] = 0x08020000u + i * 0x800u;
+        untouched[i] = 0xdeadbeefu;
+    }
+    assert(!hpclang_rpl_stock_bank_window_select(previous, owners, &bank, selected));
+    for (unsigned i = 0; i < 64; ++i)
+        assert(selected[i] == 0x48000u + i * 0x800u);
+    /* Whole-window prediction must not widen the bank's payload extent. */
+    assert(bank.bytes == 0x18000u && selected[48] == bank.physical + bank.bytes);
+    for (unsigned page = 0; page < 64; ++page) {
+        owners[page] = 2;
+        assert(!hpclang_rpl_stock_bank_window_select(previous, owners, &bank, selected));
+        for (unsigned i = 0; i < 64; ++i)
+            assert(selected[i] == (i == page ? previous[i] : bank.physical + i * 0x800u));
+        owners[page] = 0;
+    }
+    memset(owners, 255, sizeof owners);
+    assert(!hpclang_rpl_stock_bank_window_select(previous, owners, &bank, selected));
+    assert(!memcmp(previous, selected, sizeof previous));
+    memcpy(selected, previous, sizeof previous);
+    assert(!hpclang_rpl_stock_bank_window_select(selected, owners, &bank, selected));
+    assert(!memcmp(previous, selected, sizeof previous));
+    /* Even a fully hidden bank must have nonempty, bounded geometry. */
+    const struct hpclang_rpl_rom_bank invalid[] = {{0, 0},
+                                                   {0, 0x20400},
+                                                   {0, 1},
+                                                   {0x48001, 0x18000},
+                                                   {0x1e0800, 0x1000},
+                                                   {UINT32_MAX, 0x20000}};
+    for (unsigned i = 0; i < sizeof invalid / sizeof invalid[0]; ++i) {
+        memcpy(selected, untouched, sizeof selected);
+        assert(hpclang_rpl_stock_bank_window_select(previous, owners, &invalid[i], selected) < 0);
+        assert(!memcmp(selected, untouched, sizeof selected));
+    }
+    for (unsigned page = 0; page < 64; ++page) {
+        uint32_t saved = previous[page];
+        previous[page] = 1;
+        memcpy(selected, untouched, sizeof selected);
+        assert(hpclang_rpl_stock_bank_window_select(previous, owners, &bank, selected) < 0);
+        assert(!memcmp(selected, untouched, sizeof selected));
+        previous[page] = saved;
+    }
+    assert(hpclang_rpl_stock_bank_window_select(NULL, owners, &bank, selected) < 0);
+    assert(hpclang_rpl_stock_bank_window_select(previous, NULL, &bank, selected) < 0);
+    assert(hpclang_rpl_stock_bank_window_select(previous, owners, NULL, selected) < 0);
+    assert(hpclang_rpl_stock_bank_window_select(previous, owners, &bank, NULL) < 0);
+    memset(owners, 0, sizeof owners);
+    bank = (struct hpclang_rpl_rom_bank){0x1e0000, 0x20000};
+    assert(!hpclang_rpl_stock_bank_window_select(previous, owners, &bank, previous));
+    assert(previous[0] == 0x1e0000 && previous[63] == 0x1ff800);
+}
+
 int main(void)
 {
+    test_bank_window_select();
     test_rom_bank_reader();
     test_discontinuous_spans();
     test_mapping_overlap();

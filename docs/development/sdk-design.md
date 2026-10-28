@@ -905,6 +905,18 @@ whose owner byte is nonzero. Controlled per-page owner changes confirm that even
 with the ERAM flag clear, a page can retain its previous mapping. These offsets
 are fixture evidence, not a production firmware identity check; flags or selected
 bank alone must not substitute for qualifying all affected page mappings.
+
+`hpclang_rpl_stock_bank_window_select()` models the reviewed Flash-selection
+update of the 64-page bank window from stable prior pages, per-page owners and
+separately proven bank geometry. Zero-owner pages select the new Flash page;
+nonzero-owner pages retain their old mapping. It validates retained physical
+pages and geometry before publishing any output, supports in-place output and
+does not access native memory. The predicted 128-KiB window does not widen the
+bank's separately retained payload extent. Original-ROM overlay and independent
+per-page controls compare the C prediction with actual mappings. This helper
+does not infer the switch handler, P/entry/exit semantics or owner provenance,
+model other windows/write maps, or authorize Port1 mutation; those remain caller
+obligations for the complete reference integration.
 For each switch it also retains all 85 table nibbles as 17 guards, verifies the
 unchanged table, rejects every individually changed nibble through the C guard
 validator, and rejects insufficient guard capacity without publishing a binding.

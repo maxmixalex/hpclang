@@ -16,6 +16,22 @@ struct hpclang_rpl_stock_rom_bank
     uint32_t size;
 };
 
+/* Model only the reviewed Flash-selection update of Read[0x40..0x7f].
+ * A zero owner selects the corresponding bank page; any nonzero owner keeps
+ * the previous page. Inputs must be stable, independently qualified snapshots
+ * of the same interpreter state. Caller proves handler identity, P=0 selection
+ * semantics, geometry provenance and every retained owner's meaning. Flags or
+ * a bank index cannot replace those obligations. This does not model ERAM
+ * entry/exit, lower-window changes, write maps or interpreter side effects.
+ * The 128-KiB window may exceed bank->bytes (notably the 96-KiB first bank);
+ * retain that separate bound before reading any selected-bank payload.
+ * No native reads/writes or bank switches. Return zero or a negative span result.
+ * Invalid/unpopulated geometry and invalid retained pages leave output unchanged;
+ * output may alias previous. A predicted map does not authorize mutation. */
+int hpclang_rpl_stock_bank_window_select(const uint32_t previous[64], const uint8_t owners[64],
+                                         const struct hpclang_rpl_rom_bank *bank,
+                                         uint32_t selected[64]);
+
 /* Read a separately proven ROM bank in native 0x40000-based coordinates,
  * bounded by its actual declared byte size, not the entire bank-switch window.
  * Capture checks Flash extent and every touched ARM identity section for user

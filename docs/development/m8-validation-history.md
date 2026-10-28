@@ -983,3 +983,19 @@ failures. Reports: `/work/oct29-bank-overlay-state.json`,
 `/work/oct29-bank-owner-controls.json`, and maintained complete suite reports in
 `/work/oct29-bank-overlay-state-checks/`. Firmware/handler identity and complete
 banked-reference integration remain open; no runtime mutation is enabled.
+
+## Owner-aware bank-window model — local, 2026-10-29
+
+The internal C helper `hpclang_rpl_stock_bank_window_select` predicts only the
+reviewed Flash-selection update, retaining nonzero-owner pages. It rejects
+invalid geometry/retained pages before publishing output; geometry provenance,
+handler/calling-context qualification and the separate payload extent remain
+required. ASan/UBSan tests cover each retained page, late failures, null inputs,
+in-place output, fully hidden invalid banks and Flash-end bounds. ARMv4T compile
+and analysis pass. Both maintained ROM suites pass with C predictions compared
+at Flash-selection/exit stages; another 128 independent owner-byte controls agree
+with the original ROM page-for-page. Reports and source hashes are under
+`/work/oct29-bank-window-model/`, including `owner-controls.json`.
+No public Port1 edit path is enabled; complete reference integration is open.
+The prior 28 Stock call tests remain evidence for submitted `f9f50972`, not a
+claim that this new internal helper has been exercised by a public Stock caller.
