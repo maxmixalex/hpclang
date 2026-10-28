@@ -1511,3 +1511,22 @@ Exact-head CI audit: #26 b5891517 has ten queued workflow records while its jobs
 report two success, one running, thirteen queued. #20 4f2ce605 has six successful,
 one running, five queued workflows and 278 successful/19 running/91 queued jobs.
 Neither head has a failed job in this audit; neither is fully accepted.
+
+## 2026-10-29 — Bank-control SRAM effects
+
+The maintained bank-map regression now compares the entire saved SRAM image
+against an independently expressed model of the reviewed original ARM handler,
+and rejects any write outside predicted interpreter fields or its nine-register
+stack save. Besides all 256 read pages, it checks Read[256], bank selectors,
+conditional overlay write entries and saved read/write cache fields. Unchanged
+selectors require no interpreter writes. Four overlay contexts distinguish both,
+neither and either individual page already matching the overlay backing page.
+
+Both full maintained runs pass in `/work/oct29-bank-handler-effects/{model}`:
+336 original-handler executions and 48 absent-bank rejections per model, along
+with existing ROM identity, 17 switch, 16 ERAM and six attachment-sequence checks.
+Source and input hashes are in each `bank-switch-maps.json`. Ruff and formatting
+pass. This qualifies the tested populated-bank handler's SRAM effects under six
+controlled contexts, not all register/interrupt/configuration behavior or a
+production execution-edge resolver. The separate live Stock profile matrix
+continues against its unchanged application/source manifest.

@@ -118,9 +118,12 @@ through inspected P=0 code, dynamic selectors, captured bank geometry, device
 routing and full read-map prediction. Separate execution edges still reject.
 Mapping-qualified guards cover code, selectors, routing, read pages/owners,
 bank/overlay fields and ROM/native geometry; 11,744 stale-nibble changes reject.
-The full read-map predictor agrees with 336 original-handler executions across
-both models, including no-op selection and two-page overlays. These checks pass
-locally and are submitted as a follow-up; they are not CI or milestone acceptance.
+The submitted read-map predictor passes its original-handler comparisons.
+A local follow-up now checks complete SRAM effects and permitted write locations
+in 672 original-handler executions across both models, plus 96 absent-bank
+rejections. It covers unchanged selectors and independent overlay repair/cache
+branches. This is local test evidence, not production execution qualification,
+CI acceptance or milestone completion.
 A local SHA-256 profile check now identifies the two reviewed immutable ROM
 images and supplies layout locations; mutable user Flash is excluded. Maintained
 composition and controlled HOME use that result. A local read-only physical
