@@ -1494,7 +1494,15 @@ instructions nor classifies opaque payloads or authorizes catalog movement.
 Absolute transfers use five-nibble operands and do not change when only the
 instruction moves; target relocation still requires independently qualified
 mapping identity.
-Indirect transfers and complete execution coverage remain open.
+The PC-exchange inspector describes APCEX/CPCEX as two simultaneous effects:
+the old A.A/C.A value supplies the jump target, and the next instruction address
+replaces that register field. Its capture descriptor uses NEXT_PC origins;
+target provenance and instruction mapping still require separate proof. It
+does not push a return-stack cell. `pc_exchange.py` checks the descriptor against
+original interpreter execution on both models, including preserved high register
+bits, flags and stack state. This gate runs alongside incoming-carry tests in
+Stock code-relocation CI. Indirect-transfer provenance and complete execution
+coverage remain open.
 
 ## Capabilities
 

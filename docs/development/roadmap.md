@@ -110,7 +110,9 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-Incoming-carry root discovery now passes 192 controlled interpreter cases and all 28 fresh HP49g+/HP50g Stock call/catalog cases. Independent checks confirm unchanged Flash in 36 saved states and byte-identical reproduction of six launchers. Its CI gate is ready for submission; this is local validation, not branch acceptance or complete execution-reference coverage.
+Incoming-carry root discovery now passes 192 controlled interpreter cases and all 28 fresh HP49g+/HP50g Stock call/catalog cases. Independent checks confirm unchanged Flash in 36 saved states and byte-identical reproduction of six launchers. Its CI gate is submitted in #26; this is local validation, not branch acceptance or complete execution-reference coverage.
+
+Local follow-up: APCEX/CPCEX now describe both the old-register jump target and next-PC capture. Sanitizer tests, ARM analysis and 192 original-interpreter cases pass; provenance qualification and public library management remain open.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -133,10 +135,10 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `fb261f17` | **Local follow-up ready:** incoming-carry integration passes all 28 Stock cases and 192 interpreter cases; CI gate and whole-source format/lint checks pass locally. Previous exact head: 57 successful, 15 running and 316 queued jobs, no failures reported; three workflows pass and nine remain unfinished. |
+| #26 / `f66b3b97` | **CI pending:** 12 unfinished workflows; 14 queued and two running jobs at observation, no failures reported. Incoming-carry local integration is complete. The subsequent PC-exchange descriptor and 192-case interpreter gate pass locally and are not yet pushed. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `969ade88` | **Elapsed PWM wait fix submitted; new CI unobserved.** Six-model normal Direct, HP39gs/HP40gs immediate and two masked-IRQ negatives pass locally. Previous head 10e05bc0: 63 successful, nine running, 244 queued and two diagnosed PWM failures. Parent #20 and full branch acceptance remain open. |
+| #21 / `969ade88` | **CI pending:** seven unfinished workflows; eight queued and three running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. #21 follow-up 10e05bc0 now submits pre-cleanup IRQ/timing/ownership diagnostics. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports state. Diagnostic coverage is not a claimed fix. |
 

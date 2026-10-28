@@ -476,3 +476,21 @@ Pre-push fb261f17 audit: 57 successful, 15 running, 316 queued jobs; three
 passed and nine unfinished workflows, no reported failures. These are not
 accepted gates. Bounded root discovery and controlled internal library tests
 do not establish full opaque/banked coverage, public management or M8.0 completion.
+
+## 2026-10-29 — PC exchange semantics (local follow-up)
+
+APCEX/CPCEX inspection returns a jump target from the old low 20 register bits
+and a NEXT_PC capture assignment for instruction+4. The existing origin engine
+propagates the caller-proven capture tokens. It neither qualifies incoming
+register pointers nor authorizes relocation. Next-PC wrap and failures preserve
+output. Host tests exhaust all 65,536 four-nibble encodings, validate read faults,
+truncation, address boundaries and preservation of unrelated origin cells.
+ASan/UBSan rpl_code passes (1.88 s); current-source ARM static analysis passes.
+Maintained pc_exchange.py compares 96 cases/model with original execution: three
+addresses, A/C, all P values, both carries and all stack cursors represented.
+Both models pass, preserving upper register bits, flags and machine-stack state.
+Reports: /work/oct29-pc-exchange/{hp49gplus,hp50g}/pc-exchange.json. The next
+Stock CI gate includes this test in its existing isolated environment. Formatting,
+Ruff, workflow YAML and ShellCheck pass. This follow-up is local, not submitted.
+Observed CI: #26 f66b3b97 has 14 queued/two running jobs; #21 969ade88 has
+eight queued/three running; no failures reported and no completed acceptance.

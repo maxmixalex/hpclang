@@ -86,6 +86,25 @@ struct hpclang_rpl_code_assignment
     uint32_t constant;
 };
 
+struct hpclang_rpl_code_pc_exchange
+{
+    struct hpclang_rpl_code_assignment capture;
+    uint32_t target;
+};
+
+/* APCEX/CPCEX consume the OLD low 20 register bits as the next PC and replace
+ * those bits with instruction+4. The upper register bits, flags and machine
+ * return stack are unchanged. capture describes that NEXT_PC assignment and
+ * can propagate caller-proven instruction-mapping origins. The target needs
+ * independent register provenance and mapping qualification; the captured PC
+ * is not an ordinary scalar literal. Both effects belong to one instruction.
+ * Inputs describe the registers AT this proven instruction boundary. No writes
+ * or relocation authorization. Reject next-PC wrap; errors preserve output. */
+int hpclang_rpl_code_pc_exchange_inspect(const struct hpclang_rpl_reader *reader,
+                                         uint32_t instruction, uint32_t limit, uint32_t a_low,
+                                         uint32_t c_low,
+                                         struct hpclang_rpl_code_pc_exchange *exchange);
+
 /* Describe one plain register copy/zero or P literal/nibble transfer. Nibble
  * indices refer to 64-bit A/B/C/D/R0..R4, 20-bit D0/D1 or one-nibble P. Other destination
  * nibbles survive; source nibbles come from the pre-instruction state. Supports

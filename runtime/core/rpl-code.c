@@ -623,6 +623,34 @@ static int read_word(const struct hpclang_rpl_reader *reader, uint32_t at, unsig
     return 0;
 }
 
+int hpclang_rpl_code_pc_exchange_inspect(const struct hpclang_rpl_reader *reader,
+                                         uint32_t instruction, uint32_t limit, uint32_t a_low,
+                                         uint32_t c_low,
+                                         struct hpclang_rpl_code_pc_exchange *exchange)
+{
+    if (!reader || !reader->read_nibble || !exchange)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction > 0xffffbu || limit < 4 || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(reader, instruction, 4, &opcode);
+    if (result)
+        return result;
+    if (opcode != 0x6b18u && opcode != 0x7b18u)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    int selects_c = opcode == 0x7b18u;
+    struct hpclang_rpl_code_pc_exchange next = {
+        .capture = {.instruction = instruction,
+                    .length = 4,
+                    .source = HPCLANG_RPL_CODE_NEXT_PC,
+                    .destination = selects_c ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A,
+                    .nibbles = 5,
+                    .constant = instruction + 4},
+        .target = (selects_c ? c_low : a_low) & 0xfffffu};
+    *exchange = next;
+    return 0;
+}
+
 int hpclang_rpl_code_indirect_inspect(const struct hpclang_rpl_reader *instructions,
                                       const struct hpclang_rpl_reader *pointers,
                                       uint32_t instruction, uint32_t limit, uint32_t a_low,
