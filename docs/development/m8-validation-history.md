@@ -1552,3 +1552,28 @@ ARMv4T Thumb compilation/static analysis pass. The first build exposed a missing
 complete geometry-type include; adding `rpl-port.h` fixed it before all passes.
 The separate live Stock matrix uses its previously reproduced application;
 this predictor is not yet part of that application or a production resolver.
+
+## 2026-10-29 — Guarded bank-effects state capture
+
+The runtime effects capture composes the existing read-map/owner/selector/overlay
+capture with the sentinel, 256 write-map words and four saved cache words.
+It reports 4,680 unique native-state-relative nibble dependencies and publishes
+only a complete snapshot. Readers and callbacks require the same exclusive
+mapping lifetime as prediction; partial dependency collections must be discarded
+on failure. Raw captured words still require separate semantic qualification.
+
+ASan/UBSan test 167 passes 18,720 fault cases across every read/dependency position
+(unavailable read, invalid nibble, negative callback, positive callback), plus
+exact field/coordinate coverage and null inputs. Both maintained runs under
+`/work/oct29-bank-effects-capture/{model}/bank-switch-maps.json` pass: all 672
+original-handler predictions now use C-captured state, independently compared
+with raw fixture fields, each recording 4,680 unique dependencies. The 96 absent
+bank rejections and all existing suites remain passing. ARM compilation/analysis,
+full tracked-source formatting/Ruff/ShellCheck pass. Production execution-edge
+integration and full execution-state qualification remain open.
+
+The preceding remote heads remain pending with no failed job in this audit:
+#26 b5891517 has seven queued/three running workflows and 12 successful/three
+running/104 queued jobs; #20 4f2ce605 has seven successful/five queued workflow
+records and 297 successful/17 running/75 queued/one skipped jobs. Workflow/job
+snapshots are reported independently; neither head is fully accepted.

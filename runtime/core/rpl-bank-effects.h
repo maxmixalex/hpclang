@@ -11,6 +11,18 @@ struct hpclang_rpl_bank_effects
     uint32_t cache[4];    /* Saved read/read/write/write words at 0xc4c..0xc58. */
 };
 
+/* Capture read-map state plus sentinel, all write-map words and overlay caches.
+ * Coordinates are native-state-relative NIBBLES, matching bank_map_capture.
+ * Caller keeps the interpreter/mappings exclusive and stable throughout capture,
+ * prediction and use; preserve the native mapping ID in dependency guards.
+ * All 4680 observed nibbles are reported. Callback errors invalidate accumulated
+ * dependencies; negative errors propagate, positive errors become MALFORMED.
+ * Output changes only on success. Capture does not semantically validate values
+ * or establish ROM identity, geometry, routing or complete execution roots. */
+int hpclang_rpl_bank_effects_capture(const struct hpclang_rpl_reader *reader,
+                                     struct hpclang_rpl_bank_effects *state,
+                                     hpclang_rpl_reference_dependency_fn dependency, void *context);
+
 /* Predict the reviewed populated-bank handler's mapping/cache state without
  * executing it. Inputs are separately qualified, stable snapshots; retain all
  * source dependencies for later guards. The existing map validator qualifies

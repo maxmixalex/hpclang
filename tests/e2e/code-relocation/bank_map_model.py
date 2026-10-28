@@ -60,6 +60,19 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
             ("cache", c.c_uint32 * 4),
         ]
 
+    Read = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.POINTER(c.c_uint8))
+    Dependency = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
+
+    class Reader(c.Structure):
+        _fields_ = [("read", Read), ("context", c.c_void_p)]
+
+    lib.hpclang_rpl_bank_effects_capture.argtypes = [
+        c.POINTER(Reader),
+        c.POINTER(Effects),
+        Dependency,
+        c.c_void_p,
+    ]
+
     lib.hpclang_rpl_bank_effects_select.argtypes = [
         c.POINTER(Effects),
         c.POINTER(Geometry),
@@ -132,6 +145,32 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
                 effects.sentinel = struct.unpack("<I", uc.mem_read(cpu + 0x400, 4))[0]
                 effects.writes[:] = struct.unpack("<256I", uc.mem_read(cpu + 0x404, 1024))
                 effects.cache[:] = struct.unpack("<4I", uc.mem_read(cpu + 0xC4C, 16))
+                dependencies = {}
+
+                @Read
+                def read_state(_, address, value):
+                    if address >= 0xC60 * 2:
+                        return 0
+                    value[0] = (before[cpu - 0x08000000 + address // 2] >> (4 * (address & 1))) & 15
+                    return 1
+
+                @Dependency
+                def observe_state(_, address, value):
+                    if address in dependencies:
+                        return -73
+                    dependencies[address] = value
+                    return 0
+
+                reader = Reader(read_state, None)
+                captured = Effects()
+                assert (
+                    lib.hpclang_rpl_bank_effects_capture(
+                        c.byref(reader), c.byref(captured), observe_state, None
+                    )
+                    == 0
+                )
+                assert bytes(captured) == bytes(effects) and len(dependencies) == 4680
+                effects = captured
                 selected = Effects()
                 c.memset(c.byref(selected), 0xA5, c.sizeof(selected))
                 untouched = bytes(selected)
@@ -222,6 +261,7 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
                         rejected=False,
                         complete_sram_effects=True,
                         runtime_effects_match=True,
+                        captured_dependencies=len(dependencies),
                         state_write_events=len(writes),
                         unchanged_selectors=(lower, upper) == (state.lower, state.upper),
                     )
