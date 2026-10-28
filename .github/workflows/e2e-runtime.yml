@@ -154,6 +154,7 @@ jobs:
             build/e2e/*/e2e.stock-*.json
             build/e2e/*/launchers/*.bin
             build/e2e/*/launchers/*.hp
+            build/e2e/*/launchers/memory.json
           if-no-files-found: error
 
   x50ng:
@@ -371,6 +372,12 @@ jobs:
       - name: Execute Stock target
         # Raw-card witnesses use independent host FAT tools for preparation and verification.
         run: |
+          if [[ "$SUITE" == ui ]]; then
+            snapshot_dir="$PWD/build/resource-snapshots/$HPCLANG_E2E_TARGET"
+            mkdir -p "$(dirname "$snapshot_dir")"
+            mkdir "$snapshot_dir"
+            export HPCLANG_X50NG_RESOURCE_SNAPSHOT="$snapshot_dir/$HPCLANG_E2E_TARGET"
+          fi
           if [[ -f "build/e2e/$APPLICATION/e2e.stock-media.json" ]]; then
             bash tools/install-ci-packages.sh dosfstools mtools
           fi
@@ -383,9 +390,19 @@ jobs:
         run: |
           args=(stock "$FAMILY")
           if [[ "$SUITE" == ui ]]; then
-            args+=(--pool)
+            args+=(--pool --artifact "build/e2e/$APPLICATION")
           fi
           python3 "$VERIFIER" "${args[@]}"
+
+      - name: Verify UI lifecycle resource evidence
+        if: always() && matrix.suite.mode == 'ui'
+        run: |
+          snapshot_dir="build/resource-snapshots/$HPCLANG_E2E_TARGET"
+          mkdir -p "$snapshot_dir/state"
+          cp "build/$HPCLANG_E2E_TARGET-stock.json" "$snapshot_dir/"
+          cp "build/$HPCLANG_E2E_TARGET-state/flash" "$snapshot_dir/state/flash"
+          python3 tests/e2e/harness/verify-resource-snapshots.py "$snapshot_dir" \
+            --model "$HPCLANG_E2E_TARGET" --report "$snapshot_dir/verified-lifecycle.json"
 
       - name: Generate suite LCD evidence
         if: always()
@@ -425,6 +442,7 @@ jobs:
             build/stock-${{ matrix.model.family }}-targets.txt
             build/*-stock-media.img
             build/*-code-relocation/**
+            build/resource-snapshots/**
             build/e2e/${{ matrix.suite.artifact }}/e2e.hpc
             build/e2e/${{ matrix.suite.artifact }}/e2e.stock-*.json
             build/e2e/${{ matrix.suite.artifact }}/launchers/memory.json

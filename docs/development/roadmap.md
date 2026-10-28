@@ -20,6 +20,20 @@ HPGCC 1.1-p1 with 39G support is the historical HP39-family application referenc
 
 ## Current M8 follow-up evidence
 
+Stock UI lifecycle CI follow-up (local acceptance): enable exclusive per-model
+capture directories, preserve raw SRAM/Flash/status, require lifecycle validation
+even on failed execution, and upload complete evidence. Other suites stay inert.
+All six UI models pass independent pixels, memory, pool and settled-return checks;
+all 79 snapshots replay identically to saved reports. Queue 7318 exits zero.
+The exact workflow shell step passes on all six captured cases, rejects missing
+return evidence, preserves existing reports, and leaves non-UI cases inactive.
+Evidence: /work/oct26-ui-lifecycle/final-audit.json and
+/work/oct26-ui-lifecycle-workflow-matrix.json. This branch is stacked on observer
+PR #20; it adds one workflow and two documents, with no runtime changes.
+These sampled observations do not close whole-flow peak/resource or M8 acceptance.
+Previous-push CI review: research/oct26-ui-lifecycle-prepush-ci.json. Fresh CI
+is not polled after submission.
+
 Lifecycle observer six-model validation completed locally: HP39g+/HP39gs/
 HP40gs/HP48gII/HP49g+/HP50g pass Stock execution and settled return, with
 9/8/8/14/20/20 snapshots (79 total). Independent re-verification exactly matches

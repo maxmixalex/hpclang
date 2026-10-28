@@ -1471,3 +1471,19 @@ device/capability facts
 ```
 
 M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. M7.2 byte-stream storage is complete with Storage #53 / Core #254. M7.3a–j object services, including directories, composite objects, Aplet-owned persistence/Reset and native catalogs, are accepted, as are M7.4 common system services and M7.5 display/runtime services. Text/numeric/console behavior and media-change services are accepted, including four SD volumes and stable card identity on `7303a3d6`. Overall M7 is accepted at functional head `2988e1de`, including the capability ledger, timed historical client, owned CPU power policy and ordinary application termination. See [final acceptance](validation.md#m7-final-acceptance). The individually approved native Port 0/1/2, whole-calculator reset and reliable serial-number follow-ups remain on the [roadmap](roadmap.md).
+
+### Stock UI lifecycle CI evidence
+
+Stock UI jobs enable the lifecycle observer in a new per-model directory under
+`build/resource-snapshots/`. The validation step preserves final packed Flash
+and Stock status and runs even after a failed execution; an incomplete or failed
+run cannot produce a successful report. Raw captures and proof reports are
+uploaded with the existing UI evidence. Other suites remain unchanged.
+
+All six local UI runs pass independent pixels, stack/heap observations, stage
+pool checks and lifecycle validation. Their 79 snapshots replay against saved
+proofs, and the exact workflow commands pass all six positive cases plus
+missing-return, report-preservation and inactive-suite controls. Evidence:
+`/work/oct26-ui-lifecycle/final-audit.json` and
+`/work/oct26-ui-lifecycle-workflow-matrix.json`. Peak bounds, complete physical
+accounting and remote CI acceptance remain separate requirements.
