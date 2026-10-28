@@ -13,7 +13,7 @@ from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE
 from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
 
 from flashptr_guards import verify_flashptr
-from bank_overlay import verify_overlay
+from bank_overlay import verify_attachment_switches, verify_overlay
 
 if not __debug__:
     raise RuntimeError("Assertions required")
@@ -403,6 +403,7 @@ for index in range(17):
     )
 flashptr_rows = verify_flashptr(lib, read, flash, rows)
 overlay_rows = verify_overlay(lib, ram, flash, cpu, rows)
+attachment_rows = verify_attachment_switches(ram, flash, cpu, rows)
 assert all(
     hashlib.sha256(Path(p).read_bytes()).hexdigest() == value for p, value in sources.items()
 )
@@ -414,6 +415,7 @@ report.write_text(
             cases=rows,
             flashptr_tables=flashptr_rows,
             overlay_sequences=overlay_rows,
+            attachment_switch_sequences=attachment_rows,
             flash_sha256=hashlib.sha256(flash).hexdigest(),
             sram_sha256=hashlib.sha256(ram).hexdigest(),
             incoming_p=incoming_p,
@@ -429,5 +431,7 @@ print(
     len(rows),
     "ROM switches and",
     len(overlay_rows),
-    "ERAM overlay sequences; populated geometry and unused-bank rejection",
+    "ERAM overlay sequences and",
+    len(attachment_rows),
+    "attachment-switch sequences; populated geometry and unused-bank rejection",
 )

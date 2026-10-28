@@ -1029,3 +1029,58 @@ different bounds, compact ACPTR payload/switch edges, opaque rejection, exhauste
 capacity/budget, failed/invalid reads, callback failures and malformed resolver
 outputs. ARMv4T Thumb compilation/static analysis and clang-format checks pass.
 Actual Stock root classification and qualified resolution remain integration work.
+
+## Saved HOME graph integration — local, 2026-10-29
+
+`research/oct29-home-graph.py` compiles the current reference/parser sources and
+reads the existing HP49g+/HP50g Stock saved states without mutation. Both HOME
+structural scans succeed and enumerate 38 inline children, 20 attachments,
+81 direct references, four opaque objects and one Flash pointer. These are
+structural edges, not a closed reachability graph. The strict graph scheduler
+rejects the first attachment (library ID 2, target 259640, field 982345) through
+the unresolved-policy callback, preserves the unpublished visited-count sentinel,
+and records parser dependencies. No unresolved edge is accepted as a terminal.
+The two source SRAM/Flash files are byte-identical afterward. Source/input hashes,
+all unresolved structural edges and strict rejection results are retained in
+`/work/oct29-home-graph/report.json`. This is saved-state integration evidence,
+not fresh Stock execution, complete root coverage or mutation authorization.
+Next integration work is qualified attachment/catalog target resolution, followed
+by the remaining direct, opaque and Flash-pointer obligations.
+
+## Saved HOME attachment targets — local, 2026-10-29
+
+`research/oct29-home-attachments.py` resolves the 20 attachment targets in each
+previously captured HP49g+/HP50g HOME as exact 15-nibble DOACPTR objects. The
+graph schedules these objects in the captured mapping; no payload bank is
+inferred from a catalog binding. All IDs have unique catalog matches. The three
+attachment fields belonging to direct-mapped catalog bindings agree with the
+identity-checked hash/message header targets. Banked header checks remain open.
+The existing ACPTR resolver recognizes 17 wrapper switches per model, but returns
+unknown for two `0x22e83` wrappers and one `0x22e99` wrapper. This is a real
+resolution gap, not a malformed-object or missing-library result. The strict
+graph rejects the first ACPTR edge (field 259645, target 270562, switch 142979)
+and leaves visited_count unpublished. Further execution edges remain obligations.
+SRAM/Flash files remain byte-identical. Details are retained in
+`/work/oct29-home-graph/attachments.json`; the companion report records source
+and input hashes. Reader observations are diagnostic evidence, not a complete
+transaction guard or proof of supported-firmware identity. Next: establish the
+two additional switch semantics before extending production bank resolution.
+
+## Additional HOME bank-switch execution — local, 2026-10-29
+
+Maintained `bank_overlay.verify_attachment_switches`, invoked by
+`bank_switch_maps.py`, compares original-ROM entries 0x22e83/0x22e99 against
+the standard bank-2/bank-4 switch entries. Both captured supported ROMs pass
+six paired scenarios each: initial saved mapping, selected bank 0 and active
+ERAM, followed by entry P=0 and exit P=1. All 256 Read[] pages, 256 owner bytes,
+mapping flags and both bank selectors match the canonical entry at each stage.
+Normal entry selects bank 2/4; exit selects bank 2. ERAM remains visible while
+enabled. All calls return with P=0 and unchanged Flash. The normal 17-switch,
+16-overlay, guarded lookup and geometry checks also pass for each model.
+Reports/source hashes: `/work/oct29-home-switch-regression/{model}/bank-switch-maps.json`.
+The exploratory `/work/oct29-home-switches.json` retains baseline comparisons.
+Ruff and strict documentation checks pass locally. These tests establish the
+observed mappings in captured calling contexts, not a generic address-based
+alias rule, complete handler semantics or production firmware authentication.
+The runtime resolver still rejects the additional entries pending qualified
+identity integration; safe reference movement and M8.0 remain incomplete.
