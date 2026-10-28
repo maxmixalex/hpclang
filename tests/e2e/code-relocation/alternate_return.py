@@ -116,6 +116,22 @@ class Assignment(c.Structure):
     ]
 
 
+class Memory(c.Structure):
+    _fields_ = [
+        (name, c.c_uint32)
+        for name in ("instruction", "length", "data", "address", "first", "nibbles", "load")
+    ]
+
+
+lib.hpclang_rpl_code_memory_inspect.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.c_uint,
+    c.POINTER(Memory),
+]
+
+
 lib.hpclang_rpl_code_assignment_inspect.argtypes = [
     c.POINTER(Reader),
     c.c_uint32,
@@ -283,12 +299,75 @@ for cursor in range(8):
             accesses = []
             cursor_steps = []
 
+            memory_checks = []
+            pending_memory = []
+
+            def live_nibble(at):
+                return uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
+
+            @Read
+            def read_live(_, at, value):
+                value[0] = live_nibble(at)
+                return 1
+
+            live_reader = Reader(read_live, None)
+
             def hook(_, at, size, user):
                 if at == 0x28898:
+                    if pending_memory:
+                        reg_at, expected_register, address, expected_memory, address_state = (
+                            pending_memory.pop()
+                        )
+                        assert int.from_bytes(uc.mem_read(reg_at, 8), "little") == expected_register
+                        assert [
+                            live_nibble(address + i) for i in range(len(expected_memory))
+                        ] == expected_memory
+                        assert bytes(uc.mem_read(cpu + 0x954, 8)) == address_state
                     pc = uc.reg_read(UC_ARM_REG_R7)
                     trace.append(pc)
                     if pc == 0x3130 or len(trace) > 120:
                         uc.emu_stop()
+                        return
+                    if live_nibble(pc) == 1 and live_nibble(pc + 1) in (4, 5):
+                        transfer = Memory()
+                        assert (
+                            lib.hpclang_rpl_code_memory_inspect(
+                                c.byref(live_reader),
+                                pc,
+                                4,
+                                int.from_bytes(uc.mem_read(cpu + 0x95C, 4), "little"),
+                                c.byref(transfer),
+                            )
+                            == 0
+                        )
+                        address_state = bytes(uc.mem_read(cpu + 0x954, 8))
+                        address = struct.unpack_from(
+                            "<I", address_state, 4 * (transfer.address - 11)
+                        )[0]
+                        assert 0 <= address < address + transfer.nibbles <= 0x100000
+                        reg_at = cpu + 0x90C + 8 * transfer.data
+                        register = int.from_bytes(uc.mem_read(reg_at, 8), "little")
+                        values = [live_nibble(address + i) for i in range(transfer.nibbles)]
+                        mask = ((1 << (4 * transfer.nibbles)) - 1) << (4 * transfer.first)
+                        if transfer.load:
+                            value = sum(n << (4 * i) for i, n in enumerate(values))
+                            register = (register & ~mask) | (value << (4 * transfer.first))
+                        else:
+                            values = [
+                                (register >> (4 * (transfer.first + i))) & 15
+                                for i in range(transfer.nibbles)
+                            ]
+                        pending_memory.append((reg_at, register, address, values, address_state))
+                        memory_checks.append(
+                            dict(
+                                instruction=pc,
+                                load=transfer.load,
+                                register=transfer.data,
+                                address=address,
+                                first=transfer.first,
+                                nibbles=transfer.nibbles,
+                            )
+                        )
 
             def access(_, kind, at, size, value, user):
                 if at < cpu + 0x954 and at + size > cpu + 0x92C:
@@ -301,6 +380,7 @@ for cursor in range(8):
             uc.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, access)
             uc.emu_start(0x28828, 0x400000, count=30000)
             assert trace[-1] == 0x3130 and cursor_steps == [1, 7, 1, 7, 7]
+            assert memory_checks and not pending_memory
             assert 0x88CA2 + delta in trace and 0x88CA9 + delta in trace
             assert word(0x806F8) == stack - (5 if flags == 1 else 0)
             assert word(0x8076B) == 0x88D67 + delta
@@ -336,6 +416,7 @@ for cursor in range(8):
                     flags=flags,
                     mode=mode,
                     r0_read=used,
+                    memory_transfers=memory_checks,
                     writes=writes.value,
                     stack_peak=1,
                     stack_final=-1,

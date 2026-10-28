@@ -1187,6 +1187,24 @@ under `/work/oct28-pc-capture/<model>`. The earlier extreme-boundary probe reach
 an unmapped interpreter fetch; it does not prove wrap semantics. These checks
 establish capture semantics, not launcher reachability or relocation permission.
 
+`hpclang_rpl_code_memory_inspect` describes DAT0/DAT1 loads and stores involving
+A/C: direction, address register, selected register field and transfer length.
+The register field starts at its selected nibble while memory starts at D0/D1;
+the address register does not advance. Standard fields and explicit counts are
+covered by 3,456 unit combinations, with truncated/unreadable instructions and
+unsupported/custom fields rejected without publishing a descriptor. No data
+memory is read by this inspector, and memory contents are not classified as
+pointers merely because a transfer exists.
+
+The maintained `alternate_return.py` now checks every such transfer along its
+controlled original PrRUN return, including the R0-to-A-to-stack path. Both
+models pass all 192 baseline, repaired and deliberately stale-register cases,
+including original-allocation variants: 960 stores and 864 loads match C
+descriptors while preserving unrelated register bits and D0/D1. Reports in
+`/work/oct28-memory-return` retain source/input hashes and transfer observations.
+These are controlled continuation checks, not complete entry reachability,
+incoming-register provenance or permission to enable public relocation.
+
 The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
 `--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles
 the current C decoders and executes the original ARM Saturn interpreter. The

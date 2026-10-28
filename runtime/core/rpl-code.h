@@ -115,6 +115,26 @@ struct hpclang_rpl_code_exchange
     unsigned first, nibbles;
 };
 
+struct hpclang_rpl_code_memory
+{
+    uint32_t instruction, length;
+    enum hpclang_rpl_code_register data, address;
+    unsigned first, nibbles, load;
+};
+
+/* Describe DAT0/DAT1 transfers to/from A/C at a proven instruction boundary.
+ * load=1 reads memory into the register, load=0 writes the register to memory.
+ * Memory starts at the caller-proven D0/D1 address; first selects the register
+ * field, not an offset added to memory. Neither address register is advanced.
+ * Supports fixed A/B fields, standard P/WP/XS/X/S/M/B/W/A fields and explicit
+ * low-register nibble counts. p must be the established value at this instruction.
+ * No data-memory reads/writes, address-wrap policy, pointer classification or
+ * relocation permission is implied. Guard code, P, address and mapping inputs
+ * separately before using this descriptor. Errors leave the output untouched. */
+int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                    uint32_t limit, unsigned p,
+                                    struct hpclang_rpl_code_memory *memory);
+
 /* Describe a simultaneous exchange of the same field in two registers. Both
  * sources are the pre-instruction values; preserve all nibbles outside the field.
  * Supports A/B/C/D pairs and A/C with R0..R4, standard fields (0..7,F).

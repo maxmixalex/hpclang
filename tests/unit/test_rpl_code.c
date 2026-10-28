@@ -864,6 +864,70 @@ static void literal_loads(void)
     assert(!memcmp(&value, &untouched, sizeof value));
 }
 
+static void memory_transfers(void)
+{
+    const unsigned fields[] = {0, 1, 2, 3, 4, 5, 6, 7, 15};
+    const unsigned starts[] = {0, 0, 2, 0, 15, 3, 0, 0, 0};
+    const unsigned widths[] = {1, 1, 1, 3, 1, 12, 2, 16, 5};
+    for (unsigned form = 0; form < 3; ++form)
+        for (unsigned selector = 0; selector < (form ? 8u : 16u); ++selector)
+            for (unsigned field = 0; field < (form == 0 ? 1u : form == 1 ? 9u : 16u); ++field)
+                for (unsigned p = 0; p < 16; ++p) {
+                    struct image image = {{1, form ? 5 : 4, selector + (form == 2 ? 8 : 0),
+                                           form == 1 ? fields[field] : field},
+                                          0x80001,
+                                          form ? 4 : 3,
+                                          UINT32_MAX};
+                    struct hpclang_rpl_reader reader = {read_nibble, &image};
+                    struct hpclang_rpl_code_memory value, unchanged;
+                    memset(&unchanged, 0xa5, sizeof unchanged);
+                    value = unchanged;
+                    assert(hpclang_rpl_code_memory_inspect(&reader, image.address, image.size, p,
+                                                           &value) == 0);
+                    assert(value.instruction == image.address && value.length == image.size);
+                    assert(value.data ==
+                           ((selector & 4) ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A));
+                    assert(value.address ==
+                           ((selector & 1) ? HPCLANG_RPL_CODE_D1 : HPCLANG_RPL_CODE_D0));
+                    assert(value.load == ((selector & 2) != 0));
+                    unsigned first = form == 1 ? (field == 0 ? p : starts[field]) : 0;
+                    unsigned nibbles = form == 0    ? (selector < 8 ? 5 : 2)
+                                       : form == 2  ? field + 1
+                                       : field == 1 ? p + 1
+                                                    : widths[field];
+                    assert(value.first == first && value.nibbles == nibbles);
+                    for (unsigned n = 0; n < image.size; ++n) {
+                        value = unchanged;
+                        assert(hpclang_rpl_code_memory_inspect(&reader, image.address, n, p,
+                                                               &value) == HPCLANG_RPL_SPAN_BOUNDS);
+                        assert(!memcmp(&value, &unchanged, sizeof value));
+                        image.fail = image.address + n;
+                        assert(hpclang_rpl_code_memory_inspect(&reader, image.address, image.size,
+                                                               p, &value) ==
+                               HPCLANG_RPL_SPAN_UNAVAILABLE);
+                        assert(!memcmp(&value, &unchanged, sizeof value));
+                        image.fail = UINT32_MAX;
+                    }
+                }
+    for (unsigned field = 8; field < 15; ++field) {
+        struct image image = {{1, 5, 0, field}, 0x80000, 4, UINT32_MAX};
+        struct hpclang_rpl_reader reader = {read_nibble, &image};
+        struct hpclang_rpl_code_memory value, unchanged;
+        memset(&unchanged, 0xa5, sizeof unchanged);
+        value = unchanged;
+        assert(hpclang_rpl_code_memory_inspect(&reader, image.address, 4, 0, &value) ==
+               HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!memcmp(&value, &unchanged, sizeof value));
+        assert(hpclang_rpl_code_memory_inspect(&reader, image.address, 4, 16, &value) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&value, &unchanged, sizeof value));
+        image.data[3] = 16;
+        assert(hpclang_rpl_code_memory_inspect(&reader, image.address, 4, 0, &value) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&value, &unchanged, sizeof value));
+    }
+}
+
 static void pc_capture_bounds(void)
 {
     for (unsigned destination = 4; destination <= 5; ++destination) {
@@ -899,5 +963,6 @@ int main(void)
     literal_loads();
     register_exchanges();
     pc_capture_bounds();
+    memory_transfers();
     return 0;
 }

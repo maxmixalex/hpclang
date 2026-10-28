@@ -380,6 +380,49 @@ int hpclang_rpl_code_assignment_inspect(const struct hpclang_rpl_reader *reader,
     return 0;
 }
 
+int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                    uint32_t limit, unsigned p,
+                                    struct hpclang_rpl_code_memory *memory)
+{
+    if (!reader || !reader->read_nibble || !memory)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || !limit || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (p > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct instruction_cursor cursor = {.reader = reader, .at = instruction, .limit = limit};
+    unsigned size;
+    int result = instruction_size(&cursor, &size);
+    if (!result)
+        result = instruction_take(&cursor, size);
+    if (result)
+        return result;
+    const uint8_t *op = cursor.code;
+    if (op[0] != 1 || (op[1] != 4 && op[1] != 5))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned selector = op[2];
+    struct hpclang_rpl_code_memory next = {
+        .instruction = instruction,
+        .length = size,
+        .data = selector & 4 ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A,
+        .address = selector & 1 ? HPCLANG_RPL_CODE_D1 : HPCLANG_RPL_CODE_D0,
+        .load = (selector & 2) != 0,
+    };
+    if (op[1] == 5 && selector >= 8) {
+        next.nibbles = op[3] + 1u;
+    } else {
+        unsigned field = op[1] == 4 ? (selector < 8 ? 15 : 6) : op[3];
+        static const unsigned first[] = {0, 0, 2, 0, 15, 3, 0, 0};
+        static const unsigned width[] = {1, 1, 1, 3, 1, 12, 2, 16};
+        if (field >= 8 && field != 15)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        next.first = field == 15 ? 0 : field == 0 ? p : first[field];
+        next.nibbles = field == 15 ? 5 : field == 1 ? p + 1 : width[field];
+    }
+    *memory = next;
+    return 0;
+}
+
 int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
                                       uint32_t limit, unsigned p,
                                       struct hpclang_rpl_code_exchange *exchange)
