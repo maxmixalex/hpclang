@@ -116,7 +116,7 @@ startup safety and reclamation. Sound compatibility is independent.
 | --- | --- | --- |
 | Native references and libraries | #24 implements guarded catalog/HOME/cache edits, register repairs, physical mappings, TEMP traversal and terminal handling of partial publication | Complete launcher/opaque/banked provenance, handler identity, library configuration and public management; Port1 replace/remove remain unavailable |
 | Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Remote CI acceptance |
-| Port2 supported binding 769 | HP49g+ passes guarded/repeated/absent recovery and all 16 independently checked rejection cases; HP50g guarded/repeated/absent recovery passes, rejection cases running | Finish HP50g matrix; complete trusted installation, authority lifecycle, safe startup and reclamation |
+| Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
 | Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Not pushed or CI accepted; HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
 
 Guarded ID769 tests retain 23,900 user elements. Earlier complete two-model
@@ -129,7 +129,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #24 / `6ff8a1e9` | Submitted. Latest CI snapshot: five workflows successful, seven queued; 74 jobs successful, one running and 217 queued. Not accepted. Local explicit-ID follow-up is not pushed. |
+| #24 / `6ff8a1e9` | Submitted. Latest CI snapshot: five workflows successful, seven queued; 75 jobs successful, five running and 212 queued. Not accepted. Local explicit-ID follow-up is not pushed. |
 | #21 / `00d5ddf1` | UI pool/RW checks pass six retained Stock fixtures locally. HP39g+ immediate retest passes; earlier watchdog failure cause, full CI and total system peaks remain open. |
 | #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; cause unproven. |
@@ -141,7 +141,7 @@ four oversized test snapshots. All eight saved states were investigated; the
 current submitted head contains both fixes. A separate publisher cancellation
 was caused by a higher-priority pending request, not accepted as a passing job.
 
-Next: finish the running recovery matrix; complete execution-reference coverage
+Next: complete execution-reference coverage
 and public library/Port1 operations; inspect outstanding CI before delivery and
 accept only proven gates. Continue Port2 installation/startup/reclamation within
 M8, and retain every M8.2–M8.6 requirement above.

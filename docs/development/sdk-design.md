@@ -786,6 +786,21 @@ installer still needs availability, firmware and complete startup-safety checks.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
 
+Supported-ID-769 fixtures bind the recorded recovery/admission ELF artifacts
+through the maintained packager. Both HP49g+ and HP50g pass installation,
+guarded low-memory repair, reset checkpoint verification, repeat restart,
+absent-reservation recovery and all 16 rejection cases each. Guarded recovery
+preserves 23,900 array elements; 21,702 free bytes admit the 20,994-byte admission
+copy but not the recovery copy. Independent saved-state checks verify all 32
+rejections preserve Flash and user data, complete the configuration witness and
+issue no Flash operation or reset. HP50g's missing phases continue from reverified
+checkpoints without replaying its completed recovery. Inputs, results and audits
+remain under `/work/oct27-supported-recovery/<model>`.
+The harness accepts an explicit library ID (default 1701), rejects unsupported
+IDs before fixture creation and records the selected ID in new results. Its
+ID769 witness packages match the retained native fixtures byte-for-byte. These
+checks establish supported bindings, not complete pre-recovery callback safety.
+
 The internal `hpclang_rpl_library_configuration()` resolver reads the configuration
 offset from a validated library ID header in a caller-selected stable mapping.
 It distinguishes a zero offset from read failures, malformed IDs and out-of-bounds
