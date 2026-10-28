@@ -299,6 +299,7 @@ extern "C"
 
     struct hpclang_rpl_reference_edit;
     struct hpclang_rpl_reference_guard;
+    struct hpclang_rpl_reference_reader;
     /* Caller-proven Saturn address in the low 20 bits of an owned ARM word.
      * expected guards the entire word. The other 12 bits are preserved; a
      * register's separate high word is never accessed. This is not provenance
@@ -318,6 +319,9 @@ extern "C"
         uint32_t guard_count;
         const struct hpclang_rpl_register_repair *registers;
         uint32_t register_count;
+        /* Optional reader for read-only guards in proven-disjoint mappings.
+         * Main-RAM guards always use io, never this reader. */
+        const struct hpclang_rpl_reference_reader *guard_reader;
     };
 
     /* Same geometry/ownership contract as catalog_grow. Merge caller-proven
@@ -331,6 +335,12 @@ extern "C"
      * the caller proves that mapping and the continuation's address use. Exact
      * aliases with native roots coalesce only when full-word repairs agree.
      * Guards describe unchanged preconditions, not permissions to relocate.
+     * Guards outside main_mapping require guard_reader; distinct identities
+     * mean caller-proven physical disjointness, not unequal bank numbers.
+     * This permits ROM handler identity checks but no writes to other mappings.
+     * The reader must be read-only; keep all guarded mappings and bytes stable
+     * from preflight through publication/return. No fallback reader may hide a
+     * failed or changed main-RAM dependency.
      * Keep input arrays, ARM roots, mappings and memory stable throughout.
      * Allocates temporary ARM heap storage; allocation/preflight failure makes
      * no writes. INCOMPLETE distinguishes a commit failure from those preflight

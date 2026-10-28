@@ -3154,7 +3154,7 @@ static void test_catalog_alias_repairs(void)
                                                0x100000 - io.library_table, 15, &insertion) == 1);
         const struct hpclang_rpl_library_binding binding = {0x83022, 0, 0};
         const struct hpclang_rpl_catalog_repairs repairs = {
-            7, edits, refs.edit_count, guards, refs.guard_count, NULL, 0};
+            7, edits, refs.edit_count, guards, refs.guard_count, NULL, 0, NULL};
         if (fault < 19)
             memory[0x82500 + fault] ^= 1;
         else if (fault < 38)
@@ -3205,7 +3205,7 @@ static void test_catalog_observed_guards(void)
                                                0x100000 - io.library_table, 15, &insertion) == 1);
         const struct hpclang_rpl_library_binding binding = {0x83022, 0, 0};
         const struct hpclang_rpl_catalog_repairs repairs = {
-            7, NULL, 0, guards, state.builder.count, NULL, 0};
+            7, NULL, 0, guards, state.builder.count, NULL, 0, NULL};
         if (fault < 25)
             memory[0x82500 + fault] ^= 1;
         else if (fault < 50)
@@ -3478,7 +3478,7 @@ static void test_jump_return_relocation(void)
         io.native_roots = roots;
         io.native_root_count = 4;
         const struct hpclang_rpl_reference_edit edit = {1, 0x82602, 0x82620, 0x82630, 5};
-        const struct hpclang_rpl_catalog_repairs repairs = {1, &edit, 1, NULL, 0, NULL, 0};
+        const struct hpclang_rpl_catalog_repairs repairs = {1, &edit, 1, NULL, 0, NULL, 0, NULL};
         assert(!hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs));
         assert(pc == 0x82410);
         for (unsigned depth = 0; depth < 8; ++depth) {
@@ -3519,7 +3519,7 @@ static void test_call_return_relocation(void)
             io.native_root_count = 2;
             const struct hpclang_rpl_reference_edit edit = {1, pc + prefix, 0x82500, 0x82510, 5};
             const struct hpclang_rpl_catalog_repairs repairs = {1, &edit, kind == 2, NULL,
-                                                                0, NULL,  0};
+                                                                0, NULL,  0,         NULL};
             assert(!hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs));
             assert(pc == 0x82410);
             for (unsigned i = 0; i < 8; ++i)
@@ -3552,7 +3552,7 @@ static void test_catalog_merged_repairs(void)
         };
         const struct hpclang_rpl_reference_guard guards[] = {{7, 0x82000, 2, 3},
                                                              {7, 0x82500, 3, width}};
-        const struct hpclang_rpl_catalog_repairs repairs = {7, edits, 4, guards, 2, NULL, 0};
+        const struct hpclang_rpl_catalog_repairs repairs = {7, edits, 4, guards, 2, NULL, 0, NULL};
         assert(!hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs));
         assert(get_word(0x8200b, 5) == 0x82565);
         assert(get_word(0x806da, 5) == 0x82565 && watched_writes == 1);
@@ -3573,7 +3573,7 @@ static void test_catalog_merged_repairs(void)
         struct hpclang_rpl_reference_edit edits[] = {{7, 0x8200b, 0x82555, 0x82565, 5},
                                                      {7, 0x82500, 3, 4, 3}};
         struct hpclang_rpl_reference_guard guard = {7, 0x82000, 2, 3};
-        struct hpclang_rpl_catalog_repairs repairs = {7, edits, 2, &guard, 1, NULL, 0};
+        struct hpclang_rpl_catalog_repairs repairs = {7, edits, 2, &guard, 1, NULL, 0, NULL};
         switch (fault) {
         case 0:
             ++edits[0].value;
@@ -3631,6 +3631,80 @@ static void test_catalog_merged_repairs(void)
         assert(hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs) < 0);
         assert(!writes && native == 0x82555 && !memcmp(before, memory, sizeof memory));
         free(before);
+    }
+}
+
+struct identity_guard_fixture
+{
+    uint32_t address, calls, fail;
+    uint8_t nibbles[5];
+};
+
+static int identity_guard_read(void *context, uint32_t mapping, uint32_t at, uint8_t *value)
+{
+    struct identity_guard_fixture *fixture = context;
+    ++fixture->calls;
+    if (mapping != 11 || at < fixture->address || at - fixture->address >= 5 || at == fixture->fail)
+        return 0;
+    *value = fixture->nibbles[at - fixture->address];
+    return 1;
+}
+
+static void test_catalog_identity_guards(void)
+{
+    for (unsigned location = 0; location < 2; ++location) {
+        for (unsigned fault = 0; fault < 10; ++fault) {
+            struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+            uint32_t reg = 0xabc82555;
+            struct identity_guard_fixture fixture = {
+                location ? 0x82555 : 0x37258, 0, UINT32_MAX, {1, 2, 3, 4, 5}};
+            struct hpclang_rpl_reference_reader reader = {identity_guard_read, &fixture};
+            struct hpclang_rpl_reference_guard guards[] = {{7, io.library_table, 2, 3},
+                                                           {11, fixture.address, 0x54321, 5}};
+            const struct hpclang_rpl_register_repair repair = {&reg, reg};
+            struct hpclang_rpl_catalog_repairs repairs = {.main_mapping = 7,
+                                                          .guards = guards,
+                                                          .guard_count = 2,
+                                                          .registers = &repair,
+                                                          .register_count = 1,
+                                                          .guard_reader = &reader};
+            if (fault == 1)
+                fixture.nibbles[4] ^= 1;
+            if (fault == 2)
+                fixture.fail = fixture.address + 4;
+            if (fault == 3)
+                fixture.nibbles[4] = 16;
+            if (fault == 4)
+                repairs.guard_reader = NULL;
+            if (fault == 5)
+                reader.read_nibble = NULL;
+            if (fault == 6)
+                guards[1].field = 0xffffc;
+            if (fault == 7)
+                guards[0].expected ^= 1;
+            if (fault == 8)
+                rejected_read = io.library_table;
+            if (fault == 9)
+                guards[1].mapping = 12;
+            uint8_t *before = malloc(sizeof memory);
+            assert(before);
+            memcpy(before, memory, sizeof memory);
+            int result = hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs);
+            if (!fault) {
+                assert(!result && writes && reg == 0xabc82565 && fixture.calls == 5);
+                /* Equal numeric coordinates in a disjoint mapping are never edited. */
+                assert(!memcmp(fixture.nibbles, (uint8_t[]){1, 2, 3, 4, 5}, 5));
+            } else {
+                assert(result == (fault == 2 || fault == 8 || fault == 9
+                                      ? HPCLANG_RPL_MUTATION_IO
+                                      : HPCLANG_RPL_MUTATION_MALFORMED));
+                assert(!writes && reg == 0xabc82555);
+                assert(!memcmp(before, memory, sizeof memory));
+                if (fault == 7 || fault == 8)
+                    assert(!fixture.calls);
+            }
+            free(before);
+        }
     }
 }
 
@@ -3761,7 +3835,7 @@ static void test_catalog_allocation_lifetime(void)
         io.native_roots = roots;
         io.native_root_count = 1;
         struct hpclang_rpl_reference_guard guard = {1, io.library_table, 2, 3};
-        const struct hpclang_rpl_catalog_repairs repairs = {1, NULL, 0, &guard, 1, NULL, 0};
+        const struct hpclang_rpl_catalog_repairs repairs = {1, NULL, 0, &guard, 1, NULL, 0, NULL};
         if (failure == 1)
             ++guard.expected;
         if (failure == 3)
@@ -4059,6 +4133,7 @@ int main(void)
     test_catalog_allocation_lifetime();
 #endif
     test_catalog_merged_repairs();
+    test_catalog_identity_guards();
     test_catalog_register_repairs();
     test_immediate_return_relocation();
     test_conditional_return_relocation();

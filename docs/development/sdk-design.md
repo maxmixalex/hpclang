@@ -1190,6 +1190,22 @@ These windows are inspection extents, not claimed complete handler bodies.
 Evidence: `/work/oct28-dispatch-identity/results.json`, reproduced by
 `research/oct28-dispatch-identity-native.py`.
 
+Catalog/cache transactions can now revalidate read-only dependencies in
+proven-disjoint mappings through the optional `catalog_repairs.guard_reader`.
+Main-RAM guards always use the mutation IO; failures never fall back to the
+external reader. This accepts ROM identity guards without permitting foreign
+edits. Distinct mapping IDs must mean proven physical disjointness, and callers
+retain exclusive mapping/data ownership through publication and return.
+The internal repairs structure gained an optional final member; rebuild callers.
+
+Twenty focused unit scenarios cover ROM and equal-address disjoint mappings,
+changed bytes, unavailable/invalid reads, missing readers, bounds, wrong mapping
+IDs and native-guard failures. Every rejection preserves RAM and register words
+with zero writes. The full mutation suite passes ASan/UBSan; ARM runtime/caller
+compilation, static analysis and the eight repaired-dispatch cases also pass.
+This provides commit-time checking, not complete dependency discovery or a
+Stock-GC interception mechanism. ARM artifacts: `/work/oct28-mapped-guards/`.
+
 The maintained `dispatch_prefix.py` now uses that identity entry point before
 each real interpreter dispatch, with fixed reviewed window bytes rather than
 learning expected bytes from its input. All 896 prefix/full/DUP cases across

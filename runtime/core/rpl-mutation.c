@@ -1003,13 +1003,38 @@ static int catalog_resize_repaired(const struct hpclang_rpl_mutation_io *io, uin
     for (uint32_t i = 0; repairs && i < repairs->guard_count; ++i) {
         const struct hpclang_rpl_reference_guard *guard = &repairs->guards[i];
         uint32_t value;
-        if (guard->mapping != repairs->main_mapping || !guard->width || guard->width > 5 ||
-            guard->field < RPL_MAIN_FIRST || guard->field > RPL_MAIN_END - guard->width ||
+        if (!guard->width || guard->width > 5 || guard->field > 0x100000u - guard->width ||
             guard->expected >> (4 * guard->width)) {
             result = HPCLANG_RPL_MUTATION_MALFORMED;
             goto done;
         }
-        result = read_word(io, guard->field, guard->width, &value);
+        if (guard->mapping == repairs->main_mapping) {
+            if (guard->field < RPL_MAIN_FIRST) {
+                result = HPCLANG_RPL_MUTATION_MALFORMED;
+                goto done;
+            }
+            result = read_word(io, guard->field, guard->width, &value);
+        } else {
+            const struct hpclang_rpl_reference_reader *reader = repairs->guard_reader;
+            if (!reader || !reader->read_nibble) {
+                result = HPCLANG_RPL_MUTATION_MALFORMED;
+                goto done;
+            }
+            value = 0;
+            for (unsigned j = 0; j < guard->width; ++j) {
+                uint8_t nibble;
+                if (!reader->read_nibble(reader->context, guard->mapping, guard->field + j,
+                                         &nibble)) {
+                    result = HPCLANG_RPL_MUTATION_IO;
+                    goto done;
+                }
+                if (nibble > 15u) {
+                    result = HPCLANG_RPL_MUTATION_MALFORMED;
+                    goto done;
+                }
+                value |= (uint32_t)nibble << (4 * j);
+            }
+        }
         if (result)
             goto done;
         if (value != guard->expected) {
