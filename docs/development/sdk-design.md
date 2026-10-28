@@ -1521,6 +1521,8 @@ With `--stage1-elf`, the same gate also executes the linked Thumb collector in
 Unicorn, checking its actual ABI, root-cell identities, masks, untouched output
 slots and input preservation. CI retains the code-relocation stage1 ELF for this
 check. This isolates the collector; it does not execute the full stage1/MMU path.
+Both host and linked-ARM tests exercise the full ten-root capacity across all
+eight return-stack cursors, preserving mixed masks, root order and input values.
 
 `pc_exchange_move.py` adds a controlled catalog-growth contrast using the pinned
 Stock caller snapshot (`--state`, `--model`, `--output`). It executes APCEX/CPCEX

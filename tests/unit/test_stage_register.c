@@ -97,5 +97,29 @@ int main(void)
         assert(!hpclang_stage_execution_roots(&io, 0xffffc, stack, 0, 0, &a, &c, roots, masks));
         assert(!roots[0] && !masks[0]);
     }
+    for (unsigned cursor = 0; cursor < 8; ++cursor) {
+        memset(data, 15, sizeof data);
+        put(0x90000, 0x2b18, 4);
+        put(0x91000, 0x3b18, 4);
+        put(0x92000, 0x10, 2);
+        uint32_t stack[8], saved[8];
+        for (unsigned i = 0; i < 8; ++i) {
+            stack[i] = 0x93000 + i * 16;
+            put(stack[i], 0x10, 2);
+        }
+        memcpy(saved, stack, sizeof saved);
+        uint32_t a = 0xabc91000, c = 0xdef92000;
+        uint32_t *roots[11] = {0}, masks[11] = {0};
+        assert(hpclang_stage_execution_roots(&io, 0x90000, stack, cursor, -1, &a, &c, roots,
+                                             masks) == 10);
+        assert(roots[0] == &a && roots[1] == &c);
+        assert(masks[0] == 0xfffff && masks[1] == 0xfffff);
+        for (unsigned i = 0; i < 8; ++i) {
+            assert(roots[i + 2] == stack + ((cursor + 7 - i) & 7));
+            assert(masks[i + 2] == UINT32_MAX);
+        }
+        assert(!roots[10] && !masks[10]);
+        assert(a == 0xabc91000 && c == 0xdef92000 && !memcmp(stack, saved, sizeof stack));
+    }
     return 0;
 }

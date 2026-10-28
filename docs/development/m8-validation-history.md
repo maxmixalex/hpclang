@@ -585,3 +585,18 @@ are not inferred from it. The pending CI change retains the code-relocation ELF
 and runs the ARM comparison in the existing isolated environment. Ruff/format
 and workflow YAML checks pass. PR26 1dc590b1 currently has ten queued workflows
 and 16 queued jobs, no completed results. Live full Stock runs continue unchanged.
+
+The register-root application and six launchers independently reproduce all 16
+compared artifacts byte for byte, including the HPC1 payload, result address,
+stage1, memory metadata and raw/wrapped launchers. Temporary rebuilding storage
+was removed. Evidence: /work/oct29-stage-register/reproduction.json and its log;
+ELF debug-path differences are excluded, as for the preceding batch.
+Host ASan/UBSan and linked-ARM tests now cover all ten roots (A/C plus eight
+machine-stack cells) for every cursor, preserving masks/order/input and the output
+boundary. The host suite passes in 0.02 s; the maintained ROM/ARM gate still
+passes 288 cases/model and records eight additional mixed-capacity paths/model
+at /work/oct29-stage-register/arm-capacity. Ruff/format checks pass.
+PR21 969ade88 observation: four workflows pass/three unfinished, 211 successful,
+16 running and 91 queued jobs, no failures reported. Both full Stock matrices
+remain live on their original sessions, each past seven cases; no new push or
+acceptance. The register-root audit is prepared for their eventual completion.

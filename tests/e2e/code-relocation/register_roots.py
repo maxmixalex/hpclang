@@ -166,11 +166,35 @@ for address in (0x90000, 0x90001, 0xFFFE0):
             assert trace == [address, target]
             assert bytes(uc.mem_read(cpu + 0x90C, len(before))) == expected
             rows.append(dict(address=address, opcode=opcode, p=p, carry=p & 1, cursor=p % 8))
+capacity_cases = []
+if arm:
+    for cursor in range(8):
+        cells = [0x93000 + i * 16 for i in range(8)]
+        instructions = {
+            0x90000: (0x2B18, 4),
+            0x91000: (0x3B18, 4),
+            0x92000: (0x10, 2),
+            **{at: (0x10, 2) for at in cells},
+        }
+
+        def capacity_read(at, width):
+            if at not in instructions or width > instructions[at][1]:
+                return None
+            return instructions[at][0] & ((1 << (4 * width)) - 1)
+
+        actual = arm.inspect(
+            0x90000, struct.pack("<8I", *cells), cursor, -1, 0xABC91000, 0xDEF92000, capacity_read
+        )
+        expected_roots = [("a", 0xFFFFF), ("c", 0xFFFFF)]
+        expected_roots += [(f"stack-{(cursor - 1 - i) % 8}", 0xFFFFFFFF) for i in range(8)]
+        assert actual == expected_roots
+        capacity_cases.append(dict(cursor=cursor, roots=actual))
 report.write_text(
     json.dumps(
         dict(
             model=args.model,
             cases=rows,
+            linked_arm_capacity_cases=capacity_cases,
             sources={
                 str(path): hashlib.sha256(path.read_bytes()).hexdigest()
                 for path in files + [root / "platform/armtoolbox/stage-stack.h"]

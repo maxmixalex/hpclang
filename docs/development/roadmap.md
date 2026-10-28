@@ -117,8 +117,8 @@ CI is queued (ten workflows/16 jobs observed); branch acceptance remains open.
 Local launcher follow-up now discovers bounded A/C execution uses and publishes
 RPL4 masks only when needed; Port1 mutation accepts RPL4 too. Five sanitizer
 suites, 576 host/linked-ARM interpreter cases and guarded catalog-movement checks pass.
-ARM analysis/build and format/lint pass. Fresh two-model Stock integration is
-running; complete execution-reference coverage and public management remain open.
+ARM analysis/build and format/lint pass; all 16 artifacts reproduce byte for
+byte. Fresh two-model Stock integration is running; complete execution-reference coverage and public management remain open.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -144,7 +144,7 @@ All prior artifact-specific evidence and limitations are retained in
 | #26 / `1dc590b1` | **CI queued:** ten workflows and 16 jobs at observation, no completed results. Submitted PC-exchange batch passes all 28 local Stock cases and independent artifact reproduction. Local register-root follow-up remains unsubmitted; its full Stock integration is running. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `969ade88` | **CI pending:** five unfinished workflows; 61 successful, 243 queued and 14 running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |
+| #21 / `969ade88` | **CI pending:** three unfinished workflows; 211 successful, 91 queued and 16 running jobs at observation, no failures reported. Elapsed PWM wait fix passes six-model normal, two immediate and two masked-IRQ local checks. Parent #20 and full acceptance remain open. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
 | #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. #21 follow-up 10e05bc0 now submits pre-cleanup IRQ/timing/ownership diagnostics. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports state. Diagnostic coverage is not a claimed fix. |
 
