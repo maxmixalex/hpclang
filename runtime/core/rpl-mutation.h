@@ -155,6 +155,15 @@ extern "C"
                                                 hpclang_rpl_root_dependency_fn dependency,
                                                 void *context);
 
+    /* Exact lookup with every chain-read dependency observed as above. A
+     * dependency callback failure propagates unchanged and preserves nibbles.
+     * Discard partial dependencies on any failure, including NOT_FOUND; this
+     * records inputs for later preflight, it does not itself retain ownership. */
+    int hpclang_rpl_mutation_find_guarded_temp(const struct hpclang_rpl_mutation_io *io,
+                                               uint32_t address, uint32_t *nibbles,
+                                               hpclang_rpl_root_dependency_fn dependency,
+                                               void *context);
+
     /* Bootstrap-only: turn the native page interval into a rooted opaque
      * TEMPOB block. Pin
      * the compact pre-existing TEMP prefix as well, so Stock

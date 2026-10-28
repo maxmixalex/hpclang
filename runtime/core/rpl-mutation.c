@@ -795,6 +795,25 @@ int hpclang_rpl_mutation_visit_guarded_temp(const struct hpclang_rpl_mutation_io
     return scan.error ? scan.error : result;
 }
 
+int hpclang_rpl_mutation_find_guarded_temp(const struct hpclang_rpl_mutation_io *io,
+                                           uint32_t address, uint32_t *nibbles,
+                                           hpclang_rpl_root_dependency_fn dependency, void *context)
+{
+    if (!io_ready(io) || !nibbles || !dependency)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct guarded_root_scan scan = {io, dependency, context, 0};
+    struct hpclang_rpl_mutation_io observed = *io;
+    observed.read_nibble = guarded_root_read;
+    observed.write_nibble = guarded_root_write;
+    observed.context = &scan;
+    uint32_t extent;
+    int result = hpclang_rpl_mutation_find_temp(&observed, address, &extent);
+    if (scan.error || result)
+        return scan.error ? scan.error : result;
+    *nibbles = extent;
+    return 0;
+}
+
 int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
                                      hpclang_rpl_root_visit_fn visit, void *context)
 {

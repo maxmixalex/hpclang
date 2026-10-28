@@ -178,6 +178,14 @@ class Exchange(c.Structure):
 
 
 lib.bank_temp_allocation.argtypes = [c.POINTER(Reader), c.c_uint32, c.POINTER(c.c_uint32)]
+Dependency = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
+lib.bank_temp_allocation_guarded.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.POINTER(c.c_uint32),
+    Dependency,
+    c.c_void_p,
+]
 lib.hpclang_rpl_object_span.argtypes = [
     c.POINTER(Reader),
     c.c_uint32,
@@ -339,10 +347,22 @@ for cursor in range(8):
             post_move_allocation = None
 
             @Read
-            def allocation_read(_, at, value):
+            def allocation_raw_read(_, at, value):
                 value[0] = uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
+                return 1
+
+            @Dependency
+            def allocation_dependency(_, at, value):
+                allocation_reads[at] = value
+                return 0
+
+            @Read
+            def allocation_read(context, at, value):
+                allocation_raw_read(context, at, value)
                 allocation_reads[at] = value[0]
                 return 1
+
+            allocation_raw_reader = Reader(allocation_raw_read, None)
 
             allocation_reader = Reader(allocation_read, None)
             target = 0x88D67
@@ -395,8 +415,12 @@ for cursor in range(8):
                                 extent = c.c_uint32()
                                 assert first == allocation_start_top + 1
                                 assert (
-                                    lib.bank_temp_allocation(
-                                        c.byref(allocation_reader), first, c.byref(extent)
+                                    lib.bank_temp_allocation_guarded(
+                                        c.byref(allocation_raw_reader),
+                                        first,
+                                        c.byref(extent),
+                                        allocation_dependency,
+                                        None,
                                     )
                                     == 0
                                 )

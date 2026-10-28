@@ -1316,7 +1316,14 @@ rejects interior/marker/footer addresses, and preserves the output on failure.
 A matching newer block cannot mask a malformed or unreadable older footer.
 It performs no native writes and proves only allocation bounds; stable mappings,
 read-dependency guards, object parsing and execution-use proof remain separate.
-The updated return reports are in `/work/oct29-temp-query/matrix`.
+The guarded variant, `hpclang_rpl_mutation_find_guarded_temp`, records every
+chain-read dependency and preserves the output if recording fails. Partial
+observations must be discarded on errors, including NOT_FOUND. The allocation
+fixture now uses this production callback path for initial qualification before
+building its catalog guards. Reports in `/work/oct29-guarded-temp-query/matrix`
+pass 304 cases and 480 pre-write rejections. Unit checks reject every one of the
+35 dependency callbacks and all 25 unreadable chain-metadata nibbles without
+publishing an extent or performing a native write.
 
 The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
 `--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles

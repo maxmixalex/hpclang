@@ -32,6 +32,20 @@ int bank_temp_allocation(const struct hpclang_rpl_reader *reader, uint32_t addre
                                          .user_limit = 0x80000};
     return hpclang_rpl_mutation_find_temp(&io, address, extent);
 }
+int bank_temp_allocation_guarded(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                 uint32_t *extent, hpclang_rpl_root_dependency_fn dependency,
+                                 void *context)
+{
+    if (!reader)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct hpclang_rpl_mutation_io io = {.read_nibble = reader->read_nibble,
+                                         .write_nibble = reject_write,
+                                         .context = reader->context,
+                                         .temp_limit = 0x100000,
+                                         .user_limit = 0x80000};
+    return hpclang_rpl_mutation_find_guarded_temp(&io, address, extent, dependency, context);
+}
+
 static int read_nibble(void *context, uint32_t at, uint8_t *out)
 {
     struct fixture *f = context;

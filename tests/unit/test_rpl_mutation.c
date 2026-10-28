@@ -2651,7 +2651,24 @@ static void check_guarded_temp(const struct hpclang_rpl_mutation_io *io)
             assert(root_dependencies[fields[i] + n]);
     /* No allocation payload was interpreted as a dependency. */
     assert(!root_dependencies[0x83006] && !root_dependencies[0x83013]);
+    state = (struct guarded_temp_state){0};
+    uint32_t extent = UINT32_MAX;
+    memset(root_reads, 0, sizeof root_reads);
+    memset(root_dependencies, 0, sizeof root_dependencies);
+    assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83013, &extent, visit_temp_dependency,
+                                                  &state) == 0);
+    assert(extent == 11 && state.calls == 35 && !writes);
+    assert(!memcmp(root_reads, root_dependencies, sizeof root_reads));
+    extent = UINT32_MAX;
+    state = (struct guarded_temp_state){0};
+    assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83014, &extent, visit_temp_dependency,
+                                                  &state) == HPCLANG_RPL_MUTATION_NOT_FOUND);
+    assert(extent == UINT32_MAX && state.calls == 35 && !writes);
     for (unsigned stop = 1; stop <= 35; ++stop) {
+        state = (struct guarded_temp_state){.stop_at = stop};
+        assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83013, &extent,
+                                                      visit_temp_dependency, &state) == 83);
+        assert(extent == UINT32_MAX && state.calls == stop && !writes);
         state = (struct guarded_temp_state){.stop_at = stop};
         assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp, visit_temp_dependency,
                                                        &state) == 83);
@@ -2665,6 +2682,11 @@ static void check_guarded_temp(const struct hpclang_rpl_mutation_io *io)
         for (unsigned n = 0; n < 5; ++n) {
             rejected_read = fields[i] + n;
             state = (struct guarded_temp_state){0};
+            assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83013, &extent,
+                                                          visit_temp_dependency,
+                                                          &state) == HPCLANG_RPL_MUTATION_IO);
+            assert(extent == UINT32_MAX && !writes);
+            state = (struct guarded_temp_state){0};
             assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp,
                                                            visit_temp_dependency,
                                                            &state) == HPCLANG_RPL_MUTATION_IO);
@@ -2672,6 +2694,10 @@ static void check_guarded_temp(const struct hpclang_rpl_mutation_io *io)
         }
     rejected_read = UINT32_MAX;
     put_word(0x8300d, 5, 10);
+    state = (struct guarded_temp_state){0};
+    assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83013, &extent, visit_temp_dependency,
+                                                  &state) == HPCLANG_RPL_MUTATION_MALFORMED);
+    assert(extent == UINT32_MAX && !writes);
     state = (struct guarded_temp_state){0};
     assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp, visit_temp_dependency,
                                                    &state) == HPCLANG_RPL_MUTATION_MALFORMED);
