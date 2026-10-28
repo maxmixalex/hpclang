@@ -1198,8 +1198,38 @@ static void address_adjustments(void)
     assert(!memcmp(&actual, &unchanged, sizeof actual));
 }
 
+static void address_origin_invalidation(void)
+{
+    struct hpclang_rpl_code_origins initial;
+    memset(&initial, 0x5a, sizeof initial);
+    for (int reg = -1; reg <= HPCLANG_RPL_CODE_D1 + 1; ++reg) {
+        for (int delta = -17; delta <= 17; ++delta) {
+            struct hpclang_rpl_code_origins state = initial, expected = initial;
+            struct hpclang_rpl_code_address_adjust adjust = {
+                0x90000, 3, (enum hpclang_rpl_code_register)reg, delta};
+            int valid = (reg == HPCLANG_RPL_CODE_D0 || reg == HPCLANG_RPL_CODE_D1) && delta &&
+                        delta >= -16 && delta <= 16;
+            if (valid)
+                memset(expected.registers[reg], 0, 5 * sizeof(uint32_t));
+            assert(hpclang_rpl_code_origins_adjust(&state, &adjust) ==
+                   (valid ? 0 : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(!memcmp(&state, &expected, sizeof state));
+        }
+    }
+    const int32_t extremes[] = {INT32_MIN, INT32_MAX};
+    for (unsigned i = 0; i < 2; ++i) {
+        struct hpclang_rpl_code_address_adjust adjust = {0, 3, HPCLANG_RPL_CODE_D0, extremes[i]};
+        struct hpclang_rpl_code_origins state = initial;
+        assert(hpclang_rpl_code_origins_adjust(&state, &adjust) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&state, &initial, sizeof state));
+        assert(hpclang_rpl_code_origins_adjust(NULL, &adjust) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    }
+    assert(hpclang_rpl_code_origins_adjust(&initial, NULL) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 int main(void)
 {
+    address_origin_invalidation();
     address_adjustments();
     exhaustive();
     native_cross_object_call();

@@ -1300,6 +1300,15 @@ both incoming carry values, and unchanged surrounding state. Reports are in
 `/work/oct28-address-adjust/{hp49gplus,hp50g}`. The 192 return cases also pass
 using this decoder, including 96 five-step origin paths.
 
+`hpclang_rpl_code_origins_adjust` applies the address-origin invalidation in
+production code: every valid D0/D1 immediate adjustment clears all five address
+tokens, preserving other slots. Invalid registers, zero/out-of-range deltas
+and missing inputs fail before writes. Carry facts remain the caller's separate
+obligation. The return fixture now calls this operation instead of clearing tags
+in Python. The updated matrix in `/work/oct29-origin-adjust/matrix` passes all
+304 return cases and 480 pre-write rejections with current source hashes;
+sanitized origin/decoder unit tests and ARM compilation/static analysis pass.
+
 The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
 `--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles
 the current C decoders and executes the original ARM Saturn interpreter. The

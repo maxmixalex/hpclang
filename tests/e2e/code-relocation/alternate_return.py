@@ -222,6 +222,7 @@ lib.hpclang_rpl_code_origins_memory.argtypes = [
     c.POINTER(c.c_uint32),
     c.c_uint,
 ]
+lib.hpclang_rpl_code_origins_adjust.argtypes = [c.POINTER(Origins), c.POINTER(Adjustment)]
 
 
 lib.hpclang_rpl_code_memory_inspect.argtypes = [
@@ -783,8 +784,12 @@ for cursor in range(8):
                         struct.pack_into("<I", before, 0x4C, result)
                         struct.pack_into("<I", before, 0x64, 0)
                         pending_address_step.append(bytes(before))
-                        for i in range(5):
-                            origins.registers[12][i] = 0
+                        assert (
+                            lib.hpclang_rpl_code_origins_adjust(
+                                c.byref(origins), c.byref(adjustment)
+                            )
+                            == 0
+                        )
                         origin_path.append(pc)
                     if pc == 0x3130 or len(trace) > 120:
                         uc.emu_stop()

@@ -185,6 +185,14 @@ int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
                                     const struct hpclang_rpl_code_memory *transfer,
                                     uint32_t *memory, unsigned count);
 
+/* Address arithmetic destroys all five copied nibble origins of D0/D1,
+ * including when some resulting digits happen to be unchanged. Other slots
+ * are preserved. Validate a nonzero signed immediate in [-16,16] before any
+ * change. Carry is not represented here; callers must separately replace or
+ * invalidate their carry fact. This does not qualify the resulting address. */
+int hpclang_rpl_code_origins_adjust(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_address_adjust *adjust);
+
 /* Describe a simultaneous exchange of the same field in two registers. Both
  * sources are the pre-instruction values; preserve all nibbles outside the field.
  * Supports A/B/C/D pairs and A/C with R0..R4, standard fields (0..7,F).

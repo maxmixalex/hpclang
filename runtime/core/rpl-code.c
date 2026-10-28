@@ -543,6 +543,19 @@ int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
     return 0;
 }
 
+int hpclang_rpl_code_origins_adjust(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_address_adjust *adjust)
+{
+    if (!state || !adjust)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if ((adjust->address != HPCLANG_RPL_CODE_D0 && adjust->address != HPCLANG_RPL_CODE_D1) ||
+        !adjust->delta || adjust->delta < -16 || adjust->delta > 16)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned i = 0; i < 5; ++i)
+        state->registers[adjust->address][i] = 0;
+    return 0;
+}
+
 int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
                                       uint32_t limit, unsigned p,
                                       struct hpclang_rpl_code_exchange *exchange)
