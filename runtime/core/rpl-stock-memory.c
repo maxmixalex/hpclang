@@ -6,6 +6,34 @@
 #include "rpl-port.h"
 #include "launch-services.h"
 
+int hpclang_rpl_stock_bank_route_capture(const struct hpclang_rpl_reader *state,
+                                         struct hpclang_rpl_stock_bank_route *route,
+                                         hpclang_rpl_reference_dependency_fn dependency,
+                                         void *context)
+{
+    if (!state || !state->read_nibble || !route || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    static const uint32_t offsets[] = {0xb9c, 0xba0, 0xba8, 0xbb8, 0xbc4};
+    uint32_t words[5] = {0};
+    for (unsigned i = 0; i < 5; ++i) {
+        for (unsigned j = 0; j < 8; ++j) {
+            uint32_t at = offsets[i] * 2u + j;
+            uint8_t value;
+            if (!state->read_nibble(state->context, at, &value))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (value > 15)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            int result = dependency(context, at, value);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            words[i] |= (uint32_t)value << (4u * j);
+        }
+    }
+    *route =
+        (struct hpclang_rpl_stock_bank_route){words[0], words[1], words[2], words[3], words[4]};
+    return 0;
+}
+
 int hpclang_rpl_stock_bank_route_check(const struct hpclang_rpl_stock_bank_route *route,
                                        uint32_t selector, uint32_t configuration)
 {

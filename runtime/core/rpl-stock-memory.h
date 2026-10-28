@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "rpl-mutation.h"
+#include "rpl-reference.h"
 
 #define HPCLANG_RPL_MAIN_PAGES 128u
 #define HPCLANG_RPL_PORT1_NIBBLES 0x40000u
@@ -23,6 +24,19 @@ struct hpclang_rpl_stock_bank_route
 {
     uint32_t flags, io, ram, eram, port;
 };
+
+/* Capture these five 32-bit fields from a caller-qualified CPU-state reader.
+ * Reader/dependency coordinates are NIBBLE OFFSETS from the interpreter state,
+ * not Saturn virtual addresses. Use a distinct mapping ID in reference guards.
+ * Every field nibble is observed, including inactive device fields; any failure
+ * leaves route unchanged and invalidates partial dependencies. Positive callback
+ * errors become MALFORMED. Caller holds the mapping/state stable and validates
+ * retained guards before using it; capture itself supplies neither exclusion
+ * nor firmware identity. No hardware access, allocation or mutation. */
+int hpclang_rpl_stock_bank_route_capture(const struct hpclang_rpl_reader *state,
+                                         struct hpclang_rpl_stock_bank_route *route,
+                                         hpclang_rpl_reference_dependency_fn dependency,
+                                         void *context);
 
 /* Check only device routing under independently identified handler semantics.
  * Require configured IO/main RAM and no pending configuration or bank device;

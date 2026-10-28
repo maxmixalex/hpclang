@@ -1327,3 +1327,24 @@ ad-hoc analysis invocation omitted that exclusion and reported four existing L1
 fixed-address accesses; no new routing diagnostic occurred. Changed C/Python
 files pass formatting/Ruff. Public Port1 edits remain gated; this is a routing
 precondition, not full execution closure or firmware authentication.
+
+## Routing-state capture and guards — local, 2026-10-29
+
+`hpclang_rpl_stock_bank_route_capture` reads all five native 32-bit routing fields
+through a caller-qualified CPU-state reader and observes all 40 nibbles. Its
+coordinates are state-relative nibble offsets, not Saturn virtual addresses.
+Output is published only after complete success. Unit tests exercise 160
+per-position read/invalid-nibble/negative-callback/positive-callback failures and
+preserve the output sentinel. Rebuilt ASan/UBSan Stock-memory tests and ARMv4T
+compilation/static analysis pass (existing fixed hardware-address exclusion).
+
+Maintained alias guards combine the code/selector mapping with a distinct native
+state mapping, capture routing before checking it, and validate both mappings
+together. Four cases across both models retain 37 guards each and reject all
+680 individual stale-nibble changes. Alternate valid selector changes still
+invalidate old guards and resolve afresh. Both complete maintained model runs
+pass; reports and source hashes are in
+`/work/oct29-bank-route-guards/{model}/bank-switch-maps.json`. Changed source
+format/Ruff and diff checks pass. Capture is not concurrency exclusion or firmware
+identity; callers still need exclusive lifetime and complete mapping/geometry/
+owner/root coverage. No production edit gate is removed.

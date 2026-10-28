@@ -14,6 +14,67 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
     return active_boot;
 }
 
+struct route_fixture
+{
+    uint8_t bytes[0xc20];
+    unsigned reads, observations, stop, mode;
+};
+
+static int route_read(void *context, uint32_t at, uint8_t *value)
+{
+    struct route_fixture *fixture = context;
+    assert(at < sizeof fixture->bytes * 2u);
+    *value = (fixture->bytes[at / 2u] >> (4u * (at & 1u))) & 15u;
+    if (++fixture->reads == fixture->stop) {
+        if (fixture->mode == 1)
+            return 0;
+        if (fixture->mode == 2)
+            *value = 16;
+    }
+    return 1;
+}
+
+static int route_observe(void *context, uint32_t at, uint8_t value)
+{
+    struct route_fixture *fixture = context;
+    assert(value == ((fixture->bytes[at / 2u] >> (4u * (at & 1u))) & 15u));
+    if (++fixture->observations == fixture->stop && fixture->mode >= 3)
+        return fixture->mode == 3 ? -73 : 73;
+    return 0;
+}
+
+static void test_bank_route_capture(void)
+{
+    struct route_fixture fixture = {0};
+    const uint32_t offsets[] = {0xb9c, 0xba0, 0xba8, 0xbb8, 0xbc4};
+    const uint32_t words[] = {3, 4, 0x80, 0x40, UINT32_MAX};
+    for (unsigned i = 0; i < 5; ++i)
+        for (unsigned j = 0; j < 4; ++j)
+            fixture.bytes[offsets[i] + j] = (uint8_t)(words[i] >> (8u * j));
+    struct hpclang_rpl_reader reader = {route_read, &fixture};
+    struct hpclang_rpl_stock_bank_route route, expected = {3, 4, 0x80, 0x40, UINT32_MAX};
+    assert(!hpclang_rpl_stock_bank_route_capture(&reader, &route, route_observe, &fixture));
+    assert(!memcmp(&route, &expected, sizeof route));
+    assert(fixture.reads == 40 && fixture.observations == 40);
+    for (unsigned mode = 1; mode <= 4; ++mode) {
+        for (unsigned stop = 1; stop <= 40; ++stop) {
+            fixture.mode = mode;
+            fixture.stop = stop;
+            fixture.reads = fixture.observations = 0;
+            memset(&route, 0xa5, sizeof route);
+            struct hpclang_rpl_stock_bank_route before = route;
+            int result =
+                hpclang_rpl_stock_bank_route_capture(&reader, &route, route_observe, &fixture);
+            assert(result == (mode == 1   ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                              : mode == 3 ? -73
+                                          : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(fixture.reads == stop && !memcmp(&route, &before, sizeof route));
+        }
+    }
+    assert(hpclang_rpl_stock_bank_route_capture(NULL, &route, route_observe, &fixture) < 0);
+    assert(hpclang_rpl_stock_bank_route_capture(&reader, &route, NULL, &fixture) < 0);
+}
+
 static void test_bank_route(void)
 {
     struct hpclang_rpl_stock_bank_route route = {3, 4, 0x80, 0x40, 0x40};
@@ -368,6 +429,7 @@ static void test_bank_window_select(void)
 int main(void)
 {
     test_bank_route();
+    test_bank_route_capture();
     test_bank_window_select();
     test_rom_bank_reader();
     test_discontinuous_spans();
