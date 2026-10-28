@@ -520,6 +520,31 @@ int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t 
     return 1;
 }
 
+int hpclang_rpl_acptr_resolve_guarded(
+    const struct hpclang_rpl_reader *source, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_reader *rom, uint32_t flash_table, uint32_t eram_entry,
+    struct hpclang_rpl_banked_target *target, hpclang_rpl_bank_dependency_fn source_dependency,
+    void *source_context, hpclang_rpl_bank_dependency_fn rom_dependency, void *rom_context)
+{
+    if (!source || !source->read_nibble || !rom || !rom->read_nibble || !target ||
+        !source_dependency || !rom_dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer source_observer = {source, source_dependency, source_context, 0};
+    struct bank_lookup_observer rom_observer = {rom, rom_dependency, rom_context, 0};
+    const struct hpclang_rpl_reader observed_source = {bank_lookup_read, &source_observer};
+    const struct hpclang_rpl_reader observed_rom = {bank_lookup_read, &rom_observer};
+    struct hpclang_rpl_banked_target next;
+    int result = hpclang_rpl_acptr_resolve(&observed_source, address, limit, &observed_rom,
+                                           flash_table, eram_entry, &next);
+    if (source_observer.error)
+        return source_observer.error;
+    if (rom_observer.error)
+        return rom_observer.error;
+    if (result == 1)
+        *target = next;
+    return result;
+}
+
 int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_t address,
                                 uint32_t limit, struct hpclang_rpl_flashptr *pointer)
 {

@@ -291,6 +291,19 @@ int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t 
                               uint32_t flash_table, uint32_t eram_entry,
                               struct hpclang_rpl_banked_target *target);
 
+/* Resolve with independent dependency streams for the source object's 15
+ * nibbles and every switch-table nibble. Addresses are local to each reader;
+ * the caller must qualify their mappings, even when numeric addresses coincide.
+ * Callbacks follow bank_lookup_guarded's error contract. On any error discard
+ * both streams; target changes only on success. Does not observe target contents
+ * or establish switch-code identity, bank geometry or complete live references.
+ * Both mappings, readers and callback state must remain stable throughout. */
+int hpclang_rpl_acptr_resolve_guarded(
+    const struct hpclang_rpl_reader *source, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_reader *rom, uint32_t flash_table, uint32_t eram_entry,
+    struct hpclang_rpl_banked_target *target, hpclang_rpl_bank_dependency_fn source_dependency,
+    void *source_context, hpclang_rpl_bank_dependency_fn rom_dependency, void *rom_context);
+
 /* A read-only visitor: each callback's limit excludes the library CRC; the
  * input object limit must include it. Nonzero return aborts
  * traversal and is returned to the caller. The caller must keep the reader/mapping stable and must

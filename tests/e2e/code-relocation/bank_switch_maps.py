@@ -96,6 +96,23 @@ class Geometry(c.Structure):
     _fields_ = [("physical", c.c_uint32), ("size", c.c_uint32)]
 
 
+class BankedTarget(c.Structure):
+    _fields_ = [("bank", Bank), ("offset", c.c_uint32)]
+
+
+lib.hpclang_rpl_acptr_resolve_guarded.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.POINTER(BankedTarget),
+    Dependency,
+    c.c_void_p,
+    Dependency,
+    c.c_void_p,
+]
 lib.hpclang_rpl_bank_lookup.argtypes = [c.POINTER(Reader), *([c.c_uint32] * 3), c.POINTER(Bank)]
 lib.hpclang_rpl_bank_lookup_guarded.argtypes = [
     *lib.hpclang_rpl_bank_lookup.argtypes,
@@ -136,6 +153,18 @@ count = flash[count_address]
 assert 0 < count <= 16 and directory + count <= len(flash)
 sizes = (c.c_uint8 * count).from_buffer_copy(flash, directory)
 corrupt = None
+source_corrupt = None
+source_nibbles = []
+
+
+@Read
+def source_nibble(_, address, out):
+    # Deliberately overlap the table's numeric address in a different mapping.
+    offset = address - 0x26BBB
+    if not 0 <= offset < len(source_nibbles):
+        return 0
+    out[0] = source_nibbles[offset] ^ (1 if address == source_corrupt else 0)
+    return 1
 
 
 @Read
@@ -146,6 +175,8 @@ def nibble(_, address, out):
 
 @MappedRead
 def mapped_nibble(_, mapping, address, out):
+    if mapping == 2:
+        return source_nibble(None, address, out)
     if mapping != 1:
         return 0
     return nibble(None, address, out)
@@ -218,6 +249,72 @@ for index in range(17):
     )
     assert short_builder.error < 0 and short_builder.count == 0
     assert (unavailable.kind, unavailable.index) == (-1, 99)
+    source_nibbles = [
+        (word >> (4 * j)) & 15 for word in (0x02BAA, 0x7327E, switch) for j in range(5)
+    ]
+    source_reader = Reader(source_nibble, None)
+    combined = (Guard * 20)()
+    combined_builder = GuardBuilder()
+    assert lib.hpclang_rpl_reference_guards_begin(c.byref(combined_builder), combined, 20) == 0
+    source_observed, table_observed = [], []
+
+    @Dependency
+    def observe_source(_, address, value):
+        source_observed.append(address)
+        return lib.hpclang_rpl_reference_guards_observe(
+            c.byref(combined_builder), 2, address, value
+        )
+
+    @Dependency
+    def observe_table(_, address, value):
+        table_observed.append(address)
+        return lib.hpclang_rpl_reference_guards_observe(
+            c.byref(combined_builder), 1, address, value
+        )
+
+    resolved = BankedTarget(Bank(-1, 99), 0xDEAD)
+    assert (
+        lib.hpclang_rpl_acptr_resolve_guarded(
+            c.byref(source_reader),
+            0x26BBB,
+            15,
+            c.byref(reader),
+            0x26BBB,
+            0x26C39,
+            c.byref(resolved),
+            observe_source,
+            None,
+            observe_table,
+            None,
+        )
+        == 1
+    )
+    assert (resolved.bank.kind, resolved.bank.index) == (binding.kind, binding.index)
+    assert resolved.offset == 0x3327E and combined_builder.count == 20
+    assert source_observed == list(range(0x26BBB, 0x26BBB + 15))
+    assert table_observed == observed
+    assert (
+        lib.hpclang_rpl_reference_guards_validate(
+            c.byref(guard_reader), combined, combined_builder.count
+        )
+        == 0
+    )
+    for source_corrupt in source_observed:
+        assert (
+            lib.hpclang_rpl_reference_guards_validate(
+                c.byref(guard_reader), combined, combined_builder.count
+            )
+            < 0
+        )
+    source_corrupt = None
+    for corrupt in table_observed:
+        assert (
+            lib.hpclang_rpl_reference_guards_validate(
+                c.byref(guard_reader), combined, combined_builder.count
+            )
+            < 0
+        )
+    corrupt = None
     geometry = Geometry(0xDEAD, 0xBEEF)
     if index < 16:
         populated = lib.hpclang_rpl_rom_bank_layout(
@@ -278,6 +375,8 @@ for index in range(17):
             switch_guards=builder.count,
             rejected_stale_nibbles=len(observed),
             insufficient_guard_capacity_rejected=True,
+            controlled_acptr_guards=combined_builder.count,
+            controlled_acptr_stale_rejections=len(source_observed) + len(table_observed),
         )
     )
 assert all(

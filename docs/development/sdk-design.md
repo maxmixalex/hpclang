@@ -864,6 +864,12 @@ dependencies after failure. This records table dependencies only: switch-code
 identity, bank geometry and complete live-reference coverage remain separate
 requirements, with stable ownership required through commit.
 
+`hpclang_rpl_acptr_resolve_guarded()` additionally observes the source ACPTR's
+prologue, pointer and switch operand. Separate callback/context pairs retain
+source and ROM mapping identities even when their numeric addresses coincide.
+Both dependency streams must be discarded on failure; output is published only
+after the complete resolution succeeds. The target contents are not read.
+
 `tests/e2e/code-relocation/bank_switch_maps.py` compares all sixteen Flash
 switches and the ERAM switch with original ROM execution on both HP49g+/HP50g
 fixtures. Populated banks match all 64 read-map cells; ERAM maps to physical
@@ -875,6 +881,10 @@ not establish a complete banked-reference graph or authorize Port1 edits.
 For each switch it also retains all 85 table nibbles as 17 guards, verifies the
 unchanged table, rejects every individually changed nibble through the C guard
 validator, and rejects insufficient guard capacity without publishing a binding.
+Controlled ACPTR objects combined with these ROM tables produce 20 guards for
+100 observed nibbles. Separate source/ROM identities preserve overlapping numeric
+addresses, and changes in either stream reject validation. These constructed
+objects test dependency composition, not discovery of all live Stock pointers.
 
 The maintained installation witness exercises this capture on ARM, using the
 supported Stock 2.15 fixture's verified initializer literal-pool addresses and

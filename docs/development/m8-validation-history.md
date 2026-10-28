@@ -759,3 +759,24 @@ authorize Port1 mutation. The implementation is local, not CI accepted.
 PR #26 exact head `bc6596e6` observed four successful workflows and eight
 unfinished, with 117 successful / 18 running / 253 queued jobs and no failures.
 The prior-head pre-entry Kermit failure remains unexplained. No new push.
+
+## Guarded ACPTR dependency composition — 2026-10-29
+
+The guarded resolver records all 15 source nibbles and 85 ROM switch-table
+nibbles through separate callback/context pairs. Output is published only after
+both streams succeed. Unit coverage includes 51 bank/offset combinations,
+200 positive/negative callback errors and 200 failed/invalid nibble reads across
+all 100 positions. ASan/UBSan port/reference units and ARMv4T Thumb compilation
+and static analysis pass. No target contents or switch code are authenticated.
+
+Both-model maintained bank-map tests retain all prior ROM mapping checks and
+combine constructed ACPTRs with the real ROM tables. Source and ROM deliberately
+share numeric addresses under distinct mappings. Each of 34 resolutions builds
+20 guards covering 100 nibbles; all 3,400 individual changes reject validation.
+Reports with source hashes: `/work/oct29-guarded-acptr/{hp49gplus,hp50g}/bank-switch-maps.json`.
+This proves dependency composition for controlled objects, not discovery of
+all live Stock pointers or production Port1 mutation safety.
+
+Pre-delivery PR #26 head `bc6596e6`: four workflows pass, eight unfinished;
+128 jobs successful, 19 running, 241 queued, no failures observed. The earlier
+pre-entry transfer failure remains unexplained. No CI acceptance is claimed.

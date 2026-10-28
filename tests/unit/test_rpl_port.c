@@ -1021,9 +1021,58 @@ static void test_acptr_resolution(void)
                    (bank < 16 ? HPCLANG_RPL_BANK_FLASH : HPCLANG_RPL_BANK_ERAM));
             assert(target.bank.index == (bank < 16 ? bank : 0));
             assert(target.offset == pointers[i] - 0x40000u);
+            struct bank_observations so = {.image = &source}, ro = {.image = &rom};
+            struct hpclang_rpl_banked_target guarded;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &guarded,
+                                                     observe_bank, &so, observe_bank, &ro) == 1);
+            assert(!memcmp(&guarded, &target, sizeof target));
+            assert(so.count == 15 && ro.count == 85);
+            for (unsigned at = 0; at < 125; ++at) {
+                assert(so.seen[at] == (at < 15));
+                assert(ro.seen[at] == (at >= 120 || (at < 112 && at % 7 < 5)));
+            }
         }
     }
     const struct hpclang_rpl_banked_target before = target;
+    for (unsigned stream = 0; stream < 2; ++stream) {
+        struct image *failing = stream ? &rom : &source;
+        for (unsigned at = 0; at < (stream ? 125u : 15u); ++at) {
+            if (stream && at < 120 && (at >= 112 || at % 7 >= 5))
+                continue;
+            struct bank_observations so = {.image = &source}, ro = {.image = &rom};
+            failing->fail_at = at;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &target,
+                                                     observe_bank, &so, observe_bank,
+                                                     &ro) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(!memcmp(&target, &before, sizeof target));
+            assert(!(stream ? ro.seen[at] : so.seen[at]));
+            failing->fail_at = UINT32_MAX;
+            uint8_t old = failing->data[at];
+            failing->data[at] = 16;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &target,
+                                                     observe_bank, &so, observe_bank,
+                                                     &ro) == HPCLANG_RPL_SPAN_MALFORMED);
+            assert(!memcmp(&target, &before, sizeof target));
+            failing->data[at] = old;
+        }
+    }
+    for (unsigned stream = 0; stream < 2; ++stream) {
+        for (unsigned stop = 1; stop <= (stream ? 85u : 15u); ++stop) {
+            struct bank_observations so = {.image = &source}, ro = {.image = &rom};
+            struct bank_observations *failing = stream ? &ro : &so;
+            failing->stop = stop;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &target,
+                                                     observe_bank, &so, observe_bank, &ro) == -79);
+            assert(!memcmp(&target, &before, sizeof target));
+            assert(failing->count == stop && (stream || !ro.count));
+            failing->positive = 1;
+            so.count = ro.count = 0;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &target,
+                                                     observe_bank, &so, observe_bank,
+                                                     &ro) == HPCLANG_RPL_SPAN_MALFORMED);
+            assert(!memcmp(&target, &before, sizeof target));
+        }
+    }
     for (unsigned limit = 0; limit < 15; ++limit) {
         assert(hpclang_rpl_acptr_resolve(&reader, 0, limit, &tables, 0, 120, &target) ==
                HPCLANG_RPL_SPAN_BOUNDS);
