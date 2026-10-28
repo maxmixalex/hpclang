@@ -453,3 +453,12 @@ running, 244 queued and the two diagnosed PWM failures. New CI is unobserved.
 This local fix does not retrospectively prove the cause of parent #20 or
 PR18 historical failures, which lacked these captures. No branch acceptance
 or M8 completion is claimed.
+
+Current incoming-carry source reproduction: rebuilding with the retained HPC1
+payload matches stage1.bin, memory.json and all six .bin/.hp launchers byte
+for byte. /work/oct29-carry-launch-e2e/launcher-reproduction.json binds the
+current stage-stack.c/.h and stage1.c hashes to those bytes; temporary rebuild
+files were removed automatically. Full Stock sessions 85305 and 76272 remain
+live, each having passed 11 of 14 cases through gosub-rtnsxm. No complete-suite
+claim is made yet. PR26 exact-head audit: 30 successful, seven running and
+219 queued jobs, no reported failures; no push this turn.

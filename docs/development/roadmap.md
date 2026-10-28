@@ -110,7 +110,7 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-Incoming-carry root discovery passes 192 controlled original-interpreter cases across HP49g+/HP50g, sanitizer tests and six launcher builds. Its Stock code-relocation CI gate is implemented locally; clean-environment reproduction and repository-wide format/lint checks pass. Fresh full Stock call/catalog integration is running for both models; the previous 28-case result predates this follow-up.
+Incoming-carry root discovery passes 192 controlled original-interpreter cases across HP49g+/HP50g, sanitizer tests and six launcher builds. Its Stock code-relocation CI gate is implemented locally; clean-environment reproduction and repository-wide format/lint checks pass. Current sources reproduce the tested stage and all six raw/wrapped launchers byte for byte. Full Stock call/catalog integration is running for both models; the previous 28-case result predates this follow-up.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -133,7 +133,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `fb261f17` | **CI pending:** two workflows pass and ten remain queued; 24 successful and 135 queued jobs at observation, no failures reported. Local incoming-carry follow-up passes 192 interpreter cases; full Stock integration is running. Follow-up and its CI gate are not yet pushed. |
+| #26 / `fb261f17` | **CI pending:** two workflows pass and ten remain unfinished; 30 successful, seven running and 219 queued jobs at observation, no failures reported. Local incoming-carry follow-up passes 192 interpreter cases and byte-identical launcher reproduction; full Stock integration is running. Follow-up and its CI gate are not yet pushed. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **Elapsed PWM wait fix submitted; new CI unobserved.** Six-model normal Direct, HP39gs/HP40gs immediate and two masked-IRQ negatives pass locally. Previous head 10e05bc0: 63 successful, nine running, 244 queued and two diagnosed PWM failures. Parent #20 and full branch acceptance remain open. |
