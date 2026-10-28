@@ -67,8 +67,10 @@ struct hpclang_rpl_code_literal
     uint64_t mask, value;
 };
 
-/* Decode LC/LA at a caller-proven instruction boundary with the proven P value.
- * The loaded nibbles wrap modulo 16 from P; other register bits survive.
+/* Decode LC/LA or D0/D1 immediate loads at a caller-proven instruction boundary.
+ * LC/LA require the proven P value. D0/D1 loads replace their low 2, 4 or 5
+ * nibbles independently of P, preserving any remaining address nibbles.
+ * LC/LA loaded nibbles wrap modulo 16 from P; other register bits survive.
  * next_register = (old_register & ~mask) | value. field is the first encoded
  * literal nibble, not a pointer field. Constants do not establish address
  * provenance, mapping identity or permission to relocate. Preserve guards on

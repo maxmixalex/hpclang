@@ -110,21 +110,16 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-Guarded references, bounded ROM readers and mapping/guard composition are
-submitted in #26 (`dc6fbd39`); CI acceptance is pending. The reader's 28 Stock
-cases and independent Flash/artifact audit remain scoped to that submitted work.
+Guarded references, bounded ROM readers, mapped-graph scheduling and bank-alias
+primitives/regressions are submitted in #26 (`d0471894`); CI is pending. Earlier 28 Stock cases remain scoped to their recorded reader build.
 
-A local mapped-graph scheduler now follows inline/compact children and explicitly
-resolved cross-mapping edges, deduplicates cycles, and records mapping-qualified
-read dependencies. Sanitizer tests and ARM compile/analysis pass. Actual root
-classification, firmware/calling-context qualification, complete reference
-resolution, public libraries and Port1 edits remain open. Both saved HOME states resolve 20 attachment
-objects. Local original-ROM regression now covers two additional switch entries
-(banks 2/4), including ERAM precedence and bank-2 exit. These entries read
-mutable RAM selectors: original-ROM counterexamples change their selected bank
-without changing code. Selector resolution now composes with dependency
-validation locally (340 stale-nibble rejections across both models). Production
-code identity, owner-aware mapping and payload/execution coverage remain open.
+Under the controlled saved profiles, both HOME scans schedule 20 attachments
+and resolve the first ACPTR payload (bank 2, 7291 nibbles), then reject its
+separate execution reference. Selector guards reject 340 stale-nibble changes.
+Local D0/D1 literal decoding now derives selector fields from entry instructions;
+192 original-interpreter cases and both maintained bank regressions pass.
+Production firmware/handler identity, owner/geometry freshness, complete payload
+and execution coverage, public libraries and Port1 edits remain open.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -147,12 +142,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `dc6fbd39` | **CI pending:** 4 successful and 6 unfinished workflows; 142 successful, 20 running and 209 queued jobs, no failures observed. Earlier HP39g+ pre-entry Kermit failure remains unexplained. Graph/alias work remains local. |
+| #26 / `d0471894` | **CI pending:** 0 successful and 10 unfinished workflows; 0 successful, 3 running and 7 queued jobs, no failures observed. Historical HP39g+ pre-entry Kermit failure remains unexplained. D0/D1 literal decoding is local. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `1ce01859` | **CI pending:** 3 successful and 1 unfinished workflows; 168 successful, 0 running and 1 queued jobs, no failures observed. Historical HP50g PWM failure remains unproven; mainline and lifecycle acceptance remain open. |
+| #20 / `1ce01859` | **CI pending:** 3 successful and 1 unfinished workflows; 168 successful, 1 running and 0 queued jobs, no failures observed. Historical HP50g PWM failure remains unproven; mainline and lifecycle acceptance remain open. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

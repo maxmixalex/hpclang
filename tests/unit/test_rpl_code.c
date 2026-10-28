@@ -828,6 +828,45 @@ static void literal_loads(void)
 {
     struct hpclang_rpl_code_literal untouched;
     memset(&untouched, 0x5a, sizeof untouched);
+    static const unsigned address_opcodes[] = {9, 10, 11, 13, 14, 15};
+    static const unsigned address_widths[] = {2, 4, 5, 2, 4, 5};
+    for (unsigned op = 0; op < 6; ++op)
+        for (unsigned p = 0; p < 16; ++p) {
+            unsigned width = address_widths[op];
+            struct image image = {
+                .address = 0x80000, .size = width + 2, .fail = UINT32_MAX, .data = {1}};
+            image.data[1] = address_opcodes[op];
+            uint64_t expected = 0;
+            for (unsigned i = 0; i < width; ++i) {
+                image.data[2 + i] = (i * 7 + 3) & 15;
+                expected |= (uint64_t)image.data[2 + i] << (4 * i);
+            }
+            const struct hpclang_rpl_reader reader = {read_nibble, &image};
+            struct hpclang_rpl_code_literal value = untouched;
+            assert(
+                !hpclang_rpl_code_literal_inspect(&reader, image.address, image.size, p, &value));
+            assert(value.destination == (op < 3 ? HPCLANG_RPL_CODE_D0 : HPCLANG_RPL_CODE_D1));
+            assert(value.instruction == image.address && value.length == width + 2 &&
+                   value.field == image.address + 2 && value.nibbles == width &&
+                   value.value == expected && value.mask == ((UINT64_C(1) << (4 * width)) - 1));
+            for (unsigned i = 0; i < image.size; ++i) {
+                value = untouched;
+                assert(hpclang_rpl_code_literal_inspect(&reader, image.address, i, p, &value) ==
+                       HPCLANG_RPL_SPAN_BOUNDS);
+                assert(!memcmp(&value, &untouched, sizeof value));
+                image.fail = image.address + i;
+                assert(hpclang_rpl_code_literal_inspect(&reader, image.address, image.size, p,
+                                                        &value) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+                assert(!memcmp(&value, &untouched, sizeof value));
+                image.fail = UINT32_MAX;
+                uint8_t saved = image.data[i];
+                image.data[i] = 16;
+                assert(hpclang_rpl_code_literal_inspect(&reader, image.address, image.size, p,
+                                                        &value) == HPCLANG_RPL_SPAN_MALFORMED);
+                assert(!memcmp(&value, &untouched, sizeof value));
+                image.data[i] = saved;
+            }
+        }
     for (unsigned a = 0; a < 2; ++a)
         for (unsigned width = 1; width <= 16; ++width)
             for (unsigned p = 0; p < 16; ++p) {

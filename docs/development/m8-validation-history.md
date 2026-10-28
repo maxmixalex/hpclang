@@ -1159,3 +1159,21 @@ both maintained original-ROM bank regressions and strict documentation checks.
 Pre-push audit of dc6fbd39: four successful/six unfinished workflows; 153 successful,
 20 running and 198 queued jobs, no new failures. PR20 remains three successful
 workflows and one queued publisher (168 successful jobs, one queued).
+
+## Address-register immediate decoding — local, 2026-10-29
+
+`hpclang_rpl_code_literal_inspect` now decodes D0/D1 immediate loads of 2/4/5
+nibbles into the existing literal descriptor. Loads replace low address nibbles
+independently of P; shorter loads preserve high address bits. This identifies
+encoded operands, not pointer provenance or complete machine-code references.
+Sanitizer `rpl_code` tests pass all six forms across P=0..15, truncation, unreadable
+and invalid input cases with unchanged outputs on failure. Original ARM Saturn
+interpreter execution on both captured ROMs passes 192 controlled single-step
+cases, comparing all general/address registers and P, with exact next PC.
+Evidence: `/work/oct29-address-literals/literal-native.json` (source/driver hashes).
+Maintained attachment-switch regression now calls the C decoder to obtain alias
+and canonical RAM selector addresses instead of using hardcoded mutation targets;
+all normal, alternate-selector and ERAM scenarios pass on both models. Reports:
+`/work/oct29-address-literals/{model}/bank-switch-maps.json`. ARMv4T Thumb compile,
+static analysis, clang-format and Ruff pass. Shared handler control flow and
+production identity/transaction integration remain incomplete.

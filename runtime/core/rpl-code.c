@@ -283,6 +283,11 @@ int hpclang_rpl_code_literal_inspect(const struct hpclang_rpl_reader *reader, ui
     } else if (op[0] == 8 && op[1] == 0 && op[2] == 8 && op[3] == 2) {
         prefix = 5;
         destination = HPCLANG_RPL_CODE_A;
+    } else if (op[0] == 1 && (op[1] == 9 || op[1] == 10 || op[1] == 11 || op[1] == 13 ||
+                              op[1] == 14 || op[1] == 15)) {
+        prefix = 2;
+        destination = op[1] < 12 ? HPCLANG_RPL_CODE_D0 : HPCLANG_RPL_CODE_D1;
+        p = 0; /* Address literals always replace low nibbles, independent of P. */
     } else {
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     }

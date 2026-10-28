@@ -113,9 +113,48 @@ def verify_overlay(lib, ram, flash, cpu, banks):
     return results
 
 
-def verify_attachment_switches(ram, flash, cpu, banks):
+def verify_attachment_switches(lib, read, ram, flash, cpu, banks):
     """Fixture-specific aliases: compare maps/state, without granting runtime identity."""
     results = []
+    read_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.POINTER(c.c_uint8))
+
+    class Reader(c.Structure):
+        _fields_ = [("read", read_fn), ("context", c.c_void_p)]
+
+    class Literal(c.Structure):
+        _fields_ = [
+            (name, c.c_uint32)
+            for name in ("instruction", "length", "field", "destination", "nibbles")
+        ]
+        _fields_ += [("mask", c.c_uint64), ("value", c.c_uint64)]
+
+    @read_fn
+    def nibble(_, address, value):
+        value[0] = read(address, 1)
+        return 1
+
+    reader = Reader(nibble, None)
+    lib.hpclang_rpl_code_literal_inspect.argtypes = [
+        c.POINTER(Reader),
+        c.c_uint32,
+        c.c_uint32,
+        c.c_uint,
+        c.POINTER(Literal),
+    ]
+
+    def selector_operand(entry):
+        literal = Literal()
+        assert (
+            lib.hpclang_rpl_code_literal_inspect(c.byref(reader), entry, 7, 0, c.byref(literal))
+            == 0
+        )
+        assert (literal.destination, literal.length, literal.nibbles, literal.mask) == (
+            11,
+            7,
+            5,
+            0xFFFFF,
+        )
+        return literal.value
 
     def execute(initial, entry, selector=None):
         uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
@@ -169,6 +208,10 @@ def verify_attachment_switches(ram, flash, cpu, banks):
     # These addresses are evidence for the two captured supported ROMs only.
     # A lookup must not recognize them in another mapping merely by address.
     for switch, bank in ((0x22E83, 2), (0x22E99, 4)):
+        selector = selector_operand(switch)
+        canonical_selector = selector_operand(banks[bank]["switch"])
+        assert selector == (0x86063 if bank == 2 else 0x8606D)
+        assert canonical_selector == 0x860CC + bank * 5
         for initial in (None, 0, 16):
             actual = execute(initial, switch)
             canonical = execute(initial, banks[bank]["switch"])
@@ -182,7 +225,6 @@ def verify_attachment_switches(ram, flash, cpu, banks):
                 assert actual[1]["pages"][64:128] == banks[2]["pages"]
             # Entry code sets D0 to a RAM selector cell. Equal ROM code does
             # not establish equal bank selection if that mutable data changes.
-            selector = 0x86063 if bank == 2 else 0x8606D
             alternate = 4 if bank == 2 else 2
             changed = execute(initial, switch, (selector, alternate * 2))
             assert [stage["banks"][1] for stage in changed] == [alternate, 2]
@@ -198,6 +240,7 @@ def verify_attachment_switches(ram, flash, cpu, banks):
                     initial=initial,
                     stages=actual,
                     selector_field=selector,
+                    canonical_selector_field=canonical_selector,
                     changed_selector_stages=changed,
                 )
             )
