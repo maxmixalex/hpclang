@@ -1136,3 +1136,26 @@ transaction or authenticate the switch code. Owner mappings and execution/payloa
 closure remain separate requirements. Both full maintained bank-switch scripts
 pass, including original-ROM overlay/selector counterexamples. Reports are in
 `/work/oct29-alias-guards/{model}/bank-switch-maps.json`.
+
+## Saved HOME ACPTR payload composition — local, 2026-10-29
+
+`research/oct29-home-attachments.py` now composes guarded selector matching,
+validated native ROM geometry and the C owner-aware window predictor for the
+first actual HOME ACPTR on both saved models. It requires the captured baseline
+with ERAM disabled and all window owners zero; the calculated mapping retains
+all other pages. The target at 270562 resolves to bank 2 (physical base 524288),
+with exact object span 7291 nibbles. Parser reads retain mapping-qualified
+observations. After scheduling that payload, the graph rejects the separately
+emitted EXECUTION edge at field 259650, target 142979. No successful visited
+count or mutation authorization is published. All 20 attachment objects were
+scheduled first, and original SRAM/Flash files remain byte-identical.
+This is controlled saved-profile integration, not a production identity profile:
+geometry/owner capture and shared handler qualification still need production
+freshness guards. Details/source and library hashes are retained in
+`/work/oct29-home-graph/attachments.json` and its companion input/source report.
+The local delivery batch also passed full tracked-file clang-format, Ruff,
+ShellCheck, sanitizer reference/port tests, ARM compilation/static analysis,
+both maintained original-ROM bank regressions and strict documentation checks.
+Pre-push audit of dc6fbd39: four successful/six unfinished workflows; 153 successful,
+20 running and 198 queued jobs, no new failures. PR20 remains three successful
+workflows and one queued publisher (168 successful jobs, one queued).
