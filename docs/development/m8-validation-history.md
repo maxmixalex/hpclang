@@ -1499,3 +1499,15 @@ its geometry locations. `/work/oct29-stock-rom-profile/reproduction.json` record
 Flash. Both models passed their first three call/catalog cases; the complete
 14-case-per-model campaign remains running and unaccepted. These local results
 do not establish CI acceptance, production reference safety or M8.0 completion.
+
+Independent saved-memory follow-up: `profile-memory-verified.json` translates
+ELF evidence symbols through the original launcher pool table and its build
+metadata, then checks both first-case post-return SRAM images. Model IDs 5/6,
+immutable extent 0x140000, geometry locations 0x248a0/0xbe0, 14 populated banks,
+3,520 samples and both identity-section descriptors match. ELF, metadata and
+saved-SRAM hashes accompany the result. This confirms witness execution only;
+it does not qualify remaining execution roots or the still-running full matrix.
+Exact-head CI audit: #26 b5891517 has ten queued workflow records while its jobs
+report two success, one running, thirteen queued. #20 4f2ce605 has six successful,
+one running, five queued workflows and 278 successful/19 running/91 queued jobs.
+Neither head has a failed job in this audit; neither is fully accepted.
