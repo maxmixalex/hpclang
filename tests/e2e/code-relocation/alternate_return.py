@@ -49,7 +49,16 @@ parser.add_argument(
     choices=("preserve", "clobber"),
     help="Execute a controlled ARM leaf; clobber demonstrates the r0 continuation contract",
 )
+parser.add_argument(
+    "--continuous-return",
+    action="store_true",
+    help="Retain actual allocation/ARM return state through catalog movement and Saturn continuation",
+)
 args = parser.parse_args()
+if args.continuous_return:
+    if args.arm_return == "clobber":
+        parser.error("continuous return requires the preserved ARMSYS continuation")
+    args.arm_return = "preserve"
 if args.arm_return:
     args.allocated_root = True
 root = Path(__file__).resolve().parents[3]
@@ -307,6 +316,15 @@ for cursor in range(8):
             def word(at):
                 return sum(nibble(at + i) << (4 * i) for i in range(5))
 
+            caller_slot = (cursor + 7) & 7
+            if args.continuous_return:
+                put(0x8076B, 0x88D67)
+                for i in range(8):
+                    uc.mem_write(
+                        cpu + 0x978 + 4 * i,
+                        struct.pack("<I", 0x3130 if i == caller_slot else 0xA1000 + 0x101 * i),
+                    )
+
             allocation_trace = []
             allocation_origins = Origins()
             allocation_origin_path = []
@@ -503,8 +521,12 @@ for cursor in range(8):
                     )
                     assert extent.value == 0x12345678
                 assert int.from_bytes(uc.mem_read(cpu + 0x93C, 4), "little") & 0xFFF == 1
-            put(0x8076B, 0x88D67)
-            entry = c.c_uint32(0x88C73)
+            if not args.continuous_return:
+                put(0x8076B, 0x88D67)
+            entry = c.c_uint32(uc.reg_read(UC_ARM_REG_R7) if args.continuous_return else 0x88C73)
+            assert entry.value == 0x88C73
+            boundary_state = bytes(uc.mem_read(cpu + 0x90C, 0x90))
+            boundary_sp = uc.reg_read(UC_ARM_REG_SP)
             r0 = c.c_uint32(initial_r0)
             writes = c.c_uint32()
             delta = 0 if mode == "baseline" else 16
@@ -644,23 +666,34 @@ for cursor in range(8):
                     first=moved, extent=extent.value, r0_qualified=qualified == 0
                 )
             assert r0.value == initial_r0 + (16 if mode == "move" and flags == 1 else 0)
-            for off, value in ((0x95C, 0), (0x970, 0), (0xC24, 0), (0x998, cursor)):
-                uc.mem_write(cpu + off, struct.pack("<I", value))
-            for i in range(9):
-                uc.mem_write(cpu + 0x90C + 8 * i, struct.pack("<Q", 0x123456789AB00000 + i))
-            uc.mem_write(cpu + 0x92C, struct.pack("<Q", 0xABCDEF1200000000 | r0.value))
-            uc.mem_write(cpu + 0x93C, struct.pack("<Q", 0x76543210ABCDE000 | flags))
+            if args.continuous_return:
+                assert bytes(uc.mem_read(cpu + 0x90C, 0x90)) == boundary_state
+                assert int.from_bytes(uc.mem_read(cpu + 0x998, 4), "little") == cursor
+                assert uc.reg_read(UC_ARM_REG_SP) == boundary_sp
+                # Publish only the proven low-word repair into the suspended
+                # interpreter. Keep real high words, flags and stack cells.
+                uc.mem_write(cpu + 0x92C, struct.pack("<I", r0.value))
+            else:
+                for off, value in ((0x95C, 0), (0x970, 0), (0xC24, 0), (0x998, cursor)):
+                    uc.mem_write(cpu + off, struct.pack("<I", value))
+                for i in range(9):
+                    uc.mem_write(cpu + 0x90C + 8 * i, struct.pack("<Q", 0x123456789AB00000 + i))
+                uc.mem_write(cpu + 0x92C, struct.pack("<Q", 0xABCDEF1200000000 | r0.value))
+                uc.mem_write(cpu + 0x93C, struct.pack("<Q", 0x76543210ABCDE000 | flags))
             saved = bytes(uc.mem_read(cpu + 0x92C, 40))
-            for i in range(8):
-                uc.mem_write(cpu + 0x978 + 4 * i, struct.pack("<I", 0xA1000 + 0x101 * i))
-            caller_slot = (cursor + 7) & 7
-            uc.mem_write(cpu + 0x978 + 4 * caller_slot, struct.pack("<I", 0x3130))
+            if not args.continuous_return:
+                for i in range(8):
+                    uc.mem_write(cpu + 0x978 + 4 * i, struct.pack("<I", 0xA1000 + 0x101 * i))
+                uc.mem_write(cpu + 0x978 + 4 * caller_slot, struct.pack("<I", 0x3130))
+            return_cells = struct.unpack("<8I", uc.mem_read(cpu + 0x978, 32))
             stack = word(0x806F8)
             old_top = word(stack)
-            uc.reg_write(UC_ARM_REG_R4, cpu)
-            uc.reg_write(UC_ARM_REG_R5, 0xFFFFF)
+            if not args.continuous_return:
+                uc.reg_write(UC_ARM_REG_R4, cpu)
+                uc.reg_write(UC_ARM_REG_R5, 0xFFFFF)
             uc.reg_write(UC_ARM_REG_R7, entry.value)
-            uc.reg_write(UC_ARM_REG_SP, 0x308000)
+            if not args.continuous_return:
+                uc.reg_write(UC_ARM_REG_SP, 0x308000)
             trace = []
             accesses = []
             cursor_steps = []
@@ -833,7 +866,7 @@ for cursor in range(8):
 
             uc.hook_add(UC_HOOK_CODE, hook)
             uc.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, access)
-            uc.emu_start(0x28828, 0x400000, count=30000)
+            uc.emu_start(0x28898 if args.continuous_return else 0x28828, 0x400000, count=30000)
             assert trace[-1] == 0x3130 and cursor_steps == [1, 7, 1, 7, 7]
             assert memory_checks and not pending_memory
             assert not pending_address_step
@@ -861,14 +894,26 @@ for cursor in range(8):
                 assert word(stack - 5) == old_top
                 assert (word(stack) == target + delta) == (mode != "stale-r0")
             assert int.from_bytes(uc.mem_read(cpu + 0x998, 4), "little") == caller_slot
+            if args.continuous_return:
+                assert uc.reg_read(UC_ARM_REG_SP) == boundary_sp
+                final_extent = c.c_uint32(0x12345678)
+                final_query = lib.bank_temp_allocation(
+                    c.byref(allocation_reader), word(stack), c.byref(final_extent)
+                )
+                assert final_query == (-7 if mode == "stale-r0" else 0)
+                assert final_extent.value == (
+                    0x12345678 if mode == "stale-r0" else allocation_bounds[1]
+                )
             for i in range(8):
                 assert int.from_bytes(uc.mem_read(cpu + 0x978 + 4 * i, 4), "little") == (
-                    0 if i in (cursor, caller_slot) else 0xA1000 + 0x101 * i
+                    0 if i in (cursor, caller_slot) else return_cells[i]
                 )
             rows.append(
                 dict(
                     allocation_trace=[hex(x) for x in allocation_trace],
                     arm_return=args.arm_return,
+                    continuous_return=args.continuous_return,
+                    boundary_sp=boundary_sp if args.continuous_return else None,
                     arm_arguments=arm_arguments,
                     arm_trace=arm_trace,
                     allocation_origin_path=allocation_origin_path,

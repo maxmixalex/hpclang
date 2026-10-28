@@ -1251,7 +1251,7 @@ the 16 deliberately stale-R0 controls fail the exact-allocation query. These
 guards bind the recorded inputs, not unobserved launcher or caller behavior.
 Unit tests cover descriptor composition,
 overlapping copies, simultaneous exchanges, clearing constants, and unchanged
-state on invalid inputs. `/work/oct28-arm-return/matrix` retains current
+state on invalid inputs. `/work/oct28-continuous-return/matrix` retains current
 hash-bound reports; the earlier three-step and fixed-address-step evidence
 remain in `/work/oct28-origins-return` and `/work/oct28-origin-stack`.
 Seeding R0 tokens identifies their origin; it does not by itself prove the
@@ -1267,11 +1267,24 @@ not an ordinary C return value; stage0's saved r0 has the same role. Both models
 pass all eight cursors and three relocation/control modes (48 cases). With
 `--arm-return clobber`, a seventh instruction changes ARM r0 to `11`; all 16
 cases observe Saturn PC `11` at the next dispatch and stop before executing it.
-The combined 256-case matrix includes the preceding 192 cases and 320 pre-write
+This 256-case subset includes the preceding 192 cases and 320 pre-write
 guard rejections. These leaves establish this boundary behavior, not arbitrary
 application side effects, an installed SDK application run, or continuous
-launcher-to-application-to-Stock acceptance. The later controlled return still
-sets up its caller context explicitly.
+launcher-to-application-to-Stock acceptance. By default, the later controlled
+return sets up its caller context explicitly.
+
+`--continuous-return` instead retains the actual allocation/ARM boundary state.
+Its controlled caller is initialized before allocation; after ARM returns,
+the real Saturn registers, flags, circular return stack and ARM SP survive the
+catalog operation unchanged except for the explicitly proven PC/R0 repairs.
+Execution resumes at the suspended interpreter dispatch, not its entry point.
+After the Saturn return, ARM SP must match its boundary value and the pushed
+object must still pass the exact TEMP-allocation query (or fail for stale-R0
+controls). Both models pass all eight cursors and three modes: 48 additional
+cases, for 304 total cases and 480 pre-write guard rejections. This closes the
+state-reset gap in this controlled path. The initial caller and ARM leaf remain
+test fixtures, and catalog mutation runs on the host at a suspended boundary;
+it is not an installed SDK application performing the operation itself.
 
 The address-adjust inspector describes D0/D1 immediate addition/subtraction
 (`16n`, `17n`, `18n`, `1cn`) with signed deltas of 1..16. It reads only instruction
