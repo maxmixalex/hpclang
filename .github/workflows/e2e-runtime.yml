@@ -399,6 +399,11 @@ jobs:
             --model "$HPCLANG_E2E_TARGET" \
             --stage1-elf "build/e2e/$APPLICATION/launchers/objects/stage1.elf" \
             --output "build/$HPCLANG_E2E_TARGET-incoming-carry/register-roots"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/return_underflow.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --stage1-elf "build/e2e/$APPLICATION/launchers/objects/stage1.elf" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/return-underflow"
 
       - name: Verify suite-specific evidence
         if: matrix.suite.verifier != ''

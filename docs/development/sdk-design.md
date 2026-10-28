@@ -1523,6 +1523,10 @@ slots and input preservation. CI retains the code-relocation stage1 ELF for this
 check. This isolates the collector; it does not execute the full stage1/MMU path.
 Both host and linked-ARM tests exercise the full ten-root capacity across all
 eight return-stack cursors, preserving mixed masks, root order and input values.
+The private stack simulation clears each consumed slot like ROM, so a later
+underflow cannot revisit a stale return address and invent a register use.
+`return_underflow.py` compares nine-pop paths against ROM and the linked ARM
+collector for all eight cursors; it stops at the unqualified zero continuation.
 
 `pc_exchange_move.py` adds a controlled catalog-growth contrast using the pinned
 Stock caller snapshot (`--state`, `--model`, `--output`). It executes APCEX/CPCEX

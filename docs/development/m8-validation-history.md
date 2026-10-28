@@ -600,3 +600,31 @@ PR21 969ade88 observation: four workflows pass/three unfinished, 211 successful,
 16 running and 91 queued jobs, no failures reported. Both full Stock matrices
 remain live on their original sessions, each past seven cases; no new push or
 acceptance. The register-root audit is prepared for their eventual completion.
+
+## 2026-10-29 — Clear simulated return-stack cells after consumption
+
+The first register-root build completed all 28 Stock cases, with 18 original
+returns, 36 unchanged Flash snapshots and reproduced artifacts independently
+audited at /work/oct29-stage-register/verified.json. Sessions 38127/51605 are
+terminal success. That bounded suite missed an exhausted-stack classification
+defect, so it does not establish the corrected build's acceptance.
+
+A nine-pop path reproduces the defect on both models/all eight cursors: ROM
+clears the consumed cell and dispatches zero; the collector reused its old
+conditional branch with changed carry and falsely reported A as a ninth root.
+Evidence: /work/oct29-stage-register/underflow-before.json (16 cases). A host
+regression fails against the preceding source and passes when private pops clear
+their slot. Suspended input is never changed. Existing stack/register sanitizer
+suites pass (0.32 s). Maintained return_underflow.py verifies all 16 paths against
+ROM and the corrected linked ARM collector, without the false A root.
+
+The corrected build also passes 576 host/ROM/linked-ARM register cases, full
+mixed-root capacity, eight positive/16 stale-address catalog cases and 128 guard
+rejections. Full format/Ruff/ShellCheck, workflow YAML and ARM analysis pass;
+the hardware backend retains its documented fixed-address checker exclusion.
+Application/six-launcher builds pass; independent rebuilding reproduces all 16
+artifacts and removes temporary storage. Evidence: /work/oct29-stage-underflow
+(model reports, movement reports and reproduction.json). New full Stock runs
+use its app/ artifacts: sessions 33856 (HP49g+) and 94548 (HP50g), still running.
+PR26 1dc590b1 observation: ten unfinished workflows; seven successful, five
+running and 44 queued jobs, no failures. This fix remains local, not submitted.

@@ -118,6 +118,9 @@ static unsigned execution_roots(const struct hpclang_stage_stack_io *io, uint32_
                 original &= ~(1u << cursor);
             }
             continuation = *root;
+            /* ROM pop clears the consumed cell, including generated returns.
+             * Clear only the private simulation, never the suspended input. */
+            *root = 0u;
             continue;
         }
         unsigned prefix, width, call;

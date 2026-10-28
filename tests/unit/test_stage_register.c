@@ -121,5 +121,32 @@ int main(void)
         assert(!roots[10] && !masks[10]);
         assert(a == 0xabc91000 && c == 0xdef92000 && !memcmp(stack, saved, sizeof stack));
     }
+    for (unsigned cursor = 0; cursor < 8; ++cursor) {
+        memset(data, 15, sizeof data);
+        fault = UINT32_MAX;
+        put(0x90000, 0x10, 2);
+        put(0x91000, 0xf4, 3);
+        put(0x91003, 0x10, 2);
+        put(0x91010, 0x2b18, 4);
+        uint32_t stack[8], saved[8];
+        for (unsigned i = 0; i < 8; ++i) {
+            stack[(cursor + 7 - i) & 7] = 0x91000 + i * 0x100;
+            if (i)
+                put(0x91000 + i * 0x100, i == 7 ? 0x20 : 0x10, 2);
+        }
+        memcpy(saved, stack, sizeof saved);
+        uint32_t a = 0xabc95000, c = 0xdef96000;
+        uint32_t *roots[10] = {0}, masks[10] = {0};
+        /* The ninth pop sees zero, never the old conditional branch. Without
+         * clearing consumed slots, set carry falsely reaches PC=A on a loop. */
+        assert(hpclang_stage_execution_roots(&io, 0x90000, stack, cursor, 0, &a, &c, roots,
+                                             masks) == 8);
+        for (unsigned i = 0; i < 8; ++i) {
+            assert(roots[i] == stack + ((cursor + 7 - i) & 7));
+            assert(masks[i] == UINT32_MAX);
+        }
+        assert(!roots[8] && !roots[9] && !masks[8] && !masks[9]);
+        assert(a == 0xabc95000 && c == 0xdef96000 && !memcmp(stack, saved, sizeof stack));
+    }
     return 0;
 }
