@@ -131,12 +131,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `8c2bb27f` | **Submitted; CI pending.** Exact-head audit: 120 successful, nine running and 225 queued jobs; no failures. Local guarded-TEMP/native-mask and launch-descriptor follow-ups remain unpushed. Fresh two-model Stock integration is running. |
+| #26 / `8c2bb27f` | **Submitted; CI pending.** Exact-head audit: 144 successful, 11 running and 199 queued jobs; no failures. Mainline follow-ups remain unpushed; fresh two-model Stock integration continues. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `01e1d2cf` | **All 12 UI jobs across six models pass**, with resource logs independently checked. Exact-head audit: 294 successful, one intentional publisher skip, one push publisher queued. This PR targets #20 (`m8-resource-observer`), whose PWM IRQ failure remains unresolved; publication alone does not permit main acceptance. Whole-system peaks remain open. |
+| #21 / `10e05bc0` | **PWM failure diagnostics submitted; new CI unobserved.** Previous head 01e1d2cf had all 12 UI jobs passing, 294 successful jobs, one intentional skip and a queued publisher. This PR targets unresolved #20, not main. Whole-system peaks and branch acceptance remain open. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. Local #21 follow-up `10e05bc0` records pre-cleanup IRQ/timing/ownership state. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports diagnostics. Not pushed; this is diagnostic coverage, not a claimed fix. |
+| #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; historical cause unproven. #21 follow-up 10e05bc0 now submits pre-cleanup IRQ/timing/ownership diagnostics. Both normal Direct runs pass; masked-IRQ negative retains the failure and exports state. Diagnostic coverage is not a claimed fix. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

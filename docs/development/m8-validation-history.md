@@ -327,3 +327,18 @@ The follow-up is local/unpushed. #21 publisher 122976703588 remains queued.
 Mainline Stock integration continues in the original two live processes;
 each model has passed through native-cache-lookup (eight cases). No runtime
 source was changed during that run. Remaining cases have not yet been accepted.
+
+### 2026-10-29 — PWM diagnostics submitted in #21
+
+Pushed m8-ui-lifecycle-ci / 10e05bc0064502ea0c44872eee31f1ae2a2b4afb and
+updated #21's description to distinguish the new diagnostics from a bug fix.
+Pre-push audit of 01e1d2cf rechecked all five exact-head workflows: four succeeded,
+one awaited the push publisher; 294 jobs succeeded, one PR publisher was
+intentionally skipped and one push publisher was queued. The parent remains
+m8-resource-observer/#20. Verified the remote head after push, without querying
+new CI. No merge or milestone acceptance. #26 audit separately reports
+144 successful, 11 running and 199 queued jobs at 8c2bb27f, with no failures.
+Fresh mainline Stock integration passed all nine library cases on both models;
+GOSUB and RTNSXM cases also pass on both, while the three remaining
+call-return cases per model continue in the original processes. A local draft of the mainline follow-up PR body is prepared, but
+mainline code has not been pushed pending completion of that validation.
