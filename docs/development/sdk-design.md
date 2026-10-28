@@ -1205,6 +1205,27 @@ descriptors while preserving unrelated register bits and D0/D1. Reports in
 These are controlled continuation checks, not complete entry reachability,
 incoming-register provenance or permission to enable public relocation.
 
+The `hpclang_rpl_code_origins_*` operations compose those descriptors over
+caller-owned per-nibble tokens. Assignment snapshots its source, exchange
+snapshots both registers, and memory transfers snapshot their input before
+updating any destination, including overlapping token arrays. Untouched fields
+retain their tokens; scalar constants clear them, while PC captures require
+separately established mapping-aware tokens. All register/field bounds are
+checked before changes. These are abstract origins, not numeric execution,
+pointer classification or a general control-flow interpreter. Callers must stop
+or invalidate facts at unmodeled writes and retain all code/mapping dependencies.
+
+`alternate_return.py` now composes the original three-instruction R0.A-to-A.A,
+DAT1-to-C.A, A.A-to-DAT1 segment using these C operations. Across both models,
+all 192 controlled return cases pass: 96 follow that segment and carry exactly
+the R0 nibble tokens into its stack cell; the other 96 do not enter it. Original
+allocation variants are included. Unit tests cover descriptor composition,
+overlapping copies, simultaneous exchanges, clearing constants, and unchanged
+state on invalid inputs. `/work/oct28-origins-return` retains hash-bound reports.
+Seeding R0 tokens identifies their origin; it does not by itself prove the
+incoming value is a valid object, establish the whole caller path, or authorize
+movement. The deliberately stale-R0 controls retain that distinction.
+
 The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
 `--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles
 the current C decoders and executes the original ARM Saturn interpreter. The

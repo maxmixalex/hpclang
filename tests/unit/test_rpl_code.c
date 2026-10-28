@@ -24,6 +24,7 @@ static void encode(struct image *image, unsigned prefix, unsigned width, uint32_
 }
 
 static const struct hpclang_rpl_code_patch sentinel = {123, 456, 789, 1011};
+static void seed_origins(struct hpclang_rpl_code_origins *state);
 
 static void exhaustive(void)
 {
@@ -656,6 +657,18 @@ static void register_assignments(void)
         assert(value.source_first == cases[i].source_first &&
                value.destination_first == cases[i].first);
         assert(value.nibbles == cases[i].width && value.constant == cases[i].constant);
+        struct hpclang_rpl_code_origins origins, expected;
+        seed_origins(&origins);
+        expected = origins;
+        const uint32_t pc_tokens[] = {1001, 1002, 1003, 1004, 1005};
+        for (unsigned n = 0; n < value.nibbles; ++n)
+            expected.registers[value.destination][value.destination_first + n] =
+                value.source == HPCLANG_RPL_CODE_CONSTANT ? 0
+                : value.source == HPCLANG_RPL_CODE_NEXT_PC
+                    ? pc_tokens[n]
+                    : origins.registers[value.source][value.source_first + n];
+        assert(hpclang_rpl_code_origins_assign(&origins, &value, pc_tokens) == 0);
+        assert(!memcmp(&origins, &expected, sizeof origins));
         for (unsigned n = 0; n < image.size; ++n) {
             value = untouched;
             assert(hpclang_rpl_code_assignment_inspect(&reader, image.address, n, cases[i].p,
@@ -743,6 +756,15 @@ static void register_exchanges(void)
         assert(value.instruction == image.address && value.length == image.size);
         assert((unsigned)value.left == cases[i].left && (unsigned)value.right == cases[i].right);
         assert(value.first == cases[i].first && value.nibbles == cases[i].width);
+        struct hpclang_rpl_code_origins origins, expected;
+        seed_origins(&origins);
+        expected = origins;
+        for (unsigned n = value.first; n < value.first + value.nibbles; ++n) {
+            expected.registers[value.left][n] = origins.registers[value.right][n];
+            expected.registers[value.right][n] = origins.registers[value.left][n];
+        }
+        assert(hpclang_rpl_code_origins_exchange(&origins, &value) == 0);
+        assert(!memcmp(&origins, &expected, sizeof origins));
         for (unsigned n = 0; n < image.size; ++n) {
             value = untouched;
             assert(hpclang_rpl_code_exchange_inspect(&reader, image.address, n, cases[i].p,
@@ -864,6 +886,158 @@ static void literal_loads(void)
     assert(!memcmp(&value, &untouched, sizeof value));
 }
 
+static void seed_origins(struct hpclang_rpl_code_origins *state)
+{
+    for (unsigned reg = 0; reg <= HPCLANG_RPL_CODE_D1; ++reg)
+        for (unsigned n = 0; n < 16; ++n)
+            state->registers[reg][n] = 0x100u + reg * 16u + n;
+}
+
+static void origin_aliases_and_failures(void)
+{
+    struct hpclang_rpl_code_origins before, state, expected;
+    seed_origins(&before);
+    struct hpclang_rpl_code_assignment assignment = {
+        .source = HPCLANG_RPL_CODE_A,
+        .destination = HPCLANG_RPL_CODE_A,
+        .source_first = 0,
+        .destination_first = 1,
+        .nibbles = 15,
+    };
+    state = expected = before;
+    for (unsigned n = 0; n < 15; ++n)
+        expected.registers[0][n + 1] = before.registers[0][n];
+    assert(hpclang_rpl_code_origins_assign(&state, &assignment, NULL) == 0);
+    assert(!memcmp(&state, &expected, sizeof state));
+    assignment.source = HPCLANG_RPL_CODE_CONSTANT;
+    state = expected = before;
+    for (unsigned n = 1; n < 16; ++n)
+        expected.registers[0][n] = 0;
+    assert(hpclang_rpl_code_origins_assign(&state, &assignment, NULL) == 0);
+    assert(!memcmp(&state, &expected, sizeof state));
+    assignment.source = HPCLANG_RPL_CODE_NEXT_PC;
+    assignment.destination_first = 0;
+    assignment.nibbles = 5;
+    state = expected = before;
+    assert(hpclang_rpl_code_origins_assign(&state, &assignment, NULL) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!memcmp(&state, &before, sizeof state));
+    for (unsigned n = 0; n < 5; ++n)
+        expected.registers[0][n] = before.registers[0][n + 1];
+    assert(hpclang_rpl_code_origins_assign(&state, &assignment, state.registers[0] + 1) == 0);
+    assert(!memcmp(&state, &expected, sizeof state));
+
+    struct hpclang_rpl_code_exchange exchange = {
+        .left = HPCLANG_RPL_CODE_A,
+        .right = HPCLANG_RPL_CODE_D1,
+        .first = 0,
+        .nibbles = 4,
+    };
+    state = expected = before;
+    for (unsigned n = 0; n < 4; ++n) {
+        expected.registers[0][n] = before.registers[12][n];
+        expected.registers[12][n] = before.registers[0][n];
+    }
+    assert(hpclang_rpl_code_origins_exchange(&state, &exchange) == 0);
+    assert(!memcmp(&state, &expected, sizeof state));
+    exchange.nibbles = 6;
+    state = before;
+    assert(hpclang_rpl_code_origins_exchange(&state, &exchange) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&state, &before, sizeof state));
+
+    for (unsigned load = 0; load < 2; ++load) {
+        struct hpclang_rpl_code_memory transfer = {
+            .data = HPCLANG_RPL_CODE_A,
+            .address = HPCLANG_RPL_CODE_D1,
+            .first = load,
+            .nibbles = 15,
+            .load = load,
+        };
+        state = expected = before;
+        for (unsigned n = 0; n < 15; ++n)
+            expected.registers[0][n + 1] = before.registers[0][n];
+        assert(hpclang_rpl_code_origins_memory(&state, &transfer, state.registers[0] + !load, 15) ==
+               0);
+        assert(!memcmp(&state, &expected, sizeof state));
+    }
+    for (unsigned fault = 0; fault < 9; ++fault) {
+        struct hpclang_rpl_code_memory transfer = {
+            .data = HPCLANG_RPL_CODE_A,
+            .address = HPCLANG_RPL_CODE_D1,
+            .nibbles = 5,
+        };
+        unsigned count = 5;
+        switch (fault) {
+        case 0:
+            transfer.data = HPCLANG_RPL_CODE_R0;
+            break;
+        case 1:
+            transfer.address = HPCLANG_RPL_CODE_A;
+            break;
+        case 2:
+            transfer.load = 2;
+            break;
+        case 3:
+            transfer.first = 16;
+            break;
+        case 4:
+            transfer.nibbles = count = 0;
+            break;
+        case 5:
+            transfer.nibbles = count = 17;
+            break;
+        case 6:
+            transfer.first = UINT32_MAX;
+            break;
+        case 7:
+            count = 4;
+            break;
+        default:
+            transfer.data = (enum hpclang_rpl_code_register) - 1;
+            break;
+        }
+        state = before;
+        assert(hpclang_rpl_code_origins_memory(&state, &transfer, state.registers[0], count) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&state, &before, sizeof state));
+    }
+    for (unsigned fault = 0; fault < 7; ++fault) {
+        assignment = (struct hpclang_rpl_code_assignment){
+            .source = HPCLANG_RPL_CODE_R0,
+            .destination = HPCLANG_RPL_CODE_A,
+            .nibbles = 5,
+        };
+        switch (fault) {
+        case 0:
+            assignment.source = (enum hpclang_rpl_code_register) - 1;
+            break;
+        case 1:
+            assignment.destination = HPCLANG_RPL_CODE_CONSTANT;
+            break;
+        case 2:
+            assignment.nibbles = 0;
+            break;
+        case 3:
+            assignment.nibbles = 17;
+            break;
+        case 4:
+            assignment.source_first = 12;
+            break;
+        case 5:
+            assignment.destination_first = UINT32_MAX;
+            break;
+        default:
+            assignment.source = HPCLANG_RPL_CODE_CONSTANT;
+            assignment.source_first = 1;
+            break;
+        }
+        state = before;
+        assert(hpclang_rpl_code_origins_assign(&state, &assignment, NULL) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&state, &before, sizeof state));
+    }
+}
+
 static void memory_transfers(void)
 {
     const unsigned fields[] = {0, 1, 2, 3, 4, 5, 6, 7, 15};
@@ -896,6 +1070,21 @@ static void memory_transfers(void)
                                        : field == 1 ? p + 1
                                                     : widths[field];
                     assert(value.first == first && value.nibbles == nibbles);
+                    struct hpclang_rpl_code_origins origins, expected;
+                    seed_origins(&origins);
+                    expected = origins;
+                    uint32_t tags[16], expected_tags[16];
+                    for (unsigned n = 0; n < 16; ++n)
+                        tags[n] = expected_tags[n] = 0x800u + n;
+                    for (unsigned n = 0; n < value.nibbles; ++n)
+                        if (value.load)
+                            expected.registers[value.data][value.first + n] = tags[n];
+                        else
+                            expected_tags[n] = origins.registers[value.data][value.first + n];
+                    assert(hpclang_rpl_code_origins_memory(&origins, &value, tags, value.nibbles) ==
+                           0);
+                    assert(!memcmp(&origins, &expected, sizeof origins));
+                    assert(!memcmp(tags, expected_tags, sizeof tags));
                     for (unsigned n = 0; n < image.size; ++n) {
                         value = unchanged;
                         assert(hpclang_rpl_code_memory_inspect(&reader, image.address, n, p,
@@ -964,5 +1153,6 @@ int main(void)
     register_exchanges();
     pc_capture_bounds();
     memory_transfers();
+    origin_aliases_and_failures();
     return 0;
 }

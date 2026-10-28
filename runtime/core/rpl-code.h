@@ -135,6 +135,37 @@ int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uin
                                     uint32_t limit, unsigned p,
                                     struct hpclang_rpl_code_memory *memory);
 
+/* Abstract origins, not register values or pointer classifications. Each token
+ * names one caller-owned nibble fact; zero means unknown. Register numbers are
+ * the enum above, through D1. CONSTANT's slot and unused high nibbles are unused.
+ * Callers establish seeds, memory identity/aliasing, instruction identity and
+ * the executed path. Unmodeled writes must invalidate their affected facts;
+ * never skip unsupported instructions and continue with stale origins. */
+struct hpclang_rpl_code_origins
+{
+    uint32_t registers[HPCLANG_RPL_CODE_D1 + 1][16];
+};
+
+/* Apply descriptors obtained from the inspectors to abstract facts only.
+ * Assignment snapshots its source, exchange snapshots both sides, and memory
+ * transfers snapshot the selected source before writing. Overlapping tag arrays
+ * are supported. Scalar constants clear destination facts. NEXT_PC requires
+ * five caller-established tokens (all zero is allowed), separately guarded for
+ * the instruction mapping. Memory tokens name exactly count consecutive nibbles
+ * starting at the established D0/D1 address; load reads them, store replaces them.
+ * Descriptors must be disjoint from writable token storage. Validate register
+ * and field bounds before any change; errors preserve state and memory tags.
+ * These operations do not execute code, access native memory, create pointer
+ * provenance from numeric values, or establish complete relocation coverage. */
+int hpclang_rpl_code_origins_assign(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_assignment *assignment,
+                                    const uint32_t *next_pc);
+int hpclang_rpl_code_origins_exchange(struct hpclang_rpl_code_origins *state,
+                                      const struct hpclang_rpl_code_exchange *exchange);
+int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_memory *transfer,
+                                    uint32_t *memory, unsigned count);
+
 /* Describe a simultaneous exchange of the same field in two registers. Both
  * sources are the pre-instruction values; preserve all nibbles outside the field.
  * Supports A/B/C/D pairs and A/C with R0..R4, standard fields (0..7,F).

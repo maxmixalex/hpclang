@@ -423,6 +423,99 @@ int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uin
     return 0;
 }
 
+static unsigned origin_register_width(enum hpclang_rpl_code_register reg)
+{
+    if ((unsigned)reg <= HPCLANG_RPL_CODE_R4)
+        return 16;
+    if (reg == HPCLANG_RPL_CODE_P)
+        return 1;
+    if (reg == HPCLANG_RPL_CODE_D0 || reg == HPCLANG_RPL_CODE_D1)
+        return 5;
+    return 0;
+}
+
+static int origin_field_valid(enum hpclang_rpl_code_register reg, unsigned first, unsigned count)
+{
+    unsigned width = origin_register_width(reg);
+    return count && first < width && count <= width - first;
+}
+
+int hpclang_rpl_code_origins_assign(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_assignment *assignment,
+                                    const uint32_t *next_pc)
+{
+    if (!state || !assignment)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    unsigned count = assignment->nibbles;
+    if (!origin_field_valid(assignment->destination, assignment->destination_first, count))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (assignment->source == HPCLANG_RPL_CODE_NEXT_PC) {
+        if (assignment->source_first || assignment->destination_first || count != 5 ||
+            (assignment->destination != HPCLANG_RPL_CODE_A &&
+             assignment->destination != HPCLANG_RPL_CODE_C))
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        if (!next_pc)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    } else if (assignment->source == HPCLANG_RPL_CODE_CONSTANT) {
+        if (assignment->source_first)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    } else if (!origin_field_valid(assignment->source, assignment->source_first, count)) {
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    uint32_t source[16];
+    for (unsigned i = 0; i < count; ++i)
+        source[i] = assignment->source == HPCLANG_RPL_CODE_CONSTANT ? 0
+                    : assignment->source == HPCLANG_RPL_CODE_NEXT_PC
+                        ? next_pc[i]
+                        : state->registers[assignment->source][assignment->source_first + i];
+    for (unsigned i = 0; i < count; ++i)
+        state->registers[assignment->destination][assignment->destination_first + i] = source[i];
+    return 0;
+}
+
+int hpclang_rpl_code_origins_exchange(struct hpclang_rpl_code_origins *state,
+                                      const struct hpclang_rpl_code_exchange *exchange)
+{
+    if (!state || !exchange)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!origin_field_valid(exchange->left, exchange->first, exchange->nibbles) ||
+        !origin_field_valid(exchange->right, exchange->first, exchange->nibbles))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t left[16], right[16];
+    for (unsigned i = 0; i < exchange->nibbles; ++i) {
+        left[i] = state->registers[exchange->left][exchange->first + i];
+        right[i] = state->registers[exchange->right][exchange->first + i];
+    }
+    for (unsigned i = 0; i < exchange->nibbles; ++i) {
+        state->registers[exchange->left][exchange->first + i] = right[i];
+        state->registers[exchange->right][exchange->first + i] = left[i];
+    }
+    return 0;
+}
+
+int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_memory *transfer,
+                                    uint32_t *memory, unsigned count)
+{
+    if (!state || !transfer || !memory)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if ((transfer->data != HPCLANG_RPL_CODE_A && transfer->data != HPCLANG_RPL_CODE_C) ||
+        (transfer->address != HPCLANG_RPL_CODE_D0 && transfer->address != HPCLANG_RPL_CODE_D1) ||
+        transfer->load > 1 || transfer->nibbles != count ||
+        !origin_field_valid(transfer->data, transfer->first, count))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t source[16];
+    uint32_t *registers = state->registers[transfer->data] + transfer->first;
+    for (unsigned i = 0; i < count; ++i)
+        source[i] = transfer->load ? memory[i] : registers[i];
+    for (unsigned i = 0; i < count; ++i)
+        if (transfer->load)
+            registers[i] = source[i];
+        else
+            memory[i] = source[i];
+    return 0;
+}
+
 int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
                                       uint32_t limit, unsigned p,
                                       struct hpclang_rpl_code_exchange *exchange)

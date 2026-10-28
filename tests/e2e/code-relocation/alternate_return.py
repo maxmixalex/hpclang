@@ -123,6 +123,23 @@ class Memory(c.Structure):
     ]
 
 
+class Origins(c.Structure):
+    _fields_ = [("registers", (c.c_uint32 * 16) * 13)]
+
+
+lib.hpclang_rpl_code_origins_assign.argtypes = [
+    c.POINTER(Origins),
+    c.POINTER(Assignment),
+    c.POINTER(c.c_uint32),
+]
+lib.hpclang_rpl_code_origins_memory.argtypes = [
+    c.POINTER(Origins),
+    c.POINTER(Memory),
+    c.POINTER(c.c_uint32),
+    c.c_uint,
+]
+
+
 lib.hpclang_rpl_code_memory_inspect.argtypes = [
     c.POINTER(Reader),
     c.c_uint32,
@@ -301,6 +318,11 @@ for cursor in range(8):
 
             memory_checks = []
             pending_memory = []
+            origins = Origins()
+            origin_path = []
+            origin_memory = (c.c_uint32 * 5)(*[0x200 + i for i in range(5)])
+            origin_address = []
+            origin_steps = (0x88C8E + delta, 0x88C94 + delta, 0x88C97 + delta)
 
             def live_nibble(at):
                 return uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
@@ -325,6 +347,28 @@ for cursor in range(8):
                         assert bytes(uc.mem_read(cpu + 0x954, 8)) == address_state
                     pc = uc.reg_read(UC_ARM_REG_R7)
                     trace.append(pc)
+                    if origin_path and len(origin_path) < 3:
+                        assert pc == origin_steps[len(origin_path)], "unmodeled origin-path step"
+                    if pc == origin_steps[0]:
+                        # Caller-owned symbolic labels for R0.A; numeric values
+                        # never establish these labels or qualify a target map.
+                        for i in range(5):
+                            origins.registers[4][i] = 0x100 + i
+                        copy = Assignment()
+                        assert (
+                            lib.hpclang_rpl_code_assignment_inspect(
+                                c.byref(live_reader), pc, 6, 0, c.byref(copy)
+                            )
+                            == 0
+                        )
+                        assert (copy.source, copy.destination, copy.nibbles) == (4, 0, 5)
+                        assert (
+                            lib.hpclang_rpl_code_origins_assign(
+                                c.byref(origins), c.byref(copy), None
+                            )
+                            == 0
+                        )
+                        origin_path.append(pc)
                     if pc == 0x3130 or len(trace) > 120:
                         uc.emu_stop()
                         return
@@ -345,6 +389,24 @@ for cursor in range(8):
                             "<I", address_state, 4 * (transfer.address - 11)
                         )[0]
                         assert 0 <= address < address + transfer.nibbles <= 0x100000
+                        if pc in origin_steps[1:]:
+                            assert len(origin_path) == origin_steps.index(pc)
+                            assert transfer.nibbles == 5 and transfer.first == 0
+                            if pc == origin_steps[1]:
+                                assert transfer.load == 1 and transfer.data == 2
+                                origin_address.append(address)
+                            else:
+                                assert transfer.load == 0 and transfer.data == 0
+                                assert origin_address == [address]
+                            assert (
+                                lib.hpclang_rpl_code_origins_memory(
+                                    c.byref(origins), c.byref(transfer), origin_memory, 5
+                                )
+                                == 0
+                            )
+                            origin_path.append(pc)
+                            if len(origin_path) == 3:
+                                assert list(origin_memory) == [0x100 + i for i in range(5)]
                         reg_at = cpu + 0x90C + 8 * transfer.data
                         register = int.from_bytes(uc.mem_read(reg_at, 8), "little")
                         values = [live_nibble(address + i) for i in range(transfer.nibbles)]
@@ -381,6 +443,7 @@ for cursor in range(8):
             uc.emu_start(0x28828, 0x400000, count=30000)
             assert trace[-1] == 0x3130 and cursor_steps == [1, 7, 1, 7, 7]
             assert memory_checks and not pending_memory
+            assert len(origin_path) == (3 if flags == 1 else 0)
             assert 0x88CA2 + delta in trace and 0x88CA9 + delta in trace
             assert word(0x806F8) == stack - (5 if flags == 1 else 0)
             assert word(0x8076B) == 0x88D67 + delta
@@ -417,6 +480,7 @@ for cursor in range(8):
                     mode=mode,
                     r0_read=used,
                     memory_transfers=memory_checks,
+                    r0_origin_path=origin_path,
                     writes=writes.value,
                     stack_peak=1,
                     stack_final=-1,
