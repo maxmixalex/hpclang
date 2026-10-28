@@ -1101,3 +1101,22 @@ ARMv4T Thumb compilation/static analysis and clang-format pass. This internal
 primitive is not yet a production firmware profile or a complete ACPTR graph
 resolver. Existing execution obligations, owner-aware mapping, ROM geometry and
 transaction guards remain required. No Port1 edit capability is enabled by it.
+
+## Alias selector dependencies — local, 2026-10-29
+
+Original-ROM traces show both extra entries and their standard counterparts join
+Saturn 0x22fec after loading different D0 addresses. At that boundary the captured
+26 register-state words agree except D0: aliases select RAM 0x86063/0x8606d,
+canonical entries select 0x860d6/0x860e0. The current selector contents agree,
+explaining the earlier map equivalence; ROM code identity alone is insufficient.
+`bank_overlay.verify_attachment_switches` now changes the alias selector's first
+nibble in isolated emulator RAM. Both models pass six added counterexamples:
+normal/bank-0 initial maps follow the changed bank 2/4, ERAM remains visible when
+enabled, and P=1 exits still select bank 2. Canonical and unchanged-alias runs
+remain independent. All calls return, Flash is unchanged, and the existing bank
+and overlay gates pass. Reports: `/work/oct29-alias-selector/{model}/bank-switch-maps.json`;
+execution paths/disassembly: `/work/oct29-bank-alias-trace.json`.
+The alias API contract now explicitly requires mutable selector dependencies.
+Production profiles must validate these data, shared handler semantics and
+calling context; address or code-only matching must not authorize relocation.
+Ruff, clang-format and diff checks pass. No production alias is enabled yet.

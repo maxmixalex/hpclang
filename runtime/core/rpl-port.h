@@ -249,7 +249,9 @@ struct hpclang_rpl_bank_identity_range
 /* Match a separately reviewed switch alias to a canonical table entry. Expected
  * ranges must be independent immutable evidence, not a copy of the current
  * reader. They must include both entry addresses and all code/data needed by
- * the caller's equivalence proof. This routine checks bytes, not completeness
+ * the caller's equivalence proof, including mutable selector data when the
+ * handler reads it. Equal entry code alone does not prove a fixed bank index.
+ * This routine checks bytes, not completeness
  * of that proof or machine-code semantics. Calling-context assumptions, page
  * owners, geometry, firmware identity and executable references remain caller
  * obligations. No fixed ROM addresses or alias arithmetic are inferred.

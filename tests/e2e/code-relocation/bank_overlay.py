@@ -117,7 +117,7 @@ def verify_attachment_switches(ram, flash, cpu, banks):
     """Fixture-specific aliases: compare maps/state, without granting runtime identity."""
     results = []
 
-    def execute(initial, entry):
+    def execute(initial, entry, selector=None):
         uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
         for address, data in ((0, flash), (0x08000000, ram)):
             uc.mem_map(address, len(data))
@@ -156,6 +156,14 @@ def verify_attachment_switches(ram, flash, cpu, banks):
 
         if initial is not None:
             call(banks[initial]["switch"], 0)
+        if selector is not None:
+            address, value = selector
+            physical = struct.unpack("<I", uc.mem_read(cpu + (address >> 12) * 4, 4))[0]
+            physical += (address & 4095) // 2
+            assert 0x08000000 <= physical < 0x08080000
+            shift = 4 * (address & 1)
+            old = uc.mem_read(physical, 1)[0]
+            uc.mem_write(physical, bytes([(old & ~(15 << shift)) | (value << shift)]))
         return [call(entry, 0), call(entry, 1)]
 
     # These addresses are evidence for the two captured supported ROMs only.
@@ -172,5 +180,25 @@ def verify_attachment_switches(ram, flash, cpu, banks):
             else:
                 assert actual[0]["pages"][64:128] == banks[bank]["pages"]
                 assert actual[1]["pages"][64:128] == banks[2]["pages"]
-            results.append(dict(switch=switch, bank=bank, initial=initial, stages=actual))
+            # Entry code sets D0 to a RAM selector cell. Equal ROM code does
+            # not establish equal bank selection if that mutable data changes.
+            selector = 0x86063 if bank == 2 else 0x8606D
+            alternate = 4 if bank == 2 else 2
+            changed = execute(initial, switch, (selector, alternate * 2))
+            assert [stage["banks"][1] for stage in changed] == [alternate, 2]
+            if initial == 16:
+                assert all(stage["pages"][64:128] == expected for stage in changed)
+            else:
+                assert changed[0]["pages"][64:128] == banks[alternate]["pages"]
+                assert changed[1]["pages"][64:128] == banks[2]["pages"]
+            results.append(
+                dict(
+                    switch=switch,
+                    bank=bank,
+                    initial=initial,
+                    stages=actual,
+                    selector_field=selector,
+                    changed_selector_stages=changed,
+                )
+            )
     return results
