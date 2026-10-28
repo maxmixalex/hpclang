@@ -854,6 +854,15 @@ capture stable inputs; plausible bytes or a successful parse do not identify a R
 or authorize recovery. Both native saved-state inventories use this parser and
 the first bank's actual 96 KiB bound when resolving configuration entries.
 
+`tests/e2e/code-relocation/bank_switch_maps.py` compares all sixteen Flash
+switches and the ERAM switch with original ROM execution on both HP49g+/HP50g
+fixtures. Populated banks match all 64 read-map cells; ERAM maps to physical
+`0x08020000`. Unused Flash entries 14/15 still have callable switches, but install
+a repeated dummy page and return no usable geometry. A successful switch lookup
+alone therefore cannot qualify a target. The mapped window can also exceed a
+bank's declared size: callers must retain the geometry bound. These checks do
+not establish a complete banked-reference graph or authorize Port1 edits.
+
 The maintained installation witness exercises this capture on ARM, using the
 supported Stock 2.15 fixture's verified initializer literal-pool addresses and
 state layout. Its existing missing-library and matched-installation invocations

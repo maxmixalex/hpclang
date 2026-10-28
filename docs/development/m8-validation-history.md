@@ -628,3 +628,31 @@ artifacts and removes temporary storage. Evidence: /work/oct29-stage-underflow
 use its app/ artifacts: sessions 33856 (HP49g+) and 94548 (HP50g), still running.
 PR26 1dc590b1 observation: ten unfinished workflows; seven successful, five
 running and 44 queued jobs, no failures. This fix remains local, not submitted.
+
+## 2026-10-29 — Port1 public-edit dependency review
+
+Source review confirms internal rpl-port-mutation.c replacement/removal exists,
+but port-write.c still rejects public Port1 edits. The required port1_guard
+must prove no live banked reference targets the changed suffix; the unit fixture
+only supplies a synthetic verdict. Production banked-reference qualification
+remains an implementation dependency, not an accepted gate. Once commit begins,
+backend failures are INCOMPLETE and retain ownership; there is no rollback.
+Current Stock sessions 33856/94548 remain live; no restart or acceptance claim.
+PR21 969ade88 has four successful workflows and three unfinished, with 254
+successful, 13 running and 51 queued jobs; no failures at this observation.
+
+## 2026-10-29 — Native bank switch mappings and geometry
+
+Maintained bank_switch_maps.py compares bank_lookup/rom_bank_layout with actual
+ROM interpreter execution for all 17 switches on each HP49g+/HP50g fixture.
+All 34 cases pass. Populated banks match every read-map cell, ERAM selects
+physical 0x08020000, and mappings outside the window plus Flash stay unchanged.
+Unused indices 14/15 still resolve to switch routines but install one repeated
+dummy page; geometry correctly returns absent and preserves output. The first
+bank's 96 KiB bound remains required despite its 128 KiB mapped window.
+Reports: /work/oct29-bank-switch-maps/{hp49gplus,hp50g}/bank-switch-maps.json,
+with source and input hashes. Ruff/format, workflow YAML and diff checks pass.
+The test is wired into the existing code-relocation CI/evidence path locally;
+it is not submitted or CI-accepted. This proves mapping behavior on these
+fixtures, not firmware discovery, complete banked roots or public Port1 edits.
+Full Stock sessions 33856/94548 remain live, each through seven successful cases.
