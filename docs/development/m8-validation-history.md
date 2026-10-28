@@ -253,3 +253,28 @@ and a paired RPL4-aware runtime.
   backend, remaining analysis passed. No unqualified analyzer-clean claim.
 - #26 exact head 8c2bb27f: 105 successful, 12 running, 237 queued; no observed
   failures. Follow-up remains local; no new push this turn.
+
+### 2026-10-29 — UI CI logs complete; fresh Stock integration underway
+
+Exact #21 head 01e1d2cf has all 12 UI jobs successful across six models.
+`research/oct29-ui-passed-job-audit.json` and its twelve per-job logs independently
+confirm touched stack, heap, physical pool and required/reserved budget checks.
+Newly verified job IDs: 122939054452 (HP40gs), 122939061833 (HP49g+),
+122939062439 and 122938789507 (HP50g). HP50g reports stack 2432/8192,
+heap 20076/22880 and pool required/reserved 122880/385024 bytes. The complete
+head audit has 294 successful jobs, one intentional PR publisher skip and
+push publisher 122976703588 queued. Branch not yet accepted; these sampled
+resource checks do not establish whole-system transient peaks.
+
+Fresh source at 6d786f55 was built into a new ARM application and six wrapped
+launchers at `/work/oct29-native-launch-e2e/artifact`. The maintained
+`call_roots.verify_calls` suite is running against both models with original
+Stock states and actual USB transfer. Both first `native` cases passed;
+remaining cases are live, not passed or failed. Resume the existing processes;
+do not restart or overwrite their output because an observation wait expires.
+Runner: `research/oct29-native-launch-e2e.py`; root output directory:
+`/work/oct29-native-launch-e2e`. Final source/artifact hash manifests are written
+only after all cases pass. Current source remains unchanged during execution.
+
+#26 head 8c2bb27f audit: 120 successful, nine running, 225 queued jobs,
+no observed failures. No new push this turn.
