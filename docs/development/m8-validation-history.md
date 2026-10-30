@@ -284,7 +284,7 @@ and errno-preserving destruction on the three classic Stock models. Other
 contexts explicitly require ENOSYS.
 
 Fresh merged UI integration passes on HP48gII, including both artifact-budget
-and native-release checks plus 13 lifecycle snapshots. Native release identifies
+and native-release checks plus 14 lifecycle snapshots. Native release identifies
 6164 released block bytes, including 20 metadata bytes. The snapshot report confirms observed capacity
 returns to 12540 bytes and largest free block to 11516 bytes. This is sampled
 allocator evidence, not complete physical peak admission. Reports are under
@@ -319,3 +319,58 @@ The final audit passes; temporary builds are removed. No failed attempt counts
 as acceptance. Parent #13 remains local/unpushed, and C++ still needs its ancestry
 integrated. Fresh combined UI gates pass HP48gII, HP49g+ and HP50g; HP39 runs
 remain active. Neither the parent nor M8.5 is remotely accepted.
+
+### 2026-10-30 — C++ parent ancestry integrated
+
+Local C++ merge `ed93a9bd` includes parent `19e19700`. Git confirms the parent
+is an ancestor and no changes from tested `3ab04c07` in runtime, platform,
+public headers, CMake, examples, Object Basics/UI sources or their build and
+emulator preparation tools. The only non-document additions are the parent's
+Aplet preflight and Kermit patch/regression/build files. Their sources match
+the validated parent. Eighteen host tests, LF-normalized Ruff checks and strict
+docs pass (`/work/oct30-cpp-parent-merge.log`); Windows checkout CRLF caused an
+initial format-only diagnostic, with no source formatting change required.
+
+Fresh combined UI verification now also passes HP39g+. HP39gs remains live;
+HP40gs is pending. `oct30-cpp-ui-final-audit.py` is prepared to independently
+recompute all six budgets, native-release checks and lifecycle reports once
+the actual runner finishes; it has not yet passed. Parent #13 and C++ #14
+remain unpushed. Previous #14 CI retains 319 successes, one skip and fourteen
+cancellations; cancelled gates are not accepted. #26 remains queued.
+
+### 2026-10-30 — Preserve pending evidence publishers
+
+GitHub check annotation for job 121289451878 (run 40208342087, parent head
+`4a4b36bd`) states that a higher-priority waiting request for
+`ci-evidence-publisher` cancelled it. The job had no runner or executed steps.
+The retained API evidence is `research/oct30-publisher-cancellation.json`.
+
+Parent commit `700be00e`, merged into C++ as `80fdda5f`, adds `queue: max` to
+both Runtime and Font Gallery publisher concurrency groups, retaining
+`cancel-in-progress: false` and single-writer serialization. Parsed YAML checks
+both groups exactly. [GitHub's concurrency documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+specifies up to 100 pending jobs instead of the default replacement of the
+single pending job. Queue overflow can still cancel additional jobs; this
+does not repair old cancellations or prove remote behavior before CI. No
+application code changes. Fresh combined UI gates now pass HP39gs as well;
+HP40gs remains active. Both delivery heads remain local and unpushed.
+
+### 2026-10-30 — Complete combined UI matrix and delivery audit
+
+The resumed UI runner finishes all six models. Independent audit
+`oct30-cpp-ui-final-audit.py` recomputes 79 lifecycle snapshots, six linked
+image budgets and native-release outcomes, including actual SRAM/Flash hashes
+when an optional native block is present. Application and emulator hashes still
+match the original run manifest. `/work/oct30-port-cpp-ui/independent-verified.json`
+contains the final model reports. The first three-model reports survive the
+local-wrapper corrections; neither invalid setup attempt is counted as a pass.
+
+The Port C++ application/runtime/launcher/owner implementation remains identical
+to tested `3ab04c07`; later ancestry and queue commits change transport checks,
+publisher policy and documentation. Object Basics six Direct/six Stock, the
+517-output installed SDK gate, sanitizer tests and ARM analysis retain their
+recorded scope. Independent parent UI reproduction covers fifteen delivery files.
+Before delivery, exact remote heads were inspected: #13 `4a4b36bd` has 371
+successful, two skipped and one cancelled publisher job; #14 `492926e1` has
+319 successful, one skipped and fourteen cancelled jobs. No cancelled gate is
+accepted. New-head remote validation remains required, and M8 is incomplete.

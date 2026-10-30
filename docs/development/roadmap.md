@@ -115,20 +115,17 @@ library management and Port1 edits, followed by Port2 trusted recovery
 installation, authority lifecycle, safe startup and reclamation. Sound
 compatibility is independent.
 
-M8.5 Port C++ integration `3ab04c07` remains local; PR #14 depends on
-unaccepted parent #13. All six Direct and six Stock Object Basics runs pass.
-Independent audit checks twelve Stock return reports and unchanged application,
-emulator and transfer-server hashes. Live Port ownership runs on Stock
-HP48gII/HP49g+/HP50g; HP39 and Direct contexts exercise ENOSYS. Host sanitizers,
-ARM builds and the full installed/relocated SDK gate also pass (517 reproduced
-release outputs). Fresh combined UI budget/allocation/release/lifecycle checks
-pass HP48gII, HP49g+ and HP50g; HP39g+ is running, with HP39gs/HP40gs pending.
-The local test wrapper's missing capture flags and firmware link were corrected;
-invalid attempts remain archived. Parent #13 now has local merge `19e19700`,
-retaining Aplet identity and retry-pacing fixes. Eighteen host tests, six real
-Aplet identities/six mixed-asset rejections, fifteen identical rebuilt UI
-artifacts, lint and strict docs pass. This parent is not pushed; C++ ancestry
-integration, remote acceptance and M8.5 completion remain open.
+M8.5 Port C++ and its allocation parent are locally validated for submission.
+All six Direct/six Stock Object Basics runs pass; live Port owners are exercised
+on classic Stock models and other contexts require ENOSYS. All six Stock UI
+budget/allocation/release/lifecycle gates also pass. Independent replay checks
+79 lifecycle snapshots, six image budgets and six release outcomes against
+unchanged application/emulator hashes. The installed SDK gate reproduces 517
+outputs; the parent independently reproduces fifteen UI delivery files.
+Parent integration retains Aplet identity and retry-pacing checks; eighteen
+host tests, lint and strict docs pass. The publisher queue fix is locally checked.
+Previous #13 CI retains one cancelled publisher; #14 retains cancelled gates.
+Remote acceptance, whole-application peak admission and M8.5 completion remain open.
 
 M8.5 migration tools and API guide `5d5195dc` are submitted in draft PR #27;
 CI has two successful and eight queued workflows; nineteen jobs pass and 137 are queued. Checker head `b59fb56d` passed the full relocated
