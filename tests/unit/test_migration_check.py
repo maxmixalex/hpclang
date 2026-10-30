@@ -16,6 +16,24 @@ SPEC.loader.exec_module(CHECK)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_digit_separators_do_not_hide_calls(self):
+        source = (
+            "auto a = 1'000; gets(buffer); auto b = 2'000;\n"
+            "auto c = 0xAB'CD; exit(1); auto d = 0b10'01;\n"
+            "auto e = 1.2'3e+4; sys_playTone(440, 10);\n"
+            "auto f = .1'2; set_decimal_digits(2);\n"
+            "auto g = 1'000_suffix; sat_peek(0);\n"
+            "char c1 = 'a'; char32_t c2 = U'b';\n"
+            'const char *s = "1\'000; gets(hidden);";\n'
+            "// 2'000; exit(0);\n"
+        )
+        rows = CHECK.scan(source, "numbers.cpp")
+        self.assertEqual(
+            [(row["rule"], row["line"]) for row in rows],
+            [("HP002", 1), ("HP003", 2), ("HP004", 3), ("HP007", 4), ("HP001", 5)],
+        )
+        self.assertEqual(rows[0]["column"], source.index("gets") + 1)
+
     def test_comments_and_literals(self):
         source = """// gets(x);\n/* sat_peek(0); */
 const char *s = "exit(1)";

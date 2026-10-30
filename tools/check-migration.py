@@ -12,6 +12,9 @@ from pathlib import Path
 SUFFIXES = {".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hxx"}
 SKIP = {".git", "build", ".cache", "third_party"}
 TOKENS = re.compile(
+    # Consume preprocessing numbers before character literals: C++ digit
+    # separators must not hide the code between two numeric constants.
+    r"(?<![\w.])(?:[0-9]|\.[0-9])(?:[eEpP][+-]|[\w.]|'[\w])*|"
     r'//[^\n]*|/\*.*?\*/|(?:u8|u|U|L)?R"(?P<delimiter>[^ ()\\\t\r\n]{0,16})'
     r'\(.*?\)(?P=delimiter)"|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'',
     re.DOTALL,
