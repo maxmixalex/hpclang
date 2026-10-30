@@ -98,6 +98,7 @@ def main():
         )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
         shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
+        shutil.copytree(package / "examples/timer-cpp", application / "timer-cpp")
         shutil.copytree(package / "examples/hpgcc-window", application / "window")
         shutil.copyfile(application / "window/main.c", application / "window.cpp")
         shutil.copytree(package / "examples/hpgcc-console", application / "console")
@@ -110,6 +111,7 @@ def main():
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
+                "add_subdirectory(timer-cpp)\n"
                 "add_subdirectory(notebook)\nadd_subdirectory(console)\nadd_subdirectory(devices)\n"
                 "hpclang_add_application(numeric_input numeric-input.cpp)\n"
                 "target_compile_features(numeric_input PRIVATE cxx_std_17)\n"
@@ -145,6 +147,7 @@ endforeach()
                 ("objects", "object_cpp"),
                 ("storage", "storage_cpp"),
                 ("timer", "hpgcc_timer"),
+                ("timer-cpp", "timer_cpp"),
                 ("window", "hpgcc_window"),
                 ("console", "hpgcc_console"),
                 ("notebook", "notebook"),
@@ -198,6 +201,7 @@ endforeach()
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
+            ("timer_cpp", build / "timer-cpp"),
             ("hpgcc_window", build / "window"),
             ("window_cpp", build),
             ("widget_c", build),

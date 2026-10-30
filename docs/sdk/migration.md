@@ -19,7 +19,7 @@ Do not put historical include directories before the installed headers.
 | Direct LCD addresses, packed framebuffer writes, MMU changes or interrupt handlers | Express drawing through `hpclang/display.h` surfaces and fonts, and timing through `hpclang/time.h` / `timer.h`. A raw hardware algorithm requires a separate design review. |
 | `win*` widgets | Include `win.h` or individual control headers for the HPGCC 1.1/2.0 event, focus, text, image, progress, menu, checkbox, chooser and box adapters. Preserve synchronous callbacks and borrowed resources. For a new application, the [declarative UI](declarative-ui.md) provides a separate canonical view contract. |
 | Window events and timers | `winevent.h`, `wintimer.h` and `winkeys.h` provide events, timers, typed keys and modifiers; start from `examples/hpgcc-window`. Intervals are positive milliseconds. Check `hpclang_win_error()` for latched errors, including fixed-pool exhaustion; reset only after callbacks unwind. |
-| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags; modes and both KOS-entry exit paths pass locally on all six Direct/Stock models. CI acceptance remains pending. A true completion query can still mean a nonwaiting tone is playing; use the flag and polling contracts in the installed header. |
+| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags. Frequency is in Hz and duration is in milliseconds. A true completion query can still mean a nonwaiting tone is playing; use the flag and polling contracts in the installed header. Use `hpclang_sound_status` to distinguish runtime failures. |
 
 Compile with the normal SDK target options and resolve diagnostics one family
 at a time. Do not suppress undeclared functions or cast away mismatched pointer
@@ -110,6 +110,27 @@ packages printable ASCII for its formatted result. Check both missing-glyph
 behavior and the intended calculator's display size. Legacy default fonts can
 use native or packaged fallback faces, so pixel-identical glyphs are not promised.
 
+## Enumerate native ports from C++
+
+`hpclang/port.hpp` provides `hpclang::owned_port_iterator`, an allocation-free
+owner for an independently allocated metadata snapshot. Open a candidate and
+swap after success when replacing an existing snapshot:
+
+```cpp
+hpclang::owned_port_iterator candidate{hpclang_port_iterator_open(port)};
+if (!candidate)
+    return -1;
+entries.swap(candidate); // entries is an owned_port_iterator; old snapshot closes hereafter.
+```
+
+Use `get()` with `hpclang_port_iterator_read`; initialize each entry's size and
+version as required by the C interface. Names remain raw calculator bytes.
+Moving transfers close responsibility, `release()` transfers it to the caller,
+and destruction/reset preserves errno. Ordinary scope exit closes the snapshot;
+`exit()` and `_Exit()` do not unwind automatic C++ objects. Opening Port 2 retains
+the C service's recovery behavior and can write recovery metadata. The owner
+does not change model/context availability or imply new port capabilities.
+
 ## Make ownership visible
 
 `ints`, `uints` and `sys_bcd2str` return borrowed formatting buffers. Copy a result
@@ -144,6 +165,17 @@ Returning normally destroys automatic C++ owners. Calling `exit()` does not
 unwind those scopes; release local resources explicitly before that path.
 `_Exit()` skips language callbacks. SDK-owned hardware restoration does not
 substitute for saving application data or running application cleanup.
+
+For cooperative schedules, `<hpclang/timer.hpp>` provides the move-only C++17
+`cooperative_timer`. Pass `hpclang::microseconds` to `start(delay, period)` and
+call `poll(count)` from your loop; a zero period is one-shot. Moving disarms the
+source, while move assignment discards the destination's previous schedule.
+Failed start/poll calls retain the old schedule and failed polls leave `count`
+unchanged. Negative durations return `-1/EINVAL`; other errors follow the C
+timer/clock API. `armed()` observes the stored state without sampling time; a
+due one-shot remains armed until polled. No allocation or IRQ is involved.
+The installed `examples/timer-cpp` demonstrates periodic polling and moving.
+Use the C API when you need durations beyond signed chrono microseconds.
 
 The legacy `gets` / `_gets` aliases accept fixed character arrays with a known
 capacity. For a pointer or variable-length buffer, call

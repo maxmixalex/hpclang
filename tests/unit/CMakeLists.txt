@@ -482,6 +482,14 @@ hpclang_unit(timer test_timer.c
 target_include_directories(test_timer PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(timer_cpp test_timer_cpp.cpp
+    "${HPCLANG_ROOT}/runtime/core/timer-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/timer.c")
+target_compile_features(test_timer_cpp PRIVATE cxx_std_17)
+target_compile_options(test_timer_cpp PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+target_include_directories(test_timer_cpp PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(sound_api test_sound_api.c "${HPCLANG_ROOT}/runtime/core/sound.c")
 target_include_directories(test_sound_api PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
@@ -706,6 +714,7 @@ target_compile_options(test_object_store PRIVATE
 
 hpclang_unit(port
     test_port.c
+    test_port_cpp.cpp
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
     "${HPCLANG_ROOT}/runtime/core/object-construct.c"
@@ -719,6 +728,9 @@ hpclang_unit(port
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_compile_features(test_port PRIVATE cxx_std_17)
+target_compile_options(test_port PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
 target_include_directories(test_port PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 

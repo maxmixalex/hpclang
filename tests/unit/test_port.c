@@ -419,6 +419,13 @@ static void test_flash(void)
     hpclang_object_release(library);
 }
 
+void test_port_cpp(void (*invalidate)(void));
+static void invalidate_cpp_fixture(void)
+{
+    memset(memory, 0, sizeof(memory));
+    unavailable = 1;
+}
+
 static void check_port0_terminal(const struct hpclang_object *value,
                                  const struct hpclang_object *library)
 {
@@ -485,6 +492,9 @@ int main(void)
 {
     test_discovery();
     test_flash();
+    fixture();
+    test_port_cpp(invalidate_cpp_fixture);
+    unavailable = 0;
     fixture();
     struct hpclang_port_iterator *iterator = hpclang_port_iterator_open(0);
     assert(iterator);
