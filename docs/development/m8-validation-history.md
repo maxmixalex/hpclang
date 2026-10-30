@@ -186,3 +186,77 @@ as do full tracked-file format/Ruff/ShellCheck and strict docs. Logs are retaine
 in `/work/oct29-resource-integration-quality` and `/work/oct29-resource-docs-check.log`.
 The merged version requires fresh CI; neither parent CI nor this integration
 completes M8.2/M8.3 or proves unsampled peak capacity.
+
+## 2026-10-30 — Guarded configuration and independent migration tooling
+
+Local M8.0 commit `9e220d9b` records all eight configuration-header nibble
+dependencies, including absent configuration. The focused sanitizer test covers
+64 observer/read/malformed-input faults; ARM compilation/analysis and maintained
+HP49g+/HP50g regressions pass. Saved reports under `/work/oct30-config-guard`
+record 480 dependencies per model across 60 catalog entries. This does not prove
+configuration execution safety and was not included in submitted `6a582958`.
+
+M8.5 `tools/check-migration.py` adds six lexical review categories, original
+source locations after line splicing, text/JSON output and explicit check/error
+exit codes. Five unit tests cover comments, ordinary/raw literals, line splices,
+identifier boundaries, discovery/deduplication, read-only behavior and input
+errors. Actual CMake SDK installation followed by relocation runs the installed
+tool on external source and checks diagnostics, source preservation and installed
+file identity; `/work/oct30-migration-install.json` retains the result. Temporary
+SDK trees were removed. The maintained SDK validator now checks this tool too;
+the full existing SDK compiler/application matrix was not rerun for this slice.
+Full tracked formatting, Ruff, ShellCheck and strict documentation checks pass.
+These are local results, not M8.5 acceptance or a source-compatibility certificate.
+
+The preceding #26 head `6a582958` was audited before further delivery: four
+successful/seven queued workflows, with 118 successful, twelve running and
+248 queued jobs; no failures in this snapshot. Historical failures remain above.
+
+Migration delivery: `b59fb56d` pushed in draft PR #27; new-head CI was not
+polled in the submission turn. M8.5 remains incomplete.
+
+## 2026-10-30 — Full migration SDK client validation
+
+Submitted migration head `b59fb56d` passes the complete maintained relocated SDK
+validator with prepared HP39 assets: external C/C++ applications, ARMv4T return
+checks, generated fonts/HPC1, six-model launchers, all six model-specific
+Notebook builds, incremental-output restoration, invalid-model rejection and
+HP39g+/HP39gs/HP40gs Aplet packaging. Two clean builds produce 517 byte-identical
+release files. Log: `/work/oct30-migration-sdk-full-prepared.log`, exit 0.
+The installed migration checker runs as part of this gate. Temporary SDK/build
+and freshly compiled host-tool directories were removed by their context managers.
+This supersedes the earlier note that the complete SDK matrix was not rerun.
+
+The first invocation failed during configuration because the selected raw
+HPGCC39 asset directory lacked HPCRESET.000; it is not passing evidence.
+The corrected run used the prepared SDK assets, checked reset bytes against the
+maintained generator and compiled the packaging tool afresh. Its complete run
+passed. The original failure log remains `/work/oct30-migration-sdk-full.log`.
+
+Preceding remote audit: #26 `6a582958` has 125 successful, fourteen running and
+239 queued jobs, no failures; #27 `b59fb56d` has ten queued workflows and sixteen
+materialized queued jobs. Neither branch is CI-accepted. M8 remains incomplete.
+
+## 2026-10-30 — Installed public API conventions
+
+The M8.5 guide `docs/sdk/api-conventions.md` documents service-specific results,
+errno handling, versioned output initialization, failure-safe output replacement,
+C++ owner/view/lexical-guard distinctions, close errors and exit behavior. Public
+object-store iterator declarations now state 1/0/-1 results and output/name rules,
+matching the existing implementation. The guide is linked from Getting started,
+migration and navigation and installed with the SDK. It does not freeze pending
+UI names or imply cross-version object/layout compatibility. The obsolete note
+claiming opt-in formatting still awaited remote acceptance was removed.
+
+Strict docs pass. Actual CMake installation and prefix relocation preserve the
+new guide byte-for-byte; installed navigation links resolve, and its complete
+C11 example compiles for ARMv4T with Wall/Wextra/Werror. Temporary installation
+and build directories are removed. Evidence: `/work/oct30-api-contracts-installed.json`.
+This documentation/header-comment change adds no runtime behavior; the prior
+517-output full SDK result remains separately scoped to `b59fb56d`.
+
+CI audit: #26 `6a582958` has 228 successful/twenty running/129 queued/one skipped
+and one failed job (the previously investigated HP39g+ runtime transfer).
+#27 and #29 each have ten queued workflows/sixteen materialized queued jobs;
+#28 has eight queued workflows/twelve materialized queued jobs. No new failure
+was found and no branch was accepted.

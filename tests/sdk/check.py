@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import zlib
 
@@ -15,6 +16,36 @@ def run(*args, env):
     result = subprocess.run(args, env=env, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
+
+
+def check_migration_tool(package, work, env):
+    source = work / "migration input.c"
+    original = "#include <hpgcc49.h>\nvoid f(void) { gets(buffer); set_decimal_digits(2); }\n"
+    source.write_text(original)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(package / "tools/check-migration.py"),
+            "--json",
+            "--check",
+            str(source),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 1:
+        raise AssertionError(f"Migration checker did not request review: {result.stderr}")
+    report = json.loads(result.stdout)
+    if report["errors"] or [row["rule"] for row in report["findings"]] != [
+        "HP006",
+        "HP002",
+        "HP007",
+    ]:
+        raise AssertionError(f"Unexpected migration findings: {report}")
+    if source.read_text() != original:
+        raise AssertionError("Migration checker modified its input")
+    print("Installed SDK: standalone migration checker PASS")
 
 
 def check_interworking(package, work, env):
@@ -80,6 +111,7 @@ def main():
         )
         prefix.rename(sdk)
         package = sdk / "share/hpclang"
+        check_migration_tool(package, work, env)
         check_interworking(package, work, env)
         application = work / "external application"
         shutil.copytree(package / "examples/hello", application)

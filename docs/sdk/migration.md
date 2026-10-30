@@ -6,6 +6,41 @@ Start from the installed `examples/hpgcc-timer` for a C application or
 the launcher. Keep your application's source and assets; replace its historical
 startup objects, linker script and precompiled HPGCC libraries with the SDK build.
 Do not put historical include directories before the installed headers.
+The [API contracts and ownership guide](api-conventions.md) explains result
+conventions, versioned output structures and the owner/view distinction.
+
+## Locate migration work
+
+Run the installed read-only checker against your application's source:
+
+```sh
+python3 /path/to/sdk/share/hpclang/tools/check-migration.py /path/to/application
+python3 /path/to/sdk/share/hpclang/tools/check-migration.py --json --check /path/to/application
+```
+
+It reports source locations and concrete advice for legacy umbrella includes,
+raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units and
+application `errno` declarations and legacy decimal settings. Comments and string/character literals are
+ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
+`build`, `.cache` and `third_party`; explicitly named files are always checked.
+Inputs must be UTF-8 (an optional BOM is accepted). It never changes source files.
+
+Normal mode returns zero even when review findings exist. `--check` returns one
+for findings; unreadable/missing inputs return two in either mode. JSON output
+has `schema_version`, `files`, `findings`, `errors` and `scope` fields.
+
+This is a lexical checklist, not a compiler or compatibility certificate. It
+does not expand macros, resolve types or prove resource lifetimes; it also scans
+inactive preprocessor branches. A finding asks for review and may describe a
+supported call with changed semantics. No findings does not establish that a
+project builds, runs correctly or supports a particular calculator. Continue
+with the API and launch-context checks below.
+
+`HP007` flags `set_decimal_digits` and `set_decimal_separator`: they affect
+legacy formatters, not standard `printf`. Review the explicit opt-in and format
+grammar described below. The hint remains even if a source file defines the
+switch: this lexical tool cannot establish include order or which formatter a
+call ultimately uses, and opting in still requires a format-string audit.
 
 ## Choose the boundary for each old call
 
@@ -95,7 +130,6 @@ use `%L`/`%U`; standard length modifiers, `*`, `+`, `#` and `%n` are rejected.
 Precision is capped at 15 and historical malformed carry/zero-precision outputs
 are corrected. Audit each format string before opting in; see the
 [formatting contract and original-source comparisons](../development/hpgcc-compat.md#historical-console-output).
-This compatibility slice has local validation; remote acceptance is pending.
 
 Legacy HPG text and the default compatibility console use calculator bytes.
 The clean `hpclang_surface_draw_text` and `hpclang_surface_draw_utf8` functions
