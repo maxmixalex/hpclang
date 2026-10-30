@@ -20,7 +20,7 @@ def run(*args, env):
 
 def check_migration_tool(package, work, env):
     source = work / "migration input.c"
-    original = "#include <hpgcc49.h>\nvoid f(void) { gets(buffer); }\n"
+    original = "#include <hpgcc49.h>\nvoid f(void) { gets(buffer); set_decimal_digits(2); }\n"
     source.write_text(original)
     result = subprocess.run(
         [
@@ -37,7 +37,11 @@ def check_migration_tool(package, work, env):
     if result.returncode != 1:
         raise AssertionError(f"Migration checker did not request review: {result.stderr}")
     report = json.loads(result.stdout)
-    if report["errors"] or [row["rule"] for row in report["findings"]] != ["HP006", "HP002"]:
+    if report["errors"] or [row["rule"] for row in report["findings"]] != [
+        "HP006",
+        "HP002",
+        "HP007",
+    ]:
         raise AssertionError(f"Unexpected migration findings: {report}")
     if source.read_text() != original:
         raise AssertionError("Migration checker modified its input")

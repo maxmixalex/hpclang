@@ -20,7 +20,7 @@ python3 /path/to/sdk/share/hpclang/tools/check-migration.py --json --check /path
 
 It reports source locations and concrete advice for legacy umbrella includes,
 raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units and
-application `errno` declarations. Comments and string/character literals are
+application `errno` declarations and legacy decimal settings. Comments and string/character literals are
 ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
 `build`, `.cache` and `third_party`; explicitly named files are always checked.
 Inputs must be UTF-8 (an optional BOM is accepted). It never changes source files.
@@ -35,6 +35,12 @@ inactive preprocessor branches. A finding asks for review and may describe a
 supported call with changed semantics. No findings does not establish that a
 project builds, runs correctly or supports a particular calculator. Continue
 with the API and launch-context checks below.
+
+`HP007` flags `set_decimal_digits` and `set_decimal_separator`: they affect
+legacy formatters, not standard `printf`. Review the explicit opt-in and format
+grammar described below. The hint remains even if a source file defines the
+switch: this lexical tool cannot establish include order or which formatter a
+call ultimately uses, and opting in still requires a format-string audit.
 
 ## Choose the boundary for each old call
 

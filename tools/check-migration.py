@@ -42,6 +42,11 @@ RULES = (
         r"(?m)^[ \t]*(?:volatile\s+)?int\s+errno\s*(?:=|;)",
         "Remove the application errno definition; include errno.h and inspect errno only after an operation fails.",
     ),
+    (
+        "HP007",
+        r"\b(?:set_decimal_digits|set_decimal_separator)\s*\(",
+        "Review legacy formatting: these settings do not change standard printf. Define HPCLANG_HPGCC_LEGACY_FORMAT=1 before the first compatibility include, or call named hpclang_hpgcc_* formatters; audit the legacy format grammar.",
+    ),
 )
 
 

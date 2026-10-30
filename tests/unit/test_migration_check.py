@@ -41,6 +41,22 @@ char c = '\\'';
             [r["rule"] for r in CHECK.scan(source, "old.c")], ["HP002", "HP003", "HP004", "HP005"]
         )
 
+    def test_decimal_settings_request_review_even_with_local_opt_in(self):
+        source = (
+            "#define HPCLANG_HPGCC_LEGACY_FORMAT 1\n"
+            "// set_decimal_digits(2);\n"
+            'const char *s = "set_decimal_separator(44)";\n'
+            "set_decimal_digits /* precision */ (2);\n"
+            "set_decimal_\\\nseparator(44);\n"
+            "my_set_decimal_digits(2);\n"
+        )
+        rows = CHECK.scan(source, "format.c")
+        self.assertEqual(
+            [(row["rule"], row["line"], row["column"]) for row in rows],
+            [("HP007", 4, 1), ("HP007", 5, 1)],
+        )
+        self.assertTrue(all("HPCLANG_HPGCC_LEGACY_FORMAT=1" in row["message"] for row in rows))
+
     def test_cli_is_read_only_deduplicates_and_skips_build(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
