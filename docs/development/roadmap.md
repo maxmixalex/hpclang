@@ -115,10 +115,10 @@ library management and Port1 edits, followed by Port2 trusted recovery
 installation, authority lifecycle, safe startup and reclamation. Sound
 compatibility is independent.
 
-PR #26 now includes the accepted resource-snapshot mainline. Its earlier head
-passed CI; integration head `d0795413` is running and is not accepted yet.
-Unified bank planning, bounded live Stock readers and continuation mapping
-checks remain local follow-ups, separate from the submitted head.
+PR #26 now includes the accepted resource-snapshot mainline, unified bank
+planning, bounded live Stock readers, continuation mapping checks and startup
+configuration regressions. Head `6a582958` is submitted for CI and is not yet
+accepted; its local Stock and maintained regression evidence is recorded below.
 
 Local planner tests cover ROM identity, code/selector/routing/geometry guards,
 full bank effects and unchanged switch-body physical mappings. Original-handler
@@ -158,7 +158,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `d0795413` | **CI running:** eight queued and four running workflows; three successful, six running and fourteen queued jobs; no failures at inspection. Earlier `bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips). Main integration passes 18 resource/UI tests, source quality and docs locally. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `6a582958` | **Submitted, CI pending:** new head not polled this turn. Before push, `d0795413` had one successful/two running/nine queued workflows and 24 successful/four running/340 queued jobs, none failed. Earlier `bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips). Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |

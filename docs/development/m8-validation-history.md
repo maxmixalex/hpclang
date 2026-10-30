@@ -1847,3 +1847,16 @@ planner branch, resolving only roadmap/history conflicts and retaining both
 workflow artifact sets. Eighteen resource/verifier/UI regression tests pass.
 The tested application sources and eight-module analysis inputs remain unchanged.
 Remote CI has not yet tested the combined planner follow-up.
+
+
+## 2026-10-30 — Planner follow-up submitted
+
+Head `6a582958` was pushed to #26 after independently checking every preceding
+`d0795413` workflow/job: one successful, two running and nine queued workflows;
+24 successful, four running and 340 queued jobs, no failures. That preceding
+integration was not accepted as complete. The submitted batch includes unified
+planning, live Stock readers, continuation mapping checks, the latest completed
+28-case Stock witness and maintained startup configuration regressions. Artifact
+and source manifests were rechecked before delivery. No new-head CI was polled
+in the push turn. Local passing evidence remains distinct from remote acceptance
+and from completion of M8.0. The PR description now reflects this full batch.
