@@ -7,6 +7,33 @@ the launcher. Keep your application's source and assets; replace its historical
 startup objects, linker script and precompiled HPGCC libraries with the SDK build.
 Do not put historical include directories before the installed headers.
 
+## Locate migration work
+
+Run the installed read-only checker against your application's source:
+
+```sh
+python3 /path/to/sdk/share/hpclang/tools/check-migration.py /path/to/application
+python3 /path/to/sdk/share/hpclang/tools/check-migration.py --json --check /path/to/application
+```
+
+It reports source locations and concrete advice for legacy umbrella includes,
+raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units and
+application `errno` declarations. Comments and string/character literals are
+ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
+`build`, `.cache` and `third_party`; explicitly named files are always checked.
+Inputs must be UTF-8 (an optional BOM is accepted). It never changes source files.
+
+Normal mode returns zero even when review findings exist. `--check` returns one
+for findings; unreadable/missing inputs return two in either mode. JSON output
+has `schema_version`, `files`, `findings`, `errors` and `scope` fields.
+
+This is a lexical checklist, not a compiler or compatibility certificate. It
+does not expand macros, resolve types or prove resource lifetimes; it also scans
+inactive preprocessor branches. A finding asks for review and may describe a
+supported call with changed semantics. No findings does not establish that a
+project builds, runs correctly or supports a particular calculator. Continue
+with the API and launch-context checks below.
+
 ## Choose the boundary for each old call
 
 | Existing code | Migration action |

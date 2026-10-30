@@ -186,3 +186,28 @@ as do full tracked-file format/Ruff/ShellCheck and strict docs. Logs are retaine
 in `/work/oct29-resource-integration-quality` and `/work/oct29-resource-docs-check.log`.
 The merged version requires fresh CI; neither parent CI nor this integration
 completes M8.2/M8.3 or proves unsampled peak capacity.
+
+## 2026-10-30 — Guarded configuration and independent migration tooling
+
+Local M8.0 commit `9e220d9b` records all eight configuration-header nibble
+dependencies, including absent configuration. The focused sanitizer test covers
+64 observer/read/malformed-input faults; ARM compilation/analysis and maintained
+HP49g+/HP50g regressions pass. Saved reports under `/work/oct30-config-guard`
+record 480 dependencies per model across 60 catalog entries. This does not prove
+configuration execution safety and was not included in submitted `6a582958`.
+
+M8.5 `tools/check-migration.py` adds six lexical review categories, original
+source locations after line splicing, text/JSON output and explicit check/error
+exit codes. Five unit tests cover comments, ordinary/raw literals, line splices,
+identifier boundaries, discovery/deduplication, read-only behavior and input
+errors. Actual CMake SDK installation followed by relocation runs the installed
+tool on external source and checks diagnostics, source preservation and installed
+file identity; `/work/oct30-migration-install.json` retains the result. Temporary
+SDK trees were removed. The maintained SDK validator now checks this tool too;
+the full existing SDK compiler/application matrix was not rerun for this slice.
+Full tracked formatting, Ruff, ShellCheck and strict documentation checks pass.
+These are local results, not M8.5 acceptance or a source-compatibility certificate.
+
+The preceding #26 head `6a582958` was audited before further delivery: four
+successful/seven queued workflows, with 118 successful, twelve running and
+248 queued jobs; no failures in this snapshot. Historical failures remain above.
