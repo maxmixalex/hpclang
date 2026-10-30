@@ -11,6 +11,41 @@ struct hpclang_rpl_bank_effects
     uint32_t cache[4];    /* Saved read/read/write/write words at 0xc4c..0xc58. */
 };
 
+struct hpclang_rpl_bank_cpu_effects
+{
+    /* Native-state byte slice [0x90c,0x99c): A..R4, D0/D1/P, flags,
+     * saved PC, eight return cells and circular cursor. */
+    uint8_t state[0x90];
+    uint32_t continuation;
+};
+/* Predict the reviewed P=0/P=1 bank program's CPU effects after its final RTN.
+ * Caller separately qualifies program/interpreter identity, incoming P,
+ * configuration value, exclusive state and absence of pending interrupts.
+ * C's low five nibbles and D0 receive configuration; P and carry become zero.
+ * RTN clears its consumed slot and decrements the circular cursor. All other
+ * bytes in the captured slice survive. continuation is the consumed address,
+ * not a qualification of its mapping, ownership or executable contents.
+ * Keep these input bytes/configuration in dependency guards. Does not model
+ * memory/map/CONFIG effects, IRQs, or authorize execution or movement.
+ * Zero publishes output; failure preserves it. Input may be output.state. */
+int hpclang_rpl_bank_cpu_predict(const uint8_t state[0x90], uint32_t configuration,
+                                 struct hpclang_rpl_bank_cpu_effects *output);
+/* Capture the CPU slice through native-state-relative nibble coordinates and
+ * predict the same normal return. The reviewed dispatch loop tests native
+ * word 0xc24 before executing instructions; reject any nonzero value instead
+ * of silently applying the no-interrupt model. expected_p must match both the
+ * captured P and the separately prepared bank program. All 296 valid nibble
+ * reads (pending word plus CPU slice) reach dependency on success. The caller
+ * retains those guards and the configuration/program dependencies under an
+ * exclusive lifetime. This is not a complete interrupt model. Errors preserve
+ * output and invalidate partial observations; positive callback errors become
+ * MALFORMED. No native writes or allocation. */
+int hpclang_rpl_bank_cpu_capture_predict(const struct hpclang_rpl_reader *reader,
+                                         uint32_t configuration, unsigned expected_p,
+                                         struct hpclang_rpl_bank_cpu_effects *output,
+                                         hpclang_rpl_reference_dependency_fn dependency,
+                                         void *context);
+
 /* Capture read-map state plus sentinel, all write-map words and overlay caches.
  * Coordinates are native-state-relative NIBBLES, matching bank_map_capture.
  * Caller keeps the interpreter/mappings exclusive and stable throughout capture,

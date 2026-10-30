@@ -16,6 +16,7 @@ from flashptr_guards import verify_flashptr
 from bank_overlay import verify_attachment_switches, verify_overlay
 from alias_guards import verify_alias_selectors
 from bank_map_model import verify_bank_map
+from bank_cpu import verify_bank_cpu
 from rom_profile import verify_rom_profile
 
 if not __debug__:
@@ -67,6 +68,7 @@ sources = {
         Path(__file__).with_name("alias_guards.py"),
         Path(__file__).with_name("startup_configs.py"),
         Path(__file__).with_name("bank_map_model.py"),
+        Path(__file__).with_name("bank_cpu.py"),
         Path(__file__).with_name("rom_profile.py"),
     ]
 }
@@ -424,6 +426,7 @@ alias_selector_rows, bank_plan_entries, startup_configurations = verify_alias_se
     lib, read, ram, flash, cpu, rows, profile_row["profile"]
 )
 full_map_rows = verify_bank_map(lib, ram, flash, cpu, rows)
+cpu_effects = verify_bank_cpu(lib, read, ram, flash, cpu)
 assert all(
     hashlib.sha256(Path(p).read_bytes()).hexdigest() == value for p, value in sources.items()
 )
@@ -440,6 +443,7 @@ report.write_text(
             runtime_bank_plan_entries=bank_plan_entries,
             startup_configurations=startup_configurations,
             full_bank_read_maps=full_map_rows,
+            bank_cpu_effects=cpu_effects,
             rom_profile=profile_row,
             flash_sha256=hashlib.sha256(flash).hexdigest(),
             sram_sha256=hashlib.sha256(ram).hexdigest(),

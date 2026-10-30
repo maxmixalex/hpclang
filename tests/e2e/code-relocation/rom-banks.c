@@ -1,5 +1,6 @@
 #include <hpclang/bootstrap.h>
 #include <hpclang/target.h>
+#include <string.h>
 #include "rpl-port.h"
 #include "rpl-stock-memory.h"
 #include "rpl-stock-rom.h"
@@ -13,10 +14,12 @@ volatile uint32_t hpclang_rom_profile_evidence[4];
 volatile uint32_t hpclang_bank_plan_evidence[4];
 volatile uint32_t hpclang_bank_read_evidence[4];
 volatile uint32_t hpclang_bank_target_evidence[4];
+volatile uint32_t hpclang_bank_transition_evidence[4];
 static union
 {
     struct hpclang_rpl_bank_workspace bank;
     struct hpclang_rpl_bank_target_workspace target;
+    struct hpclang_rpl_bank_transition_workspace transition;
 } workspace;
 static union
 {
@@ -24,6 +27,7 @@ static union
     struct hpclang_rpl_bank_target target;
 } planned;
 static uint8_t native_before[0xc60];
+static struct hpclang_rpl_bank_transition transition;
 
 static int mapped_probe(struct hpclang_rpl_stock_view *view)
 {
@@ -62,6 +66,50 @@ static int plan_observe(void *context, uint32_t mapping, uint32_t address, uint8
     if (mapping < 1 || mapping > 4 || value > 15)
         return -73;
     ++*(unsigned *)context;
+    return 0;
+}
+
+static uint32_t saved_word(unsigned at)
+{
+    return (uint32_t)native_before[at] | (uint32_t)native_before[at + 1] << 8 |
+           (uint32_t)native_before[at + 2] << 16 | (uint32_t)native_before[at + 3] << 24;
+}
+
+/* Use the real suspended Saturn CPU, without seeding or repairing its state.
+ * An unqualified launch context must reject and preserve the entire output.
+ * Original-ROM execution comparisons live in the maintained bank_cpu gate. */
+static int transition_probe(const struct hpclang_rpl_bank_sources *sources, uint32_t entry,
+                            unsigned p, unsigned *observations)
+{
+    struct hpclang_rpl_bank_cpu_effects expected;
+    uint32_t pending = saved_word(0xc24), actual_p = saved_word(0x95c);
+    int status =
+        hpclang_rpl_bank_cpu_predict(native_before + 0x90c, planned.bank.configuration, &expected);
+    if (pending || actual_p != p)
+        status = HPCLANG_RPL_SPAN_UNSUPPORTED;
+    memset(&transition, 0xa5, sizeof transition);
+    int result = hpclang_rpl_bank_transition_prepare(sources, entry, p, &workspace.transition,
+                                                     &transition, plan_observe, observations);
+    if (result != status)
+        return 0x7030;
+    if (result) {
+        const unsigned char *bytes = (const void *)&transition;
+        for (unsigned i = 0; i < sizeof transition; ++i)
+            if (bytes[i] != 0xa5)
+                return 0x7031;
+        ++hpclang_bank_transition_evidence[1];
+    } else {
+        if (transition.mapping.bank != planned.bank.bank ||
+            transition.mapping.configuration != planned.bank.configuration ||
+            memcmp(&transition.mapping.effects, &planned.bank.effects,
+                   sizeof planned.bank.effects) ||
+            transition.cpu.continuation != expected.continuation ||
+            memcmp(transition.cpu.state, expected.state, sizeof expected.state))
+            return 0x7032;
+        ++hpclang_bank_transition_evidence[0];
+    }
+    hpclang_bank_transition_evidence[2] = actual_p;
+    hpclang_bank_transition_evidence[3] = pending;
     return 0;
 }
 
@@ -177,6 +225,9 @@ static int plan_probe(const struct hpclang_rpl_rom_profile *profile)
             result = mapped_probe(&view);
             if (result)
                 return result;
+            result = transition_probe(&sources, entry, 0, &observations);
+            if (result)
+                return result;
             ++accepted;
         }
         if (index < 16) {
@@ -185,6 +236,9 @@ static int plan_probe(const struct hpclang_rpl_rom_profile *profile)
             if (result || planned.bank.bank != 2 || planned.bank.program.selector != 0x860b8)
                 return 0x7019;
             result = mapped_probe(&view);
+            if (result)
+                return result;
+            result = transition_probe(&sources, entry, 1, &observations);
             if (result)
                 return result;
             ++hpclang_bank_read_evidence[3];
@@ -201,7 +255,8 @@ static int plan_probe(const struct hpclang_rpl_rom_profile *profile)
     hpclang_bank_plan_evidence[2] = observations;
     hpclang_bank_plan_evidence[3] = sizeof native_before;
     return accepted == 16 && rejected == 2 && observations && hpclang_bank_read_evidence[0] &&
-                   hpclang_bank_read_evidence[2] == 32 && hpclang_bank_read_evidence[3] == 16
+                   hpclang_bank_read_evidence[2] == 32 && hpclang_bank_read_evidence[3] == 16 &&
+                   hpclang_bank_transition_evidence[0] + hpclang_bank_transition_evidence[1] == 32
                ? 0
                : 0x7015;
 }

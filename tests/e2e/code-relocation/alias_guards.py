@@ -101,6 +101,14 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
     class Workspace(c.Structure):
         _fields_ = [("prior", Effects), ("banks", Geometry * 16), ("next", Plan)]
 
+    from bank_cpu import Effects as CpuEffects
+
+    class Transition(c.Structure):
+        _fields_ = [("mapping", Plan), ("cpu", CpuEffects)]
+
+    class TransitionWorkspace(c.Structure):
+        _fields_ = [("planning", Workspace), ("selected", Plan)]
+
     plan_dependency = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.c_uint8)
     lib.hpclang_rpl_bank_plan_prepare.argtypes = [
         c.POINTER(Sources),
@@ -114,6 +122,15 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
         *lib.hpclang_rpl_bank_plan_prepare.argtypes[:2],
         c.c_uint,
         *lib.hpclang_rpl_bank_plan_prepare.argtypes[2:],
+    ]
+    lib.hpclang_rpl_bank_transition_prepare.argtypes = [
+        c.POINTER(Sources),
+        c.c_uint32,
+        c.c_uint,
+        c.POINTER(TransitionWorkspace),
+        c.POINTER(Transition),
+        plan_dependency,
+        c.c_void_p,
     ]
 
     class Guard(c.Structure):
@@ -528,18 +545,28 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
     from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
 
-    for item in entries:
+    for item, context_p in (
+        (item, p) for item in entries for p in (0, 1) if p or item["populated"]
+    ):
         observed.clear()
         plan, workspace = Plan(), Workspace()
         switch = item["entry"]
         assert (
             lib.hpclang_rpl_bank_plan_prepare_p(
-                c.byref(sources), switch, 1, c.byref(workspace), c.byref(plan), capture, None
+                c.byref(sources),
+                switch,
+                context_p,
+                c.byref(workspace),
+                c.byref(plan),
+                capture,
+                None,
             )
             == 0
         )
-        assert plan.bank == 2 and plan.program.selector == 0x860B8
-        assert plan.configuration == read(0x860B8)
+        expected_bank = 2 if context_p else item["bank"]
+        expected_selector = 0x860B8 if context_p else 0x860CC + 5 * expected_bank
+        assert plan.bank == expected_bank and plan.program.selector == expected_selector
+        assert plan.configuration == read(expected_selector)
         uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
         for address, data in ((0, flash), (0x08000000, ram)):
             uc.mem_map(address, len(data))
@@ -552,8 +579,75 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
             (UC_ARM_REG_R7, switch),
         ):
             uc.reg_write(reg, value)
-        for offset, value in ((0x998, 1), (0x978, 0x3130), (0x95C, 1), (0x970, 0)):
+        for offset, value in ((0x998, 1), (0x978, 0x3130), (0x95C, context_p), (0x970, 0)):
             uc.mem_write(cpu + offset, struct.pack("<I", value))
+        uc.mem_write(cpu + 0xC24, bytes(4))
+        for offset, value in (
+            (0x998, 1),
+            (0x978, 0x3130),
+            (0x95C, context_p),
+            (0x970, 0),
+            (0xC24, 0),
+        ):
+            for j in range(8):
+                changed[(2, offset * 2 + j)] = value >> (4 * j) & 15
+        transition, transition_workspace = Transition(), TransitionWorkspace()
+        observed.clear()
+        assert (
+            lib.hpclang_rpl_bank_transition_prepare(
+                c.byref(sources),
+                switch,
+                context_p,
+                c.byref(transition_workspace),
+                c.byref(transition),
+                capture,
+                None,
+            )
+            == 0
+        )
+        assert bytes(transition.mapping) == bytes(plan)
+        assert set((2, at) for at in range(0x90C * 2, 0x99C * 2)) <= set(observed)
+        assert set((2, at) for at in range(0xC24 * 2, 0xC28 * 2)) <= set(observed)
+        # Neither half may publish if a later CPU observation fails.
+        failed = Transition()
+        c.memset(c.byref(failed), 0xA5, c.sizeof(failed))
+        sentinel = bytes(failed)
+        for address, value in ((0xC24 * 2, 1), (0x95C * 2, context_p ^ 1)):
+            saved = changed[(2, address)]
+            changed[(2, address)] = value
+            assert (
+                lib.hpclang_rpl_bank_transition_prepare(
+                    c.byref(sources),
+                    switch,
+                    context_p,
+                    c.byref(transition_workspace),
+                    c.byref(failed),
+                    capture,
+                    None,
+                )
+                < 0
+            )
+            assert bytes(failed) == sentinel
+            changed[(2, address)] = saved
+
+        for fault in (-73, 73):
+
+            @plan_dependency
+            def fail_cpu(_, mapping, address, value):
+                return fault if mapping == 2 and address == 0x99C * 2 - 1 else 0
+
+            status = lib.hpclang_rpl_bank_transition_prepare(
+                c.byref(sources),
+                switch,
+                context_p,
+                c.byref(transition_workspace),
+                c.byref(failed),
+                fail_cpu,
+                None,
+            )
+            assert status < 0 and (status == -73 if fault < 0 else status != 73)
+            assert bytes(failed) == sentinel
+        changed.clear()
         returned = []
 
         def stop(_, pc, size, user):
@@ -566,11 +660,15 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
         assert returned
         assert list(plan.effects.map.pages) == list(struct.unpack("<256I", uc.mem_read(cpu, 1024)))
         assert struct.unpack("<I", uc.mem_read(cpu + 0x95C, 4))[0] == 0
-        item["exit_p1"] = dict(
+        assert bytes(transition.cpu.state) == bytes(uc.mem_read(cpu + 0x90C, 0x90))
+        assert transition.cpu.continuation == 0x3130
+        item["exit_p1" if context_p else "entry_p0"] = dict(
             bank=plan.bank,
             selector=plan.program.selector,
             dependencies=len(observed),
             original_mapping_match=True,
+            composed_cpu_match=True,
+            combined_output_failures_preserved=4,
         )
         # No unsupported incoming context may publish a plan or dependencies.
         for p in (2, 15, 16):

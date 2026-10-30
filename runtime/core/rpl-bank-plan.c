@@ -94,3 +94,26 @@ int hpclang_rpl_bank_plan_prepare(const struct hpclang_rpl_bank_sources *sources
 {
     return hpclang_rpl_bank_plan_prepare_p(sources, entry, 0, workspace, plan, dependency, context);
 }
+
+int hpclang_rpl_bank_transition_prepare(const struct hpclang_rpl_bank_sources *sources,
+                                        uint32_t entry, unsigned p,
+                                        struct hpclang_rpl_bank_transition_workspace *workspace,
+                                        struct hpclang_rpl_bank_transition *transition,
+                                        hpclang_rpl_graph_dependency_fn dependency, void *context)
+{
+    if (!workspace || !transition)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    int result = hpclang_rpl_bank_plan_prepare_p(sources, entry, p, &workspace->planning,
+                                                 &workspace->selected, dependency, context);
+    if (result)
+        return result;
+    struct observation native = {dependency, context, sources->native_mapping};
+    struct hpclang_rpl_bank_cpu_effects cpu;
+    result = hpclang_rpl_bank_cpu_capture_predict(
+        sources->native, workspace->selected.configuration, p, &cpu, observe, &native);
+    if (result)
+        return result;
+    transition->mapping = workspace->selected;
+    transition->cpu = cpu;
+    return 0;
+}

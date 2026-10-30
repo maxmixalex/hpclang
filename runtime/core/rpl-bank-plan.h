@@ -24,6 +24,30 @@ struct hpclang_rpl_bank_workspace
     struct hpclang_rpl_rom_bank banks[16];
     struct hpclang_rpl_bank_plan next;
 };
+
+struct hpclang_rpl_bank_transition
+{
+    struct hpclang_rpl_bank_plan mapping;
+    struct hpclang_rpl_bank_cpu_effects cpu;
+};
+struct hpclang_rpl_bank_transition_workspace
+{
+    struct hpclang_rpl_bank_workspace planning;
+    struct hpclang_rpl_bank_plan selected;
+};
+/* Compose mapping and normal-return CPU predictions from the same exclusive
+ * source snapshot and P context. CPU reads use sources->native_mapping in the
+ * shared dependency stream. Reject pending Saturn interrupts and mismatched P.
+ * Publish neither result until both succeed; error invalidates all partial
+ * dependencies. Workspace is caller-owned and disjoint from inputs/output.
+ * Retain every bank-plan qualification. The continuation still requires its
+ * own mapping/ownership/code checks; success does not make an EXECUTION edge
+ * terminal or authorize mutation. No allocation or native writes. */
+int hpclang_rpl_bank_transition_prepare(const struct hpclang_rpl_bank_sources *sources,
+                                        uint32_t entry, unsigned p,
+                                        struct hpclang_rpl_bank_transition_workspace *workspace,
+                                        struct hpclang_rpl_bank_transition *transition,
+                                        hpclang_rpl_graph_dependency_fn dependency, void *context);
 /* Compose P=0 code inspection, unique configuration lookup, device routing,
  * ROM geometry, complete bank-effect capture/prediction and physical mapping
  * preservation of the inspected switch body. All observations

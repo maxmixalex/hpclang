@@ -1,5 +1,44 @@
 #include "rpl-bank-effects.h"
 
+static uint32_t cpu_word(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) | ((uint32_t)bytes[2] << 16) |
+           ((uint32_t)bytes[3] << 24);
+}
+
+static void cpu_put(uint8_t *bytes, uint32_t value)
+{
+    for (unsigned i = 0; i < 4; ++i)
+        bytes[i] = (uint8_t)(value >> (8u * i));
+}
+
+int hpclang_rpl_bank_cpu_predict(const uint8_t state[0x90], uint32_t configuration,
+                                 struct hpclang_rpl_bank_cpu_effects *output)
+{
+    if (!state || !output)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (configuration > 0xfffffu || cpu_word(state + 0x48) > 0xfffffu ||
+        cpu_word(state + 0x4c) > 0xfffffu || cpu_word(state + 0x50) > 1 ||
+        cpu_word(state + 0x64) > 1 || cpu_word(state + 0x8c) >= 8)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned cursor = (cpu_word(state + 0x8c) + 7u) & 7u;
+    uint32_t continuation = cpu_word(state + 0x6c + 4u * cursor);
+    if (continuation > 0xfffffu)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_bank_cpu_effects next;
+    for (unsigned i = 0; i < sizeof next.state; ++i)
+        next.state[i] = state[i];
+    next.continuation = continuation;
+    cpu_put(next.state + 0x10, (cpu_word(state + 0x10) & ~0xfffffu) | configuration);
+    cpu_put(next.state + 0x48, configuration);
+    cpu_put(next.state + 0x50, 0);
+    cpu_put(next.state + 0x64, 0);
+    cpu_put(next.state + 0x6c + 4u * cursor, 0);
+    cpu_put(next.state + 0x8c, cursor);
+    *output = next;
+    return 0;
+}
+
 int hpclang_rpl_bank_effects_select(const struct hpclang_rpl_bank_effects *state,
                                     const struct hpclang_rpl_rom_bank banks[16], uint32_t lower,
                                     uint32_t upper, struct hpclang_rpl_bank_effects *selected)
@@ -54,6 +93,35 @@ static int capture_word(const struct hpclang_rpl_reader *reader, uint32_t byte_o
     }
     *word = result;
     return 0;
+}
+
+int hpclang_rpl_bank_cpu_capture_predict(const struct hpclang_rpl_reader *reader,
+                                         uint32_t configuration, unsigned expected_p,
+                                         struct hpclang_rpl_bank_cpu_effects *output,
+                                         hpclang_rpl_reference_dependency_fn dependency,
+                                         void *context)
+{
+    if (!reader || !reader->read_nibble || !output || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (expected_p > 1 || configuration > 0xfffffu)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t pending;
+    int status = capture_word(reader, 0xc24u, &pending, dependency, context);
+    if (status)
+        return status;
+    if (pending)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint8_t state[0x90];
+    for (unsigned i = 0; i < sizeof state; i += 4) {
+        uint32_t value;
+        status = capture_word(reader, 0x90cu + i, &value, dependency, context);
+        if (status)
+            return status;
+        cpu_put(state + i, value);
+    }
+    if (cpu_word(state + 0x50) != expected_p)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    return hpclang_rpl_bank_cpu_predict(state, configuration, output);
 }
 
 int hpclang_rpl_bank_effects_capture(const struct hpclang_rpl_reader *reader,
