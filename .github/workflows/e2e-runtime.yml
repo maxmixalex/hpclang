@@ -402,7 +402,7 @@ jobs:
           cp "build/$HPCLANG_E2E_TARGET-stock.json" "$snapshot_dir/"
           cp "build/$HPCLANG_E2E_TARGET-state/flash" "$snapshot_dir/state/flash"
           python3 tests/e2e/harness/verify-resource-snapshots.py "$snapshot_dir" \
-            --model "$HPCLANG_E2E_TARGET" --report "$snapshot_dir/verified-lifecycle.json"
+            --model "$HPCLANG_E2E_TARGET" --ui-return --report "$snapshot_dir/verified-lifecycle.json"
 
       - name: Generate suite LCD evidence
         if: always()

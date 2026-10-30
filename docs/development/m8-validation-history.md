@@ -186,3 +186,22 @@ as do full tracked-file format/Ruff/ShellCheck and strict docs. Logs are retaine
 in `/work/oct29-resource-integration-quality` and `/work/oct29-resource-docs-check.log`.
 The merged version requires fresh CI; neither parent CI nor this integration
 completes M8.2/M8.3 or proves unsampled peak capacity.
+
+## 2026-10-30 — UI native heap return regression
+
+The optional `--ui-return` lifecycle-verifier mode is enabled for Stock UI CI.
+It requires the HP39 fetch-complete or classic ARMToolbox baseline before PASS,
+and checks each heap's usable bytes and largest free block after settled return
+against that baseline. Reduced capacity or increased fragmentation fails even
+when linked-list structure and the normal return status are valid.
+Fifteen snapshot/verifier tests pass, including missing/late baselines, a valid
+but depleted free list and equal total bytes split into smaller free blocks.
+All 79 original SRAM captures across six models replay with unchanged existing
+proof fields; each model restores both capacity measures exactly. Evidence:
+`/work/oct30-ui-return-capacity.json`. This is saved-capture validation, not a
+new live emulator run, total-memory accounting or a peak bound. M8.2/M8.3 remain
+open. Ruff passes with its cache disabled for the read-only source mount.
+
+Preceding CI audit: #26 `6a582958`, 157 successful/eighteen running/203 queued
+jobs, no failures; #27 `b59fb56d`, ten queued workflows and sixteen materialized
+queued jobs. Neither has completed CI acceptance.

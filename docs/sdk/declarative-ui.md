@@ -463,6 +463,13 @@ space. Native allocator metadata, stored launcher objects and transfer staging
 remain outside this report. The check does not change Stock allocation policy;
 the 36 KiB application RW bound must not be presented as total memory usage.
 
+The Stock UI lifecycle check also requires each native heap's available bytes
+and largest free block after settled return to be at least its pre-entry value.
+HP39 uses the completed-fetch checkpoint; classic models use the ARMToolbox
+checkpoint. Missing or late baselines fail validation. This detects lost free
+capacity and increased fragmentation in the scripted flow; it does not account
+for every Stock object or establish a whole-system peak bound.
+
 The standalone C and C++ examples also deliberately sleep for 20 milliseconds
 per event-loop iteration. They process one keyboard event per iteration and
 draw an accepted model change on the following iteration. That scheduling and
