@@ -2,6 +2,8 @@ import importlib.util
 import copy
 import json
 import struct
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,6 +15,31 @@ SPEC.loader.exec_module(VERIFY)
 
 
 class UiMemoryTests(unittest.TestCase):
+    def test_stage_cli_clears_prior_pass_before_earlier_ui_gate_failure(self):
+        root = self.prefix.parent
+        (root / "build").mkdir()
+        (root / "build/stock-hp39-targets.txt").write_text("hp39gs\n")
+        output = root / "build/hp39gs-frame-stage-stack-budget.json"
+        output.write_text('{"observed_bytes":3152}')
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "tests/e2e/ui/verify.py"),
+                "stock",
+                "hp39",
+                "--pool",
+                "--artifact",
+                str(root / "artifact"),
+                "--stage-stack",
+            ],
+            cwd=root,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("hp39gs-frame-memory-1.json", result.stderr)
+        self.assertFalse(output.exists())
+
     def test_pool_budget_is_bound_to_linked_image_and_arena(self):
         artifact = self.prefix.parent / "artifact"
         (artifact / "launchers").mkdir(parents=True)

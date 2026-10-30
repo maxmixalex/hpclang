@@ -362,6 +362,7 @@ def main() -> None:
         parser.error("--stage-stack requires --artifact and --pool")
     for target in Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines():
         Path(f"build/{target}-frame-budget.json").unlink(missing_ok=True)
+        Path(f"build/{target}-frame-stage-stack-budget.json").unlink(missing_ok=True)
         verify(
             Path(f"build/{target}-frame"),
             80 if args.family == "hp4950" else 64,
