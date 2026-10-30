@@ -186,3 +186,81 @@ as do full tracked-file format/Ruff/ShellCheck and strict docs. Logs are retaine
 in `/work/oct29-resource-integration-quality` and `/work/oct29-resource-docs-check.log`.
 The merged version requires fresh CI; neither parent CI nor this integration
 completes M8.2/M8.3 or proves unsampled peak capacity.
+
+### 2026-10-30 — Native allocation parent reconciled with accepted main
+
+Local parent #13 merge `19e19700` integrates accepted `3b77453a`, retaining
+the later Aplet identity and Kermit retry-pacing fixes absent from the current
+Port C++ branch. Conflict resolutions match the tested combined UI verifier,
+workflow arguments and emulator capture-header set; the CLI regression requires
+both image-budget and native-release checks. Eighteen host tests, Ruff and strict
+docs pass. A fresh UI build reproduces fifteen delivery files exactly, including
+the application, result address, memory layout and six raw/wrapped launchers.
+Core runtime, platform, UI and emulator harness source identity also matches the
+currently tested C++ integration. The Kermit patch/build/regression files match
+PR #29. Six actual HP39 Aplet identities and six mixed-application negatives pass.
+Evidence: `/work/oct30-allocation-main-integration/{verified,aplet-verified}.json`.
+
+The first integration audit was stopped before checks to correct its artifact
+list and avoid re-reading unrelated generated font assets. Subsequent attempts
+identified inherited Python formatting and an incorrect audit-only stage1 path;
+those logs are retained as `format-failure.log` and `audit-path-failure.log`.
+The final audit passes; temporary builds are removed. No failed attempt counts
+as acceptance. Parent #13 remains local/unpushed, and C++ still needs its ancestry
+integrated. Fresh combined UI gates pass HP48gII, HP49g+ and HP50g; HP39 runs
+remain active. Neither the parent nor M8.5 is remotely accepted.
+
+### 2026-10-30 — C++ parent ancestry integrated
+
+Local C++ merge `ed93a9bd` includes parent `19e19700`. Git confirms the parent
+is an ancestor and no changes from tested `3ab04c07` in runtime, platform,
+public headers, CMake, examples, Object Basics/UI sources or their build and
+emulator preparation tools. The only non-document additions are the parent's
+Aplet preflight and Kermit patch/regression/build files. Their sources match
+the validated parent. Eighteen host tests, LF-normalized Ruff checks and strict
+docs pass (`/work/oct30-cpp-parent-merge.log`); Windows checkout CRLF caused an
+initial format-only diagnostic, with no source formatting change required.
+
+Fresh combined UI verification now also passes HP39g+. HP39gs remains live;
+HP40gs is pending. `oct30-cpp-ui-final-audit.py` is prepared to independently
+recompute all six budgets, native-release checks and lifecycle reports once
+the actual runner finishes; it has not yet passed. Parent #13 and C++ #14
+remain unpushed. Previous #14 CI retains 319 successes, one skip and fourteen
+cancellations; cancelled gates are not accepted. #26 remains queued.
+
+### 2026-10-30 — Preserve pending evidence publishers
+
+GitHub check annotation for job 121289451878 (run 40208342087, parent head
+`4a4b36bd`) states that a higher-priority waiting request for
+`ci-evidence-publisher` cancelled it. The job had no runner or executed steps.
+The retained API evidence is `research/oct30-publisher-cancellation.json`.
+
+Parent commit `700be00e`, merged into C++ as `80fdda5f`, adds `queue: max` to
+both Runtime and Font Gallery publisher concurrency groups, retaining
+`cancel-in-progress: false` and single-writer serialization. Parsed YAML checks
+both groups exactly. [GitHub's concurrency documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+specifies up to 100 pending jobs instead of the default replacement of the
+single pending job. Queue overflow can still cancel additional jobs; this
+does not repair old cancellations or prove remote behavior before CI. No
+application code changes. Fresh combined UI gates now pass HP39gs as well;
+HP40gs remains active. Both delivery heads remain local and unpushed.
+
+### 2026-10-30 — Complete combined UI matrix and delivery audit
+
+The resumed UI runner finishes all six models. Independent audit
+`oct30-cpp-ui-final-audit.py` recomputes 79 lifecycle snapshots, six linked
+image budgets and native-release outcomes, including actual SRAM/Flash hashes
+when an optional native block is present. Application and emulator hashes still
+match the original run manifest. `/work/oct30-port-cpp-ui/independent-verified.json`
+contains the final model reports. The first three-model reports survive the
+local-wrapper corrections; neither invalid setup attempt is counted as a pass.
+
+The Port C++ application/runtime/launcher/owner implementation remains identical
+to tested `3ab04c07`; later ancestry and queue commits change transport checks,
+publisher policy and documentation. Object Basics six Direct/six Stock, the
+517-output installed SDK gate, sanitizer tests and ARM analysis retain their
+recorded scope. Independent parent UI reproduction covers fifteen delivery files.
+Before delivery, exact remote heads were inspected: #13 `4a4b36bd` has 371
+successful, two skipped and one cancelled publisher job; #14 `492926e1` has
+319 successful, one skipped and fourteen cancelled jobs. No cancelled gate is
+accepted. New-head remote validation remains required, and M8 is incomplete.

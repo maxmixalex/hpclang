@@ -115,17 +115,17 @@ library management and Port1 edits, followed by Port2 trusted recovery
 installation, authority lifecycle, safe startup and reclamation. Sound
 compatibility is independent.
 
-M8.5 Port C++ integration `3ab04c07` remains local; PR #14 depends on
-unaccepted parent #13. All six Direct and six Stock Object Basics runs pass.
-Independent audit checks twelve Stock return reports and unchanged application,
-emulator and transfer-server hashes. Live Port ownership runs on Stock
-HP48gII/HP49g+/HP50g; HP39 and Direct contexts exercise ENOSYS. Host sanitizers,
-ARM builds and the full installed/relocated SDK gate also pass (517 reproduced
-release outputs). Fresh combined UI budget/allocation/release/lifecycle checks
-pass HP48gII; HP49g+ is running and the remaining four models are pending.
-The local test wrapper's missing capture flags and firmware link were corrected;
-invalid attempts remain archived. Parent integration, remote acceptance and
-M8.5 completion remain open.
+M8.5 Port C++ and its allocation parent are locally validated for submission.
+All six Direct/six Stock Object Basics runs pass; live Port owners are exercised
+on classic Stock models and other contexts require ENOSYS. All six Stock UI
+budget/allocation/release/lifecycle gates also pass. Independent replay checks
+79 lifecycle snapshots, six image budgets and six release outcomes against
+unchanged application/emulator hashes. The installed SDK gate reproduces 517
+outputs; the parent independently reproduces fifteen UI delivery files.
+Parent integration retains Aplet identity and retry-pacing checks; eighteen
+host tests, lint and strict docs pass. The publisher queue fix is locally checked.
+Previous #13 CI retains one cancelled publisher; #14 retains cancelled gates.
+Remote acceptance, whole-application peak admission and M8.5 completion remain open.
 
 M8.5 migration tools and API guide `5d5195dc` are submitted in draft PR #27;
 CI has two successful and eight queued workflows; nineteen jobs pass and 137 are queued. Checker head `b59fb56d` passed the full relocated
@@ -136,13 +136,13 @@ Remaining ownership/application migration acceptance is still required;
 this submission does not complete M8.5.
 
 M8.2/M8.3 UI return-capacity gate `8849b85f` is submitted in draft PR #28;
-three workflows pass and five are queued; 136 jobs pass, eleven run and 207 are queued. It checks native free capacity and largest-block
+three workflows pass, one runs and four are queued; 146 jobs pass, eleven run and 197 are queued. It checks native free capacity and largest-block
 recovery after settled return. Fifteen tests, all 79 retained snapshots across
 six models, the actual CI commands and strict docs pass locally. This is not a
 new emulator run or complete physical-memory admission; whole-application
 resource acceptance remains open.
 
-CI follow-up `fce14d73` is submitted in draft PR #29; two workflows pass and eight are queued; 72 jobs pass, eight run and 294 are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
+CI follow-up `fce14d73` is submitted in draft PR #29; two workflows pass, one runs and seven are queued; 80 jobs pass, nine run and 285 are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
 a fresh build with the isolated patch passes. Original packet CRC checks pass
 at the host capture point; loss inside the emulator/device remains unproven.
 The local replay with original CI payload/assets/emulator and only the server
