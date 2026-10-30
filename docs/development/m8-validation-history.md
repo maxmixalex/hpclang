@@ -2849,3 +2849,194 @@ Exact PR #29 head fce14d7385878542a52fffce8a79280e9011d328 passed all ten workfl
 The maintained alias-selector gate retains its original thirty returns per model and adds thirty returns per model to the inspected bank-body first instruction. Original ROM execution must pop the return stack before the observer stops, preventing confusion with initial entry at the same address. The first attempt exposed that observer bug and is retained at /work/oct30-continuation-fetch-rom/hp49gplus.log; it did not pass.
 
 Corrected runs in /work/oct30-continuation-fetch-rom-return pass on HP49g+ and HP50g. Independent verified.json confirms sixty original plus sixty known-boundary returns, 480 complete-output failure controls and 896 varied-CPU comparisons; all 26 source hashes per model and original SRAM/Flash identities match. Each added continuation frames P=0 and rejects a changed physical page before any instruction read. Ruff passes. These are controlled saved-state ROM regressions, not live arbitrary-return qualification or storage-mutation authorization.
+
+## 2026-10-30 — Continuation delivery and independent branch audit
+
+PR #26 head `51b4566e` submits guarded instruction fetch and accepted main
+`1c0d1e35`. The complete ARM application and six launchers build successfully.
+The current-source ROM audit confirms, per model, 30 retained returns, 30 known
+boundary returns, 240 failure controls, 448 CPU cases and 26 source hashes.
+The prior-head CI audit found ten queued workflows and sixteen queued jobs;
+new-head CI was not polled after pushing. Controlled returns do not qualify
+arbitrary continuation provenance or complete M8.0.
+
+Independent exact-head audits of PRs #13/#14/#27/#28 found no failed or cancelled
+jobs, but each still has unfinished jobs. No branch was accepted or merged.
+Detailed audit records are retained locally in research/oct30-independent-ci-*.json.
+
+## 2026-10-30 — SDK migration documentation delivery
+
+PR #27 `f960876e` removes obsolete pending-acceptance claims for formatting and
+KOS sound, whose implementation files match accepted commits 88aae022 and
+3c484673. Strict documentation passes after preserving the branch roadmap
+snapshot and resolving its history anchor. This is documentation delivery, not
+new runtime validation. Prior exact head 583f38e6 has two successful/five queued
+workflows and ten successful/78 queued jobs, none failed or cancelled. New-head
+CI was not polled in the submission turn; M8.5 remains incomplete.
+
+## 2026-10-30 — UI allocation failure matrix
+
+Local commit 9a95726b expands renderer allocation failure injection to 131x64
+and 131x80, each with 2/4/16 levels. Every failed construction preserves an
+existing nonempty accepted image and allocation count; immediate successful
+recreation/destruction restores the baseline. Normal declaration/layout/render/
+copy checks zero allocation attempts, including rejected attempts. GCC ASan/UBSan
+passes ui, ui_surface and ui_surface_alloc; changed C formatting passes.
+This is host regression evidence, not whole-device peak memory or native-stack
+acceptance. The commit is local and unpushed. Exact-head CI audit records are
+research/oct30-independent-ci-26.json and research/oct30-independent-ci-28.json;
+both still have unfinished gates and no failed/cancelled jobs.
+
+## 2026-10-30 — Maintained launcher-stack verifier
+
+Local 8c473f80 adds optional --stage-stack verification to the Stock UI gate.
+It binds observed shared-bank launcher SP assignments to the actual native
+pool, layout and payload; missing/malformed/duplicate traces, adjacent-region
+crossings and exhausted reservations reject without leaving a stale report.
+Six memory-verifier tests, Ruff/format and strict docs pass. Existing HP39g+
+Stock trace replays at 3152/4096 bytes after verifying original runtime input
+hashes and normal settled return; this is not a new device execution. Evidence:
+/work/oct30-stack-regions/maintained-stage-gate-replay.json. Native/exception
+stack bounds, system allocation peaks and six-model stage-trace coverage remain
+open. Neither this commit nor 9a95726b has been pushed.
+
+## 2026-10-30 — Stock stage-stack matrix started
+
+Started five remaining models serially with the existing UI artifact and
+all-PC observer; HP39g+ retains its independently rechecked prior trace. Runner:
+research/oct30-stage-stack-matrix.py; evidence /work/oct30-stage-stack-matrix.
+The active HP39gs emulator/process was observed live; no new pass is claimed.
+The matrix requires original UI/SP/pool gates, maintained stage-stack gate and
+normal settled return, with artifact/emulator/Kermit/assets hashes retained.
+
+PR #13 publisher retry 124134000902 is terminal cancelled with no steps. GitHub
+annotation confirms a higher-priority waiting ci-evidence-publisher request.
+It is not a project-test failure or acceptance; repeated immediate retry is
+deferred. Exact-head audits remain in research/oct30-independent-ci-*.json.
+
+## 2026-10-30 — Deferred verifier cleanup during active matrix
+
+A tested CLI stale-report cleanup patch is preserved in `research/oct30-stage-cli-cleanup.patch` for application after the active matrix; the verifier source remains identical to the run-start hash.
+The added CLI regression proves a failed earlier UI gate removes an old stage
+pass report; all seven memory tests passed with that patch. Both edited files
+were then restored to their committed versions, and every active-run input hash
+was independently rechecked unchanged. This patch is not committed or submitted.
+The existing matrix process remains live; do not restart it.
+
+## 2026-10-30 — UI allocation and stage-gate delivery
+
+Pushed c59528cc to PR #28 with 9a95726b allocation rollback tests and 8c473f80
+optional launcher-stack gate. Prior exact head 4bcd3fb6 has two successful/eight
+queued workflows and sixteen successful/126 queued jobs, no failure/cancellation.
+Ruff, strict docs and whitespace checks pass. New-head CI was not polled.
+The live five-model Stock matrix still uses the original immutable verifier
+source; the separate tested CLI cleanup patch remains deferred. No stage or
+new device pass is inferred from submission.
+
+## 2026-10-31 — Stock HP39gs stage acceptance and publisher queue repair
+
+The existing serial matrix completed HP39gs: original UI/pool/application-SP
+gates and normal settled Stock return pass, with launcher SP 3152/4096 bytes.
+Inputs match their recorded hashes; report: /work/oct30-stage-stack-matrix/verified.json.
+The same process continues HP40gs; remaining models are not claimed complete.
+
+Draft PR #30, bfddd250, adds queue: max to both ci-evidence-publisher jobs.
+GitHub documentation supports up to 100 waiting jobs with serial execution and
+cancel-in-progress false. Both YAML structures pass. Actionlint 1.7.12 lacks
+this new keyword; only that exact diagnostic was excluded to check the rest.
+No test gates changed. Prior remote PR #28 c59528cc audit has four queued
+workflows/six queued jobs, none failed/cancelled. New PR #30 CI not polled.
+Existing cancelled runs retain old definitions and remain unaccepted.
+
+## 2026-10-31 — Independent HP39gs/HP40gs stage audit
+
+Both fresh Stock runs pass independent replay: UI pixels/themes/fonts, low-memory
+reconstruction, application SP 2424/8192, launcher SP 3152/4096, observed pool
+35 pages and normal settled return. Frame/input maxima are 14398/610 us and
+19036/854 us respectively. Runtime inputs and retained evidence hashes match.
+Auditor: research/oct31-stage-stack-matrix-audit.py; partial report in
+/work/oct30-stage-stack-matrix/partial-independent-audit.json. Its default full
+mode rejects the incomplete five-model matrix without producing acceptance.
+Same session continues HP48gII, then HP49g+/HP50g. This is partial local
+validation, not CI acceptance or whole-system memory/native-stack completion.
+
+## 2026-10-31 — Completed Stock stage matrix and missing migration CI
+
+The five-model matrix terminated successfully. Independent full audit passes
+HP39gs/HP40gs/HP48gII/HP49g+/HP50g with original UI, pool, application-SP,
+launch-stack and normal settled-return gates. All stage observations are
+3152/4096 bytes; application SP is 2424 or 2432/8192. Previous HP39g+ evidence
+is retained separately. Full audit: /work/oct30-stage-stack-matrix/independent-audit.json.
+After process completion, applied deferred CLI stale-pass cleanup as local
+b15ad2ff: seven regression tests, Ruff and normalized source formatting pass.
+No new hardware/native-exception-stack or whole-system peak claim is made.
+
+PR #27 f960876e had zero automatic check runs due docs-only path filters.
+Manually dispatched quality/runtime/storage/objects/gallery/FatFs; all six
+confirmed queued (41087137996, 41087144988, 41087152004, 41087159812,
+41087167665, 41087174489). Core runtime has no workflow_dispatch, so that
+current-head coverage remains open. No documentation deployment was requested.
+
+## 2026-10-31 — Manual core validation entry submitted
+
+PR #30 head 97d9eb46 adds workflow_dispatch to Core runtime. The unchanged job
+has no push/PR-only event dependencies; Actionlint passes without exclusions.
+This follows the docs-only PR #27 head having no automatic core check or manual
+entry. The PR also retains publisher queue: max from bfddd250. Prior exact head
+had four queued workflows/eight queued jobs, none failed/cancelled. New-head CI
+was not polled after push. Mainline integration and PR #27 core coverage remain
+open; no existing test, threshold, permissions or publishing policy was removed.
+
+## 2026-10-31 — Execution-reference provenance through stack transfers
+
+Local 8ae25d33 extends the launcher collector through RSTK=C and C=RSTK.
+Transfers carry original source cells without classifying mere copies as
+addresses; only later returns/register jumps report roots. Captures, overwritten
+slots and generated call returns discard obsolete provenance; transferred roots
+use low-20-bit repairs and repeated source uses are deduplicated.
+Both stage/register host targets pass ASan/UBSan. ARM analysis, full ARM app/six
+launchers and source format/lint pass. Maintained register_roots.py compares
+32 new transfer chains plus 576 existing register cases against original ROM
+and linked ARM collectors, with 16 linked-ARM capacity cases. Current source/
+artifact identities pass /work/oct31-stack-transfer/classification-audit.json.
+The ROM comparison retains whole-register effects, including C=RSTK merging
+the popped word into C; classification models only the consumed low 20 bits.
+Existing two-model 14-case Stock call/movement regressions run in session 83034.
+These controlled instruction tests do not establish complete execution coverage,
+Port1 public mutation or general library safety; local follow-up is not pushed.
+
+### 2026-10-31 stack-transfer artifact reproduction
+
+Local `8ae25d33` was rebuilt in a temporary container directory while its
+original two-model Stock regression continued unchanged. All 16 shipped
+artifacts match byte for byte: HPC1, result address, stage binary, memory
+metadata and six raw/wrapped launchers. Tracked input hashes remained unchanged
+through the rebuild; temporary build output was removed. Evidence:
+`/work/oct31-stack-transfer/reproduction.json`. ELF debug paths are excluded
+from byte comparison. The Stock regression remains running; no remote submission
+or complete execution-reference coverage is claimed by this result.
+
+HP49g+ completed all fourteen Stock scenarios and passed independent saved-state
+audit: nine original returns, five controlled rewritten continuations, eighteen
+unchanged Flash snapshots and unchanged source/artifact hashes matching the
+reproduced binaries. Evidence: `/work/oct31-stack-transfer/verified-hp49gplus.json`.
+This report explicitly marks the two-model matrix incomplete; HP50g continues
+in the original session 83034.
+
+### 2026-10-31 stack-transfer two-model acceptance
+
+Original session 83034 completed successfully on both HP49g+ and HP50g.
+Independent audit verifies all 28 Stock cases, 18 original and 10 controlled
+rewritten returns, 36 unchanged Flash snapshots and matching reproduced
+artifacts. Evidence: `/work/oct31-stack-transfer/verified.json`. A separate
+saved-state replay re-executes the maintained marker, operand, catalog, HOME
+attachment and message checks against every saved state, reconstructs matching
+entry/package/results, verifies originals unchanged and removes its temporary
+output: `/work/oct31-stack-transfer/saved-state-replay.json`. This replay is
+not an additional live emulator run.
+
+The stack-transfer implementation remains `8ae25d33`. Prior exact remote head
+51b4566e has 61 successful and 223 queued jobs, no reported failed/cancelled
+jobs. Strict documentation and diff checks pass. This delivery does not
+complete execution-reference coverage, public library/Port1 operations, Port2
+installation/authority/startup/reclamation or M8.0 acceptance.
