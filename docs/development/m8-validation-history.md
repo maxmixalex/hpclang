@@ -972,3 +972,30 @@ Actionlint and four observer unit tests pass; the retained five-model Stock
 matrix independently replays successfully. No fresh device run is claimed.
 Prior remote e0581c5d has four queued workflows/six queued jobs, no failures
 or cancellations. Native/exception bounds and full UI resource acceptance remain open.
+
+### 2026-10-31 implicit ARM stack-bank observations
+
+Local `2cdc9584` adds opt-in `HPCLANG_X50NG_STACK_BANKS` observations at
+the emulator's actual bank switch, before loading the incoming r13. Incoming
+and outgoing ranges remain separate per mode pair; differences are not stack
+usage. Existing traces and guest state are unchanged. Seventeen observer tests,
+Ruff and C formatting pass. A fresh emulator builds and HP39g+ Direct UI passes
+existing pixel, heap, stack and settled-return gates with 13 observed mode pairs.
+Evidence: `/work/oct31-stack-banks/direct-verified.json`. Stock validation is
+still running in session 26738. Remote cca560e0 has one queued workflow and
+two queued jobs; the local follow-up is not pushed. Reservation bounds,
+phase/mapping-aware native-stack accounting and full UI acceptance remain open.
+
+Local follow-up `a751d712` enables bank-switch capture for Stock UI CI, clears
+old traces, requires nonempty output after execution and uploads the raw JSONL.
+Actionlint passes. This captures evidence; it does not assert stack reservations
+or replace resource-budget verification. Stock validation remains active and
+neither local follow-up has been pushed.
+
+The original Stock process completed successfully. Independent replay verifies
+Direct/Stock input identities, trace structure and hashes, observed IRQ entry
+and exit, UI pass, and settled return. Direct records 13 mode pairs; Stock
+records 11. Evidence: `/work/oct31-stack-banks/independent-audit.json`.
+Before submission, exact remote cca560e0 has one queued workflow/two queued
+jobs with no reported failure or cancellation. No native/exception reservation
+bound or whole-system peak admission is claimed.
