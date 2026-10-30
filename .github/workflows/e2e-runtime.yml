@@ -484,6 +484,7 @@ jobs:
     runs-on: ubuntu-24.04
     concurrency:
       group: ci-evidence-publisher
+      queue: max
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
