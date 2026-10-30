@@ -1,6 +1,6 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-10-29. **M8 is incomplete; only M8.1 is accepted complete.**
+Current checkpoint: 2026-10-30. **M8 is incomplete; only M8.1 is accepted complete.**
 Docker/WSL is restored. Earlier ID1701 two-model reservation retests pass guarded
 recovery, repeat restart, absent recovery and 16 rejection cases per model.
 Supported ID769 reservation matrices now pass on both models; full startup
@@ -110,8 +110,14 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
+A local execution-range check now rejects physical remapping across bank switches.
+Across 672 original-handler executions, it identifies 142 preserved and 530
+remapped shared-body ranges; 96 absent-bank cases reject separately. This is a
+standalone continuation condition; planner integration and complete execution
+qualification remain open. Sanitizer tests and ARM compilation/analysis pass.
+
 Guarded references, bounded ROM readers, mapped-graph scheduling and bank-alias
-primitives/regressions and program/selector follow-ups are submitted in #26; CI is pending. Earlier 28 Stock cases remain scoped to their recorded reader build.
+primitives/regressions and program/selector follow-ups are submitted in #26; that head has passed CI. Earlier 28 Stock cases remain scoped to their recorded reader build.
 
 Under the controlled saved profiles, all 20 attachment payloads per model resolve
 through inspected P=0 code, dynamic selectors, captured bank geometry, device
@@ -139,11 +145,12 @@ locations; mutable user Flash is excluded. The read-only physical backend runs
 with IRQ/FIQ masked in the Stock witness. Both models now pass all 28 call/return
 cases locally: 18 original returns and ten fixture-rewritten returns. Independent
 audits confirm all return markers, all 28 saved-memory profile/bank witnesses,
-36 unchanged Flash snapshots and 16 byte-identical artifacts rebuilt from the
+36 unchanged Flash snapshots and 16 byte-identical artifacts rebuilt from
 that campaign's source. A new bounded Stock view now supplies native, physical
 ROM and mapped Saturn readers to the planner. Sanitizer/ARM checks and 16 artifact
-reproductions pass; the new Stock matrix is running, with the first HP50g case
-passing. Production exclusive integration, complete execution roots, public
+reproductions pass. The new Stock matrix now passes all 28 returns; independent
+saved-memory inspection confirms all 28 planning witnesses (16 accepted and two
+absent entries each), with unchanged native state checked by the witness. Production exclusive integration, complete execution roots, public
 libraries and Port1 edits remain open; ROM identity alone does not authorize
 mutation.
 
@@ -168,12 +175,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `bdeb3227` | **CI pending:** two successful and nine queued workflow records; 27 successful, 216 queued and three running jobs, none failed. Unified bank planning is a local follow-up. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `bdeb3227` | **CI passed:** all eleven workflows completed; 379 successful jobs and two conditional publisher skips. Not yet merged. Unified bank planning is a local follow-up. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `4f2ce605` | **CI pending:** eight successful, two running and two queued workflows; 328 successful, seventeen running, 44 queued and one skipped jobs. Current main integration still requires fresh CI acceptance. |
+| #20 / `4f2ce605` | **CI passed:** all twelve workflows completed; 390 successful jobs and two conditional publisher skips. Current main integration passed CI; merge review remains. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

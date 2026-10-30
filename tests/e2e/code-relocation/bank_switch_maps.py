@@ -46,6 +46,7 @@ files = [
         "rpl-stock-memory.c",
         "rpl-bank-effects.c",
         "rpl-bank-plan.c",
+        "rpl-execution-map.c",
         "rpl-rom-profile.c",
     )
 ]
@@ -58,6 +59,7 @@ sources = {
         base / "rpl-stock-memory.h",
         base / "rpl-bank-effects.h",
         base / "rpl-bank-plan.h",
+        base / "rpl-execution-map.h",
         base / "rpl-rom-profile.h",
         Path(__file__),
         Path(__file__).with_name("flashptr_guards.py"),

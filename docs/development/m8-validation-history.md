@@ -1708,3 +1708,28 @@ Exact-head CI remains pending with no failed jobs in this audit: #26 bdeb3227
 has two successful/nine queued workflow records and 27 successful/216 queued/
 three running jobs; #20 4f2ce605 has eight successful/two running/two queued
 workflows and 328 successful/17 running/44 queued/one skipped jobs.
+
+
+## 2026-10-30 — Stock planner and execution-map follow-up
+
+The completed `/work/oct29-stock-bank-plan` campaign passes the independent
+`verified.json` audit: 28 return markers (18 original, ten fixture-rewritten),
+36 unchanged Flash snapshots and 16 reproduced artifacts. The additional
+`plan-memory-all-verified.json` audit reads all 28 saved SRAM states through the
+recorded pool tables and ELF symbols: ROM identity, bank witnesses and planner
+counts (16 accepted, two absent, observed dependencies, native extent 0xc60)
+match in every case. This closes the local campaign, not M8.0.
+
+The new execution-map predicate compares physical locations page by page without
+requiring physically contiguous runs. Unit 169 passes under ASan/UBSan; ARMv4T
+compilation and static analysis pass. Maintained original-handler reports under
+`/work/oct29-execution-map/{hp49gplus,hp50g}` have matching source hashes. Across
+both models, 142 valid switch cases preserve the shared body's physical mapping,
+530 remap it, and 96 absent-bank cases reject. The comparison also covers a
+range crossing a page boundary. These synthetic contexts demonstrate a missing
+continuation condition; they do not establish full Saturn execution safety.
+The predicate is not yet part of production planner acceptance.
+
+PR #26 exact head `bdeb322708ebae3ce974a6ac41dfeee46cf140b4` has eleven successful
+workflows, 379 successful jobs and two conditional skips. Local follow-ups are
+not covered by that CI result; no milestone completion is claimed.

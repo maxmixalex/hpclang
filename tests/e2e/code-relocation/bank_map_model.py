@@ -88,6 +88,12 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
         c.c_uint32,
         c.POINTER(c.c_uint32),
     ]
+    lib.hpclang_rpl_execution_mapping_preserved.argtypes = [
+        c.POINTER(c.c_uint32),
+        c.POINTER(c.c_uint32),
+        c.c_uint32,
+        c.c_uint32,
+    ]
     geometry = (Geometry * 16)(
         *(Geometry(row["physical"] or 0, row["valid_bytes"]) for row in banks[:16])
     )
@@ -253,6 +259,18 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
                     upper,
                     "unexpected SRAM effects",
                 )
+                # The shared switch body remains an execution obligation even
+                # when the selected payload itself has a valid physical extent.
+                preserved = lib.hpclang_rpl_execution_mapping_preserved(
+                    state.pages, selected.map.pages, 0x2305A, 29
+                )
+                expected_preserved = state.pages[0x23] == actual[0x23]
+                assert (preserved == 0) == expected_preserved
+                # Also exercise a range crossing the overlay quadrant boundary.
+                crossing = lib.hpclang_rpl_execution_mapping_preserved(
+                    state.pages, selected.map.pages, 0x3FFF0, 32
+                )
+                assert (crossing == 0) == all(state.pages[i] == actual[i] for i in (63, 64))
                 results.append(
                     dict(
                         context=context,
@@ -262,6 +280,7 @@ def verify_bank_map(lib, ram, flash, cpu, banks):
                         complete_sram_effects=True,
                         runtime_effects_match=True,
                         captured_dependencies=len(dependencies),
+                        switch_body_mapping_preserved=preserved == 0,
                         state_write_events=len(writes),
                         unchanged_selectors=(lower, upper) == (state.lower, state.upper),
                     )
