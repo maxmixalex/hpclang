@@ -110,53 +110,31 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-The local bank planner now requires the inspected switch body to retain its
-physical mapping. Both-model maintained regressions pass normal entries and
-28 forced-remap rejections with unchanged output; ARM analysis and the rebuilt
-application/six launchers pass. A fresh full Stock campaign is running for this
-integration. Complete execution qualification remains open.
+The mainline remains safe movement and execution-reference coverage for native
+library management and Port1 edits, followed by Port2 trusted recovery
+installation, authority lifecycle, safe startup and reclamation. Sound
+compatibility is independent.
 
-Guarded references, bounded ROM readers, mapped-graph scheduling and bank-alias
-primitives/regressions and program/selector follow-ups are submitted in #26; that head has passed CI. Earlier 28 Stock cases remain scoped to their recorded reader build.
+PR #26 now includes the accepted resource-snapshot mainline. Its earlier head
+passed CI; integration head `d0795413` is queued and is not accepted yet.
+Unified bank planning, bounded live Stock readers and continuation mapping
+checks remain local follow-ups, separate from the submitted head.
 
-Under the controlled saved profiles, all 20 attachment payloads per model resolve
-through inspected P=0 code, dynamic selectors, captured bank geometry, device
-routing and full read-map prediction. Separate execution edges still reject.
-A local runtime planning API now composes code inspection, unique bank lookup,
-routing checks, geometry capture and full effect prediction in one call. It
-publishes only complete results and rejects table/control-bit disagreement.
-Two aliases and their alternate selectors match the independent staged path on
-both models; 144 failure controls preserve output. Each alias retains 5,024
-nibble dependencies; all 20,096 individual stale changes reject. Standard entry
-coverage passes all fourteen populated banks and rejects both absent banks per
-model. Controlled HOME now uses the single-call API: all forty payload results
-match the prior path and all forty separate execution obligations remain open.
-The submitted read-map predictor passes its original-handler comparisons.
-The submitted runtime predictor covers read/write maps, the sentinel and overlay
-caches. It agrees with 672 original-handler executions across both models;
-96 absent-bank cases reject without publishing output. Complete SRAM/write-scope
-checks cover unchanged selectors and independent overlay repair/cache branches.
-Guarded capture now supplies all 4,680 state dependencies to that predictor;
-18,720 per-position failures preserve output. Sanitizer tests, original-handler
-composition and ARM analysis pass locally. Production execution-edge integration
-remains open; this is not CI or milestone acceptance.
-SHA-256 identifies the two reviewed immutable ROM images and supplies layout
-locations; mutable user Flash is excluded. The read-only physical backend runs
-with IRQ/FIQ masked in the Stock witness. Both models now pass all 28 call/return
-cases locally: 18 original returns and ten fixture-rewritten returns. Independent
-audits confirm all return markers, all 28 saved-memory profile/bank witnesses,
-36 unchanged Flash snapshots and 16 byte-identical artifacts rebuilt from
-that campaign's source. A new bounded Stock view now supplies native, physical
-ROM and mapped Saturn readers to the planner. Sanitizer/ARM checks and 16 artifact
-reproductions pass. The new Stock matrix now passes all 28 returns; independent
-saved-memory inspection confirms all 28 planning witnesses (16 accepted and two
-absent entries each), with unchanged native state checked by the witness. Production exclusive integration, complete execution roots, public
-libraries and Port1 edits remain open; ROM identity alone does not authorize
-mutation.
+Local planner tests cover ROM identity, code/selector/routing/geometry guards,
+full bank effects and unchanged switch-body physical mappings. Original-handler
+comparisons, failure-output preservation and forty controlled HOME payload
+resolutions pass; forty separate execution obligations remain open. The previous
+live-reader build passed 28 Stock cases. For the latest continuation-check build,
+eight ARM analyses and sixteen independently reproduced artifacts pass; both
+first native cases have verified saved-memory planning witnesses. Its full
+28-case Stock campaign is still running, so earlier results do not establish
+acceptance of this build.
 
-The active dependencies are complete execution-reference handling for safe
-movement/library management, and Port2 trusted installation, authority lifecycle,
-startup safety and reclamation. Sound compatibility is independent.
+Complete execution roots and CONFIG semantics, production exclusive integration,
+public library operations and Port1 edits remain open. ROM identity and a valid
+predicted data mapping alone do not authorize mutation. Detailed tests, counts,
+artifact identities and historical limitations are retained in the validation
+history below.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
@@ -175,7 +153,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `d0795413` | **Prior head CI passed:** eleven workflows, 379 successful jobs and two conditional skips. Main integration resolves workflow/document conflicts and passes 18 resource/UI tests, full source quality and strict docs locally; submitted for fresh CI, not polled this turn. Unified planning remains a separate local follow-up. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `d0795413` | **CI queued:** twelve workflow records and twenty jobs queued; none completed at inspection. Earlier `bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips). Main integration passes 18 resource/UI tests, source quality and docs locally. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |

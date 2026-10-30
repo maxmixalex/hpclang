@@ -1769,3 +1769,21 @@ The locally integrated continuation check also passes the controlled HOME
 regression under `/work/oct30-home-plan`: forty payload resolutions match the
 previous effects path and forty separate execution obligations remain rejected.
 The fresh Stock campaign is still running; both initial native cases pass.
+
+
+## 2026-10-30 — Continuation-build reproducibility
+
+`/work/oct30-stock-plan-execution/reproduction.json` confirms sixteen byte-identical
+artifacts from an independent clean rebuild of the current continuation-check
+source: HPC1, result address, stage1, launcher memory metadata and twelve model
+launcher files. Source hashes were stable during the rebuild; the temporary
+build was removed. Eight actual-application ARM analyses pass, including the
+new execution-map predicate and its planner integration. The first native
+saved-memory witness per model independently confirms profile/bank identity and
+16 accepted/two rejected plans; the full live campaign remains in progress.
+These results do not reuse earlier-build Stock acceptance.
+
+The exact-head CI audit of #26 `d0795413fad89345a52ad20dc89b7ea018f34f61` found
+12 queued workflow records and 20 queued jobs, with no completed jobs yet.
+Current status text was shortened; M0–M7 summaries, all M8 stage requirements,
+acceptance boundaries and detailed historical evidence remain retained.
