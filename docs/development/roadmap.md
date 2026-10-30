@@ -120,8 +120,26 @@ and sixteen currently materialized jobs are queued. Local full relocated-SDK
 validation now passes external C/C++ builds, all six model-specific Notebook
 builds, three HP39 Aplet variants and 517 byte-identical release outputs.
 Five focused tests and full formatting/static/documentation checks also pass.
-This is not CI acceptance or completion of M8.5; ownership contracts and
-application migration acceptance remain required.
+A local installed API-contract guide now documents results, versioned outputs,
+owners/views and exit behavior; relocated links and its ARMv4T C11 example pass.
+This is not CI acceptance or completion of M8.5; remaining ownership/application
+migration acceptance is still required.
+
+M8.2/M8.3 UI return-capacity gate `8849b85f` is submitted in draft PR #28;
+eight workflows and twelve materialized jobs are queued. It checks native free capacity and largest-block
+recovery after settled return. Fifteen tests, all 79 retained snapshots across
+six models, the actual CI commands and strict docs pass locally. This is not a
+new emulator run or complete physical-memory admission; whole-application
+resource acceptance remains open.
+
+CI follow-up `fce14d73` is submitted in draft PR #29; ten workflows and sixteen
+materialized jobs are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
+a fresh build with the isolated patch passes. Original packet CRC checks pass
+at the host capture point; loss inside the emulator/device remains unproven.
+The local replay with original CI payload/assets/emulator and only the server
+replaced passes application execution, 52 keyboard frames and settled Stock
+return. No failing remote gate is waived; the initial packet-loss cause remains
+unproven.
 
 M8.0 local follow-up `9e220d9b` captures library-configuration read dependencies;
 sanitisers, ARM analysis and both-model maintained regressions pass. It is not
@@ -170,7 +188,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `6a582958` | **Submitted, CI pending:** exact-head audit found four successful/seven queued workflows; job records show 125 successful, fourteen running and 239 queued, none failed. Earlier `bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips). Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `6a582958` | **CI failure, not accepted:** HP39g+ Stock runtime failed before payload entry while fetching packet 57. Audit: 228 successful, twenty running, 129 queued, one skipped and one failed job; seven successful/three queued/one running workflows. Earlier `bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips). Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |

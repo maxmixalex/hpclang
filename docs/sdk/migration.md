@@ -6,6 +6,8 @@ Start from the installed `examples/hpgcc-timer` for a C application or
 the launcher. Keep your application's source and assets; replace its historical
 startup objects, linker script and precompiled HPGCC libraries with the SDK build.
 Do not put historical include directories before the installed headers.
+The [API contracts and ownership guide](api-conventions.md) explains result
+conventions, versioned output structures and the owner/view distinction.
 
 ## Locate migration work
 
@@ -122,7 +124,6 @@ use `%L`/`%U`; standard length modifiers, `*`, `+`, `#` and `%n` are rejected.
 Precision is capped at 15 and historical malformed carry/zero-precision outputs
 are corrected. Audit each format string before opting in; see the
 [formatting contract and original-source comparisons](../development/hpgcc-compat.md#historical-console-output).
-This compatibility slice has local validation; remote acceptance is pending.
 
 Legacy HPG text and the default compatibility console use calculator bytes.
 The clean `hpclang_surface_draw_text` and `hpclang_surface_draw_utf8` functions

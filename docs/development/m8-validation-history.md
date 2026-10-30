@@ -236,3 +236,27 @@ passed. The original failure log remains `/work/oct30-migration-sdk-full.log`.
 Preceding remote audit: #26 `6a582958` has 125 successful, fourteen running and
 239 queued jobs, no failures; #27 `b59fb56d` has ten queued workflows and sixteen
 materialized queued jobs. Neither branch is CI-accepted. M8 remains incomplete.
+
+## 2026-10-30 — Installed public API conventions
+
+The M8.5 guide `docs/sdk/api-conventions.md` documents service-specific results,
+errno handling, versioned output initialization, failure-safe output replacement,
+C++ owner/view/lexical-guard distinctions, close errors and exit behavior. Public
+object-store iterator declarations now state 1/0/-1 results and output/name rules,
+matching the existing implementation. The guide is linked from Getting started,
+migration and navigation and installed with the SDK. It does not freeze pending
+UI names or imply cross-version object/layout compatibility. The obsolete note
+claiming opt-in formatting still awaited remote acceptance was removed.
+
+Strict docs pass. Actual CMake installation and prefix relocation preserve the
+new guide byte-for-byte; installed navigation links resolve, and its complete
+C11 example compiles for ARMv4T with Wall/Wextra/Werror. Temporary installation
+and build directories are removed. Evidence: `/work/oct30-api-contracts-installed.json`.
+This documentation/header-comment change adds no runtime behavior; the prior
+517-output full SDK result remains separately scoped to `b59fb56d`.
+
+CI audit: #26 `6a582958` has 228 successful/twenty running/129 queued/one skipped
+and one failed job (the previously investigated HP39g+ runtime transfer).
+#27 and #29 each have ten queued workflows/sixteen materialized queued jobs;
+#28 has eight queued workflows/twelve materialized queued jobs. No new failure
+was found and no branch was accepted.

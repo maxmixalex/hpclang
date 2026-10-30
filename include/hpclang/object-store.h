@@ -112,6 +112,9 @@ extern "C"
     struct hpclang_object_store_iterator *
     hpclang_object_store_iterator_open(const struct hpclang_object_store *store);
 
+    /* Initialize entry.size and entry.version before reading. Returns 1 for
+     * an entry, 0 at end, or -1 with errno on error. End/error leaves entry
+     * unchanged. Names are length-delimited bytes, not NUL-terminated text. */
     int hpclang_object_store_iterator_read(struct hpclang_object_store_iterator *iterator,
                                            struct hpclang_object_store_entry *entry);
 
