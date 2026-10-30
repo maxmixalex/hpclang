@@ -58,12 +58,24 @@ int hpclang_hp4950_fatfs_card_identity(uint8_t cid[16])
     memset(cid, card_identity, 16);
     return 0;
 }
-uint32_t hpclang_kos_swi3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
+static uint32_t caller_irq_state = UINT32_C(0x60000010);
+static unsigned reset_calls;
+uint32_t hpclang_irq_save_disable(void)
 {
-    (void)index;
-    (void)a;
-    (void)b;
-    (void)c;
+    uint32_t saved = caller_irq_state;
+    caller_irq_state |= UINT32_C(0xc0);
+    return saved;
+}
+void hpclang_irq_restore(uint32_t state)
+{
+    assert((caller_irq_state & UINT32_C(0xc0)) == UINT32_C(0xc0));
+    caller_irq_state = state;
+}
+uint32_t hpclang_kos_sync3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
+{
+    assert(index == 19u && a == 0 && b == 0 && c == 0);
+    assert((caller_irq_state & UINT32_C(0xc0)) == UINT32_C(0xc0));
+    ++reset_calls;
     return 0;
 }
 DSTATUS disk_status(BYTE drive)
@@ -326,12 +338,17 @@ int main(void)
     CHECK(hpclang_namespace_write(fresh, "new", 3) == 3);
     CHECK(hpclang_namespace_close(fresh) == 0);
     hpclang_storage_shutdown();
+    CHECK(reset_calls > 0 && caller_irq_state == UINT32_C(0x60000010));
+    unsigned previous_resets = reset_calls;
+    caller_irq_state |= UINT32_C(0xc0);
     CHECK(partition_checks() == EXIT_SUCCESS);
+    CHECK(reset_calls > previous_resets);
     device.family = HPCLANG_FAMILY_HP39;
     struct hpclang_stream_media_identity identity = {.size = 123};
     CHECK(hpclang_stream_media_identity_query(NULL) == -1 && errno == EFAULT);
     CHECK(hpclang_stream_media_identity_query(&identity) == -1 && errno == ENOSYS);
     CHECK(identity.size == 123);
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", 0, hidden) < 0 && errno == ENOSYS);
+    CHECK(caller_irq_state == UINT32_C(0x600000d0));
     return EXIT_SUCCESS;
 }

@@ -135,6 +135,17 @@ extern "C"
     int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
                                         hpclang_rpl_temp_visit_fn visit, void *context);
 
+    /* TEMP traversal with observations for every valid nibble read, including
+     * both geometry words, the sentinel and every allocation footer in both
+     * validation/enumeration passes. Dependency errors propagate unchanged;
+     * discard all partial observations/allocations on any failure. Payload
+     * bytes are not read or classified. Keep mappings and IO stable, and guard
+     * payload traversal separately. No native write callback is forwarded. */
+    int hpclang_rpl_mutation_visit_guarded_temp(const struct hpclang_rpl_mutation_io *io,
+                                                hpclang_rpl_temp_visit_fn visit,
+                                                hpclang_rpl_root_dependency_fn dependency,
+                                                void *context);
+
     /* Bootstrap-only: turn the native page interval into a rooted opaque
      * TEMPOB block. Pin
      * the compact pre-existing TEMP prefix as well, so Stock
@@ -252,6 +263,28 @@ extern "C"
     int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_io *io,
                                                  uint32_t position, int32_t delta);
 
+    /* Internal HOME attachment: append a 13-nibble record, moving the earlier
+     * HOME/stack prefix downward while leaving directory objects fixed. Both
+     * pointer fields are caller-proven native references in the current mapping
+     * (zero is allowed), translated if their target moves. Caller proves library
+     * identity, field semantics and relocation safety, retaining mapping/IRQ
+     * ownership. This does not register a library or run configuration code.
+     * Existing IDs return EXISTS after reading the complete attachment prefix.
+     * Publish count last; preflight errors make no writes; commit failure is
+     * INCOMPLETE and forbids retry or Stock return, as with detachment below. */
+    int hpclang_rpl_mutation_home_attach(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                         uint32_t first, uint32_t second);
+
+    /* Internal HOME detachment: remove exactly one matching 13-nibble attachment
+     * and publish its count last. Following directory objects keep their addresses;
+     * HOME, stack cells and the earlier attachment prefix move upward by 13.
+     * Caller retains mapping/IRQ ownership and proves relocation safety beyond
+     * the root sources supplied by io. This does not unregister or free the
+     * library, execute configuration code, or prove that it is no longer running.
+     * Duplicate matching IDs are malformed. Preflight failures make no writes;
+     * any commit failure is INCOMPLETE: retain ownership, no retry/Stock return. */
+    int hpclang_rpl_mutation_home_detach(const struct hpclang_rpl_mutation_io *io, uint32_t number);
+
     /* Internal catalog geometry: open one 16-nibble record at position, moving
      * the catalog suffix, metadata, TEMP and RPL return stack upward. Caller
      * must validate the catalog and prove relocation safety of all object
@@ -266,6 +299,17 @@ extern "C"
 
     struct hpclang_rpl_reference_edit;
     struct hpclang_rpl_reference_guard;
+    struct hpclang_rpl_reference_reader;
+    /* Caller-proven Saturn address in the low 20 bits of an owned ARM word.
+     * expected guards the entire word. The other 12 bits are preserved; a
+     * register's separate high word is never accessed. This is not provenance
+     * discovery: scalar registers and runtime-owned workspace are not roots. */
+    struct hpclang_rpl_register_repair
+    {
+        uint32_t *word;
+        uint32_t expected;
+    };
+
     struct hpclang_rpl_catalog_repairs
     {
         uint32_t main_mapping;
@@ -273,6 +317,11 @@ extern "C"
         uint32_t edit_count;
         const struct hpclang_rpl_reference_guard *guards;
         uint32_t guard_count;
+        const struct hpclang_rpl_register_repair *registers;
+        uint32_t register_count;
+        /* Optional reader for read-only guards in proven-disjoint mappings.
+         * Main-RAM guards always use io, never this reader. */
+        const struct hpclang_rpl_reference_reader *guard_reader;
     };
 
     /* Same geometry/ownership contract as catalog_grow. Merge caller-proven
@@ -281,7 +330,17 @@ extern "C"
      * writes, including conflicts with unchanged roots. Fields are ORIGINAL
      * pre-move addresses, wholly in main RAM; normalized mappings must equal
      * main_mapping. Other physical banks require separate transaction work.
+     * Register words must be aligned, owned ARM storage outside moved memory
+     * and input arrays. Their low 20 bits use the same main-RAM address mapping;
+     * the caller proves that mapping and the continuation's address use. Exact
+     * aliases with native roots coalesce only when full-word repairs agree.
      * Guards describe unchanged preconditions, not permissions to relocate.
+     * Guards outside main_mapping require guard_reader; distinct identities
+     * mean caller-proven physical disjointness, not unequal bank numbers.
+     * This permits ROM handler identity checks but no writes to other mappings.
+     * The reader must be read-only; keep all guarded mappings and bytes stable
+     * from preflight through publication/return. No fallback reader may hide a
+     * failed or changed main-RAM dependency.
      * Keep input arrays, ARM roots, mappings and memory stable throughout.
      * Allocates temporary ARM heap storage; allocation/preflight failure makes
      * no writes. INCOMPLETE distinguishes a commit failure from those preflight
@@ -292,6 +351,37 @@ extern "C"
     hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation_io *io,
                                                uint32_t position,
                                                const struct hpclang_rpl_catalog_repairs *repairs);
+
+    /* Remove one catalog cell and shift the following metadata, TEMP and return
+     * stack down by 16 nibbles. Same caller-proven repairs/ownership and failure
+     * contract as growth. Native roots or register repairs targeting the removed
+     * cell return BUSY; supplied edit fields in that cell are invalid. Caller
+     * proves detachment and absence of live library uses, validates the catalog,
+     * then publishes the decremented count before restoring execution. This
+     * does not free the library payload or discover its execution references. */
+    int
+    hpclang_rpl_mutation_catalog_shrink_repaired(const struct hpclang_rpl_mutation_io *io,
+                                                 uint32_t position,
+                                                 const struct hpclang_rpl_catalog_repairs *repairs);
+
+    /* Internal metadata-cache DOACPTR storage. Same full reference, mapping/IRQ
+     * ownership and INCOMPLETE contract as repaired catalog movement. Insert
+     * only at the caller's expected TEMPBOTTOM; initialize all 15 nibbles before
+     * publishing geometry. Remove only a caller-proven complete object within
+     * [catalog end, TEMPBOTTOM), matching prologue, target and switch exactly.
+     * Matching bytes do not prove an object boundary or ownership. The caller
+     * proves both, detaches all uses, and supplies all surviving field repairs.
+     * Roots into a removed object return BUSY. Neither operation changes the
+     * catalog count or HOME attachments, invokes the switch, or grants public
+     * registration authority. Target/switch are 20-bit Saturn coordinates. */
+    int hpclang_rpl_mutation_cache_acptr_insert(const struct hpclang_rpl_mutation_io *io,
+                                                uint32_t position, uint32_t target,
+                                                uint32_t bank_switch,
+                                                const struct hpclang_rpl_catalog_repairs *repairs);
+    int hpclang_rpl_mutation_cache_acptr_remove(const struct hpclang_rpl_mutation_io *io,
+                                                uint32_t position, uint32_t target,
+                                                uint32_t bank_switch,
+                                                const struct hpclang_rpl_catalog_repairs *repairs);
 
 #ifdef __cplusplus
 }

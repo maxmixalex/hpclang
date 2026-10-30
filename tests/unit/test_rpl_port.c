@@ -365,6 +365,115 @@ static void test_catalog_insertion(void)
     assert(plan.slot == 8 && plan.end == 8 && plan.count == 0);
 }
 
+static int read_home(void *context, uint32_t address, uint8_t *value)
+{
+    return address >= 0x80000 && read_nibble(context, address - 0x80000, value);
+}
+
+static void test_home_attachment(void)
+{
+    struct image image = {.count = 34, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_home, &image};
+    put_word(&image, 0, 0x2a96, 5);
+    put_word(&image, 5, 2, 3);
+    put_word(&image, 8, 123, 3);
+    put_word(&image, 11, 0x90000, 5);
+    put_word(&image, 16, 0x91000, 5);
+    put_word(&image, 21, 275, 3);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 123) == 1);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 275) == 1);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 124) == 0);
+    for (unsigned at = 0; at < 34; ++at) {
+        image.fail_at = at;
+        assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 123) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        image.fail_at = UINT32_MAX;
+        uint8_t saved = image.data[at];
+        image.data[at] = 16;
+        assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 123) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        image.data[at] = saved;
+    }
+    for (unsigned limit = 0; limit < 34; ++limit)
+        assert(hpclang_rpl_home_library_attached(&reader, 0x80000, limit, 123) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_home_library_attached(NULL, 0x80000, 34, 123) < 0);
+    assert(hpclang_rpl_home_library_attached(&reader, 0, 34, 123) < 0);
+    assert(hpclang_rpl_home_library_attached(&reader, 0xfffff, 34, 123) < 0);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 4096) < 0);
+    put_word(&image, 0, 0x2a2c, 5);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 34, 123) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    put_word(&image, 0, 0x2a96, 5);
+    put_word(&image, 5, 0, 3);
+    assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 8, 123) == 0);
+}
+
+static void test_catalog_removal(void)
+{
+    struct image image = {.count = 56, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    const uint32_t ids[] = {0, 161, 4095};
+    put_word(&image, 5, 3, 3);
+    for (unsigned i = 0; i < 3; ++i) {
+        uint32_t record = 8 + 16 * i;
+        put_word(&image, record, ids[i], 3);
+        put_word(&image, record + 3, 0x70000 + i, 5);
+        put_word(&image, record + 8, 0x12345 + i, 5);
+        put_word(&image, record + 13, 0xabc + i, 3);
+    }
+    const struct hpclang_rpl_catalog_removal sentinel = {17, 18, 19, {20, 21, 22}};
+    struct hpclang_rpl_catalog_removal plan = sentinel;
+    for (unsigned i = 0; i < 3; ++i) {
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, ids[i], &plan) == 1);
+        assert(plan.slot == 8 + 16 * i && plan.end == 56 && plan.count == 3);
+        assert(plan.binding.address == 0x70000 + i);
+        assert(plan.binding.bank_switch == 0x12345 + i && plan.binding.flags == 0xabc + i);
+    }
+    plan = sentinel;
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 160, &plan) == 0);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    /* A first-record match must not hide any later read failure or bad nibble. */
+    for (uint32_t at = 5; at < 56; ++at) {
+        image.fail_at = at;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 0, &plan) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+        image.fail_at = UINT32_MAX;
+        uint8_t saved = image.data[at];
+        image.data[at] = 16;
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 0, &plan) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+        image.data[at] = saved;
+    }
+    for (unsigned id = 160; id <= 161; ++id) {
+        put_word(&image, 40, id, 3);
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 0, &plan) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+    }
+    put_word(&image, 40, 4095, 3);
+    for (uint32_t limit = 0; limit < 51; ++limit) {
+        assert(hpclang_rpl_catalog_plan_remove(&reader, 5, limit, 0, &plan) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+    }
+    assert(hpclang_rpl_catalog_plan_remove(NULL, 5, 51, 0, &plan) < 0);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 0, NULL) < 0);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, UINT32_MAX, 51, 0, &plan) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 51, 4096, &plan) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    put_word(&image, 5, 0, 3);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 3, 0, &plan) == 0);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    /* Removing the sole entry has no following records to compact. */
+    put_word(&image, 5, 1, 3);
+    assert(hpclang_rpl_catalog_plan_remove(&reader, 5, 19, 0, &plan) == 1);
+    assert(plan.slot == 8 && plan.end == 24 && plan.count == 1);
+}
+
 static void test_library_catalog_lookup(void)
 {
     struct image image = {.count = 35, .fail_at = UINT32_MAX};
@@ -448,6 +557,63 @@ static void test_library_command_resolution(void)
     assert(target == 90);
     assert(hpclang_rpl_library_command(&reader, 0, 100, 99, 161, 0, &target) ==
            HPCLANG_RPL_SPAN_BOUNDS);
+}
+
+static void test_library_attachment_targets(void)
+{
+    struct image image = {.count = 100, .fail_at = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put_word(&image, 5, 161, 3);
+    struct hpclang_rpl_library_attachment_targets result;
+    for (unsigned mask = 0; mask < 4; ++mask) {
+        put_word(&image, 8, mask & 1 ? 42 : 0, 5);
+        put_word(&image, 13, mask & 2 ? 67 : 0, 5);
+        assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 100, 5, 161, &result) == 1);
+        assert(result.present == mask && result.hash == (mask & 1 ? 50 : 0) &&
+               result.messages == (mask & 2 ? 80 : 0));
+    }
+    /* A nonzero backward offset resolving to zero is present, not absent. */
+    put_word(&image, 8, 0x100000 - 8, 5);
+    assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 100, 5, 161, &result) == 1);
+    assert(result.present == 3 && result.hash == 0 && result.messages == 80);
+    const struct hpclang_rpl_library_attachment_targets sentinel = {7, 91, 92};
+    for (unsigned at = 5; at < 18; ++at) {
+        result = sentinel;
+        image.fail_at = at;
+        assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 100, 5, 161, &result) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&result, &sentinel, sizeof result));
+        image.fail_at = UINT32_MAX;
+        uint8_t original = image.data[at];
+        image.data[at] = 16;
+        assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 100, 5, 161, &result) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&result, &sentinel, sizeof result));
+        image.data[at] = original;
+    }
+    result = sentinel;
+    assert(hpclang_rpl_library_attachment_resolve(&reader, 1, 100, 5, 161, &result) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    put_word(&image, 8, 42, 5);
+    put_word(&image, 13, 87, 5);
+    assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 100, 5, 161, &result) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    put_word(&image, 13, 67, 5);
+    assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 100, 5, 162, &result) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 100, 5, 4096, &result) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 27, 5, 161, &result) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 100, 101, 161, &result) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 0x100001, 5, 161, &result) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_library_attachment_resolve(NULL, 0, 100, 5, 161, &result) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_library_attachment_resolve(&reader, 0, 100, 5, 161, NULL) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!memcmp(&result, &sentinel, sizeof result));
 }
 
 static void test_library_configuration(void)
@@ -902,12 +1068,15 @@ int main(void)
 {
     test_catalog_rebind();
     test_catalog_insertion();
+    test_catalog_removal();
+    test_home_attachment();
     test_acptr_resolution();
     test_flashptr_resolution();
     test_flashptr_bank();
     test_flashptr_special_table();
     test_bank_lookup();
     test_library_command_resolution();
+    test_library_attachment_targets();
     test_library_configuration();
     test_rom_bank_layout();
     test_library_catalog_lookup();

@@ -1,8 +1,20 @@
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include "rpl-object-store.h"
 #include "rpl-port.h"
 #include "rpl-port-mutation.h"
+
+enum port0_operation
+{
+    PORT0_CREATE_BACKUP,
+    PORT0_CREATE_LIBRARY,
+    PORT0_REPLACE,
+    PORT0_REMOVE
+};
+static int port0_apply(const struct hpclang_rpl_mutation_io *io, enum port0_operation operation,
+                       const uint8_t *packed, uint32_t span, const uint8_t *name,
+                       uint32_t name_length);
 
 struct packed_source
 {
@@ -79,7 +91,7 @@ static int port1_append(const struct hpclang_rpl_mutation_io *io, uint32_t limit
     for (uint32_t i = 0; i < 5; ++i) {
         uint8_t nibble = (packed[i / 2u] >> (4u * (i & 1u))) & 15u;
         if (!io->write_nibble(io->context, start + i, nibble))
-            return HPCLANG_RPL_MUTATION_IO;
+            return HPCLANG_RPL_MUTATION_INCOMPLETE;
     }
     return HPCLANG_RPL_MUTATION_OK;
 }
@@ -162,13 +174,13 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
             uint8_t nibble;
             if (!io->read_nibble(io->context, from + offset, &nibble) ||
                 !io->write_nibble(io->context, to + offset, nibble))
-                return HPCLANG_RPL_MUTATION_IO;
+                return HPCLANG_RPL_MUTATION_INCOMPLETE;
         }
     }
     for (uint32_t n = 0; n < span; ++n) {
         uint8_t nibble = (packed[n / 2u] >> (4u * (n & 1u))) & 15u;
         if (!io->write_nibble(io->context, target.address + n, nibble))
-            return HPCLANG_RPL_MUTATION_IO;
+            return HPCLANG_RPL_MUTATION_INCOMPLETE;
     }
     return HPCLANG_RPL_MUTATION_OK;
 }
@@ -241,8 +253,8 @@ int hpclang_rpl_port0_shift_backups(const struct hpclang_rpl_mutation_io *io, ui
     return hpclang_rpl_mutation_port0_shift_before(io, position, delta);
 }
 
-int hpclang_rpl_port0_remove_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *name,
-                                    uint32_t name_length)
+static int port0_remove_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *name,
+                               uint32_t name_length)
 {
     if (!io || !io->read_nibble || !io->write_nibble)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -338,17 +350,17 @@ static int prepend_record(const struct hpclang_rpl_mutation_io *io, const uint8_
 int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *packed,
                                     uint32_t span)
 {
-    return prepend_record(io, packed, span, 0x02b62u);
+    return port0_apply(io, PORT0_CREATE_BACKUP, packed, span, NULL, 0);
 }
 
 int hpclang_rpl_port0_create_library(const struct hpclang_rpl_mutation_io *io,
                                      const uint8_t *packed, uint32_t span)
 {
-    return prepend_record(io, packed, span, 0x02b40u);
+    return port0_apply(io, PORT0_CREATE_LIBRARY, packed, span, NULL, 0);
 }
 
-int hpclang_rpl_port0_replace_backup(const struct hpclang_rpl_mutation_io *io,
-                                     const uint8_t *packed, uint32_t span)
+static int port0_replace_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *packed,
+                                uint32_t span)
 {
     if (!io || !io->read_nibble || !io->write_nibble)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -387,4 +399,153 @@ int hpclang_rpl_port0_replace_backup(const struct hpclang_rpl_mutation_io *io,
     if (target.span != span && first_library < target.address)
         return HPCLANG_RPL_MUTATION_UNSUPPORTED;
     return hpclang_rpl_mutation_port0_replace_record(io, target.address, target.span, packed, span);
+}
+
+int hpclang_rpl_catalog_remove_repaired(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                        const struct hpclang_rpl_catalog_removal *expected,
+                                        const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    if (!io || !io->read_nibble || !io->write_nibble || !expected)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (io->library_table < 0x80000 || io->library_table > 0xffffd)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    struct hpclang_rpl_catalog_removal plan;
+    int result = hpclang_rpl_catalog_plan_remove(&reader, io->library_table,
+                                                 0x100000 - io->library_table, number, &plan);
+    if (result != 1)
+        return result ? parse_error(result) : HPCLANG_RPL_MUTATION_NOT_FOUND;
+    if (plan.slot != expected->slot || plan.end != expected->end || plan.count != expected->count ||
+        plan.binding.address != expected->binding.address ||
+        plan.binding.bank_switch != expected->binding.bank_switch ||
+        plan.binding.flags != expected->binding.flags)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t home = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        uint8_t nibble;
+        if (!io->read_nibble(io->context, 0x80711u + i, &nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (nibble > 15)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        home |= (uint32_t)nibble << (4 * i);
+    }
+    result = hpclang_rpl_home_library_attached(&reader, home, 0x100000u - home, number);
+    if (result)
+        return result == 1 ? HPCLANG_RPL_MUTATION_BUSY : parse_error(result);
+    result = hpclang_rpl_mutation_catalog_shrink_repaired(io, plan.slot, repairs);
+    if (result)
+        return result;
+    for (unsigned nibble = 0; nibble < 3; ++nibble)
+        if (!io->write_nibble(io->context, io->library_table + nibble,
+                              ((plan.count - 1) >> (4 * nibble)) & 15))
+            return HPCLANG_RPL_MUTATION_INCOMPLETE;
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
+int hpclang_rpl_catalog_insert_repaired(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                        const struct hpclang_rpl_library_binding *binding,
+                                        const struct hpclang_rpl_catalog_insertion *expected,
+                                        const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    if (!io || !io->read_nibble || !io->write_nibble || !binding || !expected)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    const struct hpclang_rpl_library_binding added = *binding;
+    if (io->library_table < 0x80000 || io->library_table > 0xffffd || !added.address ||
+        added.address > 0xfffff || added.bank_switch > 0xfffff || added.flags > 0xfff)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    struct hpclang_rpl_catalog_insertion plan;
+    int result = hpclang_rpl_catalog_plan_insert(&reader, io->library_table,
+                                                 0x100000 - io->library_table, number, &plan);
+    if (result != 1)
+        return result ? parse_error(result) : HPCLANG_RPL_MUTATION_EXISTS;
+    if (plan.slot != expected->slot || plan.end != expected->end || plan.count != expected->count)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = hpclang_rpl_mutation_catalog_grow_repaired(io, plan.slot, repairs);
+    if (result)
+        return result;
+    const uint32_t values[] = {number, added.address, added.bank_switch, added.flags,
+                               plan.count + 1};
+    const uint32_t widths[] = {3, 5, 5, 3, 3};
+    uint32_t at = plan.slot;
+    for (unsigned field = 0; field < 5; ++field) {
+        if (field == 4)
+            at = io->library_table;
+        for (unsigned nibble = 0; nibble < widths[field]; ++nibble)
+            if (!io->write_nibble(io->context, at++, (values[field] >> (4 * nibble)) & 15))
+                return HPCLANG_RPL_MUTATION_INCOMPLETE;
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
+struct port0_commit_observer
+{
+    const struct hpclang_rpl_mutation_io *source;
+    int attempted;
+};
+
+static int port0_observed_read(void *context, uint32_t at, uint8_t *value)
+{
+    const struct port0_commit_observer *observer = context;
+    return observer->source->read_nibble(observer->source->context, at, value);
+}
+
+static int port0_observed_write(void *context, uint32_t at, uint8_t value)
+{
+    struct port0_commit_observer *observer = context;
+    observer->attempted = 1;
+    return observer->source->write_nibble(observer->source->context, at, value);
+}
+
+static int port0_apply(const struct hpclang_rpl_mutation_io *io, enum port0_operation operation,
+                       const uint8_t *packed, uint32_t span, const uint8_t *name,
+                       uint32_t name_length)
+{
+    if (!io || !io->read_nibble || !io->write_nibble ||
+        (io->native_root_count && !io->native_roots))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    const uint32_t count = io->native_root_count;
+    size_t bytes = (size_t)count * sizeof(uint32_t);
+    if (bytes / sizeof(uint32_t) != count)
+        return HPCLANG_RPL_MUTATION_NOMEM;
+    for (uint32_t i = 0; i < count; ++i)
+        if (!io->native_roots[i])
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t *roots = bytes ? malloc(bytes) : NULL;
+    if (bytes && !roots)
+        return HPCLANG_RPL_MUTATION_NOMEM;
+    for (uint32_t i = 0; i < count; ++i)
+        roots[i] = *io->native_roots[i];
+    struct port0_commit_observer observer = {io, 0};
+    struct hpclang_rpl_mutation_io observed = *io;
+    observed.read_nibble = port0_observed_read;
+    observed.write_nibble = port0_observed_write;
+    observed.context = &observer;
+    int result;
+    if (operation == PORT0_REMOVE)
+        result = port0_remove_backup(&observed, name, name_length);
+    else if (operation == PORT0_REPLACE)
+        result = port0_replace_backup(&observed, packed, span);
+    else
+        result = prepend_record(&observed, packed, span,
+                                operation == PORT0_CREATE_LIBRARY ? 0x02b40u : 0x02b62u);
+    /* Native roots can change before the first Saturn write. Both are commit
+     * effects; neither may be hidden behind a recoverable preflight error. */
+    int changed = observer.attempted;
+    for (uint32_t i = 0; i < count; ++i)
+        changed |= roots[i] != *io->native_roots[i];
+    free(roots);
+    return result && changed ? HPCLANG_RPL_MUTATION_INCOMPLETE : result;
+}
+
+int hpclang_rpl_port0_replace_backup(const struct hpclang_rpl_mutation_io *io,
+                                     const uint8_t *packed, uint32_t span)
+{
+    return port0_apply(io, PORT0_REPLACE, packed, span, NULL, 0);
+}
+
+int hpclang_rpl_port0_remove_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *name,
+                                    uint32_t name_length)
+{
+    return port0_apply(io, PORT0_REMOVE, NULL, 0, name, name_length);
 }

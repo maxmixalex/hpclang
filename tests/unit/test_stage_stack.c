@@ -40,7 +40,8 @@ static uint32_t get(uint32_t at)
 }
 static void setup(void)
 {
-    memset(memory, 0, sizeof memory);
+    /* Unwritten fixture cells are unsupported opcodes, not RTNSXM (00). */
+    memset(memory, 15, sizeof memory);
     fault = UINT32_MAX;
     writes = 0;
     fail_write = 0;
@@ -63,6 +64,14 @@ static int oversized_instruction(void *context, uint32_t at, unsigned width, uin
     return 1;
 }
 
+static int oversized_condition(void *context, uint32_t at, unsigned width, uint32_t *value)
+{
+    int result = read_word(context, at, width, value);
+    if (result && at == 0xffffe && width == 2)
+        *value = 256;
+    return result;
+}
+
 static void test_immediate_return_root(void)
 {
     setup();
@@ -74,8 +83,16 @@ static void test_immediate_return_root(void)
         put(0x88800, instruction, 2);
         for (uint32_t cursor = 0; cursor < 8; ++cursor) {
             uint32_t *root = hpclang_stage_immediate_return_root(&io, 0x88800, stack, cursor);
-            int returns = instruction == 0x10 || instruction == 0x20 || instruction == 0x30;
+            int returns = instruction == 0 || instruction == 0x10 || instruction == 0x20 ||
+                          instruction == 0x30;
             assert(root == (returns ? stack + ((cursor + 7) & 7) : NULL));
+            if (returns) {
+                for (unsigned nibble = 0; nibble < 2; ++nibble) {
+                    fault = 0x88800 + nibble;
+                    assert(!hpclang_stage_immediate_return_root(&io, 0x88800, stack, cursor));
+                }
+                fault = UINT32_MAX;
+            }
         }
     }
     assert(!writes && !memcmp(before, stack, sizeof stack));
@@ -119,11 +136,12 @@ static void test_return_chain(void)
                     unsigned slot = (cursor + 7 - depth) & 7;
                     stack[slot] = 0x88100 + depth * 0x10;
                     /* Unvisited lower cells also look like execution addresses. */
-                    put(stack[slot], depth + 1 < length ? 0x10 * (1 + depth % 3) : tail, 2);
+                    put(stack[slot], depth + 1 < length ? 0x10 * (depth % 4) : tail, 2);
                 }
                 memcpy(before, stack, sizeof stack);
                 unsigned count = hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots);
-                unsigned expected = tail == 0x10 || tail == 0x20 || tail == 0x30 ? 8 : length;
+                unsigned expected =
+                    tail == 0 || tail == 0x10 || tail == 0x20 || tail == 0x30 ? 8 : length;
                 assert(count == expected);
                 for (unsigned depth = 0; depth < 8; ++depth)
                     assert(roots[depth] ==
@@ -179,7 +197,7 @@ static void test_jump_return_chain(void)
             stack[(cursor + 7 - depth) & 7] = at;
             if (depth < 7) {
                 put_jump(at, at - 0x20, depth % 3);
-                put(at - 0x20, 0x10 * (1 + depth % 3), 2);
+                put(at - 0x20, 0x10 * (depth % 4), 2);
             }
         }
         memcpy(before, stack, sizeof stack);
@@ -213,7 +231,7 @@ static void test_jump_return_chain(void)
             put(target, 0x10, 2);
             assert(hpclang_stage_return_roots(&io, 0x90000, stack, 0, roots) == 1);
             assert(roots[0] == &stack[7]);
-            put(target, 0, 2);
+            put(target, 0xff, 2);
         }
         assert(!writes);
     }
@@ -264,7 +282,7 @@ static void test_call_return_chain(void)
             put(target, 0x10, 2);
             assert(hpclang_stage_return_roots(&io, 0x90000, stack, 0, roots) == 1);
             assert(roots[0] == stack + 7 && !writes);
-            put(target, 0, 2);
+            put(target, 0xff, 2);
         }
     }
     for (unsigned kind = 0; kind < 3; ++kind)
@@ -285,7 +303,7 @@ static void test_call_return_chain(void)
                     put(at + prefix, kind == 2 ? at + 64 : 64 - prefix - width, width);
                     put(at + prefix + width, 0x10, 2);
                 }
-                put(0x88000 + 64 * depth, 0x10, 2);
+                put(0x88000 + 64 * depth, 0, 2);
                 unsigned expected = depth < 8 ? 8 - depth : 0;
                 assert(hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots) == expected);
                 for (unsigned i = 0; i < 8; ++i)
@@ -300,8 +318,171 @@ static void test_call_return_chain(void)
             }
 }
 
+static void test_conditional_paths(void)
+{
+    const struct hpclang_stage_stack_io io = {NULL, read_word, NULL};
+    for (unsigned cursor = 0; cursor < 8; ++cursor)
+        for (unsigned carry = 0; carry < 2; ++carry)
+            for (unsigned opcode = 4; opcode <= 5; ++opcode)
+                for (unsigned encoded = 0; encoded < 256; ++encoded) {
+                    uint32_t at = 0x88000;
+                    int32_t offset = encoded < 128 ? (int32_t)encoded : (int32_t)encoded - 256;
+                    uint32_t target = (uint32_t)((int32_t)at + 1 + offset);
+                    int overlaps = encoded && target < at + 3 && target + 2 > at;
+                    setup();
+                    uint32_t stack[8], before[8], *roots[8] = {0};
+                    for (unsigned i = 0; i < 8; ++i)
+                        stack[i] = 0x8a000;
+                    stack[(cursor + 7) & 7] = at;
+                    memcpy(before, stack, sizeof stack);
+                    put(0x87000, carry ? 0x20 : 0x30, 2);
+                    put(at, opcode, 1);
+                    put(at + 1, encoded, 2);
+                    int taken = carry == (opcode == 4);
+                    unsigned expected = 1;
+                    if (encoded) {
+                        if (!taken || !overlaps) {
+                            put(taken ? target : at + 3, 0x10, 2);
+                            expected = 2;
+                        }
+                        /* Overlapping taken targets see the actual branch bytes:
+                         * offsets -2/+1 stop at unsupported opcodes, -1 loops. */
+                    } else if (taken) {
+                        expected = 2;
+                    }
+                    assert(hpclang_stage_return_roots(&io, 0x87000, stack, cursor, roots) ==
+                           expected);
+                    for (unsigned i = 0; i < 8; ++i)
+                        assert(roots[i] == (i < expected ? &stack[(cursor + 7 - i) & 7] : NULL));
+                    for (unsigned nibble = 0; nibble < 3; ++nibble) {
+                        fault = at + nibble;
+                        assert(hpclang_stage_return_roots(&io, 0x87000, stack, cursor, roots) == 1);
+                    }
+                    fault = UINT32_MAX;
+                    /* A plausible native carry is never inferred from these inputs. */
+                    assert(!hpclang_stage_return_roots(&io, at, stack, cursor, roots));
+                    put(0x87000, 0, 2); /* RTNSXM does not establish carry. */
+                    assert(hpclang_stage_return_roots(&io, 0x87000, stack, cursor, roots) == 1);
+                    assert(!writes && !memcmp(stack, before, sizeof stack));
+                }
+    /* Both RTN and RTNSXM retain a previously established carry. */
+    for (unsigned carry = 0; carry < 2; ++carry)
+        for (unsigned preserve = 0; preserve <= 0x10; preserve += 0x10) {
+            setup();
+            uint32_t stack[8] = {0}, *roots[8] = {0};
+            stack[7] = 0x88100;
+            stack[6] = 0x88200;
+            put(0x88000, carry ? 0x20 : 0x30, 2);
+            put(0x88100, preserve, 2);
+            put(0x88200, carry ? 4 : 5, 3);
+            assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 3);
+            assert(roots[2] == stack + 5);
+        }
+    /* A generated call frame sets carry without becoming an original root. */
+    setup();
+    uint32_t stack[8] = {0}, *roots[8] = {0};
+    put(0x88000, 0x37, 4); /* GOSUB to 88007 */
+    put(0x88004, 5, 3);    /* RTNNC */
+    put(0x88007, 0x30, 2);
+    assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 1);
+    assert(roots[0] == stack + 7 && !writes);
+    /* A callee's later flag-setting return supersedes the earlier carry. */
+    stack[7] = 0x88000;
+    put(0x87000, 0x20, 2);
+    put(0x88000, 0x1c7, 4); /* Call 88020, leaving an unsupported fallthrough after RTNNC. */
+    put(0x88007, 0xff, 2);
+    put(0x88020, 0x30, 2);
+    assert(hpclang_stage_return_roots(&io, 0x87000, stack, 0, roots) == 2);
+    assert(roots[0] == stack + 7 && roots[1] == stack + 6);
+    /* A taken conditional cycle must retain the instruction budget. */
+    stack[7] = 0x88100;
+    put(0x88000, 0x20, 2);
+    put(0x88100, 0xff4, 3);
+    assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 1);
+
+    setup();
+    stack[7] = 0xffffd;
+    put(0x88000, 0x20, 2);
+    put(0xffffd, 4, 3); /* Last complete RTNC encoding. */
+    assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 2);
+    for (unsigned i = 0; i < 3; ++i) {
+        fault = 0xffffd + i;
+        assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 1);
+    }
+    fault = UINT32_MAX;
+    const struct hpclang_stage_stack_io malformed = {NULL, oversized_condition, NULL};
+    assert(hpclang_stage_return_roots(&malformed, 0x88000, stack, 0, roots) == 1);
+    put(0xffffd, 0x24, 3); /* Both paths wrap to an unreadable zero PC. */
+    assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 1);
+    stack[7] = 0xffffe;
+    put(0xffffe, 4, 2); /* Truncated operand must not be read across the mapping. */
+    assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 1);
+}
+
+static void test_main_page(void)
+{
+    uint32_t map[256] = {0};
+    const uint32_t physical = 0x08040000u;
+    uint32_t output = 0x12345u;
+    assert(hpclang_stage_main_page(NULL, physical, &output) == -1);
+    assert(hpclang_stage_main_page(map, physical, NULL) == -1);
+    assert(hpclang_stage_main_page(map, physical + 1, &output) == -1);
+    assert(hpclang_stage_main_page(map, physical, &output) == 0);
+    assert(output == 0x12345u);
+    /* Every possible full-page placement, including odd Saturn pages. */
+    for (unsigned first = 128; first < 255; ++first) {
+        memset(map, 0, sizeof map);
+        map[first] = physical;
+        map[first + 1] = physical + 2048;
+        assert(hpclang_stage_main_page(map, physical, &output) == 1);
+        assert(output == first * 4096u);
+        output = 0x12345u;
+        map[first + 1] = physical + 4096;
+        assert(hpclang_stage_main_page(map, physical, &output) == -1);
+        assert(output == 0x12345u);
+        map[first] = 0;
+        map[first + 1] = physical + 2048;
+        assert(hpclang_stage_main_page(map, physical, &output) == -1);
+        assert(output == 0x12345u);
+    }
+    memset(map, 0, sizeof map);
+    map[128] = physical;
+    map[129] = physical + 2048;
+    /* A second full alias is ambiguous even when each pair is contiguous. */
+    map[200] = physical;
+    map[201] = physical + 2048;
+    assert(hpclang_stage_main_page(map, physical, &output) == -1);
+    map[201] = 0;
+    /* Interior/straddling aliases cannot escape a start-address-only scan. */
+    for (unsigned offset = 1; offset < 4096; ++offset) {
+        map[200] = physical + offset;
+        assert(hpclang_stage_main_page(map, physical, &output) == -1);
+        assert(output == 0x12345u);
+    }
+    for (unsigned offset = 1; offset < 2048; ++offset) {
+        map[200] = physical - offset;
+        assert(hpclang_stage_main_page(map, physical, &output) == -1);
+        assert(output == 0x12345u);
+    }
+    map[200] = physical - 2048;
+    assert(hpclang_stage_main_page(map, physical, &output) == 1);
+    memset(map, 0, sizeof map);
+    map[255] = physical;
+    assert(hpclang_stage_main_page(map, physical, &output) == -1);
+    map[255] = 0;
+    map[128] = physical + 2048;
+    assert(hpclang_stage_main_page(map, physical, &output) == -1);
+    memset(map, 0, sizeof map);
+    map[254] = 0xfffff000u;
+    map[255] = 0xfffff800u;
+    assert(hpclang_stage_main_page(map, 0xfffff000u, &output) == 1);
+    assert(output == 0xfe000u);
+}
+
 int main(void)
 {
+    test_main_page();
+    test_conditional_paths();
     test_call_return_chain();
     test_jump_return_chain();
     test_immediate_return_root();

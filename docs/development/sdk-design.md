@@ -786,6 +786,43 @@ installer still needs availability, firmware and complete startup-safety checks.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
 
+Ordinary Stock probes on HP49g+/HP50g evaluate configuration 2 while a child directory is current. They add a duplicate HOME attachment; the child header remains `0x7FF`.
+
+The maintained `tests/e2e/port-library/configuration_audit.py` checks those two
+snapshots and three additional HP49g+ executions: inline BINT 2, inline BINT 12
+and the original ROM configuration-2 program. The library-2 cases add the same
+duplicate HOME record. Library 12 adds `(12, 0, 550399)` to HOME, preserving
+the other records, catalog, Flash, child header and sentinel with an empty stack.
+All five audits and five deliberately wrong expected-record controls pass;
+reports are in `/work/oct28-configuration-audit`. The exploratory scripts that
+expected the child header to equal the library number failed their assertions;
+these failures do not establish failed execution. This is ordinary Stock
+configuration behavior, not startup safety or permission to move its references.
+
+`configuration_references.py --audits /work/oct28-configuration-audit --output
+/work/oct28-home-reference-maintained` compiles the current C reference scanner
+and replays those five hash-bound snapshots. It matches all 109 nonzero HOME
+attachment edges and skips 21 zero fields, while reading every nibble of each
+zero field. All 105 injected unreadable-nibble cases return `UNAVAILABLE`;
+partial visitor output is not accepted. These local checks need private native
+snapshots and are not ordinary CI coverage or a complete relocation proof.
+
+
+Supported-ID-769 fixtures bind the recorded recovery/admission ELF artifacts
+through the maintained packager. Both HP49g+ and HP50g pass installation,
+guarded low-memory repair, reset checkpoint verification, repeat restart,
+absent-reservation recovery and all 16 rejection cases each. Guarded recovery
+preserves 23,900 array elements; 21,702 free bytes admit the 20,994-byte admission
+copy but not the recovery copy. Independent saved-state checks verify all 32
+rejections preserve Flash and user data, complete the configuration witness and
+issue no Flash operation or reset. HP50g's missing phases continue from reverified
+checkpoints without replaying its completed recovery. Inputs, results and audits
+remain under `/work/oct27-supported-recovery/<model>`.
+The harness accepts an explicit library ID (default 1701), rejects unsupported
+IDs before fixture creation and records the selected ID in new results. Its
+ID769 witness packages match the retained native fixtures byte-for-byte. These
+checks establish supported bindings, not complete pre-recovery callback safety.
+
 The internal `hpclang_rpl_library_configuration()` resolver reads the configuration
 offset from a validated library ID header in a caller-selected stable mapping.
 It distinguishes a zero offset from read failures, malformed IDs and out-of-bounds
@@ -1119,6 +1156,208 @@ body, but neither reverse instruction matching nor a matching boundary proves
 that a saved scalar was produced by that call. The platform still owes the
 suspended caller's provenance contract before publishing relocation roots.
 
+The internal `rpl-code` literal inspector describes LC/LA register writes at
+proven instruction boundaries. A caller-proven P value determines a 64-bit
+write mask and positioned value, including nibble wrap; untouched register bits
+survive. The encoded literal location is retained for guards, not declared to
+be a pointer field. Numeric constants alone never establish address provenance
+or mapping identity. A later register copy may propagate an independently
+proven address fact, but these primitives do not authorize relocation.
+The exchange inspector describes simultaneous standard-field swaps between
+A/B/C/D pairs or A/C and R0..R4, including the launcher's `ACEX W` instructions.
+Both fields must be read from the pre-instruction state before either is
+replaced; bits outside the selected field survive. P/WP fields require the
+proven current P. A/C exchanges with D0/D1 are also decoded: EX swaps five low nibbles,
+XS swaps four while preserving the fifth address nibble; higher A/C nibbles
+survive. Plain D0/D1=A/C assignments likewise copy five low nibbles, while
+D0/D1=AS/CS copy four and preserve the fifth address nibble; the source remains
+unchanged. P exchanges and custom fields remain unsupported. This is a data-flow building block, not a complete
+launcher analysis or permission to treat arbitrary register values as roots.
+
+`A=PC` and `C=PC` now expose `NEXT_PC` as their assignment source, with
+`instruction+4` in the descriptor's constant field. This distinguishes an
+execution address in the instruction reader's mapping from an arbitrary
+literal. Only the low five nibbles change; PC exchanges remain unsupported.
+An address-space-crossing next PC is rejected. The maintained `pc_capture.py`
+driver compares the C decoder with one synthetic instruction executed by the
+original ARM Saturn interpreter: 192 cases across HP49g+/HP50g, both registers,
+three instruction locations and every P value pass, preserving all unrelated
+registers, flags and machine-stack cells. Reports and source/input hashes are
+under `/work/oct28-pc-capture/<model>`. The earlier extreme-boundary probe reached
+an unmapped interpreter fetch; it does not prove wrap semantics. These checks
+establish capture semantics, not launcher reachability or relocation permission.
+
+`hpclang_rpl_code_memory_inspect` describes DAT0/DAT1 loads and stores involving
+A/C: direction, address register, selected register field and transfer length.
+The register field starts at its selected nibble while memory starts at D0/D1;
+the address register does not advance. Standard fields and explicit counts are
+covered by 3,456 unit combinations, with truncated/unreadable instructions and
+unsupported/custom fields rejected without publishing a descriptor. No data
+memory is read by this inspector, and memory contents are not classified as
+pointers merely because a transfer exists.
+
+The maintained `alternate_return.py` now checks every such transfer along its
+controlled original PrRUN return, including the R0-to-A-to-stack path. Both
+models pass all 192 baseline, repaired and deliberately stale-register cases,
+including original-allocation variants: 960 stores and 864 loads match C
+descriptors while preserving unrelated register bits and D0/D1. Reports in
+`/work/oct28-memory-return` retain source/input hashes and transfer observations.
+These are controlled continuation checks, not complete entry reachability,
+incoming-register provenance or permission to enable public relocation.
+
+The `hpclang_rpl_code_origins_*` operations compose those descriptors over
+caller-owned per-nibble tokens. Assignment snapshots its source, exchange
+snapshots both registers, and memory transfers snapshot their input before
+updating any destination, including overlapping token arrays. Untouched fields
+retain their tokens; scalar constants clear them, while PC captures require
+separately established mapping-aware tokens. All register/field bounds are
+checked before changes. These are abstract origins, not numeric execution,
+pointer classification or a general control-flow interpreter. Callers must stop
+or invalidate facts at unmodeled writes and retain all code/mapping dependencies.
+
+`alternate_return.py` now composes the original three-instruction R0.A-to-A.A,
+DAT1-to-C.A, A.A-to-DAT1 segment using these C operations. Across both models,
+all 192 controlled return cases pass: 96 follow that segment and carry exactly
+the R0 nibble tokens into its stack cell; the other 96 do not enter it. Original
+allocation variants are included. Unit tests cover descriptor composition,
+overlapping copies, simultaneous exchanges, clearing constants, and unchanged
+state on invalid inputs. `/work/oct28-origins-return` retains hash-bound reports.
+Seeding R0 tokens identifies their origin; it does not by itself prove the
+incoming value is a valid object, establish the whole caller path, or authorize
+movement. The deliberately stale-R0 controls retain that distinction.
+
+The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
+`--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles
+the current C decoders and executes the original ARM Saturn interpreter. The
+prefix mode checks entry `351cc` through the comparison boundary `351e8`:
+128 controlled-entry cases and eight changed-code controls pass across both
+models and both retained-predicate/standard-Stock snapshots. D0/D1 and P restore;
+the temporary machine-stack slot contains the scalar type ID (including
+address-like `90001`), then clears on pop while seven other slots survive.
+
+The extended mode continues through the true/false branches, native Boolean
+writeback and next RPL dispatch. Its 256 cases cover both initial carry values;
+16 modified-code controls reject incorrect address restoration or true/false
+constants. Only the expected Boolean stack slot may change outside CPU state;
+the complete remaining native RAM is compared byte-for-byte. D0 advances five
+nibbles to the next thread entry and the interpreter reaches its expected target.
+The result binds ROM/RAM, decoder sources/headers, reader and driver hashes.
+These are controlled entries after OS setup, with no IRQ, not an unrestricted
+caller/startup proof or permission to relocate. The individual D0/D1 checks
+retain 4,096 x48 comparisons and 128 saved-ROM instruction checks.
+
+The internal `hpclang_rpl_dispatch_reference_visit_identified` binds a
+caller-reviewed schema to exact handler/dependency nibble ranges before
+emitting edges. At least one range contains the dispatch entry. Successful
+reads of matched code and object fields become commit-guard dependencies;
+code mismatches, malformed/unreadable input and callback errors reject without
+object edges during identity checking. Expected bytes must be independently
+reviewed, and the caller must establish full semantic/callee coverage and a
+stable shared mapping. This is neither automatic ROM authentication nor proof
+that a matching prefix makes an arbitrary RAM continuation safe.
+
+ASan/UBSan reference tests cover disjoint ranges, byte changes before/after
+capture, unavailable/invalid input, dependency failures and metadata bounds.
+ARM compilation and static analysis pass. Four retained ROM identity windows
+match across HP49g+/HP50g; all 768 single-nibble changes reject before edges.
+These windows are inspection extents, not claimed complete handler bodies.
+Evidence: `/work/oct28-dispatch-identity/results.json`, reproduced by
+`research/oct28-dispatch-identity-native.py`.
+
+Catalog/cache transactions can now revalidate read-only dependencies in
+proven-disjoint mappings through the optional `catalog_repairs.guard_reader`.
+Main-RAM guards always use the mutation IO; failures never fall back to the
+external reader. This accepts ROM identity guards without permitting foreign
+edits. Distinct mapping IDs must mean proven physical disjointness, and callers
+retain exclusive mapping/data ownership through publication and return.
+The internal repairs structure gained an optional final member; rebuild callers.
+
+Twenty focused unit scenarios cover ROM and equal-address disjoint mappings,
+changed bytes, unavailable/invalid reads, missing readers, bounds, wrong mapping
+IDs and native-guard failures. Every rejection preserves RAM and register words
+with zero writes. The full mutation suite passes ASan/UBSan; ARM runtime/caller
+compilation, static analysis and the eight repaired-dispatch cases also pass.
+This provides commit-time checking, not complete dependency discovery or a
+Stock-GC interception mechanism. ARM artifacts: `/work/oct28-mapped-guards/`.
+
+The maintained `dispatch_prefix.py` now uses that identity entry point before
+each real interpreter dispatch, with fixed reviewed window bytes rather than
+learning expected bytes from its input. All 896 prefix/full/DUP cases across
+two models and both snapshot families pass, checking code and object dependency
+coverage. All 44 changed-code cases reject with no edges for the mismatched
+handler. A separate, explicitly bypassed run retains the 44 causal execution
+controls; bypass is forbidden without an injected fault. These counts do not
+extend the windows' semantic scope. Current reports and independent count/hash
+audit: `/work/oct28-dispatch-identity-integrated/`.
+
+With `--through-dispatch --duplicate-entry`, execution starts at `37258`:
+DUP preserves the original stack-top object, consumes one existing stack slot,
+and enters the embedded predicate. The C structural decoder's two wrapper
+edges and single predicate edge agree with the actual interpreter entry; the
+scalar type operand is never emitted as a pointer. Capacity values 1 and 16,
+both carry inputs, all eight machine-stack cursors and all P values are covered.
+Across both models and both snapshot families, 512 cases and 20 changed-code
+controls pass, including a wrong stack-step control. Together with the existing
+modes this gives 896 cases and 44 controls. The allocation/GC branch at exhausted
+capacity is deliberately outside this result, and remains an open handler
+obligation rather than permission for public relocation.
+
+Inspection of both retained ROMs identifies the exhausted-capacity dependency:
+`05f0f` calls `0679b`, `0613e`, and `067d2` before decrementing the replenished
+capacity. The first/last routines save/restore D0, D1, B.A and D.A through
+system slots `8076b`, `806f8`, `806f3`, and `80e9b`. The inspected `0613e`
+prefix pops its return address into `80fad`, follows the chain rooted at
+`806ee`, and writes six-nibble entries at `06184`. Consequently, setting the
+synthetic test's capacity to zero is not a valid heap fixture. Exhaustion
+coverage requires a coherent Stock heap and continuation roots, with movement
+and write-set assertions. These inspection windows establish dependencies,
+not complete handler extents or successful GC execution. Reproduction:
+`research/oct28-dispatch-capacity-callees.py`; local artifacts:
+`/work/oct28-dispatch-capacity-callees/windows.json` and per-model disassembly.
+
+The maintained `tests/e2e/code-relocation/dispatch_capacity.py` runs the
+original interpreter with the retained ten-predicate Stock fixture. Invoke it
+with `--state <snapshot> --model hp49gplus|hp50g --output <directory>`;
+add `--ram-interior` for the unsafe movable-entry contrast. Unicorn is required;
+this is a local fixture test, not part of ordinary CI. Reports distinguish
+`ROM continuation preserved` from `stale RAM continuation reproduced` and
+record input, driver and native-reader hashes. Neither mode claims real
+low-memory or public relocation acceptance. IRQs are disabled and caller
+machine-stack frames cleared; no allocator or Saturn instruction is stubbed.
+
+The ROM mode forces D.A=0, executes 12,205 Saturn instructions through collection
+and DUP, and checks all 20 user values, the duplicated top, A.A/R1.A continuation,
+D0 and machine-stack cursor. The return-stack boundary falls from 556530 to
+554981; the user objects remain at their original addresses.
+
+The RAM mode models a 32-nibble TEMP DOCSTR envelope with an explicit data-stack
+root and a validated footer chain. Collection moves it from 556486 to 554937
+and repairs that root, but leaves A.A/R1.A at 556501 instead of 554952. Both
+models reproduce this while preserving the original 20 user values. Old payload
+bytes remain readable, so reaching the next handler is insufficient proof.
+This diagnoses an unsupported Stock execution fixture; it does not establish
+a defect in hpclang's caller-proven register repairs for catalog transactions.
+Those repairs do not intercept Stock collection. Public movable entries still
+require a proven native launch convention or explicit continuation ownership
+and repair/pinning. Latest four reports and final SRAM are retained under
+`/work/oct28-dispatch-capacity-maintained/{rom,ram}/`.
+
+`dispatch_repaired.py` consumes the RAM contrast SRAM via `--prepared-sram`,
+plus `--state`, `--model` and `--output`. The current C catalog-grow transaction
+checks both reviewed ROM windows through its mapped read-only guard channel,
+then resumes original ROM at `3727d`. `dispatch_identity.py` supplies the same
+fixed expected bytes to this test and the identity-bound interpreter test.
+Both models reach the expected type comparison after a 16-nibble move when R1
+is repaired (with or without A repair). Omitting R1, including repairing A
+alone, yields an observed wrong dispatch after seven instructions, not timeout.
+The restore instruction overwrites A from R1. Four positive and four negative
+execution cases check register bits and the moved data root. Fourteen injected
+ROM-read change/unavailable/invalid cases reject before any RAM/register write,
+including faults at the final identity byte. Reports retain code/profile/input
+hashes. This supplies caller provenance and stops before catalog publication or
+Stock return; it is not complete discovery, public registration, or a Stock-GC
+repair hook. Results: `/work/oct28-dispatch-repaired-guarded/<model>/results.json`.
+
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
 GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
 A/C bit-test instruction boundaries. Its relocation planner
@@ -1262,15 +1501,69 @@ documented target adaptations, not removed application requirements.
 
 ### Startup resource admission
 
-The wrapper's native request word is `0x01c00000`, not a byte count. The
+The wrapper's native request word is `0x0fc00000`, not a byte count. The
 Launcher V3 format in HPGCC 1.1's `ARMToolbox/LibFmt.txt` and HPGCC 2.0 SP2's
 `sources/ARMToolbox/masd_source/ARMTBX_3_SOURCES.DIR` assigns bit 22 to the MMU
 packer, bit 23 to optional ARM OS RAM, and bits 24–27 to native stack-growth
-reservation in 16-byte blocks. Our word sets both flags and one stack block.
+reservation in 16-byte blocks. Our word sets both flags and all 15 stack blocks
+(240 bytes), the largest representable request. Runtime fences still bound
+each mutation; this request does not promise unlimited or unconsumed capacity.
 With the packer enabled, the low 20 bits describe space to leave for TEMPOB
 growth, not the application's pool size; this word leaves that field zero.
 Writing a 36 KiB application limit there would change native free-space policy,
 not enforce a 36 KiB allocation.
+
+The exact-head `0e68b3b1` object-mutation CI failures on HP49g+ and HP50g
+expose a concrete USEROB capacity limit on the third invocation. Independent
+reads of both captured MMU tables, boot bounds and Saturn RAM give DSKTOP
+`0xe0012`, RSKTOP `0x88de4`, USEROB fence `0xe0000` and five reserved nibbles.
+Only 13 nibbles remain for growth, despite a raw stack gap of 356,910 nibbles.
+Replacing integer 987 (14 nibbles) with the unchanged 34-character test string
+(78 nibbles) needs 64 nibbles and would lower DSKTOP to `0xdffd2`, below the
+required `0xe0005`. Both captured TLS errno cells contain ENOSPC (28). The
+native-page fence must remain intact; total free RAM is not contiguous USEROB
+capacity. The failed wrapper requested only one 16-byte stack-growth block.
+
+Reproduction artifacts are retained in `research/oct27-object-ci`: the two
+full SRAM/on-chip captures and `capacity-audit.json` with SHA-256 input identities.
+`research/oct27-object-ci-capacity.py` checks the bounds against both captures.
+The original CI jobs are 121826320519 and 121826320547. The historical Launcher
+V3 source's MMUARMJUMP subtracts the stack-growth request from DSKTOP before
+assembling main-RAM pages. The 240-byte candidate now passes the complete
+three-invocation Stock object-mutation lifecycle on both models, including
+settled return and phases 0x4f530400/401/402. All five retained CI code artifacts
+(application ELF/HPC, two launcher ELFs and stage1 ELF) match byte-for-byte;
+only the wrapping request changes. The production wrapper reproduces both
+tested packages exactly. `research/oct27-port0-reserve-identity.py` and
+`/work/oct27-port0-reserve/{code-identity,verified-results}.json` retain the
+artifact checks and six result records. All six models now pass: three invocations each on HP48gII/HP49g+/HP50g
+and 15 each on HP39g+/HP39gs/HP40gs, totaling 54 lifecycle phases with settled
+return. The independently checked structured records are retained in
+`/work/oct27-port0-reserve/verified-results.json`, separately from the subsequent
+catalog suite which reuses the harness build-output paths. The accepted-main integration preserves
+all three family payloads/result addresses and six launchers byte-for-byte;
+integration port/mutation/reference/physical-mapping sanitizer tests pass.
+New CI remains required; these local passes do not complete M8.0.
+
+The code-relocation CI failures (HP49g+ job 121826775448 and HP50g job
+121826775572, same `0e68b3b1` head) are test allocation failures before HOME
+detachment. Independent snapshots from both models agree on the following bounds. The retained PC
+`0x0122c298`, malloc return LR `0x0122c45f`, stack operands and TLS errno 12
+identify the one-byte-per-nibble HOME snapshot: 246,907 requested bytes exceed
+the complete 229,376-byte RW region. HOME is `0xc3a60`, its body begins at
+`0xc3b04`, and Port 0 begins at `0xfff7f`. The candidate packs both nibbles into
+each snapshot byte, needing 123,454 bytes for this odd-sized body, and still
+compares every native nibble after detach/reattach. ARM build, formatting and
+static analysis pass. All ten native detach/reattach/cache cases across
+HP49g+/HP50g now pass from fresh standard Stock installations. The 62,136-byte
+payload, verifier inputs and every packaged case match the saved input hashes;
+`research/oct28-packed-home-audit.py` replays all checks against the retained
+RAM/Flash without running the emulator. The replay verifies catalog bindings,
+HOME attachments, cache lookup/message behavior and original Flash preservation.
+New delivery CI is still required. Failure RAM, matching-image identity and allocation audit
+remain under `research/oct27-code-ci`; `oct27-code-ci-allocation.py` reproduces
+the address/size/errno checks. This fixture fix changes neither production
+mutation behavior nor its memory fences.
 
 The historical implementations assemble a pool from available native memory
 and optionally append an OS allocation. Their OS probing policy varies: the
@@ -1447,6 +1740,75 @@ application execution. Each rejection must return with the caller registers,
 interrupt state and mappings intact and leave the entire temporary pool
 unchanged. Normal payload PASS, pixels and Stock return are still required.
 
+### Opt-in lifecycle SRAM observation
+
+The local Stock frontend supports `HPCLANG_X50NG_RESOURCE_SNAPSHOT=/new/path/prefix`.
+When set, named sequence captures, installation completion, application PASS and
+settled return write `prefix-PHASE.sram` and `prefix-PHASE.json`. The sidecar records
+model, emulated time, PC/CPSR, base address and exact SRAM length (256 KiB on
+HP48gII, 512 KiB otherwise). No guest memory or register is written. Unset/empty
+configuration performs no resource reads and preserves ordinary execution.
+
+Use a fresh prefix per emulator invocation, especially for repeated application
+launches. Outputs are exclusive: existing evidence is never overwritten, malformed
+phase/model selections and read failures reject capture, and partial new outputs
+are removed after write failure. The frontend treats capture failure as an E2E
+failure. The snapshot helper has six passing host tests; the observation frontend
+builds with the existing headless configuration. The initial HP50g run in
+`/work/oct26-resource-snapshots` fails the watchdog assertion on a reused older
+emulator; its 19 snapshots validate structurally but are not a successful run.
+The clean pinned-source build passes HP50g Stock transfer, application execution
+and settled return in `/work/oct26-resource-snapshots-clean`. All 20 captured
+stages have valid metadata/lengths and complete validated allocator free lists.
+Heap 0x100 free usable bytes are 105,116 before USB, 104,072 during USB, 105,116
+before launch, 19,080 at application PASS and 105,116 after settled return.
+The 86,036-byte application interval difference is consistent with the earlier
+86,016-byte usable native block plus 20 bytes of metadata; ownership attribution
+still requires the block/pool evidence. These sampled values are not peak bounds.
+Remaining-model validation runs in `/work/oct26-resource-snapshot-matrix`. Named screenshot phases identify capture events, not necessarily
+stable allocator states; an independent allocator/ownership analysis must validate
+and interpret each snapshot before using it for admission or peak-memory claims.
+
+The maintained verifier accepts a completed run directory containing
+`MODEL-stock.json`, `MODEL-PHASE.{json,sram}` and `state/flash`:
+
+```sh
+python3 tests/e2e/harness/verify-resource-snapshots.py /path/to/run \
+  --model hp50g --report /new/path/verified-lifecycle.json
+```
+
+Use `--rom` when the matching packed ROM is stored elsewhere. It rejects an
+unreviewed allocator implementation, mismatched model/length/schema, malformed
+lists, orphan sidecars, missing PASS/return captures, invalid lifecycle order or
+an unsettled/failed execution. It requires an earlier snapshot before PASS; it
+does not infer that every possible intermediate phase or transient peak was
+captured. Reports fingerprint the ROM, status and each SRAM image and preserve
+phase/time and both heaps' free totals/largest blocks. Report creation is
+exclusive so a prior result cannot silently be overwritten.
+
+The HP50g 20-snapshot run passes. Thirteen observer/verifier host tests pass;
+real-capture negatives reject missing return SRAM, wrong model, reordered phases,
+truncated SRAM and unsettled execution. Evidence is in
+`/work/oct26-resource-snapshots-clean/verified-lifecycle.json` and
+`/work/oct26-resource-verifier-negatives.json`.
+
+HP39g+ also passes Stock execution and all nine captured phases through the
+maintained verifier. Heap 0x100 usable bytes are 13,212 before transfer,
+12,168 during USB, 13,212 after fetch, 7,048 at application PASS and 13,212
+after settled return. Each sample has two free blocks and an empty heap 0x200;
+the largest free block is 1,024 bytes smaller than the usable total. The
+6,164-byte application interval difference does not by itself identify an
+allocation owner. Evidence:
+`/work/oct26-resource-snapshot-matrix/hp39gplus/verified-lifecycle.json`.
+HP39gs passes eight captures with usable bytes 12,540 before transfer, 11,496
+during transfer, 12,540 after fetch, 6,376 at PASS and 12,540 after return.
+Its independent report is
+`/work/oct26-resource-snapshot-matrix/hp39gs/verified-lifecycle.json`.
+All six models now pass: HP40gs adds eight snapshots, HP48gII 14, and HP49g+
+20. Independent replay verifies all 79 captured stages and their saved reports;
+`/work/oct26-resource-snapshot-matrix/final-audit.json` fingerprints the evidence.
+These successful sampled runs do not establish a transient peak bound.
+
 ### UI resource measurements
 
 The UI E2E application limits its mapped writable arena to 36 KiB. Its test-only
@@ -1495,3 +1857,19 @@ device/capability facts
 ```
 
 M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. M7.2 byte-stream storage is complete with Storage #53 / Core #254. M7.3a–j object services, including directories, composite objects, Aplet-owned persistence/Reset and native catalogs, are accepted, as are M7.4 common system services and M7.5 display/runtime services. Text/numeric/console behavior and media-change services are accepted, including four SD volumes and stable card identity on `7303a3d6`. Overall M7 is accepted at functional head `2988e1de`, including the capability ledger, timed historical client, owned CPU power policy and ordinary application termination. See [final acceptance](validation.md#m7-final-acceptance). The individually approved native Port 0/1/2, whole-calculator reset and reliable serial-number follow-ups remain on the [roadmap](roadmap.md).
+
+### Stock UI lifecycle CI evidence
+
+Stock UI jobs enable the lifecycle observer in a new per-model directory under
+`build/resource-snapshots/`. The validation step preserves final packed Flash
+and Stock status and runs even after a failed execution; an incomplete or failed
+run cannot produce a successful report. Raw captures and proof reports are
+uploaded with the existing UI evidence. Other suites remain unchanged.
+
+All six local UI runs pass independent pixels, stack/heap observations, stage
+pool checks and lifecycle validation. Their 79 snapshots replay against saved
+proofs, and the exact workflow commands pass all six positive cases plus
+missing-return, report-preservation and inactive-suite controls. Evidence:
+`/work/oct26-ui-lifecycle/final-audit.json` and
+`/work/oct26-ui-lifecycle-workflow-matrix.json`. Peak bounds, complete physical
+accounting and remote CI acceptance remain separate requirements.

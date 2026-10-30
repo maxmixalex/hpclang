@@ -4,7 +4,12 @@
 #include "rpl-mutation.h"
 
 /* Append to the ERAM chain without moving any existing record. limit is the
- * launcher-proven exclusive nibble boundary before its physical page pool. */
+ * launcher-proven exclusive nibble boundary before its physical page pool.
+ * Body/next-terminator write failure is IO: the old zero prologue still hides
+ * the append, although unused bytes may have changed. Once prologue publication
+ * is attempted, write failure is INCOMPLETE: retain ownership and do not resume
+ * Stock or retry a possibly partially published record. Stable production RAM
+ * callbacks must not fail after successful preflight. */
 int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
                                     const uint8_t *packed, uint32_t span);
 /* Same ownership/append contract for a library. Does not register or attach it;
@@ -24,13 +29,23 @@ struct hpclang_rpl_port1_guard
 
 /* Internal ERAM edits require the reference guard; absence is UNAVAILABLE.
  * These routines do not relocate banked references. Libraries after the target
- * cannot move. The launcher ownership fence and append commit contract apply. */
+ * cannot move. The launcher ownership fence and append commit contract apply.
+ * Input/guard/preflight failures do not write. Once the guarded commit begins,
+ * a backend read/write failure is INCOMPLETE, not a preflight IO failure. Retain
+ * ownership and do not resume Stock or retry: earlier writes may have changed
+ * the chain and the reference guard does not provide rollback. */
 int hpclang_rpl_port1_replace_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
                                      const uint8_t *packed, uint32_t span,
                                      const struct hpclang_rpl_port1_guard *guard);
 int hpclang_rpl_port1_remove_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
                                     const uint8_t *name, uint32_t name_length,
                                     const struct hpclang_rpl_port1_guard *guard);
+
+/* Port0 create/replace/remove track native-root changes and Saturn write
+ * attempts. Any subsequent failure is INCOMPLETE: keep ownership and never
+ * retry or resume Stock. Errors before either effect retain their original
+ * result. Root snapshot allocation can return NOMEM without modifying state.
+ * This does not extend the supported reference coverage or provide rollback. */
 
 /* Store a library record without registering or attaching it to the OS.
  * Existing record addresses remain stable; duplicate library IDs are rejected.
@@ -61,5 +76,33 @@ int hpclang_rpl_port0_shift_backups(const struct hpclang_rpl_mutation_io *io, ui
  * Preceding libraries still require the separate library relocation path. */
 int hpclang_rpl_port0_remove_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *name,
                                     uint32_t name_length);
+
+struct hpclang_rpl_catalog_insertion;
+struct hpclang_rpl_library_binding;
+/* Internal catalog commit, not public registration authorization. Revalidate
+ * the strictly ordered catalog and the expected insertion plan before writes.
+ * binding uses FINAL post-move coordinates, independently proven by the caller;
+ * its payload, bank selector, flags and execution safety are not inferred here.
+ * Caller supplies complete reference repairs and retains mapping/IRQ ownership
+ * through growth, record publication and count publication (last). Input objects
+ * and backend remain stable throughout. No callbacks/configuration are executed.
+ * Preflight errors do not write. Any failure after growth starts is INCOMPLETE:
+ * retain ownership, do not resume Stock or retry this non-replayable operation. */
+int hpclang_rpl_catalog_insert_repaired(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                        const struct hpclang_rpl_library_binding *binding,
+                                        const struct hpclang_rpl_catalog_insertion *expected,
+                                        const struct hpclang_rpl_catalog_repairs *repairs);
+
+struct hpclang_rpl_catalog_removal;
+/* Internal unregister commit. Caller proves the library is detached and unused
+ * and supplies all relocation repairs. Revalidate the complete ordered catalog
+ * and exact expected binding before contraction. Validate the entire HOME
+ * attachment prefix and reject a matching ID as BUSY before writes; this does
+ * not establish complete execution liveness. Publish count last. No payload
+ * deletion or configuration execution. Ownership and INCOMPLETE handling match
+ * insert_repaired; a partial commit must not be retried or resumed in Stock. */
+int hpclang_rpl_catalog_remove_repaired(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                        const struct hpclang_rpl_catalog_removal *expected,
+                                        const struct hpclang_rpl_catalog_repairs *repairs);
 
 #endif

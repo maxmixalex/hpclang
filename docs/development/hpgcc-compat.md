@@ -4,6 +4,92 @@ This page records the M7 source-compatibility inventory. Historical names are in
 
 ## Sources and method
 
+### Original HPGCC3 graphics documentation programs
+
+`tests/compat/check-hpgcc3-graphics.py` extracts the three self-contained
+programs from `libs_workspace/headers/hpgraphics.h` in the caller-supplied
+HPGCC3 R004.revA archive. It pins the original header SHA-256 and records each
+extracted/adapted source hash and migration diff. The only application-source
+change replaces `hpgcc3.h` with `hpkeyb49.h`; all drawing statements, original
+geometry and ON-key busy waits remain. These are original documentation
+programs, not the earlier clean-service behavioral ports.
+
+After [installing the SDK](../sdk/getting-started.md), run:
+
+```sh
+ATFE=/path/to/atfe python3 tests/compat/check-hpgcc3-graphics.py \
+  /path/to/hpgcc3_R004.revA.tar.gz \
+  --sdk /path/to/installed-sdk --work /new/evidence/path
+```
+
+The output `application` directory is a standalone CMake SDK project. The gate
+builds the text, gray16 double-buffer and mixed-font/geometry programs, and
+checks their HPC1 images and all six raw/wrapped launcher envelopes. One existing
+SDK installation serves every program; the gate does not create SDK copies.
+
+Local validation on 2026-10-25 passes using a relocated SDK, with no repository
+source/include paths in the compiler commands. All three ARM source analyses
+pass; a changed-header negative is rejected before building. Evidence is in
+`/work/oct25-hpgcc3-graphics/report.json`, its source diffs and `analysis.log`.
+Add `--native` to generate separate `hello-native-artifact`,
+`gray-native-artifact` and `shapes-native-artifact` directories. External
+instrumentation renames the entry point and wraps `keyb_isON`; drawing statements
+remain unchanged. It captures frame 2200, injects the physical ON GPIO using
+`HPCLANG_KEYBOARD_ON`, checks the real key reader, releases ON, and performs
+external HPG cleanup before process return. A failed key check produces failure,
+even though the wrapper lets the application exit its wait loop.
+
+Run each artifact with `tests/e2e/harness/run-direct.sh`, or prepare assets with
+`prepare-stock-assets.sh` and use `run-stock.sh`. Check the captured frame with:
+
+```sh
+python3 tests/compat/verify-hpgcc3-graphics.py /path/to/frame-2200.pgm shapes
+```
+
+For a complete serial matrix, use the maintained runner (Linux E2E prerequisites
+and emulator setup are the same as for the ordinary harness):
+
+```sh
+python3 tests/compat/run-hpgcc3-graphics.py /path/to/native-build \
+  --mode direct --work /new/direct-evidence
+python3 tests/compat/run-hpgcc3-graphics.py /path/to/native-build \
+  --mode stock --work /new/stock-evidence
+```
+
+The input is the work directory created by the build gate with `--native`.
+`--models hp50g` selects a smaller diagnostic run; the default covers all six
+models and all three programs. `--harness-root` selects an already prepared
+checkout. Run only one native suite at a time per harness checkout because
+its model state directories are shared. The runner requires a new output
+directory, fingerprints input artifacts, prepares Stock assets once per program,
+retains per-case logs/results/frames, and requires successful execution, settled
+return and independent pixels before recording a pass. It rejects missing
+results even when an older result exists in the build directory. A partial
+report remains failed if execution stops. Replay controls in
+`/work/oct25-hpgcc3-runner-check` cover both orchestration paths and reject
+missing results, failed status, unsettled return, bad pixels and nonzero exit;
+these controls are not additional native or Stock acceptance.
+
+The final argument selects `hello`, `gray` or `shapes`. All 18 Direct cases
+(three programs on six models) pass physical input checks, independent pixels
+and settled return in `/work/oct25-hpgcc3-direct-v2`. Changed color/geometry
+negatives for all three programs are rejected. Instrumented ARM analysis passes.
+The initial Direct attempt used an incorrect ON scan code in the test wrapper;
+its failure is retained separately and corrected using the public physical-key
+constant. The Stock queue (82103) now exits zero with all 18 cases passing in
+`/work/oct25-hpgcc3-stock`. Independent result and pixel rechecks of all 36
+Direct/Stock cases pass; result/frame fingerprints are recorded in
+`/work/oct26-hpgcc3-final-audit.json`. These are local results; remote CI
+acceptance remains separate.
+
+The pixel gate checks text presence/colors and original geometry, not exact
+historical font glyph identity or every circle boundary pixel. The fourth
+example needs an external `monalisa.xpm` asset and is not included. No source
+application is silently resized for 64-line displays; offscreen geometry is
+clipped. The original programs do not check allocation failures, and this gate
+does not establish memory-exhaustion handling or whole-system resource bounds.
+
+
 ### Original window application gate
 
 `win.h` supplies the historical control umbrella. Run
@@ -1222,8 +1308,110 @@ immediately at the final column, including scrolling after the last screen cell.
 Single-buffer output publishes immediately; HPG double-buffer modes still need
 `hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
 cleanup restores the borrowed display. Historical `gets/_gets` spellings use
-the bounded adapters described below; decimal-format policy remains
-M8 work. Host sanitizers, ARM analysis, all six Direct targets and HP39g+,
+the bounded adapters described below. Legacy decimal formatting requires an
+explicit compatibility switch, as selected by the user. Including
+compatibility headers alone does not enable it; standard C formatting remains
+the default. Define `HPCLANG_HPGCC_LEGACY_FORMAT=1` before the first `hpstdio.h`,
+`hpconio.h` or `hpclang/hpgcc-format.h` include in an application translation
+unit. Omitted or zero leaves all standard calls unchanged. For example:
+
+```c
+#define HPCLANG_HPGCC_LEGACY_FORMAT 1
+#include <hpstdio.h>
+
+int main(void)
+{
+    char text[32];
+    set_decimal_digits(2);
+    set_decimal_separator(',');
+    snprintf(text, sizeof(text), "%f", 1.25); /* text is "1,25" */
+    return 0;
+}
+```
+
+The switch aliases unqualified calls to printf/fprintf/sprintf/snprintf and
+all four va_list variants. Named `hpclang_hpgcc_*` entry points remain available
+without the switch. Function addresses and parenthesized names remain standard;
+C++ can use `(std::snprintf)(...)` for standard formatting in an opted-in unit.
+Include the compatibility header after any application configuration of this
+switch. `sprintf` retains standard C's destination-capacity obligation; use
+`snprintf` for bounded output. Stream variants write through the supplied FILE
+(or stdout) without replacing its binding, and propagate write errors without
+clearing stream error flags.
+The caller-supplied original-source probe can be reproduced on a POSIX host:
+
+```sh
+python3 tests/compat/check-decimal-reference.py /path/to/archives --candidate --report decimal-reference.json
+python3 tests/compat/check-decimal-reference.py /path/to/archives --candidate --sweep --report decimal-sweep.json
+```
+
+It hash-checks the 1.1/2.0 formatter sources and asserts 20 traces per version
+under ASan/UBSan. Explicit precision restores the global setting; legacy `%g`
+counts fractional places and uses a three-digit exponent when selected.
+The trace also records historical defects (including a zero return count).
+These observations do not require copying defects into the safe adapter.
+The expanded sweep checks 5,300 cases: 5,208 outputs match exactly and 92
+explicitly pinned cases correct historical zero-precision or fractional-carry
+defects. Examples are `12e+001` corrected to `1e+001` at zero precision and
+`0.100e+002` corrected to `1.00e+002` after carry. Return counts are corrected
+throughout. Scientific scaling preserves the original multiplication order;
+the gate rejects the former division-based implementation's rounding differences.
+Host integer/power/libm shims mean ARM numerical edge cases remain unverified.
+The internal bounded conversion core is implemented locally in
+`runtime/core/hpgcc-format.c`; its host sanitizer and ARM compile/analysis checks
+pass. It formats one f/e/E/g value without changing standard stdio. The core
+uses two-stage half-away rounding, caps settings/precision at 15, rejects
+negative settings and NUL separators, and returns the required character count
+with snprintf-style truncation. Nonfinite values produce `inf`, `-inf` or `nan`.
+The internal bounded parser now matches these original traces, including mixed
+arguments and padding, with corrected return lengths. It accepts the historical
+s/c/d/i/u/x/X/p/b/U/L/f/e/E/g/percent conversions, numeric width/precision and
+-/0 rules. As in the original, string alignment reverses numeric alignment,
+string/integer precision is ignored, and numeric zeros precede the sign.
+Unsupported grammar (including standard length modifiers, dynamic widths and
+`%n`) returns `EINVAL`; count/width overflow returns `EOVERFLOW`. Errors retain
+terminated partial output. Host sanitizers, ARM compile/analysis and a mutated
+alignment negative pass locally. Public aliases and stream wrappers additionally
+pass six C/C++ default/off/on sanitizer targets and file/stdout/embedded-NUL/
+padding/write-error coverage. Active C/C++ calls compile for ARMv4T; stream
+runtime analysis passes. The installed SDK probe now builds four mixed C/C++
+translation units and all six launcher packages using only installed headers and
+runtime sources:
+
+```sh
+ATFE=/path/to/atfe python3 tests/compat/check-hpgcc-format-sdk.py \
+  --sdk /path/to/installed-sdk --work /new/format-evidence
+```
+
+Its `artifact` directory works with the ordinary Direct/Stock harness. The
+maintained `hpgcc-format` runtime suite checks default and opted-in calls,
+precision, bounds, standard-stream binding, embedded NUL, stderr errors and
+recovery. All six Direct models pass locally with settled return, including the repaired
+finite-overflow boundary; all six Stock cases also pass in
+`/work/oct26-format-boundary-native` (71812). The earlier queue 66389 completed all six Direct and six Stock models
+with the pre-boundary artifact and remains separate evidence. Six ARM analyses, suite
+planning and maintained builds pass. Final formatted source rebuilds match the
+native ELF/HPC byte-for-byte. Target validation found that the selected picolibc
+`fwrite` fails to set the stream error flag on callback failure; using `fputc`
+preserves both error reporting and `ferror`. A display marker supplies the
+existing return verifier's required application-to-Stock transition. Earlier
+failures remain recorded in the roadmap. Strict multiplication-boundary guards
+also prevent large finite values from becoming infinity during rounding; a
+32,784-finite-case host sweep passes, and the old SDK is rejected by the new
+native regression. Full host integration passes all 162 tests at the boundary
+checkpoint; the later scientific scaling change passes nine targeted sanitizer
+tests, two ARM analyses and installed SDK packaging. Its updated native suite
+adds scientific rounding/carry regressions; all six Direct and six Stock cases
+pass with settled return in `/work/oct26-format-scientific-native`. The earlier pre-boundary matrix
+completed all 12 cases, but does not validate the latest numerical fixes.
+Host Clang analysis passes seven sources and 26 configurations after the stream
+fixture replaced unchecked rewind calls with checked fseek. Remote acceptance
+remains pending. Default standard printf is unchanged.
+
+Historical 1.1/2.0 digit/separator behavior and HPGCC3 formatting must be reviewed
+separately rather than treated as one shared contract.
+
+Console validation: host sanitizers, ARM analysis, all six Direct targets and HP39g+,
 HP48gII, HP49g+ and HP50g Stock pass locally. The installed mixed C/C++ console
 example also passes relocation, six-model launchers and three HP39 Aplet
 packaging families. HP39gs/40gs Stock also pass; CI acceptance is pending.
