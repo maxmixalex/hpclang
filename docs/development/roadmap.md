@@ -115,12 +115,13 @@ library management and Port1 edits, followed by Port2 trusted recovery
 installation, authority lifecycle, safe startup and reclamation. Sound
 compatibility is independent.
 
-M8.5 independent work during the #26 CI wait: a read-only migration checker
-now reports source locations and JSON review hints, with installed-SDK integration.
-Five focused tests and an actual SDK install/relocation smoke pass locally;
-full tracked formatting, Ruff and ShellCheck pass. This remains local work,
-not CI acceptance or completion of M8.5. Ownership contracts and application
-migration acceptance remain required.
+M8.5 migration checker `b59fb56d` is submitted in draft PR #27; ten workflows
+and sixteen currently materialized jobs are queued. Local full relocated-SDK
+validation now passes external C/C++ builds, all six model-specific Notebook
+builds, three HP39 Aplet variants and 517 byte-identical release outputs.
+Five focused tests and full formatting/static/documentation checks also pass.
+This is not CI acceptance or completion of M8.5; ownership contracts and
+application migration acceptance remain required.
 
 M8.0 local follow-up `9e220d9b` captures library-configuration read dependencies;
 sanitisers, ARM analysis and both-model maintained regressions pass. It is not
@@ -169,7 +170,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `6a582958` | **Submitted, CI pending:** exact-head audit found four successful/seven queued workflows; job records show 118 successful, twelve running and 248 queued, none failed. Earlier `bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips). Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `6a582958` | **Submitted, CI pending:** exact-head audit found four successful/seven queued workflows; job records show 125 successful, fourteen running and 239 queued, none failed. Earlier `bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips). Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |

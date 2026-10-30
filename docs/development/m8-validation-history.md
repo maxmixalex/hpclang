@@ -211,3 +211,28 @@ These are local results, not M8.5 acceptance or a source-compatibility certifica
 The preceding #26 head `6a582958` was audited before further delivery: four
 successful/seven queued workflows, with 118 successful, twelve running and
 248 queued jobs; no failures in this snapshot. Historical failures remain above.
+
+Migration delivery: `b59fb56d` pushed in draft PR #27; new-head CI was not
+polled in the submission turn. M8.5 remains incomplete.
+
+## 2026-10-30 — Full migration SDK client validation
+
+Submitted migration head `b59fb56d` passes the complete maintained relocated SDK
+validator with prepared HP39 assets: external C/C++ applications, ARMv4T return
+checks, generated fonts/HPC1, six-model launchers, all six model-specific
+Notebook builds, incremental-output restoration, invalid-model rejection and
+HP39g+/HP39gs/HP40gs Aplet packaging. Two clean builds produce 517 byte-identical
+release files. Log: `/work/oct30-migration-sdk-full-prepared.log`, exit 0.
+The installed migration checker runs as part of this gate. Temporary SDK/build
+and freshly compiled host-tool directories were removed by their context managers.
+This supersedes the earlier note that the complete SDK matrix was not rerun.
+
+The first invocation failed during configuration because the selected raw
+HPGCC39 asset directory lacked HPCRESET.000; it is not passing evidence.
+The corrected run used the prepared SDK assets, checked reset bytes against the
+maintained generator and compiled the packaging tool afresh. Its complete run
+passed. The original failure log remains `/work/oct30-migration-sdk-full.log`.
+
+Preceding remote audit: #26 `6a582958` has 125 successful, fourteen running and
+239 queued jobs, no failures; #27 `b59fb56d` has ten queued workflows and sixteen
+materialized queued jobs. Neither branch is CI-accepted. M8 remains incomplete.
