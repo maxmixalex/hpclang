@@ -388,12 +388,16 @@ jobs:
             mkdir "$snapshot_dir"
             export HPCLANG_X50NG_RESOURCE_SNAPSHOT="$snapshot_dir/$HPCLANG_E2E_TARGET"
             export HPCLANG_X50NG_STACK_REGIONS="$PWD/build/$HPCLANG_E2E_TARGET-frame-stack-regions.jsonl"
-            rm -f "$HPCLANG_X50NG_STACK_REGIONS" "$PWD/build/$HPCLANG_E2E_TARGET-frame-stage-stack-budget.json"
+            export HPCLANG_X50NG_STACK_BANKS="$PWD/build/$HPCLANG_E2E_TARGET-frame-stack-banks.jsonl"
+            rm -f "$HPCLANG_X50NG_STACK_REGIONS" "$HPCLANG_X50NG_STACK_BANKS" "$PWD/build/$HPCLANG_E2E_TARGET-frame-stage-stack-budget.json"
           fi
           if [[ -f "build/e2e/$APPLICATION/e2e.stock-media.json" ]]; then
             bash tools/install-ci-packages.sh dosfstools mtools
           fi
           bash tests/e2e/harness/run-family.sh stock "$FAMILY" "build/e2e/$APPLICATION" "build/assets/$APPLICATION"
+          if [[ "$SUITE" == ui ]]; then
+            test -s "$HPCLANG_X50NG_STACK_BANKS"
+          fi
 
       - name: Verify suite-specific evidence
         if: matrix.suite.verifier != ''
@@ -447,6 +451,7 @@ jobs:
             build/*-*.json
             build/*-frame-stack-pointer.jsonl
             build/*-frame-stack-regions.jsonl
+            build/*-frame-stack-banks.jsonl
             build/*-frame-*.lcd
             build/*-kermit*
             build/*-socat.log
