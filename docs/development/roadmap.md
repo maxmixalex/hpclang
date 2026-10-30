@@ -130,21 +130,22 @@ Previous #13 CI retains one cancelled publisher; #14 retains cancelled gates.
 Remote acceptance, whole-application peak admission and M8.5 completion remain open.
 
 M8.5 migration tools and API guide `5d5195dc` are submitted in draft PR #27;
-CI has four successful and six queued workflows; 138 jobs pass and 230 are queued. Checker head `b59fb56d` passed the full relocated
+CI has four successful, five queued and one running workflow; 159 jobs pass, 205 are queued and four run. Checker head `b59fb56d` passed the full relocated
 SDK gate, six model-specific Notebook builds, three HP39 Aplet variants and 517
 byte-identical release outputs. The later guide/header-comment follow-up passes
 installation/relocation, links, strict ARMv4T C11 example compilation and docs.
 Remaining ownership/application migration acceptance is still required;
 this submission does not complete M8.5.
 
-M8.2/M8.3 UI return-capacity gate `8849b85f` is submitted in draft PR #28;
-six workflows pass and two are queued; 309 jobs pass, one is skipped, six run and 39 are queued. It checks native free capacity and largest-block
+M8.2/M8.3 UI stack/return-capacity gate `79a5fe36` is submitted in draft
+PR #28; its twelve workflows and twenty materialized jobs are queued. Preceding `8849b85f` had six successful/two
+queued workflows and 309 successful/one skipped/six running/39 queued jobs. It checks native free capacity and largest-block
 recovery after settled return. Fifteen tests, all 79 retained snapshots across
 six models, the actual CI commands and strict docs pass locally. This is not a
 new emulator run or complete physical-memory admission; whole-application
 resource acceptance remains open.
 
-The UI SP follow-up is locally complete and prepared for PR #28.
+The UI SP follow-up `79a5fe36` is submitted in PR #28; CI acceptance is pending.
 All six Direct and six Stock UI/SP/return cases pass; independent replay
 checks all 79 lifecycle snapshots, pool/artifact budgets and unchanged
 application/emulator identities. Shared User/System stack use is
@@ -152,6 +153,18 @@ application/emulator identities. Shared User/System stack use is
 docs checks pass. The untouched 4 KiB control detects 4144 bytes while
 the watermark stays 2424. CI, native/exception stacks and whole-system
 peak admission remain open.
+
+A local optional all-PC SP observer now separates CPU modes and 1 MiB stack
+address regions, including ROM/launcher assignments. Thirteen host tests, Ruff,
+strict docs and a fresh emulator build pass. HP39g+ Direct UI/return and the
+existing application SP gate pass on the unchanged application; additional
+stage-region observations span `0x0131d3b0–0x0131dff8`. Independent
+image/pool reconciliation measures 3152/4096 bytes for this Direct stage
+stack, deepest in image decompression. HP39g+ Stock UI/return also passes;
+reconciliation against its observed 34-page stage pool measures the same
+3152/4096-byte stage stack. Full source quality checks pass. Native-stack
+bounds and full peak admission remain open.
+
 
 CI follow-up `fce14d73` is submitted in draft PR #29; four workflows pass and six are queued; 126 jobs pass, one is skipped, five run and 243 are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
 a fresh build with the isolated patch passes. Original packet CRC checks pass
@@ -229,8 +242,16 @@ qualification or authorization for public storage mutation.
 A local, unsubmitted mapped reader now consumes caller-qualified predicted
 pages without installing them. Unit sanitizers, ARM checks and both-model
 saved-state physical-read comparisons pass. The device probe now checks
-32 P=0/P=1 plans per launch with unchanged native state; its fresh two-model
-Stock call/return matrices are running. Graph/policy integration remains open.
+32 P=0/P=1 plans per launch with unchanged native state; both 14-case Stock
+matrices pass. Independent audits confirm 28 return markers, 36 unchanged
+Flash snapshots and 16 reproduced artifacts.
+A separate local C data-target resolver now joins planning, bounded reads
+and object spans, including observed mutable-Flash data. All 40 saved HOME
+targets resolve and their execution edges remain rejected. Unit/ARM checks
+pass. The device build passes ten ARM analyses and reproduces sixteen
+delivery files byte-for-byte; its main frame remains 1064 bytes. Both
+models pass the first native call/return case; the remaining matrix is
+running. Complete graph/execution policy remains open.
 
 ## Pending delivery
 

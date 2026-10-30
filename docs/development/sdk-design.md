@@ -1746,6 +1746,18 @@ translator's register-store path; native firmware, exception bank switches and
 unexecuted paths still need separate accounting. These observations alone do
 not establish whole-system peak admission.
 
+For investigation, `HPCLANG_X50NG_STACK_REGIONS=/absolute/path/trace.jsonl`
+enables translated SP-assignment observations at all code addresses, including
+ROM and launcher code. Records retain CPU mode, the SP's 1 MiB address region,
+write count, extrema and their instruction addresses. Distinct regions and
+modes remain separate; their address distance is not stack consumption. A
+region boundary crossing produces separate records and must not be discarded
+when checking a known stack reservation. The original application-only trace
+can run alongside it. Both outputs refuse to overwrite existing evidence.
+This diagnostic uses host memory only and is disabled by default. It does not
+observe implicit bank switches or SP updates outside the translated register
+store path, and it does not itself certify a stack bound or memory admission.
+
 Before the launcher removes the mappings, the test requests a memory checkpoint.
 The shared Direct/Stock harness accepts a word-aligned descriptor within the
 reported application RW arena: `{id, count, words[count]}` with 1–64 words.

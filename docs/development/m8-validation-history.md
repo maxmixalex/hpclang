@@ -386,3 +386,111 @@ Pre-push PR #28 audit: exact 8849b85f, six successful/two queued
 workflows, 309 successful/one skipped/six running/39 queued jobs.
 M8.0 mapped-reader matrices have passed native, new-message,
 missing-message, remove and detach cases on both models; they remain live.
+
+UI delivery `79a5fe36` was pushed to PR #28 and the remote head verified.
+The preceding exact-head CI was audited before push; new-head CI was
+not polled. The nine observer/gate tests are included by the existing
+Python unittest discovery. Full tracked-file format/Ruff/ShellCheck
+and strict docs passed before push. No merge or UI milestone completion.
+
+## 2026-10-30 — Complete mapped-read device matrix; C data-target composition
+
+The mapped-reader application passes all 14 call/return cases on both
+models. Independent `/work/oct30-mapped-view/verified.json` checks
+28 post-call markers, 18 original/ten rewritten returns, 36 unchanged
+Flash states and 16 independently reproduced artifacts. Every launch
+requires 32 P=0/P=1 plan/read checks and unchanged native state.
+
+Separately added `rpl-bank-target.c` joins the actual bank planner to
+bounded object-span decoding and a reader for subsequent graph work.
+It requires Stock source callbacks over the same captured view,
+distinct mapping IDs and a nonzero-switch ACPTR; source-edge and
+exclusive-lifetime qualification remain caller obligations. Plan and
+payload reads retain mapping-qualified dependencies; output publishes
+only after successful parsing. EXECUTION edges are rejected.
+
+Initial real-state comparison resolved 26/40 targets; 14 were blocked
+by immutable-only reads. A separate bounded mutable-Flash data reader
+now checks identity descriptors on each read and emits no Flash
+commands. Immutable-ROM identification stays unchanged. All 40 HOME
+targets now match prior independent spans/banks and every payload
+nibble matches the saved physical bytes, including 14 mutable-Flash
+targets. Outside-object reads preserve output; all 40 execution edges
+remain unsupported. Inputs are unchanged. Evidence/source hashes:
+`/work/oct30-bank-target/targets-verified.json`.
+
+Registered the new runtime sources and host test in CMake. Composition
+unit tests use an isolated planner stub; the saved-state test uses
+the real planner and identified ROM. ASan/UBSan, CTest and ARM compile/
+analysis pass, including final Flash nibble bounds, callback errors,
+stale descriptors, mapping collisions and unchanged failed outputs.
+This newer resolver was not part of the completed device artifact;
+its device validation, full graph policy and execution closure remain
+open. These changes are local/unsubmitted and do not enable edits.
+
+## 2026-10-30 — C data-target device integration started
+
+The updated Stock probe walks actual HOME ACPTR tables, resolves their data
+objects through the C planner/reader, reparses their bounded spans, checks the
+first out-of-object read, and rejects execution edges. It requires mutable
+Flash coverage and preserves the captured native state. The working image
+passes ten ARM analyses; an independent temporary build reproduces all sixteen
+delivery artifacts and is removed afterwards. Main stack frame: 1064 bytes.
+Evidence: `/work/oct30-bank-target/reproduction.json`. HP49g+ and HP50g each
+pass the first native call/return case; remaining cases are running, not accepted.
+The independent audit now explicitly binds the new resolver, Flash data reader,
+code decoder and profile to the reproduced sources. No public edits are enabled.
+
+Exact submitted-head CI audit: UI #28 `79a5fe36` has twelve queued workflows
+and twenty queued materialized jobs. Migration #27 `5d5195dc` has four successful,
+five queued and one running workflow; 159 successful, 205 queued and four
+running jobs. Neither branch is accepted or merged by this audit.
+
+## 2026-10-30 — UI all-PC stack-region observation
+
+Added an optional `HPCLANG_X50NG_STACK_REGIONS` observer and translator opt-in
+in the UI follow-up worktree. Unlike the application-PC filter, it records
+translated SP writes by ROM and launcher instructions. Fixed-size host storage
+separates 32 CPU modes and 4096 address regions; output records extrema, their
+PCs and write counts. Zero/end-of-address-space values and boundary crossings
+remain visible. Independent opt-in, application-trace coexistence, native PCs,
+mode separation, boundary crossings and output failures are covered by four
+new host tests; all thirteen stack-observer tests pass, as do Ruff and strict
+docs. Disabled instrumentation emits no helper calls unless the existing
+application observer is enabled. Guest code and memory are unchanged.
+
+A freshly prepared emulator passes HP39g+ Direct UI/LCD/return checks and the
+existing application stack gate using the unchanged `gated-app` image. Nine
+mode/region groups are retained, including stage-region SP extrema
+`0x0131d3b0–0x0131dff8` and application SP use of 2424 bytes. Native boot and
+runtime assignments are included; extrema must not be interpreted as a single
+stack when the region contains multiple stacks or initialization phases.
+Evidence and artifact hashes: `/work/oct30-stack-regions/direct-verified.json`.
+This is local/unsubmitted. Stock runtime integration, implicit mode-bank changes,
+non-translated writes, stack-reservation bounds and whole-system peak admission
+remain open. No milestone is closed by this diagnostic.
+
+## 2026-10-30 — Direct launcher stack bound reconciliation
+
+Independent `direct-stage-budget.json` binds the raw region trace, tested image,
+ELF, launcher layout, Direct runner and settled-return result. The requested
+30-page pool places the stack top at `0x0131e000`; observed SP reaches
+`0x0131d3b0`, using 3152 of 4096 bytes including eight saved-entry bytes.
+The deepest PC resolves to `tinf_getbits` in the linked stage1 decompressor.
+This validates the observed Direct workload only. HP39g+ Stock all-PC tracing
+is running separately; portal/native/exception stacks and full peak admission
+remain open. Evidence directory: `/work/oct30-stack-regions`.
+
+## 2026-10-30 — Stock all-PC observation and stage reconciliation
+
+HP39g+ Stock UI, LCD, application SP, pool and settled-return gates pass with
+the optional all-PC observer and unchanged application image. Eight CPU-mode/
+region groups include native firmware assignments; the application uses 2424
+bytes. Independent reconciliation verifies both pool snapshots (34 stage pages
+plus two native workspace pages) and the linked stage ELF: stage SP use is
+3152/4096 bytes, deepest in `tinf_getbits`, matching the Direct workload.
+Evidence: `/work/oct30-stack-regions/stock-verified.json` and
+`stock-stage-budget.json`. These are observed-workload bounds, not complete
+native/exception-stack or whole-system admission. Full tracked-source format,
+Ruff and ShellCheck pass for both the UI and data-target worktrees; their
+temporary normalized source trees are removed. No milestone is closed.

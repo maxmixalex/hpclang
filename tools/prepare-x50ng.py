@@ -1401,6 +1401,7 @@ def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
     """Observe actual SP assignments without writing to guest stack memory."""
     arm = root / "src/qemu/target-arm"
     shutil.copy2(args.headless_header.parent / "stack-pointer-observer.h", arm)
+    shutil.copy2(args.headless_header.parent / "stack-region-observer.h", arm)
     replace_once(
         arm / "helpers.h",
         '#include "def-helper.h"',
@@ -1411,8 +1412,10 @@ def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
         arm / "helper.c",
         '#include "helpers.h"',
         '#include "helpers.h"\n#include "stack-pointer-observer.h"\n'
+        '#include "stack-region-observer.h"\n'
         "void HELPER(hpclang_stack_pointer)(void *opaque, uint32_t sp, uint32_t pc)\n"
-        "{ CPUState *env = opaque; stack_pointer_observe(sp, pc, env->uncached_cpsr & 31u); }\n",
+        "{ CPUState *env = opaque; uint32_t mode = env->uncached_cpsr & 31u;\n"
+        "  stack_pointer_observe(sp, pc, mode); stack_region_observe(sp, pc, mode); }\n",
         "stack pointer helper implementation",
     )
     replace_once(
@@ -1422,7 +1425,9 @@ def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
         "    if (reg == 13) {\n"
         "        uint32_t address = s->pc - (s->thumb ? 2 : 4);\n"
         '        const char *trace = getenv("HPCLANG_X50NG_STACK_POINTER");\n'
-        "        if (trace && *trace && address >= 0x01200000u && address < 0x01300000u) {\n"
+        '        const char *regions = getenv("HPCLANG_X50NG_STACK_REGIONS");\n'
+        "        if ((regions && *regions) ||\n"
+        "            (trace && *trace && address >= 0x01200000u && address < 0x01300000u)) {\n"
         "            TCGv pc = tcg_const_i32(address);\n"
         "            gen_helper_hpclang_stack_pointer(cpu_env, var, pc);\n"
         "            tcg_temp_free_i32(pc);\n"
