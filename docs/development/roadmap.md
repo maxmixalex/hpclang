@@ -115,16 +115,23 @@ library management and Port1 edits, followed by Port2 trusted recovery
 installation, authority lifecycle, safe startup and reclamation. Sound
 compatibility is independent.
 
-M8.5 Port C++ integration is local, not submitted: PR #14 still depends on
-unaccepted parent #13 and its previous CI contains cancellations. The local
-merge with accepted main retains both native allocation/release and image-budget
-checks; a regression test prevents one gate from silently skipping the other.
-Three ASan/UBSan host tests, eight UI verifier tests, the ARMv4T Object Basics
-build, Ruff and strict documentation build pass. Fresh merged emulator/SDK and
-remote CI acceptance remain required; this does not complete M8.5.
+M8.5 Port C++ integration `3ab04c07` remains local; PR #14 depends on
+unaccepted parent #13. All six Direct and six Stock Object Basics runs pass.
+Independent audit checks twelve Stock return reports and unchanged application,
+emulator and transfer-server hashes. Live Port ownership runs on Stock
+HP48gII/HP49g+/HP50g; HP39 and Direct contexts exercise ENOSYS. Host sanitizers,
+ARM builds and the full installed/relocated SDK gate also pass (517 reproduced
+release outputs). Fresh combined UI budget/allocation/release/lifecycle checks
+pass HP48gII, HP49g+ and HP50g; HP39g+ is running, with HP39gs/HP40gs pending.
+The local test wrapper's missing capture flags and firmware link were corrected;
+invalid attempts remain archived. Parent #13 now has local merge `19e19700`,
+retaining Aplet identity and retry-pacing fixes. Eighteen host tests, six real
+Aplet identities/six mixed-asset rejections, fifteen identical rebuilt UI
+artifacts, lint and strict docs pass. This parent is not pushed; C++ ancestry
+integration, remote acceptance and M8.5 completion remain open.
 
 M8.5 migration tools and API guide `5d5195dc` are submitted in draft PR #27;
-new-head CI has not been polled. Checker head `b59fb56d` passed the full relocated
+CI has two successful and eight queued workflows; nineteen jobs pass and 137 are queued. Checker head `b59fb56d` passed the full relocated
 SDK gate, six model-specific Notebook builds, three HP39 Aplet variants and 517
 byte-identical release outputs. The later guide/header-comment follow-up passes
 installation/relocation, links, strict ARMv4T C11 example compilation and docs.
@@ -132,14 +139,13 @@ Remaining ownership/application migration acceptance is still required;
 this submission does not complete M8.5.
 
 M8.2/M8.3 UI return-capacity gate `8849b85f` is submitted in draft PR #28;
-eight workflows and twelve materialized jobs are queued. It checks native free capacity and largest-block
+three workflows pass, one runs and four are queued; 146 jobs pass, eleven run and 197 are queued. It checks native free capacity and largest-block
 recovery after settled return. Fifteen tests, all 79 retained snapshots across
 six models, the actual CI commands and strict docs pass locally. This is not a
 new emulator run or complete physical-memory admission; whole-application
 resource acceptance remains open.
 
-CI follow-up `fce14d73` is submitted in draft PR #29; ten workflows and sixteen
-materialized jobs are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
+CI follow-up `fce14d73` is submitted in draft PR #29; two workflows pass, one runs and seven are queued; 80 jobs pass, nine run and 285 are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
 a fresh build with the isolated patch passes. Original packet CRC checks pass
 at the host capture point; loss inside the emulator/device remains unproven.
 The local replay with original CI payload/assets/emulator and only the server
@@ -147,14 +153,26 @@ replaced passes application execution, 52 keyboard frames and settled Stock
 return. No failing remote gate is waived; the initial packet-loss cause remains
 unproven.
 
-M8.0 local follow-up `9e220d9b` captures library-configuration read dependencies;
-sanitisers, ARM analysis and both-model maintained regressions pass. It is not
-part of submitted head `6a582958` and does not qualify startup execution.
+M8.0 head `b8d38497` is submitted in PR #26, including relocation fix `fb0510ba`.
+Its ten workflows are queued; no new-head CI acceptance is claimed. Diagnosis identifies a fixture
+heap/stack collision. Inlining kept a 7408-byte branch workspace frame live during library
+probes; a later allocation crossed the active stack and zeroed return addresses.
+Moving branch tables into a scoped heap workspace reduces the main frame to
+1064 bytes. A 2048-byte compile gate rejects the old source and accepts the fix.
+Both models pass the original missing-message removal/relaunch/query and all 88
+branch cases locally. Both complete fourteen-case matrices now pass. Independent
+checks confirm 28 post-call markers, 36 unchanged Flash states and sixteen
+byte-identical rebuilt artifacts. Full format/Ruff/ShellCheck and ARM analysis
+pass. This delivery still requires new-head CI acceptance; M8.0 remains open.
+
+M8.0 follow-up `9e220d9b` captures library-configuration read dependencies;
+sanitisers, ARM analysis and both-model maintained regressions pass. It is included
+in this delivery, but does not qualify startup execution.
 
 PR #26 now includes the accepted resource-snapshot mainline, unified bank
 planning, bounded live Stock readers, continuation mapping checks and startup
-configuration regressions. Head `6a582958` is submitted for CI and is not yet
-accepted; its local Stock and maintained regression evidence is recorded below.
+configuration regressions. Previous head `6a582958` failed CI; this delivery
+adds the verified workspace fix and return-state checks, and awaits CI acceptance.
 
 Local planner tests cover ROM identity, code/selector/routing/geometry guards,
 full bank effects and unchanged switch-body physical mappings. Original-handler
@@ -194,7 +212,8 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `6a582958` | **Two CI failures, not accepted:** HP39g+ runtime packet-57 transfer and HP49g+ code-relocation second-launch key delivery. Audit: 278 successful, one skipped, 86 queued, twelve running and two failed jobs; eight successful and three queued workflows. The relocation failure occurs before USB readiness in `native-missing-message/message-run`; saved logs report key 6 was not sampled. Its cause remains unresolved; neither failure is waived. |
+| #26 / `b8d38497` | Submitted; ten workflows and sixteen currently materialized jobs queued. Local full relocation matrices and artifact reproduction pass; remote acceptance remains open. |
+| #26 previous head / `6a582958` | **Five failed jobs retained:** HP39g+ runtime/console pre-entry transfer, plus three HP49g+/HP50g relocation jobs across push/PR runs. Final pre-push audit: 370 successful, one skipped, five failed, three running and one queued job; nine successful, one running and one queued workflow. The workspace fix passes all 28 local call/return cases. HP39g+ packet-loss origin remains unproven; no failing gate is waived. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |

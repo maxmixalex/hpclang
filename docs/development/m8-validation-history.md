@@ -211,3 +211,111 @@ its root cause is not established. Downloaded evidence is retained at
 `research/oct30-pr26-relocation-failure`, with the job log beside it. Neither
 failure is waived. The original 88 native reference/control cases and preceding
 native/new-message checks passed, but do not accept the remaining cases.
+
+
+## 2026-10-30 — Port C++ full SDK gate and additional PR26 failures
+
+Port C++ local integration `3ab04c07` passes the full maintained SDK gate:
+installed/relocated external C/C++ (including the owner example), public ARMv4T
+assembly checks, six model-specific Notebook builds, three HP39 Aplet variants,
+incremental missing-output regeneration and rejected model configurations.
+Two builds produce 517 byte-identical outputs. Log:
+`/work/oct30-port-cpp-sdk-full.log`; runner:
+`research/oct30-port-cpp-sdk-full.py`. Prepared reset assets were byte-checked
+against the generator and a fresh hp2aplet host tool compiled; temporary SDK/tool
+workspaces are removed by the test. This is local SDK validation, not CI or M8.5
+acceptance. New Object Basics application/all launchers also build.
+
+Six-model Direct/Stock owner verification is running under
+`/work/oct30-port-cpp-integration/runner`, with application/emulator/server hashes
+in `runtime-inputs.json`. The first local wrapper incorrectly enabled keyboard
+progression for Object Basics, while runtime-suites.json specifies false. All
+three HP39 payloads passed but that wrapper run failed; its log is retained as
+`runtime-keyboard-config-failure.log`. The corrected wrapper reads the maintained
+suite flag and reruns. Do not count the failed wrapper run as an accepted gate.
+The runner uses the separately tested PR29 retry-pacing server; this dependency
+is explicit in the input hash and is not remote CI acceptance.
+
+PR26 exact-head audit: 341 successful, one skipped, four running, thirty queued
+and four failed jobs. HP50g job 123960552981 in run 41024016583 has the same first
+missing-message ARM-abort snapshot as HP49g+: PC 0x10, CPSR 0x1d7, fault address
+0x53000000. Its artifact is `research/oct30-pr26-hp50-relocation-failure`.
+
+Console job 123962113880 belongs to run 41024024226 (not 41024016583). The latter
+run's passing console artifact was initially downloaded, identified by its
+returned/PASS evidence, and retained separately as `hp39-console-pass-control`.
+The correctly matched failure artifact is `research/oct30-pr26-hp39-console-failure`.
+It stops before payload entry at packet 36: 90 seconds without acknowledged
+progress, three NAKs and four resends. All 1218 checked captured data/ACK/NAK
+frames pass; the terminal Timeout frame also has valid length/sequence/CRC.
+The passing control has 2505 checked frames without failures. These host capture
+results do not establish the source of packet loss or accept a failed gate.
+Audits are `research/oct30-pr26-console-{packet-audit,pass-packet-audit}.json`.
+
+### 2026-10-30 — M8.5 merged UI resource gate execution
+
+The Port C++ integration source remains `3ab04c07`. All six Direct Object
+Basics runs and Stock HP39g+/HP39gs/HP40gs runs pass. The same live process
+continues to HP48gII and then HP49g+/HP50g; no restart or six-Stock acceptance
+is inferred. Inputs and runtime evidence remain in
+`/work/oct30-port-cpp-integration`.
+
+The merged UI application and freshly patched pinned x50ng build pass, using
+`research/oct30-port-cpp-ui-build.py`; source hashes and the build log are in
+`/work/oct30-port-cpp-ui`. The fresh emulator contains both native-allocation
+and resource-snapshot capture support. `oct30-port-cpp-ui-run.py` exercises the
+actual combined CI verifier arguments (`--pool --allocation --native-release
+--artifact`) and separately checks lifecycle snapshots. The first HP48gII run
+is active, not accepted. Verified existing firmware assets and the separately
+tested PR #29 Kermit server are reused; this local dependency does not imply
+remote acceptance of PR #29 or parent PR #13. Application ownership, whole-UI
+acceptance and M8.5 completion remain open.
+
+### 2026-10-30 — Port C++ full runtime matrix and first integrated UI pass
+
+`oct30-port-cpp-runtime-audit.py` passes after the six Direct/six Stock runner
+finishes. `/work/oct30-port-cpp-integration/runtime-verified.json` records twelve
+Stock reports, settled returns, all target completion markers and unchanged
+application/emulator/Kermit hashes. Direct JSON files were replaced by Stock
+reports; Direct acceptance retains the per-target log and successful family
+completion, not independent retained Direct JSON. The actual owner fixture
+exercises move assignment, release/re-adoption, independent snapshot digests
+and errno-preserving destruction on the three classic Stock models. Other
+contexts explicitly require ENOSYS.
+
+Fresh merged UI integration passes on HP48gII, including both artifact-budget
+and native-release checks plus 13 lifecycle snapshots. Native release identifies
+6164 released block bytes, including 20 metadata bytes. The snapshot report confirms observed capacity
+returns to 12540 bytes and largest free block to 11516 bytes. This is sampled
+allocator evidence, not complete physical peak admission. Reports are under
+`/work/oct30-port-cpp-ui/{runner/build,snapshots/hp48gii}`.
+
+Two local-wrapper setup errors remain archived: `capture-disabled-*` lacks
+CI's pool/allocation capture flags; `missing-firmware` is an explicitly stopped
+HP49g+ attempt that lacked the nested firmware directory. The wrapper now sets
+both capture flags and checks the shared verified firmware file before launch.
+It retains the HP48gII pass and resumes HP49g+ with identical application and
+emulator hashes. Remaining UI models and parent #13 integration remain open.
+
+### 2026-10-30 — Native allocation parent reconciled with accepted main
+
+Local parent #13 merge `19e19700` integrates accepted `3b77453a`, retaining
+the later Aplet identity and Kermit retry-pacing fixes absent from the current
+Port C++ branch. Conflict resolutions match the tested combined UI verifier,
+workflow arguments and emulator capture-header set; the CLI regression requires
+both image-budget and native-release checks. Eighteen host tests, Ruff and strict
+docs pass. A fresh UI build reproduces fifteen delivery files exactly, including
+the application, result address, memory layout and six raw/wrapped launchers.
+Core runtime, platform, UI and emulator harness source identity also matches the
+currently tested C++ integration. The Kermit patch/build/regression files match
+PR #29. Six actual HP39 Aplet identities and six mixed-application negatives pass.
+Evidence: `/work/oct30-allocation-main-integration/{verified,aplet-verified}.json`.
+
+The first integration audit was stopped before checks to correct its artifact
+list and avoid re-reading unrelated generated font assets. Subsequent attempts
+identified inherited Python formatting and an incorrect audit-only stage1 path;
+those logs are retained as `format-failure.log` and `audit-path-failure.log`.
+The final audit passes; temporary builds are removed. No failed attempt counts
+as acceptance. Parent #13 remains local/unpushed, and C++ still needs its ancestry
+integrated. Fresh combined UI gates pass HP48gII, HP49g+ and HP50g; HP39 runs
+remain active. Neither the parent nor M8.5 is remotely accepted.
