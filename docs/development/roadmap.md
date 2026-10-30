@@ -1,6 +1,6 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-10-30. **M8 is incomplete; only M8.1 is accepted complete.**
+Current checkpoint: 2026-10-31. **M8 is incomplete; only M8.1 is accepted complete.**
 Docker/WSL is restored. Earlier ID1701 two-model reservation retests pass guarded
 recovery, repeat restart, absent recovery and 16 rejection cases per model.
 Supported ID769 reservation matrices now pass on both models; full startup
@@ -120,10 +120,10 @@ its requirements from M8.
 | --- | --- | --- |
 | M8.0 native storage, PR #26 | Accepted Port0/HOME and reference foundations; prior `2e7885a4` passes both 14-case Stock matrices. Submitted `51b4566e` adds guarded continuation fetch and accepted Kermit integration, with controlled ROM/source audits and full ARM build passing locally. | Latest exact-head CI remains queued/pending. Complete launcher/opaque/banked provenance, CONFIG/interrupt semantics, continuation qualification, RAM roots across collection, exclusive production integration and public library/Port1 operations. Prediction alone never authorizes mutation. |
 | M8.0 Port2 | Both supported ID769 recovery/rejection matrices pass locally; explicit recovery-ID support accepted in #25. | Trusted recovery installation, transaction authority lifecycle, safe startup and space reclamation. Mutable-Flash configuration execution remains unqualified; forty resolved data targets retain separate execution obligations. |
-| M8.2/M8.3 UI, PR #28 | Six Direct/six Stock UI, stack/return and timing evidence retained. Local `9a95726b` strengthens low-memory renderer tests; `8c473f80` adds optional stage-stack verification bound to the observed pool and artifact. Saved HP39g+ Stock trace passes at 3152/4096 bytes; host tests pass. | Both follow-ups remain local. Five remaining Stock models are running serially for stage-stack evidence; no new pass claimed yet. CLI stale-report cleanup is tested and queued until the frozen-input run ends. Remote `4bcd3fb6` has unfinished CI. Native/exception stack bounds, whole-system peak memory and complete resource/lifecycle acceptance remain open. |
+| M8.2/M8.3 UI, PR #28 | All six models now have Stock launcher-stack evidence (3152/4096 bytes): prior HP39g+ plus five fresh runs independently audited with UI, pool, application-SP and settled return. b15ad2ff clears stale stage reports before earlier UI gates; seven tests pass. | Cleanup commit prepared for submission. CI, native/exception stack bounds and whole-system peak-memory/lifecycle acceptance remain open. |
 | M8.4 compatibility | SD Reset #15, explicit opt-in formatting #17 and async/KOS sound adapters #25 accepted. | Retained historical application/API coverage and remaining migration/branch acceptance. |
 | M8.5 C++ ownership, PRs #13/#14 | Six-model Object Basics and Stock UI lifecycle checks pass locally; submitted SDK gate reproduces 517 outputs. | Parent `97d5ba74` and child `d3e27922` await CI; complete ownership/error/lifetime and downstream application acceptance. |
-| M8.5 migration, PR #27 | Submitted `f960876e` corrects stale SDK documentation for accepted formatting/KOS sound and consolidates the roadmap while preserving history. HP007 checker and installed/relocated checker have local validation; strict docs pass. | New-head CI not polled in submission turn; retain complete migration guidance and application coverage. |
+| M8.5 migration, PR #27 | Submitted f960876e corrects SDK documentation; HP007 checker and installed/relocated checker pass locally. | Docs-only head had no automatic CI; six existing workflows manually dispatched and confirmed queued. Core workflow has no manual trigger; current-head coverage and broader migration acceptance remain open. |
 | M8.6 applications/release | Existing applications provide integration foundations. | Nontrivial integrated applications, clean SDK consumption, cross-family resources/return, documentation and release acceptance remain open. |
 
 Local M8.0 guarded instruction-fetch checks pass sanitizer tests and ARM analysis.
@@ -146,12 +146,13 @@ Remote acceptance and broader M8.5 completion remain open.
 
 | Delivery | Current acceptance state |
 | --- | --- |
-| #13 / `97d5ba74` | Latest audit: nine successful/two queued/one cancelled workflow; 305 successful/74 queued/nine running/one skipped/one cancelled job. Publisher retry 124134000902 was cancelled before any steps because a higher-priority publisher is waiting. Gate remains incomplete; immediate repeated retry deferred. |
-| #14 / `d3e27922` | Latest audit: eight queued workflows and twelve queued jobs; no failed/cancelled jobs. Timer local validation is complete; remote acceptance remains open. |
+| #13 / `97d5ba74` | Latest audit: nine successful/two queued/one cancelled workflow; 318 successful/67 queued/three running/one skipped/one cancelled job. Publisher retry 124134000902 was cancelled before steps by queue replacement; another publisher is still running, so retry remains deferred. |
+| #14 / `d3e27922` | Latest exact-head audit: two successful/six queued workflows; twelve successful/114 queued jobs, none failed/cancelled. Acceptance remains open. |
 | #26 / `51b4566e` | Latest exact-head audit: eight queued/three pending workflows, eighteen queued jobs; no failed/cancelled jobs. Local validation does not replace remote acceptance. |
-| #27 / `f960876e` | Documentation follow-up submitted. Prior exact head `583f38e6`: two successful/five queued workflows, ten successful/78 queued jobs, none failed/cancelled. New-head CI not polled; not accepted. |
-| #28 / `4bcd3fb6` | Latest audit: one successful/six queued/three running workflows; thirteen successful/92 queued/three running jobs, none failed/cancelled. Local follow-ups `9a95726b` and `8c473f80` are not pushed. |
+| #27 / `f960876e` | Confirmed zero automatic checks after docs-only push. Six manual runs (quality, runtime, storage, objects, gallery, FatFs) now queued; core lacks workflow_dispatch. No acceptance claimed. |
+| #28 / `c59528cc` | Last exact-head audit: four queued workflows/six queued jobs, none failed/cancelled. Five fresh Stock stage runs and independent full-matrix audit pass. Follow-up b15ad2ff prepared for submission; seven tests, Ruff and strict docs pass. |
 | #29 / `fce14d73` | Accepted and merged as `1c0d1e35`: ten workflows pass, 376 successful jobs and two intentional PR publisher skips. Retransmission pacing is fixed; the original initial packet-loss cause remains unproven. |
+| #30 / `97d9eb46` | Submitted publisher queue preservation and manual Core runtime trigger. Core Actionlint passes; publisher syntax follows GitHub docs with the known Actionlint keyword limitation. Prior head had four queued workflows/eight queued jobs, none failed/cancelled. New-head CI not polled; PR #27 core coverage remains open until integration. |
 | Historical #18 / `439339b1` | Three unresolved failures retained: HP49g+ Direct system-services PWM IRQ `0x46417b03`, HP40gs UI transfer and HP39g+ Notebook transfer. Valid captured packet checks do not establish the original failure causes. |
 
 Accepted deliveries include #15, #17, #20, #22, #23, #24, #25 and #29; #21 was

@@ -888,3 +888,76 @@ pass report; all seven memory tests passed with that patch. Both edited files
 were then restored to their committed versions, and every active-run input hash
 was independently rechecked unchanged. This patch is not committed or submitted.
 The existing matrix process remains live; do not restart it.
+
+## 2026-10-30 — UI allocation and stage-gate delivery
+
+Pushed c59528cc to PR #28 with 9a95726b allocation rollback tests and 8c473f80
+optional launcher-stack gate. Prior exact head 4bcd3fb6 has two successful/eight
+queued workflows and sixteen successful/126 queued jobs, no failure/cancellation.
+Ruff, strict docs and whitespace checks pass. New-head CI was not polled.
+The live five-model Stock matrix still uses the original immutable verifier
+source; the separate tested CLI cleanup patch remains deferred. No stage or
+new device pass is inferred from submission.
+
+## 2026-10-31 — Stock HP39gs stage acceptance and publisher queue repair
+
+The existing serial matrix completed HP39gs: original UI/pool/application-SP
+gates and normal settled Stock return pass, with launcher SP 3152/4096 bytes.
+Inputs match their recorded hashes; report: /work/oct30-stage-stack-matrix/verified.json.
+The same process continues HP40gs; remaining models are not claimed complete.
+
+Draft PR #30, bfddd250, adds queue: max to both ci-evidence-publisher jobs.
+GitHub documentation supports up to 100 waiting jobs with serial execution and
+cancel-in-progress false. Both YAML structures pass. Actionlint 1.7.12 lacks
+this new keyword; only that exact diagnostic was excluded to check the rest.
+No test gates changed. Prior remote PR #28 c59528cc audit has four queued
+workflows/six queued jobs, none failed/cancelled. New PR #30 CI not polled.
+Existing cancelled runs retain old definitions and remain unaccepted.
+
+## 2026-10-31 — Independent HP39gs/HP40gs stage audit
+
+Both fresh Stock runs pass independent replay: UI pixels/themes/fonts, low-memory
+reconstruction, application SP 2424/8192, launcher SP 3152/4096, observed pool
+35 pages and normal settled return. Frame/input maxima are 14398/610 us and
+19036/854 us respectively. Runtime inputs and retained evidence hashes match.
+Auditor: research/oct31-stage-stack-matrix-audit.py; partial report in
+/work/oct30-stage-stack-matrix/partial-independent-audit.json. Its default full
+mode rejects the incomplete five-model matrix without producing acceptance.
+Same session continues HP48gII, then HP49g+/HP50g. This is partial local
+validation, not CI acceptance or whole-system memory/native-stack completion.
+
+## 2026-10-31 — Completed Stock stage matrix and missing migration CI
+
+The five-model matrix terminated successfully. Independent full audit passes
+HP39gs/HP40gs/HP48gII/HP49g+/HP50g with original UI, pool, application-SP,
+launch-stack and normal settled-return gates. All stage observations are
+3152/4096 bytes; application SP is 2424 or 2432/8192. Previous HP39g+ evidence
+is retained separately. Full audit: /work/oct30-stage-stack-matrix/independent-audit.json.
+After process completion, applied deferred CLI stale-pass cleanup as local
+b15ad2ff: seven regression tests, Ruff and normalized source formatting pass.
+No new hardware/native-exception-stack or whole-system peak claim is made.
+
+PR #27 f960876e had zero automatic check runs due docs-only path filters.
+Manually dispatched quality/runtime/storage/objects/gallery/FatFs; all six
+confirmed queued (41087137996, 41087144988, 41087152004, 41087159812,
+41087167665, 41087174489). Core runtime has no workflow_dispatch, so that
+current-head coverage remains open. No documentation deployment was requested.
+
+## 2026-10-31 — Manual core validation entry submitted
+
+PR #30 head 97d9eb46 adds workflow_dispatch to Core runtime. The unchanged job
+has no push/PR-only event dependencies; Actionlint passes without exclusions.
+This follows the docs-only PR #27 head having no automatic core check or manual
+entry. The PR also retains publisher queue: max from bfddd250. Prior exact head
+had four queued workflows/eight queued jobs, none failed/cancelled. New-head CI
+was not polled after push. Mainline integration and PR #27 core coverage remain
+open; no existing test, threshold, permissions or publishing policy was removed.
+
+## 2026-10-31 — UI stage follow-up delivery validation
+
+Before delivery, audited previous remote head c59528cc: four queued workflows,
+six queued jobs and no failures/cancellations. Seven memory regression tests,
+Ruff without a read-only mount cache, strict documentation and whitespace checks
+pass. b15ad2ff clears stale stage reports before earlier CLI gates can fail.
+The completed five-model Stock matrix and independent audit are retained above;
+this delivery does not claim native/exception bounds or milestone completion.
