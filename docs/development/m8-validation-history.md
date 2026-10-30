@@ -2045,3 +2045,39 @@ branch probe. An orchestration regression covers abort and undefined modes and
 requires that no second transfer occurs; it and 47 recovery-verifier tests pass.
 Ruff and formatting pass. This is a diagnostic/acceptance correction, not a
 runtime fix, and does not accept PR26 or complete M8.0.
+
+
+## 2026-10-30 — Relocation fixture stack collision and local correction
+
+Original CI emulator/ELF payload identity was checked against retained
+`/work/oct30-stock-plan-execution/app/e2e.hpc` (SHA256
+326692cc6a7a25175129c14db47d6df92f5695d512712bfb0032829096418968).
+A debugger breakpoint at the data-abort branch (`do_interrupt+622` in this exact
+emulator) captures the first data abort at guest PC 0x28 in user mode, before the
+ROM handler enters abort mode. Guest breakpoints then show a correct sbrk return
+at 0x0122bf52 followed by a zero return address. The allocation starts at
+0x0112e2f4, requests 0x28f8 bytes and ends at 0x01130bec, beyond the active
+SP 0x011308f0. Clearing it overwrites live stack/return data. Logs remain in
+`/work/oct30-relocation-abort-pc/run/emulator.log` and
+`/work/oct30-relocation-return/guest.log`. Two earlier instrumentation attempts
+were deliberately stopped: the common interrupt breakpoint perturbed USB timing,
+and a source-line breakpoint resolved to the wrong optimized location. Neither
+is validation evidence; their logs remain separately retained.
+
+The mutually exclusive branch path was inlined into main, reserving 7408 bytes
+before calling the 2096-byte native probe, already exceeding the 8192-byte ABI
+stack reservation before further callees. Branch edit/guard/address tables now
+live in a heap workspace released on every run result; allocation failure has an
+explicit test failure code. Main's compiled frame is now 1064 bytes. The source
+compile gate `-Wframe-larger-than=2048 -Werror=frame-larger-than` rejects the old
+source and accepts the fix (`old-frame.log`, `new-frame.log`). This is a fixture
+correction, not a claim that sbrk dynamically prevents arbitrary stack overflow.
+
+ARM application and all six launchers build. The HP49g+ CI-derived baseline and
+retained HP50g baseline both pass missing-message removal, catalog/reference
+checks, normal return, second-launch message query and unchanged Flash. Both
+also pass all 88 branch/control cases with the heap workspace. Results are under
+`/work/oct30-relocation-workspace/{hp49gplus,hp50g,branches}`. Full fourteen-case
+matrices continue under `full-hp49gplus` and `full-hp50g`; do not infer their
+completion from these targeted results. Formatting and the compiler regression
+pass. No new remote CI acceptance or milestone completion is claimed.

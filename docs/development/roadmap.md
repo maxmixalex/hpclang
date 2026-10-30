@@ -147,12 +147,14 @@ replaced passes application execution, 52 keyboard frames and settled Stock
 return. No failing remote gate is waived; the initial packet-loss cause remains
 unproven.
 
-M8.0 relocation follow-up: original CI payload/emulator replay reproduces ARM
-abort after the first missing-message library-removal execution (PC `0x10`,
-CPSR `0x1d7`, recorded fault address `0x53000000`). The later key/USB failure is
-secondary. A local verifier change rejects exception states before subsequent
-launches; its orchestration regression and 47 recovery tests pass. This improves
-diagnosis only; the runtime fault and full reference coverage remain open.
+M8.0 relocation follow-up: local diagnosis identifies a fixture heap/stack
+collision. Inlining kept a 7408-byte branch workspace frame live during library
+probes; a later allocation crossed the active stack and zeroed return addresses.
+Moving branch tables into a scoped heap workspace reduces the main frame to
+1064 bytes. A 2048-byte compile gate rejects the old source and accepts the fix.
+Both models pass the original missing-message removal/relaunch/query and all 88
+branch cases locally. Full fourteen-case call/return matrices are running on
+both models; no new CI submission or M8.0 acceptance is claimed.
 
 M8.0 local follow-up `9e220d9b` captures library-configuration read dependencies;
 sanitisers, ARM analysis and both-model maintained regressions pass. It is not
@@ -201,7 +203,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `6a582958` | **Two CI failures, not accepted:** HP39g+ runtime packet-57 transfer and HP49g+ code-relocation second-launch key delivery. Audit: 290 successful, one skipped, 74 queued, twelve running and two failed jobs; eight successful and three queued workflows. The relocation key failure is secondary: the preceding `native-missing-message/run` already saved ARM abort mode. Original CI payload/emulator replay reproduces the first-run abort locally; its initial cause remains unresolved. Neither failure is waived. |
+| #26 / `6a582958` | **Two CI failures, not accepted:** HP39g+ runtime packet-57 transfer and HP49g+ code-relocation second-launch key delivery. Audit: 290 successful, one skipped, 74 queued, twelve running and two failed jobs; eight successful and three queued workflows. The relocation key failure is secondary: the preceding `native-missing-message/run` already saved ARM abort mode. Original CI replay and debugger traces identify a fixture heap/stack collision; the local workspace fix passes the failing case on both models, with full regression still running. Neither failure is waived. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |

@@ -27,6 +27,11 @@ target_include_directories(hpclang_code_relocation_e2e PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core" "${CMAKE_CURRENT_BINARY_DIR}"
     "${HPCLANG_ROOT}/platform/armtoolbox")
 target_compile_features(hpclang_code_relocation_e2e PRIVATE c_std_11)
+
+# Keep the dispatch frame below one quarter of the 8 KiB ABI stack reserve.
+# Branch-only tables must not consume the native probe and allocator's stack.
+set_source_files_properties(main.c PROPERTIES COMPILE_OPTIONS
+    "-Wframe-larger-than=2048;-Werror=frame-larger-than")
 target_compile_options(hpclang_code_relocation_e2e PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)

@@ -1,8 +1,9 @@
 
-#include <stdint.h>
-#include "rpl-stock-memory.h"
-#include "rpl-object-store.h"
 #include "rpl-code.h"
+#include "rpl-object-store.h"
+#include "rpl-stock-memory.h"
+#include <stdint.h>
+#include <stdlib.h>
 volatile uint32_t hpclang_e2e_result;
 int hpclang_call_roots_probe(void);
 int hpclang_rom_banks_probe(void);
@@ -54,7 +55,15 @@ static int check_boundary(void *context, uint32_t instruction, uint32_t length)
     }
     return 0;
 }
-static int run(void)
+/* Keep large branch-only tables off the shared call-probe stack. Inlining
+ * mutually exclusive paths must not consume the ABI's entire stack reserve. */
+struct branch_workspace
+{
+    struct hpclang_rpl_reference_edit edits[CASE_COUNT];
+    struct hpclang_rpl_reference_guard guards[CASE_COUNT * 3];
+    uint32_t addresses[CASE_COUNT];
+};
+static int run_with_workspace(struct branch_workspace *workspace)
 {
     struct hpclang_rpl_stock_memory memory;
     struct hpclang_rpl_mutation_io io;
@@ -80,10 +89,10 @@ static int run(void)
     if (!word(&io, cursor, 5, &prologue) || prologue != 0x2e92)
         return 6;
     cursor += 11; /* library 275 command 0 */
-    struct hpclang_rpl_reference_edit edits[CASE_COUNT];
+    struct hpclang_rpl_reference_edit *edits = workspace->edits;
     struct hpclang_rpl_reference_edit_builder builder;
-    struct hpclang_rpl_reference_guard guards[CASE_COUNT * 3];
-    uint32_t addresses[CASE_COUNT];
+    struct hpclang_rpl_reference_guard *guards = workspace->guards;
+    uint32_t *addresses = workspace->addresses;
     unsigned count = 0;
     if (hpclang_rpl_reference_edits_begin(&builder, edits, CASE_COUNT))
         return 7;
@@ -202,6 +211,15 @@ static int run(void)
         }
     }
     return 0;
+}
+static int run(void)
+{
+    struct branch_workspace *workspace = malloc(sizeof *workspace);
+    if (!workspace)
+        return 16;
+    int result = run_with_workspace(workspace);
+    free(workspace);
+    return result;
 }
 int main(void)
 {
