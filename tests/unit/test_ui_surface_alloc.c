@@ -11,8 +11,10 @@ void __real_free(void *pointer);
 static int remaining = -1;
 static unsigned live;
 static size_t requested;
+static unsigned allocation_attempts;
 static int reject(void)
 {
+    ++allocation_attempts;
     if (!remaining)
         return 1;
     if (remaining > 0)
@@ -101,22 +103,7 @@ int main(void)
     struct hpclang_ui *ui = hpclang_ui_init(storage, bytes, config);
     assert(healthy && target && ui);
     unsigned baseline = live;
-    int recovered = 0;
-    for (int point = 0; point < 32; ++point) {
-        remaining = point;
-        struct hpclang_ui_surface *attempt = hpclang_ui_surface_create(8, 8, 16, &style, 1, 0);
-        remaining = -1;
-        if (attempt) {
-            hpclang_ui_surface_destroy(attempt);
-            assert(live == baseline);
-            recovered = 1;
-            break;
-        }
-        assert(errno == ENOMEM && live == baseline);
-        assert(hpclang_ui_surface_copy(healthy, target) == 0);
-        assert(hpclang_surface_get_pixel(target, 0, 0) == 0);
-    }
-    assert(recovered);
+    unsigned before_frame = allocation_attempts;
     remaining = 0;
     assert(hpclang_ui_begin(ui) == 0);
     assert(hpclang_ui_text(ui, 1, 0, "A") == 0);
@@ -128,7 +115,39 @@ int main(void)
     assert(hpclang_surface_get_pixel(target, 0, 0) == 255);
     assert(hpclang_ui_surface_render(healthy, ui) == 0);
     assert(live == baseline);
+    assert(allocation_attempts == before_frame);
     remaining = -1;
+    /* Exhaust each allocation position at real display geometries/depths while
+     * another renderer retains a nonempty accepted image. A failed creation
+     * must neither leak nor poison a subsequent successful creation. */
+    for (unsigned height = 64; height <= 80; height += 16) {
+        for (unsigned levels = 2; levels <= 16; levels *= levels) {
+            int recovered = 0;
+            for (int point = 0; point < 32; ++point) {
+                remaining = point;
+                struct hpclang_ui_surface *attempt =
+                    hpclang_ui_surface_create(131, height, levels, &style, 1, 0);
+                int error = errno;
+                remaining = -1;
+                if (attempt) {
+                    hpclang_ui_surface_destroy(attempt);
+                    assert(live == baseline);
+                    recovered = 1;
+                    break;
+                }
+                assert(error == ENOMEM && live == baseline);
+                assert(hpclang_ui_surface_copy(healthy, target) == 0);
+                assert(hpclang_surface_get_pixel(target, 0, 0) == 255);
+                assert(hpclang_surface_get_pixel(target, 7, 7) == 0);
+                attempt = hpclang_ui_surface_create(131, height, levels, &style, 1, 0);
+                assert(attempt);
+                hpclang_ui_surface_destroy(attempt);
+                assert(live == baseline);
+                assert(hpclang_ui_surface_render(healthy, ui) == 0);
+            }
+            assert(recovered);
+        }
+    }
     assert(hpclang_ui_shutdown(ui) == 0);
     hpclang_ui_surface_destroy(healthy);
     hpclang_surface_destroy(target);
