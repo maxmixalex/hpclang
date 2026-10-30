@@ -1758,6 +1758,16 @@ This diagnostic uses host memory only and is disabled by default. It does not
 observe implicit bank switches or SP updates outside the translated register
 store path, and it does not itself certify a stack bound or memory admission.
 
+For a Stock UI run, save that trace as `build/<model>-frame-stack-regions.jsonl`
+and pass `--stage-stack --pool --artifact /path/to/ui-artifact` to the UI verifier.
+The optional gate reconciles the linked image and observed native pool before
+checking the launcher's one-page stack, including its eight saved-entry bytes.
+Missing/duplicate/malformed observations, adjacent-region crossings and exhausted
+stack observations reject and remove any stale stage-budget report. The report
+records trace, pool, layout and payload hashes. This checks observed shared-bank
+launcher assignments only; native/exception stack bounds and system allocation
+peaks still require separate evidence.
+
 Before the launcher removes the mappings, the test requests a memory checkpoint.
 The shared Direct/Stock harness accepts a word-aligned descriptor within the
 reported application RW arena: `{id, count, words[count]}` with 1–64 words.

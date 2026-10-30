@@ -68,6 +68,7 @@ class UiMemoryTests(unittest.TestCase):
         self.assertEqual(report["pool_required_bytes"], 14 * 4096)
         self.assertEqual(report["pool_excess_bytes"], 16 * 4096)
         self.assertEqual(report["arena_other_bytes"], 0)
+        self.check_stage_stack(artifact)
         for section, key, value in (
             ("application", "image_bytes", 4096),
             ("application", "static_bytes", 0),
@@ -92,6 +93,49 @@ class UiMemoryTests(unittest.TestCase):
         self.path.write_text(json.dumps(bad))
         with self.assertRaises(AssertionError):
             VERIFY.verify_budget(self.prefix, "hp50g", artifact)
+
+    def check_stage_stack(self, artifact):
+        top = 0x01300000 + 30 * 4096
+        row = dict(
+            version=1,
+            mode=16,
+            region=19,
+            writes=100,
+            minimum=top - 3152,
+            maximum=top - 8,
+            minimum_pc=0x01300100,
+            maximum_pc=0x08000100,
+        )
+        trace = Path(f"{self.prefix}-stack-regions.jsonl")
+        output = Path(f"{self.prefix}-stage-stack-budget.json")
+        trace.write_text(json.dumps(row) + "\n")
+        report = VERIFY.verify_stage_stack(self.prefix, "hp50g", artifact)
+        self.assertEqual(report["observed_bytes"], 3152)
+        self.assertEqual(report["stack_top"], top)
+        for rows in (
+            [],
+            [row, row],
+            [dict(row, minimum=top - 4096)],
+            [dict(row, maximum=top)],
+            [dict(row, writes=0)],
+            [dict(row, version=True)],
+            [dict(row, mode=18)],
+            [dict(row, minimum=top - 3151)],
+            [dict(row, region=18)],
+            [row, dict(row, region=18, minimum=0x012FF000, maximum=0x012FFFFC)],
+            [row, dict(row, region=20, minimum=0x01400000, maximum=0x01400004)],
+            [dict(row, maximum_pc=-2)],
+        ):
+            trace.write_text("".join(json.dumps(r) + "\n" for r in rows))
+            output.write_text(json.dumps(report))
+            with self.subTest(rows=rows), self.assertRaises(AssertionError):
+                VERIFY.verify_stage_stack(self.prefix, "hp50g", artifact)
+            self.assertFalse(output.exists())
+        output.write_text(json.dumps(report))
+        trace.unlink()
+        with self.assertRaises(FileNotFoundError):
+            VERIFY.verify_stage_stack(self.prefix, "hp50g", artifact)
+        self.assertFalse(output.exists())
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()

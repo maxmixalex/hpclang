@@ -282,6 +282,63 @@ def verify_budget(prefix: Path, model: str, artifact: Path) -> dict:
     return report
 
 
+def verify_stage_stack(prefix: Path, model: str, artifact: Path) -> dict:
+    """Check observed launcher SP assignments against the actual Stock pool."""
+    output = Path(f"{prefix}-stage-stack-budget.json")
+    output.unlink(missing_ok=True)
+    budget = verify_budget(prefix, model, artifact)
+    pool_bytes = Path(f"{prefix}-pool-1.json").read_bytes()
+    pool = json.loads(pool_bytes)
+    top = 0x01300000 + pool["stage_pool_pages"] * 4096
+    source = Path(f"{prefix}-stack-regions.jsonl").read_bytes()
+    rows = [json.loads(line) for line in source.splitlines()]
+    fields = {
+        "version",
+        "mode",
+        "region",
+        "writes",
+        "minimum",
+        "maximum",
+        "minimum_pc",
+        "maximum_pc",
+    }
+    seen = set()
+    for row in rows:
+        assert isinstance(row, dict) and set(row) == fields
+        assert all(type(row[key]) is int for key in fields)
+        assert row["version"] == 1 and 0 < row["writes"] <= 0xFFFFFFFFFFFFFFFF
+        assert row["mode"] in (16, 17, 18, 19, 23, 27, 31)
+        key = (row["mode"], row["region"])
+        assert key not in seen
+        seen.add(key)
+        assert 0 <= row["minimum"] <= row["maximum"] <= 0xFFFFFFFF
+        assert row["minimum"] >> 20 == row["maximum"] >> 20 == row["region"]
+        assert row["minimum"] % 4 == row["maximum"] % 4 == 0
+        assert 0 <= row["minimum_pc"] <= 0xFFFFFFFF and row["minimum_pc"] % 2 == 0
+        assert 0 <= row["maximum_pc"] <= 0xFFFFFFFF and row["maximum_pc"] % 2 == 0
+    stage = [row for row in rows if row["region"] == 19 and row["mode"] in (16, 31)]
+    # The adjacent application-code and post-pool regions contain no shared-bank
+    # stack. Do not silently discard a trace that crossed this reservation.
+    assert not any(row["region"] in (18, 20) and row["mode"] in (16, 31) for row in rows)
+    assert stage and max(row["maximum"] for row in stage) == top - 8
+    minimum = min(row["minimum"] for row in stage)
+    assert top - 4096 < minimum < top, f"{prefix}: exhausted launcher stack"
+    report = dict(
+        version=1,
+        model=model,
+        observed_bytes=top - minimum,
+        reserved_bytes=4096,
+        stack_top=top,
+        trace_sha256=hashlib.sha256(source).hexdigest(),
+        pool_sha256=hashlib.sha256(pool_bytes).hexdigest(),
+        layout_sha256=budget["layout_sha256"],
+        payload_sha256=budget["payload_sha256"],
+        scope="Observed shared-bank launcher SP assignments in this workload, including eight saved-entry bytes; excludes native/exception stacks and unexecuted paths.",
+    )
+    output.write_text(json.dumps(report, indent=2) + "\n")
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -293,11 +350,16 @@ def main() -> None:
         "--artifact", type=Path, help="reconcile pool/RW with the linked UI artifact"
     )
     parser.add_argument("--stack-pointer", action="store_true", help="require application SP trace")
+    parser.add_argument(
+        "--stage-stack", action="store_true", help="require launcher stack-region trace"
+    )
     args = parser.parse_args()
     if args.pool and args.mode != "stock":
         parser.error("--pool requires Stock mode")
     if args.artifact and not args.pool:
         parser.error("--artifact requires --pool")
+    if args.stage_stack and not args.artifact:
+        parser.error("--stage-stack requires --artifact and --pool")
     for target in Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines():
         Path(f"build/{target}-frame-budget.json").unlink(missing_ok=True)
         verify(
@@ -307,7 +369,9 @@ def main() -> None:
         )
         if args.stack_pointer:
             verify_stack_pointer(Path(f"build/{target}-frame"))
-        if args.artifact:
+        if args.stage_stack:
+            verify_stage_stack(Path(f"build/{target}-frame"), target, args.artifact)
+        elif args.artifact:
             verify_budget(Path(f"build/{target}-frame"), target, args.artifact)
         elif args.pool:
             models = ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g")
