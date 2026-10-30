@@ -97,8 +97,8 @@ M7 acceptance does not imply those capabilities are implemented.
 | --- | --- | --- |
 | M8.0 Native Port 0/1/2 | Implemented in part; active mainline | Complete safe reference handling and movement, public library management and Port 1 edits; Port2 trusted recovery installation, authority lifecycle, safe startup and reclamation |
 | M8.1 Installable SDK | **Accepted complete** | Preserve installed external C/C++ builds, relocatability, packaging and reproducibility |
-| M8.2 Declarative C UI core | Implemented substantially; stage open | Complete whole-application resource/lifecycle acceptance and pending CI; original design reviewed, six host UI regressions pass locally |
-| M8.3 Components/renderers | Implemented substantially; stage open | Complete reusable components, renderer/theme independence and six-model interaction/resource acceptance |
+| M8.2 Declarative C UI core | Declaration, layout, input and effects implemented; design reviewed; stage open | Smallest-target memory/update-cost and whole-application resource/lifecycle acceptance; pending follow-up CI |
+| M8.3 Components/renderers | Reusable controls and renderer/theme independence implemented; stage open | Complete six-model low-memory, resource-budget and clean-return acceptance; pending follow-up CI |
 | M8.4 HPGCC source adapters | SD Reset #15, opt-in formatting #17 and async/KOS tone gates #25 accepted; stage open | Complete retained historical application/API coverage, documented migrations and pending branch acceptance |
 | M8.5 Modern C++/migration | Implemented in part; stage open | Complete ownership/error/lifetime contracts, migration tooling/guidance and public downstream examples |
 | M8.6 Applications/release | Stage open | Nontrivial integrated apps, clean SDK use, cross-family resource/return checks, documentation and release acceptance |
@@ -108,7 +108,7 @@ UI must retain the user's declarative C design: nested ordinary C declarations,
 stable keyed identity, controlled inputs, explicit asynchronous state and
 revision-driven canvas. A superficially similar imperative API is not completion.
 
-## Current work: M8.0 mainline and independent M8.5 tooling
+## Current work: M8.0 mainline and independent UI/C++ acceptance
 
 The mainline remains safe movement and execution-reference coverage for native
 library management and Port1 edits, followed by Port2 trusted recovery
@@ -130,29 +130,40 @@ Previous #13 CI retains one cancelled publisher; #14 retains cancelled gates.
 Remote acceptance, whole-application peak admission and M8.5 completion remain open.
 
 M8.5 migration tools and API guide `5d5195dc` are submitted in draft PR #27;
-CI has two successful and eight queued workflows; 89 jobs pass, twelve run and 267 are queued. Checker head `b59fb56d` passed the full relocated
+CI has four successful, five queued and one running workflow; 159 jobs pass, 205 are queued and four run. Checker head `b59fb56d` passed the full relocated
 SDK gate, six model-specific Notebook builds, three HP39 Aplet variants and 517
 byte-identical release outputs. The later guide/header-comment follow-up passes
 installation/relocation, links, strict ARMv4T C11 example compilation and docs.
 Remaining ownership/application migration acceptance is still required;
 this submission does not complete M8.5.
 
-M8.2/M8.3 UI return-capacity gate `8849b85f` is submitted in draft PR #28;
-four workflows pass and four are queued; 215 jobs pass, three run and 136 are queued. It checks native free capacity and largest-block
-recovery after settled return. Fifteen tests, all 79 retained snapshots across
-six models, the actual CI commands and strict docs pass locally. This is not a
-new emulator run or complete physical-memory admission; whole-application
-resource acceptance remains open.
+M8.2/M8.3 UI stack/return-capacity gate `a181a6d2` is submitted in draft
+PR #28; new-head CI is unpolled. The pre-push audit of preceding `79a5fe36`
+found twelve queued workflows and twenty queued materialized jobs. The branch
+checks application SP and native free-capacity recovery after settled return,
+and adds optional native/launcher SP diagnostics. Local evidence below does
+not replace CI acceptance or whole-application resource admission.
 
-The local, unsubmitted M8.2/M8.3 SP follow-up now includes a budget gate,
-negative-report tests and Direct/Stock CI wiring with retained traces.
-All six Direct UI/SP/return cases pass and independently replay (2424-byte
-SP use). The gate now combines the shared User/System SP bank, matching
-bootstrap caller-mode preservation. Nine host tests and replay of all six
-Direct cases plus HP39g+ Stock pass, including its nine lifecycle snapshots.
-The remaining five Stock cases have resumed; their acceptance stays open.
-The untouched 4 KiB control detects 4144 bytes while the watermark stays
-2424. Native/exception stacks and whole-system peak admission remain open.
+The UI SP follow-up `79a5fe36` is submitted in PR #28; CI acceptance is pending.
+All six Direct and six Stock UI/SP/return cases pass; independent replay
+checks all 79 lifecycle snapshots, pool/artifact budgets and unchanged
+application/emulator identities. Shared User/System stack use is
+2424–2432 bytes of 8192. Nine host tests and full source-quality/strict
+docs checks pass. The untouched 4 KiB control detects 4144 bytes while
+the watermark stays 2424. CI, native/exception stacks and whole-system
+peak admission remain open.
+
+The optional all-PC SP observer in `a181a6d2` separates CPU modes and 1 MiB stack
+address regions, including ROM/launcher assignments. Thirteen host tests, Ruff,
+strict docs and a fresh emulator build pass. HP39g+ Direct UI/return and the
+existing application SP gate pass on the unchanged application; additional
+stage-region observations span `0x0131d3b0–0x0131dff8`. Independent
+image/pool reconciliation measures 3152/4096 bytes for this Direct stage
+stack, deepest in image decompression. HP39g+ Stock UI/return also passes;
+reconciliation against its observed 34-page stage pool measures the same
+3152/4096-byte stage stack. Full source quality checks pass. Native-stack
+bounds and full peak admission remain open.
+
 
 CI follow-up `fce14d73` is submitted in draft PR #29; four workflows pass and six are queued; 126 jobs pass, one is skipped, five run and 243 are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
 a fresh build with the isolated patch passes. Original packet CRC checks pass
@@ -162,8 +173,10 @@ replaced passes application execution, 52 keyboard frames and settled Stock
 return. No failing remote gate is waived; the initial packet-loss cause remains
 unproven.
 
-M8.0 head `b8d38497` is submitted in PR #26, including relocation fix `fb0510ba`.
-Its ten workflows are queued; no new-head CI acceptance is claimed. Diagnosis identifies a fixture
+M8.0 head `af7d7e8b` is submitted in PR #26, including explicit-P planning
+`84fa1a70` and relocation fix `fb0510ba`. Eight workflows are queued and
+two pending, with 16 materialized jobs queued; no CI acceptance is claimed;
+preceding `b8d38497` had ten queued workflows/16 jobs at the pre-push audit. Diagnosis identifies a fixture
 heap/stack collision. Inlining kept a 7408-byte branch workspace frame live during library
 probes; a later allocation crossed the active stack and zeroed return addresses.
 Moving branch tables into a scoped heap workspace reduces the main frame to
@@ -219,18 +232,33 @@ and a fourth mutable-Flash configuration. Passing these checks does not prove st
 All prior artifact-specific evidence and limitations are retained in
 [M8 validation history](m8-validation-history.md).
 
-M8.0 follow-up `84fa1a70` is prepared for PR #26: explicit P=0/P=1 retains
+Submitted M8.0 planning `84fa1a70` accepts explicit P=0/P=1 and retains
 the existing P=0 entry point. Both-model original-interpreter comparisons
 pass 32 P=1 page-map predictions and 96 unsupported-P rejection controls.
 ASan/UBSan, ARM compile/analysis and current-source artifact checks pass.
 This is mapping prediction, not arbitrary-bank restoration, startup
 qualification or authorization for public storage mutation.
+A local, unsubmitted mapped reader now consumes caller-qualified predicted
+pages without installing them. Unit sanitizers, ARM checks and both-model
+saved-state physical-read comparisons pass. The device probe now checks
+32 P=0/P=1 plans per launch with unchanged native state; both 14-case Stock
+matrices pass. Independent audits confirm 28 return markers, 36 unchanged
+Flash snapshots and 16 reproduced artifacts.
+A separate local C data-target resolver now joins planning, bounded reads
+and object spans, including observed mutable-Flash data. All 40 saved HOME
+targets resolve and their execution edges remain rejected. Unit/ARM checks
+pass. The device build passes ten ARM analyses and reproduces sixteen
+delivery files byte-for-byte; its main frame remains 1064 bytes. Both
+models pass all fourteen Stock cases. Independent replay verifies 28
+return markers, 36 unchanged Flash states and sixteen reproduced
+artifacts, binding the new resolver/reader sources. Full source quality
+passes. This follow-up is local; complete graph/execution policy remains open.
 
 ## Pending delivery
 
 | PR / head | State |
 | --- | --- |
-| #26 / `b8d38497` | Submitted; ten workflows and sixteen currently materialized jobs queued. Local full relocation matrices and artifact reproduction pass; remote acceptance remains open. |
+| #26 / `af7d7e8b` | Submitted; eight workflows queued/two pending and 16 jobs queued. Explicit-P planning passes both-model original-interpreter comparisons and local quality gates. Remote acceptance remains open. |
 | #26 previous head / `6a582958` | **Five failed jobs retained:** HP39g+ runtime/console pre-entry transfer, plus three HP49g+/HP50g relocation jobs across push/PR runs. Final pre-push audit: 370 successful, one skipped, five failed, three running and one queued job; nine successful, one running and one queued workflow. The workspace fix passes all 28 local call/return cases. HP39g+ packet-loss origin remains unproven; no failing gate is waived. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |

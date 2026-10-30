@@ -2393,3 +2393,163 @@ and whole-system peak coverage remain outside this local result.
 Delivery preparation: functional commit `84fa1a70` passes full tracked-file
 format/Ruff/ShellCheck and strict docs. Pre-push audit of `b8d38497` finds
 ten queued workflows/16 queued jobs; no preceding CI acceptance is claimed.
+
+Delivery: PR #26 now points to `af7d7e8b`, including functional
+`84fa1a70`. Push and remote head readback succeeded. Pre-push `b8d38497`
+had ten queued workflows/16 jobs. New-head CI was not polled; no merge
+or M8.0 acceptance is claimed. Full tracked-file quality and strict
+docs passed before push.
+
+## 2026-10-30 — Read caller-qualified predicted mappings
+
+`hpclang_rpl_stock_view_mapped` reads through a stable caller-owned
+256-page array without changing native mappings. The live reader and
+mapped reader share the same physical SRAM/immutable-ROM bounds.
+Invalid pages, mutable Flash/MMIO, stale descriptors and invalid
+arguments preserve the output. Caller retains plan dependencies,
+exclusive lifetime and distinct mapping IDs; this is not a resolver
+policy or complete reference guard.
+
+Maintained unit tests exercise different live/predicted maps, every
+logical page boundary, descriptor invalidation and unchanged live
+page words. ASan/UBSan and ARM compilation/static analysis pass.
+Static analysis uses the existing stock-view exclusion for intentional
+fixed hardware address reads; no new checker exclusion was introduced.
+Saved-state replay covers 17 maps per HP49g+/HP50g model: each has
+15,360 successful nibble comparisons, 2,048 rejected reads and 1,024
+page selections differing from the live map. Inputs remain unchanged.
+Proof/source hashes: `/work/oct30-mapped-view/snapshots-verified.json`.
+This is local validation, not a new device execution or submitted CI.
+
+## 2026-10-30 — Device mapped-read integration in progress
+
+The maintained ROM-bank probe now feeds each accepted P=0 plan and
+16 P=1 exit plans into the mapped reader (32 plans per launch). It
+checks both end bytes of every logical page against direct physical
+SRAM/immutable-ROM reads, rejects unsupported pages, and checks the
+complete 0xc60-byte native state remains unchanged. Successful return
+requires all plan/read checks; this is still read-only prediction.
+The fresh application and all six launchers build; eight ARM analyses
+pass. Independent rebuild matches all 16 delivery artifacts; the
+main frame remains 1064 bytes below the 2048-byte gate. Temporary
+rebuild output was removed. Two-model 14-case Stock matrices run in
+`/work/oct30-mapped-view/`; no runtime acceptance is claimed yet.
+
+Current UI gate independently replays 8/12 cases: six Direct and
+HP39g+/HP39gs Stock, including 17 lifecycle snapshots. HP40gs is live.
+Proof: `/work/oct30-stack-pointer/matrix-user-mode-independent-verified.json`.
+PR #26 af7d7e8b: eight queued/two pending workflows, 16 queued jobs.
+PR #28 8849b85f: six successful/two queued workflows; 300 successful,
+one skipped, five running, 49 queued jobs. Neither is fully accepted.
+
+## 2026-10-30 — Clarify UI implementation versus remaining acceptance
+
+Rechecked the frozen M8.2/M8.3 contracts: M8.2a/b/c and the original
+sketch review are checked; M8.3 reusable controls, default renderer,
+independent backend/theme and keyboard/surface adaptation are checked.
+Current UI implementation files have no local changes against the
+submitted observer branch. The current roadmap had misleadingly
+listed reusable controls/theme independence as remaining work. It now
+separates implemented functionality from the still-open smallest-target
+memory/update-cost, whole-application resource/lifecycle, six-model
+low-memory/return and follow-up CI acceptance. No criterion is removed
+and neither UI milestone is marked complete.
+
+M8.0 mapped-reader Stock matrices each passed native and
+native-new-message cases and continue on the same live processes.
+PR #27 exact head 5d5195dc has four successful/six queued workflows,
+138 successful/230 queued jobs; no complete CI acceptance yet.
+
+## 2026-10-30 — Complete local UI SP matrix
+
+The UI SP follow-up is locally complete and prepared for PR #28.
+All six Direct and six Stock UI/SP/return cases pass; independent replay
+checks all 79 lifecycle snapshots, pool/artifact budgets and unchanged
+application/emulator identities. Shared User/System stack use is
+2424–2432 bytes of 8192. Nine host tests and full source-quality/strict
+docs checks pass. The untouched 4 KiB control detects 4144 bytes while
+the watermark stays 2424. CI, native/exception stacks and whole-system
+peak admission remain open.
+
+Complete proof: `/work/oct30-stack-pointer/matrix-user-mode-independent-verified.json`.
+All Direct and HP39-family Stock cases observe 2424 bytes; HP48/49/50
+Stock observe 2432 bytes. Original gate failure and trace are retained.
+The replay originally tried to recreate an immutable lifecycle report;
+it now recomputes and compares the retained report instead. Final
+`--require-complete` replay passes 12/12 and 79 snapshots. No skipped
+model, changed application or relaxed stack limit was used.
+Pre-push PR #28 audit: exact 8849b85f, six successful/two queued
+workflows, 309 successful/one skipped/six running/39 queued jobs.
+M8.0 mapped-reader matrices have passed native, new-message,
+missing-message, remove and detach cases on both models; they remain live.
+
+UI delivery `79a5fe36` was pushed to PR #28 and the remote head verified.
+The preceding exact-head CI was audited before push; new-head CI was
+not polled. The nine observer/gate tests are included by the existing
+Python unittest discovery. Full tracked-file format/Ruff/ShellCheck
+and strict docs passed before push. No merge or UI milestone completion.
+
+## 2026-10-30 — Complete mapped-read device matrix; C data-target composition
+
+The mapped-reader application passes all 14 call/return cases on both
+models. Independent `/work/oct30-mapped-view/verified.json` checks
+28 post-call markers, 18 original/ten rewritten returns, 36 unchanged
+Flash states and 16 independently reproduced artifacts. Every launch
+requires 32 P=0/P=1 plan/read checks and unchanged native state.
+
+Separately added `rpl-bank-target.c` joins the actual bank planner to
+bounded object-span decoding and a reader for subsequent graph work.
+It requires Stock source callbacks over the same captured view,
+distinct mapping IDs and a nonzero-switch ACPTR; source-edge and
+exclusive-lifetime qualification remain caller obligations. Plan and
+payload reads retain mapping-qualified dependencies; output publishes
+only after successful parsing. EXECUTION edges are rejected.
+
+Initial real-state comparison resolved 26/40 targets; 14 were blocked
+by immutable-only reads. A separate bounded mutable-Flash data reader
+now checks identity descriptors on each read and emits no Flash
+commands. Immutable-ROM identification stays unchanged. All 40 HOME
+targets now match prior independent spans/banks and every payload
+nibble matches the saved physical bytes, including 14 mutable-Flash
+targets. Outside-object reads preserve output; all 40 execution edges
+remain unsupported. Inputs are unchanged. Evidence/source hashes:
+`/work/oct30-bank-target/targets-verified.json`.
+
+Registered the new runtime sources and host test in CMake. Composition
+unit tests use an isolated planner stub; the saved-state test uses
+the real planner and identified ROM. ASan/UBSan, CTest and ARM compile/
+analysis pass, including final Flash nibble bounds, callback errors,
+stale descriptors, mapping collisions and unchanged failed outputs.
+This newer resolver was not part of the completed device artifact;
+its device validation, full graph policy and execution closure remain
+open. These changes are local/unsubmitted and do not enable edits.
+
+## 2026-10-30 — C data-target device integration started
+
+The updated Stock probe walks actual HOME ACPTR tables, resolves their data
+objects through the C planner/reader, reparses their bounded spans, checks the
+first out-of-object read, and rejects execution edges. It requires mutable
+Flash coverage and preserves the captured native state. The working image
+passes ten ARM analyses; an independent temporary build reproduces all sixteen
+delivery artifacts and is removed afterwards. Main stack frame: 1064 bytes.
+Evidence: `/work/oct30-bank-target/reproduction.json`. HP49g+ and HP50g each
+pass the first native call/return case; remaining cases are running, not accepted.
+The independent audit now explicitly binds the new resolver, Flash data reader,
+code decoder and profile to the reproduced sources. No public edits are enabled.
+
+Exact submitted-head CI audit: UI #28 `79a5fe36` has twelve queued workflows
+and twenty queued materialized jobs. Migration #27 `5d5195dc` has four successful,
+five queued and one running workflow; 159 successful, 205 queued and four
+running jobs. Neither branch is accepted or merged by this audit.
+
+## 2026-10-30 — C data-target device matrix complete locally
+
+Both HP49g+ and HP50g pass all fourteen Stock call/return cases with mandatory
+HOME data-target parsing, bounded-read and execution-edge rejection checks.
+Independent `/work/oct30-bank-target/verified.json` validates 28 post-call
+markers, eighteen original/ten rewritten returns, 36 unchanged Flash states
+and sixteen byte-identical rebuilt artifacts. The audit explicitly checks the
+new resolver, Flash data reader, code decoder and profile against reproduced
+source identities. Ten ARM analyses, main-frame budget (1064 < 2048) and full
+source format/Ruff/ShellCheck pass. This local result does not enable public
+Port1 edits or close graph/execution qualification, startup safety or M8.0.

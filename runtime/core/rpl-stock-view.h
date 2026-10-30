@@ -31,4 +31,18 @@ int hpclang_rpl_stock_view_reader(struct hpclang_rpl_stock_view *view);
 int hpclang_rpl_stock_view_native(void *context, uint32_t address, uint8_t *value);
 int hpclang_rpl_stock_view_rom(void *context, uint32_t address, uint8_t *value);
 int hpclang_rpl_stock_view_saturn(void *context, uint32_t address, uint8_t *value);
+
+struct hpclang_rpl_stock_mapped_view
+{
+    struct hpclang_rpl_stock_view *view;
+    const uint32_t *pages; /* Exactly 256 physical 2-KiB page addresses. */
+};
+/* Read through a caller-qualified predicted mapping without installing it.
+ * The view and page array must remain stable under the same exclusive lifetime
+ * as the source view. Callers retain the plan's mapping/selector dependencies
+ * and assign a distinct mapping ID when traversing references. This callback
+ * bounds physical reads like saturn; it does not qualify the plan, capture its
+ * dependencies or authorize execution. Mutable Flash/MMIO remain unavailable.
+ * Success is 1; failure preserves value. No writes or bank switching. */
+int hpclang_rpl_stock_view_mapped(void *context, uint32_t address, uint8_t *value);
 #endif

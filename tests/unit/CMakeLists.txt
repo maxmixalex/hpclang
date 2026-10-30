@@ -988,6 +988,14 @@ hpclang_unit(rpl_stock_view test_rpl_stock_view.c
     "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c")
 target_include_directories(test_rpl_stock_view PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_bank_target test_rpl_bank_target.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-bank-target.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-flash-data.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-view.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_bank_target PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(rpl_execution_map test_rpl_execution_map.c
     "${HPCLANG_ROOT}/runtime/core/rpl-execution-map.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")

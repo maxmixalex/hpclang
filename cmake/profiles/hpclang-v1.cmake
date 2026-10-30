@@ -116,6 +116,8 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-memory.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-bank-effects.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-bank-plan.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-bank-target.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-flash-data.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-execution-map.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-rom-profile.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-rom.c"

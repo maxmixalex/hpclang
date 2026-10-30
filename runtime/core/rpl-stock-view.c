@@ -60,15 +60,9 @@ int hpclang_rpl_stock_view_rom(void *context, uint32_t address, uint8_t *value)
     return 1;
 }
 
-int hpclang_rpl_stock_view_saturn(void *context, uint32_t address, uint8_t *value)
+static int page_read(struct hpclang_rpl_stock_view *view, uint32_t page, uint32_t address,
+                     uint8_t *value)
 {
-    struct hpclang_rpl_stock_view *view = context;
-    if (!value || address >= 0x100000u || !ram_live(view))
-        return 0;
-    uint32_t at = view->state_offset + (address >> 12) * 4u;
-    uint32_t page = 0;
-    for (unsigned i = 0; i < 4; ++i)
-        page |= (uint32_t)view->sram[at + i] << (8u * i);
     if (page & 0x7ffu)
         return 0;
     uint32_t offset = (address & 0xfffu) / 2u;
@@ -82,4 +76,24 @@ int hpclang_rpl_stock_view_saturn(void *context, uint32_t address, uint8_t *valu
         return 0;
     *value = (byte >> (4u * (address & 1u))) & 15u;
     return 1;
+}
+
+int hpclang_rpl_stock_view_saturn(void *context, uint32_t address, uint8_t *value)
+{
+    struct hpclang_rpl_stock_view *view = context;
+    if (!value || address >= 0x100000u || !ram_live(view))
+        return 0;
+    uint32_t at = view->state_offset + (address >> 12) * 4u;
+    uint32_t page = 0;
+    for (unsigned i = 0; i < 4; ++i)
+        page |= (uint32_t)view->sram[at + i] << (8u * i);
+    return page_read(view, page, address, value);
+}
+
+int hpclang_rpl_stock_view_mapped(void *context, uint32_t address, uint8_t *value)
+{
+    const struct hpclang_rpl_stock_mapped_view *mapped = context;
+    if (!mapped || !mapped->pages || !value || address >= 0x100000u || !ram_live(mapped->view))
+        return 0;
+    return page_read(mapped->view, mapped->pages[address >> 12], address, value);
 }

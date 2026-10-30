@@ -5,22 +5,139 @@
 #include "rpl-stock-rom.h"
 #include "rpl-stock-view.h"
 #include "rpl-bank-plan.h"
+#include "rpl-bank-target.h"
 #include "irq.h"
 
 volatile uint32_t hpclang_rom_bank_evidence[4];
 volatile uint32_t hpclang_rom_profile_evidence[4];
 volatile uint32_t hpclang_bank_plan_evidence[4];
-static struct hpclang_rpl_bank_workspace plan_workspace;
-static struct hpclang_rpl_bank_plan bank_plan;
+volatile uint32_t hpclang_bank_read_evidence[4];
+volatile uint32_t hpclang_bank_target_evidence[4];
+static union
+{
+    struct hpclang_rpl_bank_workspace bank;
+    struct hpclang_rpl_bank_target_workspace target;
+} workspace;
+static union
+{
+    struct hpclang_rpl_bank_plan bank;
+    struct hpclang_rpl_bank_target target;
+} planned;
 static uint8_t native_before[0xc60];
+
+static int mapped_probe(struct hpclang_rpl_stock_view *view)
+{
+    struct hpclang_rpl_stock_mapped_view mapped = {view, planned.bank.effects.map.pages};
+    const uint32_t offsets[] = {0, 1, 4094, 4095};
+    for (unsigned page = 0; page < 256; ++page) {
+        uint32_t physical = planned.bank.effects.map.pages[page];
+        for (unsigned j = 0; j < 4; ++j) {
+            uint32_t offset = offsets[j];
+            uint8_t value = 99, expected;
+            int result = hpclang_rpl_stock_view_mapped(&mapped, page * 4096u + offset, &value);
+            if (!(physical & 0x7ffu) && physical <= 0x13f800u) {
+                if (!hpclang_rpl_stock_view_rom(view, physical * 2u + offset, &expected))
+                    return 0x7016;
+            } else if (!(physical & 0x7ffu) && physical >= 0x08000000u && physical <= 0x0807f800u) {
+                uint8_t byte = view->sram[physical - 0x08000000u + offset / 2u];
+                expected = (byte >> (4u * (offset & 1u))) & 15u;
+            } else {
+                if (result || value != 99)
+                    return 0x7017;
+                ++hpclang_bank_read_evidence[1];
+                continue;
+            }
+            if (!result || value != expected)
+                return 0x7018;
+            ++hpclang_bank_read_evidence[0];
+        }
+    }
+    ++hpclang_bank_read_evidence[2];
+    return 0;
+}
 
 static int plan_observe(void *context, uint32_t mapping, uint32_t address, uint8_t value)
 {
     (void)address;
-    if (mapping < 1 || mapping > 3 || value > 15)
+    if (mapping < 1 || mapping > 4 || value > 15)
         return -73;
     ++*(unsigned *)context;
     return 0;
+}
+
+static int word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned width,
+                uint32_t *value)
+{
+    if (at >= 0x100000u || width > 0x100000u - at)
+        return 0;
+    *value = 0;
+    for (unsigned i = 0; i < width; ++i) {
+        uint8_t nibble;
+        if (!reader->read_nibble(reader->context, at + i, &nibble) || nibble > 15)
+            return 0;
+        *value |= (uint32_t)nibble << (4u * i);
+    }
+    return 1;
+}
+
+static int target_probe(struct hpclang_rpl_stock_view *view,
+                        const struct hpclang_rpl_bank_sources *sources, unsigned *observations)
+{
+    uint32_t home, prologue, count;
+    const struct hpclang_rpl_reader *reader = sources->saturn;
+    if (!word(reader, 0x80711, 5, &home) || home > 0xffff8u || !word(reader, home, 5, &prologue) ||
+        prologue != 0x2a96 || !word(reader, home + 5, 3, &count) || count > 128 ||
+        count > (0x100000u - home - 8u) / 13u)
+        return 0x7020;
+    for (uint32_t i = 0; i < count; ++i) {
+        for (unsigned table = 0; table < 2; ++table) {
+            uint32_t wrapper;
+            if (!word(reader, home + 8u + i * 13u + 3u + table * 5u, 5, &wrapper))
+                return 0x7021;
+            if (!wrapper)
+                continue;
+            if (!word(reader, wrapper, 5, &prologue))
+                return 0x7022;
+            if (prologue != 0x2baa)
+                continue;
+            struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_ACPTR, wrapper + 5, 0, 0, 0};
+            if (wrapper > 0xffff1u || !word(reader, wrapper + 5, 5, &edge.target) ||
+                !word(reader, wrapper + 10, 5, &edge.auxiliary))
+                return 0x7023;
+            if (!edge.auxiliary)
+                continue;
+            int result =
+                hpclang_rpl_bank_target_prepare(view, sources, &edge, 4, &workspace.target,
+                                                &planned.target, plan_observe, observations);
+            if (result)
+                return 0x7024;
+            struct hpclang_rpl_bank_target_view target_view = {view, &planned.target};
+            const struct hpclang_rpl_reader payload = {hpclang_rpl_bank_target_read, &target_view};
+            uint32_t span;
+            if (hpclang_rpl_object_span(&payload, edge.target, planned.target.node.object.limit,
+                                        &span) ||
+                span != planned.target.node.object.limit)
+                return 0x7025;
+            uint8_t value = 99;
+            if (hpclang_rpl_bank_target_read(&target_view, edge.target + span, &value) ||
+                value != 99)
+                return 0x7026;
+            ++hpclang_bank_target_evidence[0];
+            hpclang_bank_target_evidence[1] += planned.target.plan.geometry.physical >= 0x140000u &&
+                                               planned.target.plan.geometry.physical < 0x200000u;
+            hpclang_bank_target_evidence[2] += span;
+            edge.kind = HPCLANG_RPL_REFERENCE_EXECUTION;
+            if (hpclang_rpl_bank_target_prepare(view, sources, &edge, 4, &workspace.target,
+                                                &planned.target, plan_observe,
+                                                observations) != HPCLANG_RPL_SPAN_UNSUPPORTED)
+                return 0x7027;
+            ++hpclang_bank_target_evidence[3];
+        }
+    }
+    return hpclang_bank_target_evidence[0] && hpclang_bank_target_evidence[1] &&
+                   hpclang_bank_target_evidence[0] == hpclang_bank_target_evidence[3]
+               ? 0
+               : 0x7028;
 }
 
 static int plan_probe(const struct hpclang_rpl_rom_profile *profile)
@@ -47,7 +164,7 @@ static int plan_probe(const struct hpclang_rpl_rom_profile *profile)
                 entry |= (uint32_t)value << (4u * j);
             }
         }
-        int result = hpclang_rpl_bank_plan_prepare(&sources, entry, &plan_workspace, &bank_plan,
+        int result = hpclang_rpl_bank_plan_prepare(&sources, entry, &workspace.bank, &planned.bank,
                                                    plan_observe, &observations);
         if (index == 14 || index == 15) {
             if (result >= 0)
@@ -55,11 +172,27 @@ static int plan_probe(const struct hpclang_rpl_rom_profile *profile)
             ++rejected;
         } else {
             uint32_t expected = index < 16 ? index : index == 16 ? 2u : 4u;
-            if (result || bank_plan.bank != expected || !bank_plan.geometry.bytes)
+            if (result || planned.bank.bank != expected || !planned.bank.geometry.bytes)
                 return 0x7013;
+            result = mapped_probe(&view);
+            if (result)
+                return result;
             ++accepted;
         }
+        if (index < 16) {
+            result = hpclang_rpl_bank_plan_prepare_p(&sources, entry, 1, &workspace.bank,
+                                                     &planned.bank, plan_observe, &observations);
+            if (result || planned.bank.bank != 2 || planned.bank.program.selector != 0x860b8)
+                return 0x7019;
+            result = mapped_probe(&view);
+            if (result)
+                return result;
+            ++hpclang_bank_read_evidence[3];
+        }
     }
+    int result = target_probe(&view, &sources, &observations);
+    if (result)
+        return result;
     for (unsigned i = 0; i < sizeof native_before; ++i)
         if (native_before[i] != view.sram[view.state_offset + i])
             return 0x7014;
@@ -67,7 +200,10 @@ static int plan_probe(const struct hpclang_rpl_rom_profile *profile)
     hpclang_bank_plan_evidence[1] = rejected;
     hpclang_bank_plan_evidence[2] = observations;
     hpclang_bank_plan_evidence[3] = sizeof native_before;
-    return accepted == 16 && rejected == 2 && observations ? 0 : 0x7015;
+    return accepted == 16 && rejected == 2 && observations && hpclang_bank_read_evidence[0] &&
+                   hpclang_bank_read_evidence[2] == 32 && hpclang_bank_read_evidence[3] == 16
+               ? 0
+               : 0x7015;
 }
 
 /* Identify the reviewed immutable image before using its layout locations. */
