@@ -27,8 +27,10 @@ add_executable(hpclang_system_services_e2e
     power.c
     console.c)
 
+# The observer explicitly binds stdout. Keep the example's optional legacy
+# console constructor from changing the suite's independent unbound-stdio tests.
 set_source_files_properties("${HPCLANG_ROOT}/examples/timer-cpp/main.cpp" PROPERTIES
-    COMPILE_DEFINITIONS "main=hpclang_timer_example_main")
+    COMPILE_DEFINITIONS "main=hpclang_timer_example_main;HPCLANG_HPCONIO_NO_AUTOINIT=1")
 
 target_include_directories(
     hpclang_system_services_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
