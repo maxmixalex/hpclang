@@ -12,6 +12,11 @@ APP_DIR="$3"
 ASSETS_DIR="${4:-}"
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 REQUIRE_KEYBOARD="${HPCLANG_E2E_REQUIRE_KEYBOARD:-1}"
+CAPTURE_STACK_POINTER="${HPCLANG_E2E_CAPTURE_STACK_POINTER:-0}"
+case "$CAPTURE_STACK_POINTER" in
+    0|1) ;;
+    *) echo "HPCLANG_E2E_CAPTURE_STACK_POINTER must be 0 or 1" >&2; exit 2 ;;
+esac
 
 case "$REQUIRE_KEYBOARD" in
     0|1) ;;
@@ -63,6 +68,10 @@ printf 'E2E %s/%s targets: %s\n' "$MODE" "$FAMILY" "${TARGETS[*]}"
 # execution on a busy runner. Preserve every target and aggregate failures.
 status=0
 for target in "${TARGETS[@]}"; do
+    if [[ "$CAPTURE_STACK_POINTER" == 1 ]]; then
+        export HPCLANG_X50NG_STACK_POINTER="$ROOT/build/$target-frame-stack-pointer.jsonl"
+        rm -f "$HPCLANG_X50NG_STACK_POINTER" "$ROOT/build/$target-frame-stack-pointer-budget.json"
+    fi
     frames=""
     if [[ "$REQUIRE_KEYBOARD" == 1 ]]; then
         frames="$ROOT/build/$target-keyboard-frames"

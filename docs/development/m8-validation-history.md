@@ -205,3 +205,184 @@ open. Ruff passes with its cache disabled for the read-only source mount.
 Preceding CI audit: #26 `6a582958`, 157 successful/eighteen running/203 queued
 jobs, no failures; #27 `b59fb56d`, ten queued workflows and sixteen materialized
 queued jobs. Neither has completed CI acceptance.
+
+UI return-capacity delivery: `8849b85f` submitted in draft PR #28 after the
+preceding CI audit. New-head CI was not polled this submission turn.
+
+### Application SP observation control (2026-10-30, local only)
+
+The resource-observer worktree adds opt-in `HPCLANG_X50NG_STACK_POINTER`
+instrumentation to translated application SP writes. Records separate CPSR modes;
+native firmware instructions and exception bank switches are outside this scope.
+Four host tests cover untouched reservations, mode separation, disabled output,
+existing evidence preservation and invalid destinations. A linked-helper symbol
+check ensures the QEMU archive was rebuilt, rather than merely relinking stale
+objects. The initial op_helper stdio conflict was corrected by placing the helper
+in helper.c; the first stale-archive build is not runtime evidence.
+HP39g+ Direct completes full UI pixel/resource/return gates in three runs:
+baseline, a temporary control reserving 4096 untouched bytes, and tracing disabled.
+Independent checks retain identical memory reports (2424 touched stack bytes),
+but SP excursions are 2424 and 4144 bytes. The reported deepest PC is verified
+against the control ELF's `mov sp, r2` instruction. Disabled tracing creates no
+trace. The control does not alter the shipped application source.
+Evidence: `/work/oct30-stack-pointer/independent-verified.json`, retained traces,
+runtime reports and control disassembly; drivers `research/oct30-stack-pointer-*.py`.
+The follow-up is not submitted and does not establish six-model/Stock coverage,
+complete stack bounds or whole-system peak memory admission.
+
+The SP follow-up now has a maintained budget verifier and both Direct/Stock
+UI workflow gates. CI artifacts retain raw JSONL traces and budget reports.
+Eight observer/budget tests and five existing UI memory tests pass; Ruff,
+ShellCheck and workflow structure checks pass. The gate rejects absent,
+duplicate, truncated, invalid-mode, inconsistent-watermark and exhausted-stack
+reports and removes stale success output. A fresh current-branch emulator
+contains the linked helper; its UI HPC matches the earlier accepted local image.
+All six Direct runs pass UI pixels, update timing, SP budget and return. Current
+verifier replay checks all six stored cases and unchanged application/emulator
+hashes. Each observes 2424 bytes of System-mode SP use. The original matrix
+process continues into Stock; these six Direct cases are not a completed matrix.
+Evidence: `/work/oct30-stack-pointer/matrix-independent-verified.json` and
+`matrix-runtime.log`; runner `research/oct30-stack-pointer-matrix.py` and replay
+`research/oct30-stack-pointer-matrix-audit.py`. Setup first rejected obsolete
+firmware filenames before running any target; the corrected setup uses the
+model profiles' `boot-49g+.bin` and `boot-50g.bin`. No new push or CI acceptance.
+
+## 2026-10-30 — P=1 bank-exit recognition and Stock SP gate failure
+
+Local, unsubmitted M8.0 recognition now covers the reviewed P=1 bank-exit
+shape, including its replacement selector and consumed dispatch bytes.
+P=0/P=1 unit regressions pass ASan/UBSan and ARM compilation/static
+analysis. This does not restore an arbitrary prior bank, qualify startup
+execution, or enable public storage mutation.
+
+The maintained unit fixture follows the reviewed comparison order
+(0,2,3,4,5,6,7,8,9,10,1), distinguishes entry/exit selectors, and
+rejects each consumed unreadable nibble, callback stop, truncated exit,
+body mismatch and absent matching test without changing output.
+Host ASan/UBSan and ARM compile/static analysis pass locally; no push.
+Artifacts: `/work/oct30-bank-exit/`; reproduction script:
+`research/oct30-bank-exit-check.py`.
+
+The Stock matrix stopped at HP39g+: execution/UI/return passed, but the
+SP gate rejected the recorded User-mode application because it requires
+System mode. Mode qualification and the remaining Stock cases are open.
+The process is terminal, not waiting. The retained trace records modes
+16 and 19; the gate requires 31. Six Direct passes remain valid; no
+Stock SP acceptance is inferred. Runtime log and trace remain under
+`/work/oct30-stack-pointer/`.
+
+## 2026-10-30 — Explicit exit planning and shared-stack gate
+
+Local, unsubmitted M8.0 planning now accepts explicit P=0/P=1 and retains
+the existing P=0 entry point. Both-model original-interpreter comparisons
+pass 32 P=1 page-map predictions and 96 unsupported-P rejection controls.
+ASan/UBSan, ARM compile/analysis and current-source artifact checks pass.
+This is mapping prediction, not arbitrary-bank restoration, startup
+qualification or authorization for public storage mutation.
+
+The maintained `alias_guards.py` runs 16 P=1 ROM entries per model
+through the original ARM interpreter, checks return/P reset and compares
+all 256 predicted page mappings. P=2/15/16 preserve plan output and emit
+no dependencies. Existing P=0, overlay, alias and startup tests pass.
+Reports and source hashes: `/work/oct30-bank-exit/plan-verified.json`.
+PR #26 exact head `b8d38497` remains ten queued workflows/16 jobs.
+
+SP use). The gate now combines the shared User/System SP bank, matching
+bootstrap caller-mode preservation. Nine host tests and replay of all six
+Direct cases plus HP39g+ Stock pass, including its nine lifecycle snapshots.
+The remaining five Stock cases have resumed; their acceptance stays open.
+The original failed gate/log is retained. Replayed artifacts retain
+application/emulator hashes; no failed runtime was replaced.
+Proof: `/work/oct30-stack-pointer/matrix-user-mode-verified.json`;
+remaining Stock runner: `research/oct30-stack-mode-resume.py`.
+Shared-bank transition and overflow regressions pass. Exception-stack
+and whole-system peak coverage remain outside this local result.
+
+Delivery: PR #26 now points to `af7d7e8b`, including functional
+`84fa1a70`. Push and remote head readback succeeded. Pre-push `b8d38497`
+had ten queued workflows/16 jobs. New-head CI was not polled; no merge
+or M8.0 acceptance is claimed. Full tracked-file quality and strict
+docs passed before push.
+
+## 2026-10-30 — Read caller-qualified predicted mappings
+
+`hpclang_rpl_stock_view_mapped` reads through a stable caller-owned
+256-page array without changing native mappings. The live reader and
+mapped reader share the same physical SRAM/immutable-ROM bounds.
+Invalid pages, mutable Flash/MMIO, stale descriptors and invalid
+arguments preserve the output. Caller retains plan dependencies,
+exclusive lifetime and distinct mapping IDs; this is not a resolver
+policy or complete reference guard.
+
+Maintained unit tests exercise different live/predicted maps, every
+logical page boundary, descriptor invalidation and unchanged live
+page words. ASan/UBSan and ARM compilation/static analysis pass.
+Static analysis uses the existing stock-view exclusion for intentional
+fixed hardware address reads; no new checker exclusion was introduced.
+Saved-state replay covers 17 maps per HP49g+/HP50g model: each has
+15,360 successful nibble comparisons, 2,048 rejected reads and 1,024
+page selections differing from the live map. Inputs remain unchanged.
+Proof/source hashes: `/work/oct30-mapped-view/snapshots-verified.json`.
+This is local validation, not a new device execution or submitted CI.
+
+## 2026-10-30 — Device mapped-read integration in progress
+
+The maintained ROM-bank probe now feeds each accepted P=0 plan and
+16 P=1 exit plans into the mapped reader (32 plans per launch). It
+checks both end bytes of every logical page against direct physical
+SRAM/immutable-ROM reads, rejects unsupported pages, and checks the
+complete 0xc60-byte native state remains unchanged. Successful return
+requires all plan/read checks; this is still read-only prediction.
+The fresh application and all six launchers build; eight ARM analyses
+pass. Independent rebuild matches all 16 delivery artifacts; the
+main frame remains 1064 bytes below the 2048-byte gate. Temporary
+rebuild output was removed. Two-model 14-case Stock matrices run in
+`/work/oct30-mapped-view/`; no runtime acceptance is claimed yet.
+
+Current UI gate independently replays 8/12 cases: six Direct and
+HP39g+/HP39gs Stock, including 17 lifecycle snapshots. HP40gs is live.
+Proof: `/work/oct30-stack-pointer/matrix-user-mode-independent-verified.json`.
+PR #26 af7d7e8b: eight queued/two pending workflows, 16 queued jobs.
+PR #28 8849b85f: six successful/two queued workflows; 300 successful,
+one skipped, five running, 49 queued jobs. Neither is fully accepted.
+
+## 2026-10-30 — Clarify UI implementation versus remaining acceptance
+
+Rechecked the frozen M8.2/M8.3 contracts: M8.2a/b/c and the original
+sketch review are checked; M8.3 reusable controls, default renderer,
+independent backend/theme and keyboard/surface adaptation are checked.
+Current UI implementation files have no local changes against the
+submitted observer branch. The current roadmap had misleadingly
+listed reusable controls/theme independence as remaining work. It now
+separates implemented functionality from the still-open smallest-target
+memory/update-cost, whole-application resource/lifecycle, six-model
+low-memory/return and follow-up CI acceptance. No criterion is removed
+and neither UI milestone is marked complete.
+
+M8.0 mapped-reader Stock matrices each passed native and
+native-new-message cases and continue on the same live processes.
+PR #27 exact head 5d5195dc has four successful/six queued workflows,
+138 successful/230 queued jobs; no complete CI acceptance yet.
+
+## 2026-10-30 — Complete local UI SP matrix
+
+The UI SP follow-up is locally complete and prepared for PR #28.
+All six Direct and six Stock UI/SP/return cases pass; independent replay
+checks all 79 lifecycle snapshots, pool/artifact budgets and unchanged
+application/emulator identities. Shared User/System stack use is
+2424–2432 bytes of 8192. Nine host tests and full source-quality/strict
+docs checks pass. The untouched 4 KiB control detects 4144 bytes while
+the watermark stays 2424. CI, native/exception stacks and whole-system
+peak admission remain open.
+
+Complete proof: `/work/oct30-stack-pointer/matrix-user-mode-independent-verified.json`.
+All Direct and HP39-family Stock cases observe 2424 bytes; HP48/49/50
+Stock observe 2432 bytes. Original gate failure and trace are retained.
+The replay originally tried to recreate an immutable lifecycle report;
+it now recomputes and compares the retained report instead. Final
+`--require-complete` replay passes 12/12 and 79 snapshots. No skipped
+model, changed application or relaxed stack limit was used.
+Pre-push PR #28 audit: exact 8849b85f, six successful/two queued
+workflows, 309 successful/one skipped/six running/39 queued jobs.
+M8.0 mapped-reader matrices have passed native, new-message,
+missing-message, remove and detach cases on both models; they remain live.

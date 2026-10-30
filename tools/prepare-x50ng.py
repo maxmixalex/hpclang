@@ -1397,6 +1397,41 @@ def patch_execution_clock(root: Path, args: argparse.Namespace) -> None:
     )
 
 
+def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
+    """Observe actual SP assignments without writing to guest stack memory."""
+    arm = root / "src/qemu/target-arm"
+    shutil.copy2(args.headless_header.parent / "stack-pointer-observer.h", arm)
+    replace_once(
+        arm / "helpers.h",
+        '#include "def-helper.h"',
+        '#include "def-helper.h"\nDEF_HELPER_3(hpclang_stack_pointer, void, ptr, i32, i32)',
+        "stack pointer helper declaration",
+    )
+    replace_once(
+        arm / "helper.c",
+        '#include "helpers.h"',
+        '#include "helpers.h"\n#include "stack-pointer-observer.h"\n'
+        "void HELPER(hpclang_stack_pointer)(void *opaque, uint32_t sp, uint32_t pc)\n"
+        "{ CPUState *env = opaque; stack_pointer_observe(sp, pc, env->uncached_cpsr & 31u); }\n",
+        "stack pointer helper implementation",
+    )
+    replace_once(
+        arm / "translate.c",
+        "    tcg_gen_mov_i32(cpu_R[reg], var);\n    dead_tmp(var);",
+        "    tcg_gen_mov_i32(cpu_R[reg], var);\n"
+        "    if (reg == 13) {\n"
+        "        uint32_t address = s->pc - (s->thumb ? 2 : 4);\n"
+        '        const char *trace = getenv("HPCLANG_X50NG_STACK_POINTER");\n'
+        "        if (trace && *trace && address >= 0x01200000u && address < 0x01300000u) {\n"
+        "            TCGv pc = tcg_const_i32(address);\n"
+        "            gen_helper_hpclang_stack_pointer(cpu_env, var, pc);\n"
+        "            tcg_temp_free_i32(pc);\n"
+        "        }\n"
+        "    }\n    dead_tmp(var);",
+        "translated application SP writes",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("x50ng", type=Path)
@@ -1411,6 +1446,7 @@ def main() -> None:
     root = args.x50ng
     patch_frontends(root, args)
     patch_execution_clock(root, args)
+    patch_stack_pointer_observer(root, args)
     verify_ui_build_inheritance(root)
     patch_universal_flash(root)
     patch_flash_busy(root)

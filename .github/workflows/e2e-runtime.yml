@@ -250,6 +250,7 @@ jobs:
       APPLICATION: ${{ matrix.suite.artifact }}
       HPCLANG_E2E_TARGET: ${{ matrix.model.target }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: ${{ matrix.suite.keyboard && '1' || '0' }}
+      HPCLANG_E2E_CAPTURE_STACK_POINTER: ${{ matrix.suite.mode == 'ui' && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -283,7 +284,12 @@ jobs:
         if: matrix.suite.verifier != ''
         env:
           VERIFIER: ${{ matrix.suite.verifier }}
-        run: python3 "$VERIFIER" direct "$FAMILY"
+        run: |
+          args=(direct "$FAMILY")
+          if [[ "$SUITE" == ui ]]; then
+            args+=(--stack-pointer)
+          fi
+          python3 "$VERIFIER" "${args[@]}"
 
       - name: Generate suite LCD evidence
         if: always()
@@ -315,6 +321,8 @@ jobs:
             build/*-*.pgm.png
             build/*-e2e.json
             build/*-frame-memory-*.json
+            build/*-frame-stack-pointer.jsonl
+            build/*-frame-stack-pointer-budget.json
             build/*-frame-*.lcd
             build/*-summary.png
             build/direct-${{ matrix.family }}-targets.txt
@@ -337,6 +345,7 @@ jobs:
       APPLICATION: ${{ matrix.suite.artifact }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: ${{ matrix.suite.keyboard && '1' || '0' }}
       HPCLANG_E2E_CAPTURE_STAGE_POOL: ${{ matrix.suite.mode == 'ui' && '1' || '0' }}
+      HPCLANG_E2E_CAPTURE_STACK_POINTER: ${{ matrix.suite.mode == 'ui' && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -390,7 +399,7 @@ jobs:
         run: |
           args=(stock "$FAMILY")
           if [[ "$SUITE" == ui ]]; then
-            args+=(--pool --artifact "build/e2e/$APPLICATION")
+            args+=(--pool --artifact "build/e2e/$APPLICATION" --stack-pointer)
           fi
           python3 "$VERIFIER" "${args[@]}"
 
@@ -433,6 +442,7 @@ jobs:
             build/*-*.pgm
             build/*-*.pgm.png
             build/*-*.json
+            build/*-frame-stack-pointer.jsonl
             build/*-frame-*.lcd
             build/*-kermit*
             build/*-socat.log
