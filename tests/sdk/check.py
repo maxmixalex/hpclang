@@ -19,8 +19,12 @@ def run(*args, env):
 
 
 def check_migration_tool(package, work, env):
-    source = work / "migration input.c"
-    original = "#include <hpgcc49.h>\nvoid f(void) { gets(buffer); set_decimal_digits(2); }\n"
+    source = work / "migration input.cpp"
+    original = (
+        "#include <hpgcc49.h>\n"
+        "void f(void) { gets(buffer); set_decimal_digits(2); }\n"
+        "void g() { auto a = 1'000; gets(buffer); auto b = 2'000; }\n"
+    )
     source.write_text(original)
     result = subprocess.run(
         [
@@ -41,6 +45,7 @@ def check_migration_tool(package, work, env):
         "HP006",
         "HP002",
         "HP007",
+        "HP002",
     ]:
         raise AssertionError(f"Unexpected migration findings: {report}")
     if source.read_text() != original:
