@@ -13,10 +13,13 @@ def verify_startup_configurations(lib, read, ram, flash, cpu, profile, select):
     class Entry(c.Structure):
         _fields_ = [("kind", c.c_int), ("dispatch", c.c_uint32), ("span", c.c_uint32)]
 
-    lib.hpclang_rpl_library_configuration.argtypes = [
+    dependency_fn = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
+    lib.hpclang_rpl_library_configuration_guarded.argtypes = [
         c.POINTER(Reader),
         *([c.c_uint32] * 4),
         c.POINTER(c.c_uint32),
+        dependency_fn,
+        c.c_void_p,
     ]
     lib.hpclang_rpl_entry_inspect.argtypes = [
         c.POINTER(Reader),
@@ -53,11 +56,29 @@ def verify_startup_configurations(lib, read, ram, flash, cpu, profile, select):
 
         reader = Reader(mapped, None)
         target = c.c_uint32(0xDEADBEEF)
-        result = lib.hpclang_rpl_library_configuration(
-            c.byref(reader), 0, 0x100000, header, number, c.byref(target)
+        dependencies = {}
+
+        @dependency_fn
+        def capture(_, address, value):
+            assert address not in dependencies
+            dependencies[address] = value
+            return 0
+
+        result = lib.hpclang_rpl_library_configuration_guarded(
+            c.byref(reader), 0, 0x100000, header, number, c.byref(target), capture, None
         )
+        assert set(dependencies) == set(range(header, header + 3)) | set(
+            range(header + 18, header + 23)
+        )
+        assert all(observed[at] == value for at, value in dependencies.items())
         assert result in (0, 1), (number, result)
-        row = dict(library=number, header=header, switch=switch, configuration=None)
+        row = dict(
+            library=number,
+            header=header,
+            switch=switch,
+            configuration=None,
+            configuration_dependencies=dependencies,
+        )
         if not result:
             assert target.value == 0xDEADBEEF
         else:

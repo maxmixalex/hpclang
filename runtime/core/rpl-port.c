@@ -470,6 +470,25 @@ static int bank_lookup_read(void *context, uint32_t address, uint8_t *value)
     return 1;
 }
 
+int hpclang_rpl_library_configuration_guarded(const struct hpclang_rpl_reader *reader,
+                                              uint32_t first, uint32_t end, uint32_t header,
+                                              uint32_t number, uint32_t *target,
+                                              hpclang_rpl_bank_dependency_fn dependency,
+                                              void *context)
+{
+    if (!reader || !reader->read_nibble || !target || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {reader, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    uint32_t next = 0;
+    int result = hpclang_rpl_library_configuration(&observed, first, end, header, number, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1)
+        *target = next;
+    return result;
+}
+
 static int rom_bank_capture(const struct hpclang_rpl_reader *rom,
                             const struct hpclang_rpl_reader *state, uint32_t operands,
                             uint32_t bases_address, uint32_t flash_bytes,

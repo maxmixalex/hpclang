@@ -229,6 +229,18 @@ int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t fl
  * lookup dependencies, not switch-code identity, populated-bank geometry or all
  * live references. Keep reader, table and callback state stable throughout. */
 typedef int (*hpclang_rpl_bank_dependency_fn)(void *context, uint32_t address, uint8_t value);
+/* Configuration lookup with dependencies for the library ID and relative
+ * configuration pointer, including a zero (absent) pointer. Same stable selected
+ * mapping contract as library_configuration; retain mapping/catalog guards too.
+ * Callback errors discard partial observations: negative propagates, positive
+ * becomes MALFORMED. Target changes only on found (1), not absence or error.
+ * This does not inspect the target or qualify startup order/execution safety. */
+int hpclang_rpl_library_configuration_guarded(const struct hpclang_rpl_reader *reader,
+                                              uint32_t first, uint32_t end, uint32_t header,
+                                              uint32_t number, uint32_t *target,
+                                              hpclang_rpl_bank_dependency_fn dependency,
+                                              void *context);
+
 /* Capture/validate all sixteen bank geometries from an independently qualified
  * layout. operands is the ROM BYTE offset of two little-endian ARM pointers:
  * count byte, then KiB-size directory. bases_address is the CPU-state BYTE offset
