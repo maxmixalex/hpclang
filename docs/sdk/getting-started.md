@@ -134,60 +134,16 @@ LLVM linker and binary tools and shares its bootstrap builder with repository
 E2E. Changing the payload or bootstrap sources, or removing an output file,
 causes CMake to regenerate the launchers.
 
-For a reproducible application memory ceiling, use
-`hpclang_target_launchers(my_application MAX_RW_BYTES 36864)` (36 KiB).
-The command-line builder exposes the same option as `--max-rw-bytes 36864`.
-The ceiling must be a positive multiple of 4096, at most 1 MiB, and must fit
-the boot page, page-rounded static data and the reserved 8 KiB stack. A launcher
-with fewer available pages still exposes only those available pages. This caps
-the application's mapped read/write arena and moves its stack top accordingly;
-it does not reduce the legacy launcher's Stock reservation or guarantee enough
-heap for a particular application. Omitting the option keeps all available pages.
+For a fixed application RW arena, configure both admission and ceiling:
 
-Use `MIN_RW_BYTES` when the application needs a known minimum rather than just
-a ceiling. For example,
-`hpclang_target_launchers(my_application MIN_RW_BYTES 36864 MAX_RW_BYTES 36864)`
-requires a complete 36 KiB arena or rejects the launch. The command-line
-equivalent is `--min-rw-bytes 36864 --max-rw-bytes 36864`. Both sizes must be
-page-aligned and contain the boot page, static data and reserved stack; the
-minimum cannot exceed the maximum. An impossible total page-pool requirement
-is rejected during packaging. With a minimum configured, stage0 checks the
-complete code/RW/workspace requirement before copying startup code or changing
-the mappings or stack. Stage1 rechecks the RW requirement before app entry.
-The option establishes an admission condition; it does not ask Stock to reserve
-less memory or prove that the chosen size covers every application allocation.
+```cmake
+hpclang_target_launchers(my_application MIN_RW_BYTES 36864 MAX_RW_BYTES 36864)
+```
 
-Each launcher directory also contains `memory.json`, a versioned build report.
-It separates the page-rounded application code, minimum RW layout (boot page,
-static data and reserved stack), linked startup stage, startup stack and MMU
-workspace. Per-model totals distinguish Direct from Stock: HP39 Stock retains
-two additional native workspace pages. With `MAX_RW_BYTES`, the report also
-calculates the pool needed to expose that complete ceiling; without it, those
-fields are null. `required_rw_bytes` records an optional explicit minimum,
-which is included in the per-model minimum pool totals; `minimum_rw_pages`
-still describes the ABI-only layout. Deleting the report causes CMake to
-regenerate it.
-
-The report's `serialized` section records actual output sizes: the standalone
-HPC1 file, the embedded payload (possibly compressed), and each model's raw
-launcher, wrapped transfer file and native object in nibbles. The object extent
-is checked against the wrapper's encoded size field; its eight-byte transfer
-header is excluded. Wrapper-dependent values are null for `--raw-only` builds.
-These are nested representations, not additive allocations: the wrapped file
-already contains the launcher and embedded payload, and launching it does not
-also require storing the standalone HPC1 file. HP39 Aplet envelopes, directory
-metadata, native allocation overhead and transfer/install temporary copies are
-not included in these serialized sizes.
-
-These totals describe required pool geometry, not measured free memory or a
-change to Stock's allocation policy. The minimum RW layout does not promise
-application heap capacity. Native allocator overhead, stored launcher/payload
-objects and transfer staging are excluded and listed in the report. The current
-display backend allocates LCD DMA buffers from the application heap: their
-backing storage and alignment slack consume the same RW arena, not an additional
-native allocation. An ABI-only RW minimum does not budget those heap requests;
-choose an application minimum that includes them. A successful build does not prove that a particular
-calculator state has enough memory to launch.
+This requires 36 KiB of application RW; the complete launcher also needs code
+and startup/workspace pages. Inspect the generated `memory.json` and follow
+[Memory budgets and package sizes](memory.md) to choose a budget, understand
+serialized sizes and validate allocation/return behavior on your targets.
 
 ## Own calculator objects in C++
 

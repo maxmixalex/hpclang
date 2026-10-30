@@ -100,7 +100,13 @@ class Peer:
         self.expect(b"Y")
 
     def fetch(
-        self, name: bytes, expected: bytes, *, lose_data_ack: bool, delay_data_ack: float = 0
+        self,
+        name: bytes,
+        expected: bytes,
+        *,
+        lose_data_ack: bool,
+        delay_data_ack: float = 0,
+        nak_turnaround: bool = False,
     ) -> None:
         self.acknowledged_data = None
         self.send(packet(b"R", name))
@@ -116,6 +122,17 @@ class Peer:
         wire_length = len(expected) + expected.count(b"\n") + expected.count(b"\\")
         while len(received) < wire_length:
             data = self.expect(b"D", 3, sequence)
+            if nak_turnaround:
+                # Stock must switch back to receiving after sending a NAK.
+                # New packets already honor the configured 50 ms send pause;
+                # retries must also leave this 30 ms unavailable interval clear.
+                for _ in range(2):
+                    self.send(packet(b"N", sequence=sequence, check=3))
+                    if self.receive(0.03) or self.buffer:
+                        raise AssertionError("NAK retransmission ignored peer turnaround pacing")
+                    if self.expect(b"D", 3, sequence) != data:
+                        raise AssertionError("NAK retransmission changed sequence or bytes")
+                nak_turnaround = False
             if lose_data_ack:
                 # Deliberately lose an ACK. The retransmission must preserve
                 # both sequence and bytes, rather than advancing the file.
@@ -207,7 +224,7 @@ def verify(tools: Path) -> None:
                     # server must recover while waiting for the next request.
                     peer.expect(b"N")
                     peer.negotiate()
-                    peer.fetch(b"FIRST.BIN", payload, lose_data_ack=True)
+                    peer.fetch(b"FIRST.BIN", payload, lose_data_ack=True, nak_turnaround=True)
                     if peer.receive(1.2):
                         raise AssertionError("server did not return to silent command wait")
                     peer.negotiate()
@@ -241,7 +258,7 @@ def verify(tools: Path) -> None:
         finally:
             os.close(master)
             os.close(slave)
-    print("PASS: Kermit idle, recovery, CRC, byte-exact Stock decoding, retries, and next file")
+    print("PASS: Kermit idle, recovery, CRC, byte-exact Stock decoding, retry pacing, next file")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,12 @@
 import importlib.util
 import copy
 import json
+import os
 import struct
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("ui_verify", ROOT / "tests/e2e/ui/verify.py")
@@ -13,6 +15,48 @@ SPEC.loader.exec_module(VERIFY)
 
 
 class UiMemoryTests(unittest.TestCase):
+    def test_cli_keeps_image_budget_and_native_release_checks(self):
+        # Combining the two independently developed gates must not make one
+        # silently skip the other through an if/elif dispatch.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "build").mkdir()
+            (root / "build/stock-hp4950-targets.txt").write_text("hp50g\n")
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
+                with (
+                    patch(
+                        "sys.argv",
+                        [
+                            "verify.py",
+                            "stock",
+                            "hp4950",
+                            "--pool",
+                            "--allocation",
+                            "--native-release",
+                            "--artifact",
+                            "artifact",
+                        ],
+                    ),
+                    patch.object(VERIFY, "verify") as pixels,
+                    patch.object(VERIFY, "verify_budget") as budget,
+                    patch.object(VERIFY, "verify_native_release") as release,
+                ):
+                    VERIFY.main()
+                    pixels.assert_called_once()
+                    budget.assert_called_once_with(
+                        Path("build/hp50g-frame"), "hp50g", Path("artifact")
+                    )
+                    release.assert_called_once_with(
+                        Path("build/hp50g-frame"),
+                        6,
+                        Path("build/hp50g-state"),
+                        Path("build/hp50g-native-release.json"),
+                    )
+            finally:
+                os.chdir(previous)
+
     def test_pool_budget_is_bound_to_linked_image_and_arena(self):
         artifact = self.prefix.parent / "artifact"
         (artifact / "launchers").mkdir(parents=True)
@@ -166,6 +210,73 @@ class UiMemoryTests(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     self.check(invalid)
 
+    def test_native_allocation_cross_checks_pool_without_double_counting(self):
+        pool = dict(
+            version=1,
+            model=6,
+            rw_bytes=36864,
+            stage_pool_pages=32,
+            native_workspace_pages=0,
+            native_os_block=0x08001010,
+            pool_l2_physical=0x08008000,
+            physical_pages=[0x08002000, 0x08003000] + [0x08008000 + i * 4096 for i in range(30)],
+        )
+        allocation = dict(
+            version=1,
+            model=6,
+            pointer=0x08001010,
+            usable_bytes=0x2FF0,
+            flags=0x2102,
+            next=0,
+            previous=0,
+            metadata_bytes=20,
+            mapped_pages=2,
+            unmapped_usable_bytes=0xFF0,
+        )
+
+        def save(block, pages=pool):
+            for checkpoint in (1, 2):
+                for kind, value in (("allocation", block), ("pool", pages)):
+                    Path(f"{self.prefix}-{kind}-{checkpoint}.json").write_text(
+                        json.dumps(dict(value, id=checkpoint))
+                    )
+
+        save(allocation)
+        self.assertEqual(VERIFY.verify_allocation(self.prefix, 6), 32 * 4096 + 0xFF0 + 20)
+        for invalid in (
+            dict(allocation, version=True),
+            dict(allocation, model=1),
+            dict(allocation, usable_bytes=0xFFFFFFFF),
+            dict(allocation, flags=0x102),
+            dict(allocation, mapped_pages=3),
+            dict(allocation, unmapped_usable_bytes=0x2FF0),
+            dict(allocation, metadata_bytes=0),
+            dict(allocation, pointer=0),
+            dict(allocation, next=0x08001000),
+            dict(allocation, previous=0x08080000),
+            dict(allocation, extra=1),
+        ):
+            save(invalid)
+            with self.subTest(report=invalid), self.assertRaises(AssertionError):
+                VERIFY.verify_allocation(self.prefix, 6)
+        invalid_pool = dict(pool, physical_pages=[0x08004000] + pool["physical_pages"][1:])
+        save(allocation, invalid_pool)  # a mapped page overlaps only the footer
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_allocation(self.prefix, 6)
+        save(allocation)
+        path = Path(f"{self.prefix}-allocation-2.json")
+        changed = dict(allocation, flags=0x2103, id=2)
+        path.write_text(json.dumps(changed))
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_allocation(self.prefix, 6)
+        path.unlink()
+        with self.assertRaises(FileNotFoundError):
+            VERIFY.verify_allocation(self.prefix, 6)
+        empty = dict.fromkeys(allocation, 0)
+        empty.update(version=1, model=6)
+        save(empty, dict(pool, native_os_block=0))
+        self.assertEqual(VERIFY.verify_allocation(self.prefix, 6), 32 * 4096)
+
     def test_schema_and_missing_artifact_are_not_accepted(self):
         with self.assertRaises(FileNotFoundError):
             VERIFY.verify_memory(self.prefix)
@@ -180,6 +291,49 @@ class UiMemoryTests(unittest.TestCase):
         ):
             with self.subTest(report=invalid), self.assertRaises(AssertionError):
                 self.check(invalid)
+
+    def test_native_release_requires_complete_consistent_free_list(self):
+        memory = {
+            0x1040: 0x100,
+            0x1044: 0x100,
+            0x1048: 0x1200,
+            0x104C: 0,
+            0x1150: 0x100,
+            0x1200: 0x80,
+            0x1204: 0x100,
+            0x1208: 0,
+            0x120C: 0x1040,
+            0x1290: 0x80,
+        }
+
+        def check(values, low=0x1080, high=0x1100):
+            return VERIFY.free_list_covers(
+                values.__getitem__, 0x1040, 0x1000, 0x2000, 0x100, low, high
+            )
+
+        self.assertTrue(check(memory))  # coalescing may absorb the original header
+        self.assertFalse(check(memory, 0x1600, 0x1700))
+        for address, value in (
+            (0x1040, 0xFFFFFFFC),
+            (0x1040, 0x101),
+            (0x1044, 0x2100),
+            (0x1048, 0x1040),
+            (0x1048, 0x2000),
+            (0x104C, 0x1200),
+            (0x1150, 0),
+            (0x120C, 0),
+            (0x1290, 0),
+        ):
+            invalid = dict(memory)
+            invalid[address] = value
+            with self.subTest(address=address, value=value), self.assertRaises(AssertionError):
+                check(invalid)
+        overlap = dict(memory)
+        overlap.update(
+            {0x1048: 0x1080, 0x1080: 0x80, 0x1084: 0x100, 0x1088: 0, 0x108C: 0x1040, 0x1110: 0x80}
+        )
+        with self.assertRaises(AssertionError):
+            check(overlap)
 
     def test_update_observations_require_complete_unsaturated_samples(self):
         path = Path(f"{self.prefix}-memory-2.json")

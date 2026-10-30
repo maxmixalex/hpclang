@@ -337,6 +337,7 @@ jobs:
       APPLICATION: ${{ matrix.suite.artifact }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: ${{ matrix.suite.keyboard && '1' || '0' }}
       HPCLANG_E2E_CAPTURE_STAGE_POOL: ${{ matrix.suite.mode == 'ui' && '1' || '0' }}
+      HPCLANG_E2E_CAPTURE_NATIVE_ALLOCATION: ${{ matrix.suite.mode == 'ui' && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -390,7 +391,7 @@ jobs:
         run: |
           args=(stock "$FAMILY")
           if [[ "$SUITE" == ui ]]; then
-            args+=(--pool --artifact "build/e2e/$APPLICATION")
+            args+=(--pool --allocation --native-release --artifact "build/e2e/$APPLICATION")
           fi
           python3 "$VERIFIER" "${args[@]}"
 
@@ -448,6 +449,34 @@ jobs:
             build/e2e/${{ matrix.suite.artifact }}/launchers/memory.json
           if-no-files-found: warn
 
+      - name: Upload system service diagnostic state
+        if: always() && startsWith(matrix.suite.mode, 'system-services')
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.model.target }}-stock-${{ matrix.suite.mode }}-diagnostic-state
+          retention-days: 14
+          path: |
+            build/*-state/sram
+            build/*-state/state
+            build/*-state/s3c2410-sram
+            build/*-stock.json
+            build/e2e/${{ matrix.suite.artifact }}/e2e.elf
+          if-no-files-found: warn
+
+      - name: Upload UI native allocation SRAM
+        if: always() && matrix.suite.mode == 'ui'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.model.target }}-stock-ui-native-allocation-state
+          retention-days: 14
+          path: |
+            build/*-state/sram
+            build/*-native-release.json
+            build/*-frame-allocation-*.json
+            build/*-frame-pool-*.json
+            build/*-stock.json
+          if-no-files-found: warn
+
   publish-evidence:
     name: Publish ci-evidence
     if: always() && !cancelled() && github.event_name != 'pull_request'
@@ -455,6 +484,7 @@ jobs:
     runs-on: ubuntu-24.04
     concurrency:
       group: ci-evidence-publisher
+      queue: max
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
