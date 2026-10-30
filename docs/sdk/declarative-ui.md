@@ -372,8 +372,9 @@ runs of the instrumented fixture submitted at `19143951` report:
 | HP50g Stock | 303,104 | 20,076 | 289,224 |
 
 All sizes are bytes. Both Stock flows include native fonts and normal return;
-HP50g also exercises the 80-row renderer. The current HP39g+ fixture uses a
-52 KiB arena, so this run does not revalidate the earlier 36 KiB observation.
+HP50g also exercises the 80-row renderer. These historical runs used a
+52 KiB HP39g+ Stock arena; they do not validate the maintained 36 KiB limit.
+The bounded-arena follow-up below records that separate validation.
 These are observations of the scripted application flow, not upper bounds for
 arbitrary UI declarations or a minimum whole-application memory requirement.
 
@@ -439,6 +440,28 @@ The pool requirement in its own `memory.json` is authoritative for that linked
 image; the larger instrumented C/C++ acceptance fixture has different code and
 static-data sizes. Both settings govern application RW admission, not the total
 system allocation or installation footprint.
+
+Stock UI verification now reconciles `--artifact`'s HPC1 image and generated
+`launchers/memory.json` with both pool checkpoints and the RW watermarks.
+The resulting `*-frame-budget.json` records image/layout hashes, required and
+observed pool bytes, static/boot bytes and stack/heap limits and watermarks.
+Renderer and LCD allocations are already inside the measured heap; they are
+not added a second time. Invalid or insufficient layouts remove stale reports.
+
+The retained six-model Stock lifecycle run, using its original 56,280-byte
+application image, gives the following pool accounting:
+
+| Model | Required pool | Observed pool | Beyond declared layout |
+| --- | ---: | ---: | ---: |
+| HP39g+ | 128 KiB | 144 KiB | 16 KiB |
+| HP39gs / HP40gs | 128 KiB | 140 KiB | 12 KiB |
+| HP48gII | 120 KiB | 148 KiB | 28 KiB |
+| HP49g+ / HP50g | 120 KiB | 376 KiB | 256 KiB |
+
+These are sampled pool reservations, not whole-system peaks or reclaimable
+space. Native allocator metadata, stored launcher objects and transfer staging
+remain outside this report. The check does not change Stock allocation policy;
+the 36 KiB application RW bound must not be presented as total memory usage.
 
 The standalone C and C++ examples also deliberately sleep for 20 milliseconds
 per event-loop iteration. They process one keyboard event per iteration and

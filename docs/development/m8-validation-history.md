@@ -170,3 +170,19 @@ Earlier ID1701 recovery fixture retests pass on both models against the failed C
 M0–M7 summaries are restored on main by accepted PR #22. Keep these summaries visible in the roadmap. All original milestone requirements remain in `docs/development/roadmap-history.md`. Keep current state here, reproducible details in tests/PRs, and history in the archive. Local passes, submitted CI, accepted delivery and milestone completion are distinct.
 
 Before every push, inspect the preceding exact-head CI and investigate failures. Do not poll newly pushed CI in the same turn or merge unfinished gates. HP39gs/40gs ROM-write capability remains deferred research; no hardware flashing is authorized. Legacy formatting uses explicit `HPCLANG_HPGCC_LEGACY_FORMAT=1`.
+
+## Resource observer main integration — local, 2026-10-29
+
+PR20 head 1ce01859 passes all four workflows and 169 jobs, including publication.
+GitHub reports conflicts with accepted main 3c484673 in roadmap and PWM IRQ test.
+The local merge retains main's accepted IRQ/watchdog implementations unchanged
+(both files byte-identical to main), which already include elapsed-time waits,
+clock-error handling and failure preservation. Observer capture, independent
+capacity verifier, UI lifecycle checks and workflow evidence remain present.
+The roadmap keeps M0-M7 summaries and current compact status; branch-specific
+historical evidence remains in prior commits, sdk-design and the history archive.
+Six snapshot tests, seven verifier tests and five UI memory tests pass (18 total),
+as do full tracked-file format/Ruff/ShellCheck and strict docs. Logs are retained
+in `/work/oct29-resource-integration-quality` and `/work/oct29-resource-docs-check.log`.
+The merged version requires fresh CI; neither parent CI nor this integration
+completes M8.2/M8.3 or proves unsampled peak capacity.

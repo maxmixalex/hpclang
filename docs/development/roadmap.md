@@ -1,11 +1,11 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-10-28. **M8 is incomplete; only M8.1 is accepted complete.**
+Current checkpoint: 2026-10-29. **M8 is incomplete; only M8.1 is accepted complete.**
 Docker/WSL is restored. Earlier ID1701 two-model reservation retests pass guarded
 recovery, repeat restart, absent recovery and 16 rejection cases per model.
 Supported ID769 reservation matrices now pass on both models; full startup
 safety and M8.0 remain incomplete.
-Accepted main: `fee4e4b9` (native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
+Accepted main: `3c484673` (guarded dispatch/origin foundations #25, native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
@@ -99,7 +99,7 @@ M7 acceptance does not imply those capabilities are implemented.
 | M8.1 Installable SDK | **Accepted complete** | Preserve installed external C/C++ builds, relocatability, packaging and reproducibility |
 | M8.2 Declarative C UI core | Implemented substantially; stage open | Complete whole-application resource/lifecycle acceptance and pending CI; original design reviewed, six host UI regressions pass locally |
 | M8.3 Components/renderers | Implemented substantially; stage open | Complete reusable components, renderer/theme independence and six-model interaction/resource acceptance |
-| M8.4 HPGCC source adapters | SD Reset #15 and opt-in legacy formatting #17 accepted; stage open | Complete retained historical application/API coverage, documented migrations and pending branch acceptance |
+| M8.4 HPGCC source adapters | SD Reset #15, opt-in formatting #17 and async/KOS tone gates #25 accepted; stage open | Complete retained historical application/API coverage, documented migrations and pending branch acceptance |
 | M8.5 Modern C++/migration | Implemented in part; stage open | Complete ownership/error/lifetime contracts, migration tooling/guidance and public downstream examples |
 | M8.6 Applications/release | Stage open | Nontrivial integrated apps, clean SDK use, cross-family resource/return checks, documentation and release acceptance |
 
@@ -110,16 +110,27 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
+Guarded references, bounded ROM readers, mapped-graph scheduling and bank-alias
+primitives/regressions are submitted in #26 (`d0471894`); CI is pending. Earlier 28 Stock cases remain scoped to their recorded reader build.
+
+Under the controlled saved profiles, both HOME scans schedule 20 attachments
+and resolve the first ACPTR payload (bank 2, 7291 nibbles), then reject its
+separate execution reference. Selector guards reject 340 stale-nibble changes.
+Local D0/D1 literal decoding now derives selector fields from entry instructions;
+192 original-interpreter cases and both maintained bank regressions pass.
+Production firmware/handler identity, owner/geometry freshness, complete payload
+and execution coverage, public libraries and Port1 edits remain open.
+
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
 startup safety and reclamation. Sound compatibility is independent.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
-| Native references and libraries | #24 accepted catalog/HOME/cache repairs. #25 contains guarded dispatch and PC capture; CI remains pending. The origin-flow batch (`c366b7f1`) composes register/memory origins: 192 original-return cases include 96 verified R0-to-stack paths and 1,824 transfer checks; current source hashes match all four reports. Sanitizer, ARM analysis, source quality and strict docs pass locally; four sanitizer integration suites also pass (35.81 s). Submitted for CI, not accepted. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and Port1 replace/remove |
+| Native references and libraries | #25 accepted; #26 follow-up submitted. Guarded TEMP lookup and masked roots pass 304 controlled return cases/480 rejections, sanitizer/API checks and ARM builds. The corrected register-root build passes all 28 HP49g+/HP50g Stock call/catalog cases, with source/artifact hashes and unchanged Flash independently checked. This exercises default RPL3; explicit RPL4 masks retain host/controlled-fixture coverage only. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and a production banked-reference guard for Port1 replace/remove |
 | Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Accepted in #24; retain lifecycle regressions |
 | Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
-| Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Submitted in #25; CI acceptance pending. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
+| Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Accepted in #25. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
 
 Guarded ID769 tests retain 23,900 user elements. Earlier complete two-model
 matrices used ID1701. Fourteen configured Stock libraries precede supported
@@ -131,13 +142,14 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #25 / `m8-dispatch-identity` | **Origin-flow batch submitted; fresh CI pending.** Pre-push audit of `319d521a`: both quality jobs pass; 100 successful, 18 running and 236 queued jobs, no failures observed. Neither the unfinished preceding CI nor this batch is accepted. |
+| #26 / `d0471894` | **CI pending:** 0 successful and 10 unfinished workflows; 23 successful, 19 running and 40 queued jobs, no failures observed. Historical HP39g+ pre-entry Kermit failure remains unexplained. D0/D1 literal decoding is local. |
+| #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
-| #21 / `00d5ddf1` | UI pool/RW checks pass six retained Stock fixtures locally. HP39g+ immediate retest passes; earlier watchdog failure cause, full CI and total system peaks remain open. |
-| #18 / `439339b1` | HP49g+ Direct PWM IRQ failure `0x46417b03`; cause unproven. |
-| #20 / `41e35a36` | HP50g Direct exit PWM IRQ failure `0x46417b03`; cause unproven. |
+| #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
+| #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
+| #20 / `1ce01859` | **Prior head CI passed:** four workflows, 169 successful jobs. Merge with current main is resolved locally; 18 host tests, full quality checks and strict docs pass. Updated-head CI is required before main integration. |
 
-Accepted deliveries: #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
+Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head
 `0e68b3b1` failed eight jobs: four insufficient Stock-growth reservations and
 four oversized test snapshots. All eight saved states were investigated; the
