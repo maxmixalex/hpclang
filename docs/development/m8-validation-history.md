@@ -1733,3 +1733,23 @@ The predicate is not yet part of production planner acceptance.
 PR #26 exact head `bdeb322708ebae3ce974a6ac41dfeee46cf140b4` has eleven successful
 workflows, 379 successful jobs and two conditional skips. Local follow-ups are
 not covered by that CI result; no milestone completion is claimed.
+
+
+## 2026-10-30 — Planner continuation gate and resource snapshot acceptance
+
+The planner now checks physical mapping preservation for all 29 nibbles of the
+inspected shared body before publishing a plan. Both maintained reports under
+`/work/oct30-plan-execution` pass the original-handler/alias/standard-entry
+regressions. Each populated canonical entry additionally forces a different
+incoming code page and a real selector transition: all 28 cases reject and
+preserve the output sentinel; restoring the input restores success. This checks
+a necessary continuation condition, not all intermediate CONFIG semantics or
+execution roots. ARM compilation/static analysis pass, and the application plus
+six launchers build under `/work/oct30-stock-plan-execution`. A new 28-case Stock
+campaign is running; earlier Stock acceptance remains scoped to its old build.
+
+PR #20 head `4f2ce60534d366a7e84ff06338286d07766edd09` passed all twelve workflows
+(390 successful jobs, two conditional skips). Scope review confirmed resource
+capture/verifier/UI evidence changes and no production runtime changes relative
+to main. It was marked ready and merged as `3b77453a70d0850a42736ba728eb29081fd7c6b1`.
+M8.2/M8.3 remain open; snapshot delivery alone is not whole-application acceptance.

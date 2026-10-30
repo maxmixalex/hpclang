@@ -5,7 +5,7 @@ Docker/WSL is restored. Earlier ID1701 two-model reservation retests pass guarde
 recovery, repeat restart, absent recovery and 16 rejection cases per model.
 Supported ID769 reservation matrices now pass on both models; full startup
 safety and M8.0 remain incomplete.
-Accepted main: `3c484673` (guarded dispatch/origin foundations #25, native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
+Accepted main: `3b77453a` (resource snapshots #20, guarded dispatch/origin foundations #25, native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
@@ -110,11 +110,11 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
-A local execution-range check now rejects physical remapping across bank switches.
-Across 672 original-handler executions, it identifies 142 preserved and 530
-remapped shared-body ranges; 96 absent-bank cases reject separately. This is a
-standalone continuation condition; planner integration and complete execution
-qualification remain open. Sanitizer tests and ARM compilation/analysis pass.
+The local bank planner now requires the inspected switch body to retain its
+physical mapping. Both-model maintained regressions pass normal entries and
+28 forced-remap rejections with unchanged output; ARM analysis and the rebuilt
+application/six launchers pass. A fresh full Stock campaign is running for this
+integration. Complete execution qualification remains open.
 
 Guarded references, bounded ROM readers, mapped-graph scheduling and bank-alias
 primitives/regressions and program/selector follow-ups are submitted in #26; that head has passed CI. Earlier 28 Stock cases remain scoped to their recorded reader build.
@@ -180,7 +180,7 @@ All prior artifact-specific evidence and limitations are retained in
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `4f2ce605` | **CI passed:** all twelve workflows completed; 390 successful jobs and two conditional publisher skips. Current main integration passed CI; merge review remains. |
+| #20 / `4f2ce605` | **Accepted and merged as `3b77453a`.** All twelve workflows pass: 390 successful jobs and two conditional publisher skips. Resource snapshot delivery does not complete M8.2/M8.3. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

@@ -1,4 +1,5 @@
 #include "rpl-bank-plan.h"
+#include "rpl-execution-map.h"
 
 struct observation
 {
@@ -74,6 +75,11 @@ int hpclang_rpl_bank_plan_prepare(const struct hpclang_rpl_bank_sources *sources
         return result;
     result = hpclang_rpl_bank_effects_select(&workspace->prior, workspace->banks,
                                              (configuration >> 5) & 3u, next->bank, &next->effects);
+    if (result)
+        return result;
+    /* CONFIG must not remap the inspected body before its return. */
+    result = hpclang_rpl_execution_mapping_preserved(
+        workspace->prior.map.pages, next->effects.map.pages, next->program.body, 29);
     if (result)
         return result;
     next->geometry = workspace->banks[next->bank];

@@ -475,6 +475,35 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
                 banks[index]["valid_bytes"],
             )
             assert plan.effects.map.upper == index
+            # A valid predicted payload does not authorize remapping the body.
+            # Force a transition and an unowned body page with a different
+            # incoming physical address; all syntax and geometry stay valid.
+            body_page = plan.program.body >> 12
+            for offset, width, value in (
+                (body_page * 4, 8, 0x08070000),
+                (0x808 + body_page, 2, 0),
+                (0xBD0, 8, (index + 1) % 14),
+            ):
+                for j in range(width):
+                    changed[(2, offset * 2 + j)] = (value >> (4 * j)) & 15
+            observed.clear()
+            c.memset(c.byref(plan), 0xA5, c.sizeof(plan))
+            assert (
+                lib.hpclang_rpl_bank_plan_prepare(
+                    c.byref(sources), switch, c.byref(workspace), c.byref(plan), capture, None
+                )
+                < 0
+            )
+            assert bytes(plan) == before
+            assert workspace.next.effects.map.pages[body_page] != 0x08070000
+            changed.clear()
+            observed.clear()
+            assert (
+                lib.hpclang_rpl_bank_plan_prepare(
+                    c.byref(sources), switch, c.byref(workspace), c.byref(plan), capture, None
+                )
+                == 0
+            )
         else:
             assert result < 0 and bytes(plan) == before
         entries.append(
@@ -484,6 +513,7 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
                 result=result,
                 populated=banks[index]["populated"],
                 dependencies=len(observed),
+                body_remap_rejected=bool(banks[index]["populated"]),
             )
         )
     return rows, entries

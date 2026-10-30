@@ -25,7 +25,8 @@ struct hpclang_rpl_bank_workspace
     struct hpclang_rpl_bank_plan next;
 };
 /* Compose P=0 code inspection, unique configuration lookup, device routing,
- * ROM geometry and complete bank-effect capture/prediction. All observations
+ * ROM geometry, complete bank-effect capture/prediction and physical mapping
+ * preservation of the inspected switch body. All observations
  * carry the supplied distinct mapping IDs. Profile must come from successful
  * immutable-ROM identification; callers qualify native state, code mapping,
  * configuration table and exclusive lifetime. Prediction does not execute code
