@@ -175,7 +175,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `bdeb3227` | **CI passed:** all eleven workflows completed; 379 successful jobs and two conditional publisher skips. Not yet merged. Unified bank planning is a local follow-up. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `d0795413` | **Prior head CI passed:** eleven workflows, 379 successful jobs and two conditional skips. Main integration resolves workflow/document conflicts and passes 18 resource/UI tests, full source quality and strict docs locally; submitted for fresh CI, not polled this turn. Unified planning remains a separate local follow-up. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |

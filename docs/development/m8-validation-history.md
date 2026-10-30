@@ -1753,3 +1753,19 @@ PR #20 head `4f2ce60534d366a7e84ff06338286d07766edd09` passed all twelve workflo
 capture/verifier/UI evidence changes and no production runtime changes relative
 to main. It was marked ready and merged as `3b77453a70d0850a42736ba728eb29081fd7c6b1`.
 M8.2/M8.3 remain open; snapshot delivery alone is not whole-application acceptance.
+
+
+## 2026-10-30 — Main integration and HOME continuation regression
+
+PR #26 needs fresh CI after integrating accepted main `3b77453a`: the workflow
+conflicts retain both code-relocation stage1/incoming-carry artifacts and resource
+memory metadata/snapshots. Historical evidence from both parents is retained.
+Eighteen resource snapshot/verifier/UI tests, full format/Ruff/ShellCheck and
+strict docs pass in the isolated integration worktree. The previous exact head
+`bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips).
+This integration does not include the separate local bank-planner follow-ups.
+
+The locally integrated continuation check also passes the controlled HOME
+regression under `/work/oct30-home-plan`: forty payload resolutions match the
+previous effects path and forty separate execution obligations remain rejected.
+The fresh Stock campaign is still running; both initial native cases pass.
