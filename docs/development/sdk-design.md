@@ -1727,6 +1727,37 @@ stack-pointer excursions through unwritten storage. Heap observations count
 allocator-reserved bytes; deliberate exhaustion is excluded from the normal
 workload high-water observation.
 
+The optional `HPCLANG_E2E_CAPTURE_STACK_POINTER=1` family-runner flag also
+records translated application SP writes, separately for each CPSR mode, in
+`*-frame-stack-pointer.jsonl`. UI CI enables it for Direct and Stock and invokes
+`tests/e2e/ui/verify.py --stack-pointer`. Bootstrap preserves the caller mode;
+the gate combines User/System observations of their shared SP bank and requires
+the expected stack top, an excursion covering the touched watermark and usage
+below the 8 KiB reservation. Missing, malformed, duplicate-mode and out-of-budget
+reports fail; a failed check removes its prior budget report. The output binds
+the trace and memory report by SHA-256.
+
+This observes reserved but untouched frames without writing guest memory.
+An HP39g+ Direct control reserves 4096 untouched bytes: SP use reaches 4144 bytes
+while the existing watermark stays at 2424. The deepest reported PC matches the
+control's `mov sp, r2`. The control is a separate test build, not part of the
+application. Coverage is limited to executed application instructions using the
+translator's register-store path; native firmware, exception bank switches and
+unexecuted paths still need separate accounting. These observations alone do
+not establish whole-system peak admission.
+
+For investigation, `HPCLANG_X50NG_STACK_REGIONS=/absolute/path/trace.jsonl`
+enables translated SP-assignment observations at all code addresses, including
+ROM and launcher code. Records retain CPU mode, the SP's 1 MiB address region,
+write count, extrema and their instruction addresses. Distinct regions and
+modes remain separate; their address distance is not stack consumption. A
+region boundary crossing produces separate records and must not be discarded
+when checking a known stack reservation. The original application-only trace
+can run alongside it. Both outputs refuse to overwrite existing evidence.
+This diagnostic uses host memory only and is disabled by default. It does not
+observe implicit bank switches or SP updates outside the translated register
+store path, and it does not itself certify a stack bound or memory admission.
+
 Before the launcher removes the mappings, the test requests a memory checkpoint.
 The shared Direct/Stock harness accepts a word-aligned descriptor within the
 reported application RW arena: `{id, count, words[count]}` with 1–64 words.

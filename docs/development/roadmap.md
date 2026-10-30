@@ -1,11 +1,11 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-10-29. **M8 is incomplete; only M8.1 is accepted complete.**
+Current checkpoint: 2026-10-30. **M8 is incomplete; only M8.1 is accepted complete.**
 Docker/WSL is restored. Earlier ID1701 two-model reservation retests pass guarded
 recovery, repeat restart, absent recovery and 16 rejection cases per model.
 Supported ID769 reservation matrices now pass on both models; full startup
 safety and M8.0 remain incomplete.
-Accepted main: `3c484673` (guarded dispatch/origin foundations #25, native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
+Accepted main: `3b77453a` (resource snapshots #20, guarded dispatch/origin foundations #25, native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
@@ -97,8 +97,8 @@ M7 acceptance does not imply those capabilities are implemented.
 | --- | --- | --- |
 | M8.0 Native Port 0/1/2 | Implemented in part; active mainline | Complete safe reference handling and movement, public library management and Port 1 edits; Port2 trusted recovery installation, authority lifecycle, safe startup and reclamation |
 | M8.1 Installable SDK | **Accepted complete** | Preserve installed external C/C++ builds, relocatability, packaging and reproducibility |
-| M8.2 Declarative C UI core | Implemented substantially; stage open | Complete whole-application resource/lifecycle acceptance and pending CI; original design reviewed, six host UI regressions pass locally |
-| M8.3 Components/renderers | Implemented substantially; stage open | Complete reusable components, renderer/theme independence and six-model interaction/resource acceptance |
+| M8.2 Declarative C UI core | Declaration, layout, input and effects implemented; design reviewed; stage open | Smallest-target memory/update-cost and whole-application resource/lifecycle acceptance; pending follow-up CI |
+| M8.3 Components/renderers | Reusable controls and renderer/theme independence implemented; stage open | Complete six-model low-memory, resource-budget and clean-return acceptance; pending follow-up CI |
 | M8.4 HPGCC source adapters | SD Reset #15, opt-in formatting #17 and async/KOS tone gates #25 accepted; stage open | Complete retained historical application/API coverage, documented migrations and pending branch acceptance |
 | M8.5 Modern C++/migration | Implemented in part; stage open | Complete ownership/error/lifetime contracts, migration tooling/guidance and public downstream examples |
 | M8.6 Applications/release | Stage open | Nontrivial integrated apps, clean SDK use, cross-family resource/return checks, documentation and release acceptance |
@@ -108,22 +108,110 @@ UI must retain the user's declarative C design: nested ordinary C declarations,
 stable keyed identity, controlled inputs, explicit asynchronous state and
 revision-driven canvas. A superficially similar imperative API is not completion.
 
-## Current work: M8.0
+## Current work: M8.0 mainline and independent UI/C++ acceptance
 
-Guarded references, bounded ROM readers, mapped-graph scheduling and bank-alias
-primitives/regressions are submitted in #26 (`d0471894`); CI is pending. Earlier 28 Stock cases remain scoped to their recorded reader build.
+The mainline remains safe movement and execution-reference coverage for native
+library management and Port1 edits, followed by Port2 trusted recovery
+installation, authority lifecycle, safe startup and reclamation. Sound
+compatibility is independent.
 
-Under the controlled saved profiles, both HOME scans schedule 20 attachments
-and resolve the first ACPTR payload (bank 2, 7291 nibbles), then reject its
-separate execution reference. Selector guards reject 340 stale-nibble changes.
-Local D0/D1 literal decoding now derives selector fields from entry instructions;
-192 original-interpreter cases and both maintained bank regressions pass.
-Production firmware/handler identity, owner/geometry freshness, complete payload
-and execution coverage, public libraries and Port1 edits remain open.
+M8.5 Port C++ `3b06b8c0` is submitted in PR #14 on allocation parent
+`97d5ba74` (PR #13). Both await new-head CI acceptance: #13 has twelve queued workflows and
+#14 has ten. No completed new-head acceptance is claimed.
+All six Direct/six Stock Object Basics runs pass; live Port owners are exercised
+on classic Stock models and other contexts require ENOSYS. All six Stock UI
+budget/allocation/release/lifecycle gates also pass. Independent replay checks
+79 lifecycle snapshots, six image budgets and six release outcomes against
+unchanged application/emulator hashes. The installed SDK gate reproduces 517
+outputs; the parent independently reproduces fifteen UI delivery files.
+Parent integration retains Aplet identity and retry-pacing checks; eighteen
+host tests, lint and strict docs pass. The publisher queue fix is locally checked.
+Previous #13 CI retains one cancelled publisher; #14 retains cancelled gates.
+Remote acceptance, whole-application peak admission and M8.5 completion remain open.
 
-The active dependencies are complete execution-reference handling for safe
-movement/library management, and Port2 trusted installation, authority lifecycle,
-startup safety and reclamation. Sound compatibility is independent.
+M8.5 migration tools and API guide `5d5195dc` are submitted in draft PR #27;
+CI has four successful, five queued and one running workflow; 159 jobs pass, 205 are queued and four run. Checker head `b59fb56d` passed the full relocated
+SDK gate, six model-specific Notebook builds, three HP39 Aplet variants and 517
+byte-identical release outputs. The later guide/header-comment follow-up passes
+installation/relocation, links, strict ARMv4T C11 example compilation and docs.
+Remaining ownership/application migration acceptance is still required;
+this submission does not complete M8.5.
+
+M8.2/M8.3 UI stack/return-capacity gate `79a5fe36` is submitted in draft
+PR #28; its twelve workflows and twenty materialized jobs are queued. Preceding `8849b85f` had six successful/two
+queued workflows and 309 successful/one skipped/six running/39 queued jobs. It checks native free capacity and largest-block
+recovery after settled return. Fifteen tests, all 79 retained snapshots across
+six models, the actual CI commands and strict docs pass locally. This is not a
+new emulator run or complete physical-memory admission; whole-application
+resource acceptance remains open.
+
+The UI SP follow-up `79a5fe36` is submitted in PR #28; CI acceptance is pending.
+All six Direct and six Stock UI/SP/return cases pass; independent replay
+checks all 79 lifecycle snapshots, pool/artifact budgets and unchanged
+application/emulator identities. Shared User/System stack use is
+2424–2432 bytes of 8192. Nine host tests and full source-quality/strict
+docs checks pass. The untouched 4 KiB control detects 4144 bytes while
+the watermark stays 2424. CI, native/exception stacks and whole-system
+peak admission remain open.
+
+A local optional all-PC SP observer now separates CPU modes and 1 MiB stack
+address regions, including ROM/launcher assignments. Thirteen host tests, Ruff,
+strict docs and a fresh emulator build pass. HP39g+ Direct UI/return and the
+existing application SP gate pass on the unchanged application; additional
+stage-region observations span `0x0131d3b0–0x0131dff8`. Independent
+image/pool reconciliation measures 3152/4096 bytes for this Direct stage
+stack, deepest in image decompression. HP39g+ Stock UI/return also passes;
+reconciliation against its observed 34-page stage pool measures the same
+3152/4096-byte stage stack. Full source quality checks pass. Native-stack
+bounds and full peak admission remain open.
+
+
+CI follow-up `fce14d73` is submitted in draft PR #29; four workflows pass and six are queued; 126 jobs pass, one is skipped, five run and 243 are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
+a fresh build with the isolated patch passes. Original packet CRC checks pass
+at the host capture point; loss inside the emulator/device remains unproven.
+The local replay with original CI payload/assets/emulator and only the server
+replaced passes application execution, 52 keyboard frames and settled Stock
+return. No failing remote gate is waived; the initial packet-loss cause remains
+unproven.
+
+M8.0 head `af7d7e8b` is submitted in PR #26, including explicit-P planning
+`84fa1a70` and relocation fix `fb0510ba`. Eight workflows are queued and
+two pending, with 16 materialized jobs queued; no CI acceptance is claimed;
+preceding `b8d38497` had ten queued workflows/16 jobs at the pre-push audit. Diagnosis identifies a fixture
+heap/stack collision. Inlining kept a 7408-byte branch workspace frame live during library
+probes; a later allocation crossed the active stack and zeroed return addresses.
+Moving branch tables into a scoped heap workspace reduces the main frame to
+1064 bytes. A 2048-byte compile gate rejects the old source and accepts the fix.
+Both models pass the original missing-message removal/relaunch/query and all 88
+branch cases locally. Both complete fourteen-case matrices now pass. Independent
+checks confirm 28 post-call markers, 36 unchanged Flash states and sixteen
+byte-identical rebuilt artifacts. Full format/Ruff/ShellCheck and ARM analysis
+pass. This delivery still requires new-head CI acceptance; M8.0 remains open.
+
+M8.0 follow-up `9e220d9b` captures library-configuration read dependencies;
+sanitisers, ARM analysis and both-model maintained regressions pass. It is included
+in this delivery, but does not qualify startup execution.
+
+PR #26 now includes the accepted resource-snapshot mainline, unified bank
+planning, bounded live Stock readers, continuation mapping checks and startup
+configuration regressions. Previous head `6a582958` failed CI; this delivery
+adds the verified workspace fix and return-state checks, and awaits CI acceptance.
+
+Local planner tests cover ROM identity, code/selector/routing/geometry guards,
+full bank effects and unchanged switch-body physical mappings. Original-handler
+comparisons, failure-output preservation and forty controlled HOME payload
+resolutions pass; forty separate execution obligations remain open. The previous
+live-reader build passed 28 Stock cases. The latest continuation-check build
+now also passes all 28 cases locally: independent audits confirm every saved
+planning witness, 18 original/ten fixture-rewritten returns, 36 unchanged Flash
+snapshots and sixteen reproduced artifacts. Eight ARM analyses pass. This is
+local validation; the planner follow-up still needs remote CI acceptance.
+
+Complete execution roots and CONFIG semantics, production exclusive integration,
+public library operations and Port1 edits remain open. ROM identity and a valid
+predicted data mapping alone do not authorize mutation. Detailed tests, counts,
+artifact identities and historical limitations are retained in the validation
+history below.
 
 | Work | Verified state | Remaining gate |
 | --- | --- | --- |
@@ -134,20 +222,48 @@ startup safety and reclamation. Sound compatibility is independent.
 
 Guarded ID769 tests retain 23,900 user elements. Earlier complete two-model
 matrices used ID1701. Fourteen configured Stock libraries precede supported
-ID769; passing these recovery fixtures does not prove complete startup safety.
+ID769 among 59 lower-ID catalog entries in both saved fixtures. Their mapped
+configuration objects are now resolved; IDs 226, 227 and 229 lie in mutable user
+Flash, outside immutable-ROM identity coverage. Their configuration bodies invoke `0x7709`. All six ordinary-Stock executions
+add the expected HOME record and preserve catalog/Flash/child/sentinel/stack;
+current C traversal recognizes the resulting references. Startup execution,
+bank-switch calls and allocation effects still require qualification. Maintained tests cover this baseline and the Stock
+launcher fixture, which adds ARMToolbox 275: 60 entries, 15 configuration roots
+and a fourth mutable-Flash configuration. Passing these checks does not prove startup safety.
 All prior artifact-specific evidence and limitations are retained in
 [M8 validation history](m8-validation-history.md).
+
+Submitted M8.0 planning `84fa1a70` accepts explicit P=0/P=1 and retains
+the existing P=0 entry point. Both-model original-interpreter comparisons
+pass 32 P=1 page-map predictions and 96 unsupported-P rejection controls.
+ASan/UBSan, ARM compile/analysis and current-source artifact checks pass.
+This is mapping prediction, not arbitrary-bank restoration, startup
+qualification or authorization for public storage mutation.
+A local, unsubmitted mapped reader now consumes caller-qualified predicted
+pages without installing them. Unit sanitizers, ARM checks and both-model
+saved-state physical-read comparisons pass. The device probe now checks
+32 P=0/P=1 plans per launch with unchanged native state; both 14-case Stock
+matrices pass. Independent audits confirm 28 return markers, 36 unchanged
+Flash snapshots and 16 reproduced artifacts.
+A separate local C data-target resolver now joins planning, bounded reads
+and object spans, including observed mutable-Flash data. All 40 saved HOME
+targets resolve and their execution edges remain rejected. Unit/ARM checks
+pass. The device build passes ten ARM analyses and reproduces sixteen
+delivery files byte-for-byte; its main frame remains 1064 bytes. Both
+models pass the first native call/return case; the remaining matrix is
+running. Complete graph/execution policy remains open.
 
 ## Pending delivery
 
 | PR / head | State |
 | --- | --- |
-| #26 / `d0471894` | **CI pending:** 0 successful and 10 unfinished workflows; 23 successful, 19 running and 40 queued jobs, no failures observed. Historical HP39g+ pre-entry Kermit failure remains unexplained. D0/D1 literal decoding is local. |
+| #26 / `af7d7e8b` | Submitted; eight workflows queued/two pending and 16 jobs queued. Explicit-P planning passes both-model original-interpreter comparisons and local quality gates. Remote acceptance remains open. |
+| #26 previous head / `6a582958` | **Five failed jobs retained:** HP39g+ runtime/console pre-entry transfer, plus three HP49g+/HP50g relocation jobs across push/PR runs. Final pre-push audit: 370 successful, one skipped, five failed, three running and one queued job; nine successful, one running and one queued workflow. The workspace fix passes all 28 local call/return cases. HP39g+ packet-loss origin remains unproven; no failing gate is waived. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `1ce01859` | **Prior head CI passed:** four workflows, 169 successful jobs. Merge with current main is resolved locally; 18 host tests, full quality checks and strict docs pass. Updated-head CI is required before main integration. |
+| #20 / `4f2ce605` | **Accepted and merged as `3b77453a`.** All twelve workflows pass: 390 successful jobs and two conditional publisher skips. Resource snapshot delivery does not complete M8.2/M8.3. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head
