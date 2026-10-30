@@ -23,7 +23,14 @@ from unicorn import (
     UC_HOOK_MEM_WRITE,
     UC_MEM_READ,
 )
-from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
+from unicorn.arm_const import (
+    UC_ARM_REG_R0,
+    UC_ARM_REG_R1,
+    UC_ARM_REG_R4,
+    UC_ARM_REG_R5,
+    UC_ARM_REG_R7,
+    UC_ARM_REG_SP,
+)
 
 if not __debug__:
     raise RuntimeError("Verification requires assertions")
@@ -37,7 +44,23 @@ parser.add_argument(
     action="store_true",
     help="Use original legacy allocation to establish R0 (flags=1)",
 )
+parser.add_argument(
+    "--arm-return",
+    choices=("preserve", "clobber"),
+    help="Execute a controlled ARM leaf; clobber demonstrates the r0 continuation contract",
+)
+parser.add_argument(
+    "--continuous-return",
+    action="store_true",
+    help="Retain actual allocation/ARM return state through catalog movement and Saturn continuation",
+)
 args = parser.parse_args()
+if args.continuous_return:
+    if args.arm_return == "clobber":
+        parser.error("continuous return requires the preserved ARMSYS continuation")
+    args.arm_return = "preserve"
+if args.arm_return:
+    args.allocated_root = True
 root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(root / "tests/e2e/port-recovery"))
 native_words = importlib.import_module("verify").native_words
@@ -100,6 +123,26 @@ class Reader(c.Structure):
     _fields_ = [("read", Read), ("context", c.c_void_p)]
 
 
+MappedRead = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint32, c.POINTER(c.c_uint8))
+
+
+class MappedReader(c.Structure):
+    _fields_ = [("read", MappedRead), ("context", c.c_void_p)]
+
+
+class Guard(c.Structure):
+    _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
+
+
+lib.bank_catalog_grow_r0_guarded.argtypes = [
+    *lib.bank_catalog_grow_r0.argtypes,
+    c.POINTER(MappedReader),
+    c.POINTER(Guard),
+    c.c_uint32,
+    c.c_uint32,
+]
+
+
 class Assignment(c.Structure):
     _fields_ = [
         (n, c.c_uint32)
@@ -127,6 +170,55 @@ class Origins(c.Structure):
     _fields_ = [("registers", (c.c_uint32 * 16) * 13)]
 
 
+class Exchange(c.Structure):
+    _fields_ = [
+        (name, c.c_uint32)
+        for name in ("instruction", "length", "left", "right", "first", "nibbles")
+    ]
+
+
+lib.bank_temp_allocation.argtypes = [c.POINTER(Reader), c.c_uint32, c.POINTER(c.c_uint32)]
+Dependency = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_uint32, c.c_uint8)
+lib.bank_temp_allocation_guarded.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.POINTER(c.c_uint32),
+    Dependency,
+    c.c_void_p,
+]
+lib.hpclang_rpl_object_span.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.POINTER(c.c_uint32),
+]
+lib.hpclang_rpl_code_exchange_inspect.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.c_uint,
+    c.POINTER(Exchange),
+]
+lib.hpclang_rpl_code_origins_exchange.argtypes = [c.POINTER(Origins), c.POINTER(Exchange)]
+
+
+class Adjustment(c.Structure):
+    _fields_ = [
+        ("instruction", c.c_uint32),
+        ("length", c.c_uint32),
+        ("address", c.c_uint32),
+        ("delta", c.c_int32),
+    ]
+
+
+lib.hpclang_rpl_code_address_adjust_inspect.argtypes = [
+    c.POINTER(Reader),
+    c.c_uint32,
+    c.c_uint32,
+    c.POINTER(Adjustment),
+]
+
+
 lib.hpclang_rpl_code_origins_assign.argtypes = [
     c.POINTER(Origins),
     c.POINTER(Assignment),
@@ -138,6 +230,7 @@ lib.hpclang_rpl_code_origins_memory.argtypes = [
     c.POINTER(c.c_uint32),
     c.c_uint,
 ]
+lib.hpclang_rpl_code_origins_adjust.argtypes = [c.POINTER(Origins), c.POINTER(Adjustment)]
 
 
 lib.hpclang_rpl_code_memory_inspect.argtypes = [
@@ -204,7 +297,12 @@ rows = []
 baseline_traces = {}
 for cursor in range(8):
     for flags in (1,) if args.allocated_root else range(4):
-        for mode in ("baseline", "move") + (("stale-r0",) if flags == 1 else ()):
+        modes = (
+            ("baseline",)
+            if args.arm_return == "clobber"
+            else ("baseline", "move") + (("stale-r0",) if flags == 1 else ())
+        )
+        for mode in modes:
             uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
             uc.mem_map(0, len(flash))
             uc.mem_write(0, flash)
@@ -221,14 +319,52 @@ for cursor in range(8):
                         p, bytes([(old & ~(15 << shift)) | ((value >> (4 * i) & 15) << shift)])
                     )
 
+            def nibble(at):
+                return uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
+
             def word(at):
-                return sum(
-                    ((uc.mem_read(mapping.physical(at + i), 1)[0] >> (4 * ((at + i) & 1))) & 15)
-                    << (4 * i)
-                    for i in range(5)
-                )
+                return sum(nibble(at + i) << (4 * i) for i in range(5))
+
+            caller_slot = (cursor + 7) & 7
+            if args.continuous_return:
+                put(0x8076B, 0x88D67)
+                for i in range(8):
+                    uc.mem_write(
+                        cpu + 0x978 + 4 * i,
+                        struct.pack("<I", 0x3130 if i == caller_slot else 0xA1000 + 0x101 * i),
+                    )
 
             allocation_trace = []
+            allocation_origins = Origins()
+            allocation_origin_path = []
+            allocation_bounds = []
+            allocation_start_top = word(0x806EE)
+            arm_trace = []
+            arm_arguments = []
+            allocation_reads = {}
+            guard_rejections = 0
+            register_guard_rejections = 0
+            post_move_allocation = None
+
+            @Read
+            def allocation_raw_read(_, at, value):
+                value[0] = uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
+                return 1
+
+            @Dependency
+            def allocation_dependency(_, at, value):
+                allocation_reads[at] = value
+                return 0
+
+            @Read
+            def allocation_read(context, at, value):
+                allocation_raw_read(context, at, value)
+                allocation_reads[at] = value[0]
+                return 1
+
+            allocation_raw_reader = Reader(allocation_raw_read, None)
+
+            allocation_reader = Reader(allocation_read, None)
             target = 0x88D67
             initial_r0 = 0x34588D67
             target_word = 0x312B
@@ -246,28 +382,184 @@ for cursor in range(8):
                 uc.reg_write(UC_ARM_REG_R5, 0xFFFFF)
                 uc.reg_write(UC_ARM_REG_R7, 0x88BC1)
                 uc.reg_write(UC_ARM_REG_SP, 0x308000)
+                if args.arm_return:
+                    # ARMSYS returns Saturn PC in ARM r0. The other volatile
+                    # registers and ARM condition flags are not that contract.
+                    leaf = [0xE3A01022, 0xE3A02033, 0xE3A03044, 0xE3A0C055, 0xE3510022]
+                    if args.arm_return == "clobber":
+                        leaf.append(0xE3A00011)
+                    leaf.append(0xE12FFF1E)  # BX LR
+                    uc.mem_write(0x08050000, struct.pack("<" + "I" * len(leaf), *leaf))
 
                 def allocation_hook(_, at, size, user):
+                    if args.arm_return and 0x08050000 <= at < 0x08050000 + 4 * len(leaf):
+                        arm_trace.append(at)
+                        if at == 0x08050000:
+                            arm_arguments.extend(
+                                (uc.reg_read(UC_ARM_REG_R0), uc.reg_read(UC_ARM_REG_R1))
+                            )
+                            assert arm_arguments == [0x88C73, cpu]
                     if at == 0x28898:
                         pc = uc.reg_read(UC_ARM_REG_R7)
                         allocation_trace.append(pc)
-                        if pc == 0x88C6E or len(allocation_trace) > 30000:
+                        if args.arm_return and arm_trace:
+                            assert pc == (0x11 if args.arm_return == "clobber" else 0x88C73)
+                            uc.emu_stop()
+                            return
+                        steps = (0x5BC2, 0x5BC5, 0x5BC8)
+                        if allocation_origin_path and len(allocation_origin_path) < 3:
+                            assert pc == steps[len(allocation_origin_path)]
+                        if pc in steps:
+                            if pc == steps[0]:
+                                first = int.from_bytes(uc.mem_read(cpu + 0x954, 4), "little")
+                                extent = c.c_uint32()
+                                assert first == allocation_start_top + 1
+                                assert (
+                                    lib.bank_temp_allocation_guarded(
+                                        c.byref(allocation_raw_reader),
+                                        first,
+                                        c.byref(extent),
+                                        allocation_dependency,
+                                        None,
+                                    )
+                                    == 0
+                                )
+                                assert word(0x806EE) == allocation_start_top + extent.value + 6
+                                allocation_bounds.extend((first, extent.value))
+                                for i in range(5):
+                                    allocation_origins.registers[11][i] = 0x100 + i
+                            if pc == steps[1]:
+                                copy = Assignment()
+                                assert (
+                                    lib.hpclang_rpl_code_assignment_inspect(
+                                        c.byref(allocation_reader), pc, 3, 0, c.byref(copy)
+                                    )
+                                    == 0
+                                )
+                                assert (copy.source, copy.destination, copy.nibbles) == (0, 11, 5)
+                                assert (
+                                    lib.hpclang_rpl_code_origins_assign(
+                                        c.byref(allocation_origins), c.byref(copy), None
+                                    )
+                                    == 0
+                                )
+                            else:
+                                exchange = Exchange()
+                                assert (
+                                    lib.hpclang_rpl_code_exchange_inspect(
+                                        c.byref(allocation_reader), pc, 3, 0, c.byref(exchange)
+                                    )
+                                    == 0
+                                )
+                                assert (
+                                    exchange.left,
+                                    exchange.right,
+                                    exchange.first,
+                                    exchange.nibbles,
+                                ) == ((0, 11, 0, 5) if pc == steps[0] else (0, 4, 0, 16))
+                                assert (
+                                    lib.hpclang_rpl_code_origins_exchange(
+                                        c.byref(allocation_origins), c.byref(exchange)
+                                    )
+                                    == 0
+                                )
+                            allocation_origin_path.append(pc)
+                        elif len(allocation_origin_path) == 3:
+                            assert (
+                                int.from_bytes(uc.mem_read(cpu + 0x92C, 4), "little") & 0xFFFFF
+                                == allocation_bounds[0]
+                            )
+                        if (pc == 0x88C6E and not args.arm_return) or len(allocation_trace) > 30000:
                             uc.emu_stop()
 
+                def allocation_write(_, kind, at, size, value, user):
+                    if len(allocation_origin_path) == 3 and allocation_trace[-1] != 0x5BC8:
+                        assert not (at < cpu + 0x934 and at + size > cpu + 0x92C), (
+                            "unmodeled R0 write after qualification"
+                        )
+
+                write_handle = uc.hook_add(UC_HOOK_MEM_WRITE, allocation_write)
                 handle = uc.hook_add(UC_HOOK_CODE, allocation_hook)
                 uc.emu_start(0x28828, 0x400000, count=3000000)
                 uc.hook_del(handle)
-                assert allocation_trace[-1] == 0x88C6E and 0x5B80 in allocation_trace
+                uc.hook_del(write_handle)
+                assert 0x5B80 in allocation_trace
+                if args.arm_return:
+                    assert arm_trace == [0x08050000 + 4 * i for i in range(len(leaf))]
+                    if args.arm_return == "clobber":
+                        assert allocation_trace[-1] == 0x11
+                        rows.append(
+                            dict(
+                                cursor=cursor,
+                                arm_return=args.arm_return,
+                                arm_arguments=arm_arguments,
+                                arm_trace=arm_trace,
+                                observed_saturn_pc=allocation_trace[-1],
+                                expected_saturn_pc=0x88C73,
+                            )
+                        )
+                        continue
+                    assert allocation_trace[-1] == 0x88C73
+                    assert (
+                        int.from_bytes(uc.mem_read(cpu + 0x92C, 4), "little") & 0xFFFFF
+                        == allocation_bounds[0]
+                    )
+                else:
+                    assert allocation_trace[-1] == 0x88C6E
                 initial_r0 = int.from_bytes(uc.mem_read(cpu + 0x92C, 4), "little")
                 target = initial_r0 & 0xFFFFF
                 target_word = 0x2A2C
                 assert word(target) == target_word and word(target + 5) >= 69
+                assert len(allocation_origin_path) == 3 and target == allocation_bounds[0]
+                assert list(allocation_origins.registers[4])[:5] == [0x100 + i for i in range(5)]
+                span = c.c_uint32()
+                assert (
+                    lib.hpclang_rpl_object_span(
+                        c.byref(allocation_reader), target, allocation_bounds[1], c.byref(span)
+                    )
+                    == 0
+                )
+                assert span.value == allocation_bounds[1]
+                # The TEMP query qualifies exact starts, never coincidental
+                # interior values. Unreadable chain metadata cannot leave a
+                # partially qualified output behind.
+                for candidate in (target - 1, target + 1, target + allocation_bounds[1] - 1):
+                    extent = c.c_uint32(0x12345678)
+                    assert (
+                        lib.bank_temp_allocation(
+                            c.byref(allocation_reader), candidate, c.byref(extent)
+                        )
+                        == -7
+                    )
+                    assert extent.value == 0x12345678
+                for unreadable in (0x806EE, word(0x806E9), word(0x806EE) - 5):
+
+                    @Read
+                    def failing_read(context, at, value):
+                        return 0 if at == unreadable else allocation_read(context, at, value)
+
+                    failing_reader = Reader(failing_read, None)
+                    extent = c.c_uint32(0x12345678)
+                    assert (
+                        lib.bank_temp_allocation(c.byref(failing_reader), target, c.byref(extent))
+                        < 0
+                    )
+                    assert extent.value == 0x12345678
                 assert int.from_bytes(uc.mem_read(cpu + 0x93C, 4), "little") & 0xFFF == 1
-            put(0x8076B, 0x88D67)
-            entry = c.c_uint32(0x88C73)
+            if not args.continuous_return:
+                put(0x8076B, 0x88D67)
+            entry = c.c_uint32(uc.reg_read(UC_ARM_REG_R7) if args.continuous_return else 0x88C73)
+            assert entry.value == 0x88C73
+            boundary_state = bytes(uc.mem_read(cpu + 0x90C, 0x90))
+            boundary_sp = uc.reg_read(UC_ARM_REG_SP)
             r0 = c.c_uint32(initial_r0)
             writes = c.c_uint32()
             delta = 0 if mode == "baseline" else 16
+            allocation_bytes = (
+                bytes(nibble(target + i) for i in range(allocation_bounds[1]))
+                if args.allocated_root
+                else b""
+            )
             if delta:
                 nibbles = bytearray(
                     n
@@ -276,13 +568,88 @@ for cursor in range(8):
                     for n in (value & 15, value >> 4)
                 )
                 data = (c.c_uint8 * len(nibbles)).from_buffer(nibbles)
+                guards = (Guard * len(allocation_reads))(
+                    *[
+                        Guard(1 if at >= 0x80000 else 2, at, value, 1)
+                        for at, value in sorted(allocation_reads.items())
+                    ]
+                )
+
+                @MappedRead
+                def read_guard(_, identity, at, value):
+                    # Main-RAM dependencies must use the mutation IO, not this
+                    # alternate reader. ROM has a separately owned mapping.
+                    if identity != 2 or at >= 0x80000:
+                        return 0
+                    value[0] = uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
+                    return 1
+
+                guard_reader = MappedReader(read_guard, None)
+                if args.allocated_root:
+                    before_move = bytes(data)
+                    for field in (0x806EE, 0x5BC8, target):
+                        guard = next(g for g in guards if g.field == field)
+                        guard.expected ^= 1
+                        probe_entry, probe_r0, probe_writes = (
+                            c.c_uint32(entry.value),
+                            c.c_uint32(r0.value),
+                            c.c_uint32(),
+                        )
+                        assert (
+                            lib.bank_catalog_grow_r0_guarded(
+                                data,
+                                c.byref(probe_entry),
+                                c.byref(probe_r0),
+                                1,
+                                c.byref(probe_writes),
+                                c.byref(guard_reader),
+                                guards,
+                                len(guards),
+                                initial_r0,
+                            )
+                            < 0
+                        )
+                        assert not probe_writes.value and bytes(data) == before_move
+                        assert (probe_entry.value, probe_r0.value) == (entry.value, r0.value)
+                        guard.expected ^= 1
+                        guard_rejections += 1
+                    for change in (1, 0x100000):
+                        probe_entry, probe_r0, probe_writes = (
+                            c.c_uint32(entry.value),
+                            c.c_uint32(initial_r0 ^ change),
+                            c.c_uint32(),
+                        )
+                        assert (
+                            lib.bank_catalog_grow_r0_guarded(
+                                data,
+                                c.byref(probe_entry),
+                                c.byref(probe_r0),
+                                1,
+                                c.byref(probe_writes),
+                                c.byref(guard_reader),
+                                guards,
+                                len(guards),
+                                initial_r0,
+                            )
+                            < 0
+                        )
+                        assert not probe_writes.value and bytes(data) == before_move
+                        assert (probe_entry.value, probe_r0.value) == (
+                            entry.value,
+                            initial_r0 ^ change,
+                        )
+                        register_guard_rejections += 1
                 assert (
-                    lib.bank_catalog_grow_r0(
+                    lib.bank_catalog_grow_r0_guarded(
                         data,
                         c.byref(entry),
                         c.byref(r0),
                         int(flags == 1 and mode == "move"),
                         c.byref(writes),
+                        c.byref(guard_reader),
+                        guards,
+                        len(guards),
+                        initial_r0,
                     )
                     == 0
                 )
@@ -294,24 +661,64 @@ for cursor in range(8):
                         bytes(nibbles[i] | nibbles[i + 1] << 4 for i in range(lo, lo + 4096, 2)),
                     )
                 assert word(target + 16) == target_word and word(target) != target_word
+            if args.allocated_root:
+                moved = target + delta
+                extent = c.c_uint32()
+                assert (
+                    lib.bank_temp_allocation(c.byref(allocation_reader), moved, c.byref(extent))
+                    == 0
+                )
+                assert extent.value == allocation_bounds[1]
+                assert bytes(nibble(moved + i) for i in range(extent.value)) == allocation_bytes
+                span = c.c_uint32()
+                assert (
+                    lib.hpclang_rpl_object_span(
+                        c.byref(allocation_reader), moved, extent.value, c.byref(span)
+                    )
+                    == 0
+                )
+                assert span.value == extent.value
+                candidate = c.c_uint32(0x12345678)
+                qualified = lib.bank_temp_allocation(
+                    c.byref(allocation_reader), r0.value & 0xFFFFF, c.byref(candidate)
+                )
+                assert qualified == (-7 if mode == "stale-r0" else 0)
+                if mode == "stale-r0":
+                    assert candidate.value == 0x12345678
+                else:
+                    assert candidate.value == extent.value
+                post_move_allocation = dict(
+                    first=moved, extent=extent.value, r0_qualified=qualified == 0
+                )
             assert r0.value == initial_r0 + (16 if mode == "move" and flags == 1 else 0)
-            for off, value in ((0x95C, 0), (0x970, 0), (0xC24, 0), (0x998, cursor)):
-                uc.mem_write(cpu + off, struct.pack("<I", value))
-            for i in range(9):
-                uc.mem_write(cpu + 0x90C + 8 * i, struct.pack("<Q", 0x123456789AB00000 + i))
-            uc.mem_write(cpu + 0x92C, struct.pack("<Q", 0xABCDEF1200000000 | r0.value))
-            uc.mem_write(cpu + 0x93C, struct.pack("<Q", 0x76543210ABCDE000 | flags))
+            if args.continuous_return:
+                assert bytes(uc.mem_read(cpu + 0x90C, 0x90)) == boundary_state
+                assert int.from_bytes(uc.mem_read(cpu + 0x998, 4), "little") == cursor
+                assert uc.reg_read(UC_ARM_REG_SP) == boundary_sp
+                # Publish only the proven low-word repair into the suspended
+                # interpreter. Keep real high words, flags and stack cells.
+                uc.mem_write(cpu + 0x92C, struct.pack("<I", r0.value))
+            else:
+                for off, value in ((0x95C, 0), (0x970, 0), (0xC24, 0), (0x998, cursor)):
+                    uc.mem_write(cpu + off, struct.pack("<I", value))
+                for i in range(9):
+                    uc.mem_write(cpu + 0x90C + 8 * i, struct.pack("<Q", 0x123456789AB00000 + i))
+                uc.mem_write(cpu + 0x92C, struct.pack("<Q", 0xABCDEF1200000000 | r0.value))
+                uc.mem_write(cpu + 0x93C, struct.pack("<Q", 0x76543210ABCDE000 | flags))
             saved = bytes(uc.mem_read(cpu + 0x92C, 40))
-            for i in range(8):
-                uc.mem_write(cpu + 0x978 + 4 * i, struct.pack("<I", 0xA1000 + 0x101 * i))
-            caller_slot = (cursor + 7) & 7
-            uc.mem_write(cpu + 0x978 + 4 * caller_slot, struct.pack("<I", 0x3130))
+            if not args.continuous_return:
+                for i in range(8):
+                    uc.mem_write(cpu + 0x978 + 4 * i, struct.pack("<I", 0xA1000 + 0x101 * i))
+                uc.mem_write(cpu + 0x978 + 4 * caller_slot, struct.pack("<I", 0x3130))
+            return_cells = struct.unpack("<8I", uc.mem_read(cpu + 0x978, 32))
             stack = word(0x806F8)
             old_top = word(stack)
-            uc.reg_write(UC_ARM_REG_R4, cpu)
-            uc.reg_write(UC_ARM_REG_R5, 0xFFFFF)
+            if not args.continuous_return:
+                uc.reg_write(UC_ARM_REG_R4, cpu)
+                uc.reg_write(UC_ARM_REG_R5, 0xFFFFF)
             uc.reg_write(UC_ARM_REG_R7, entry.value)
-            uc.reg_write(UC_ARM_REG_SP, 0x308000)
+            if not args.continuous_return:
+                uc.reg_write(UC_ARM_REG_SP, 0x308000)
             trace = []
             accesses = []
             cursor_steps = []
@@ -321,8 +728,10 @@ for cursor in range(8):
             origins = Origins()
             origin_path = []
             origin_memory = (c.c_uint32 * 5)(*[0x200 + i for i in range(5)])
+            preserved_top = (c.c_uint32 * 5)()
             origin_address = []
-            origin_steps = (0x88C8E + delta, 0x88C94 + delta, 0x88C97 + delta)
+            pending_address_step = []
+            origin_steps = tuple(pc + delta for pc in (0x88C8E, 0x88C94, 0x88C97, 0x88C9A, 0x88C9D))
 
             def live_nibble(at):
                 return uc.mem_read(mapping.physical(at), 1)[0] >> (4 * (at & 1)) & 15
@@ -336,6 +745,8 @@ for cursor in range(8):
 
             def hook(_, at, size, user):
                 if at == 0x28898:
+                    if pending_address_step:
+                        assert bytes(uc.mem_read(cpu + 0x90C, 0x90)) == pending_address_step.pop()
                     if pending_memory:
                         reg_at, expected_register, address, expected_memory, address_state = (
                             pending_memory.pop()
@@ -347,13 +758,17 @@ for cursor in range(8):
                         assert bytes(uc.mem_read(cpu + 0x954, 8)) == address_state
                     pc = uc.reg_read(UC_ARM_REG_R7)
                     trace.append(pc)
-                    if origin_path and len(origin_path) < 3:
+                    if origin_path and len(origin_path) < len(origin_steps):
                         assert pc == origin_steps[len(origin_path)], "unmodeled origin-path step"
                     if pc == origin_steps[0]:
                         # Caller-owned symbolic labels for R0.A; numeric values
                         # never establish these labels or qualify a target map.
                         for i in range(5):
-                            origins.registers[4][i] = 0x100 + i
+                            origins.registers[4][i] = (
+                                allocation_origins.registers[4][i]
+                                if args.allocated_root
+                                else 0x100 + i
+                            )
                         copy = Assignment()
                         assert (
                             lib.hpclang_rpl_code_assignment_inspect(
@@ -365,6 +780,37 @@ for cursor in range(8):
                         assert (
                             lib.hpclang_rpl_code_origins_assign(
                                 c.byref(origins), c.byref(copy), None
+                            )
+                            == 0
+                        )
+                        origin_path.append(pc)
+                    if pc == origin_steps[3]:
+                        # Decode arithmetic separately from nibble copies. Its
+                        # borrow invalidates D1 origins and replaces carry.
+                        assert len(origin_path) == 3
+                        adjustment = Adjustment()
+                        assert (
+                            lib.hpclang_rpl_code_address_adjust_inspect(
+                                c.byref(live_reader), pc, 3, c.byref(adjustment)
+                            )
+                            == 0
+                        )
+                        assert (adjustment.address, adjustment.delta, adjustment.length) == (
+                            12,
+                            -5,
+                            3,
+                        )
+                        before = bytearray(uc.mem_read(cpu + 0x90C, 0x90))
+                        d1 = struct.unpack_from("<I", before, 0x4C)[0]
+                        assert origin_address == [d1] and d1 == stack and d1 >= 5
+                        result = d1 + adjustment.delta
+                        assert 0 <= result <= 0xFFFFF
+                        struct.pack_into("<I", before, 0x4C, result)
+                        struct.pack_into("<I", before, 0x64, 0)
+                        pending_address_step.append(bytes(before))
+                        assert (
+                            lib.hpclang_rpl_code_origins_adjust(
+                                c.byref(origins), c.byref(adjustment)
                             )
                             == 0
                         )
@@ -389,24 +835,33 @@ for cursor in range(8):
                             "<I", address_state, 4 * (transfer.address - 11)
                         )[0]
                         assert 0 <= address < address + transfer.nibbles <= 0x100000
-                        if pc in origin_steps[1:]:
+                        if pc in (origin_steps[1], origin_steps[2], origin_steps[4]):
                             assert len(origin_path) == origin_steps.index(pc)
                             assert transfer.nibbles == 5 and transfer.first == 0
                             if pc == origin_steps[1]:
                                 assert transfer.load == 1 and transfer.data == 2
+                                assert address == stack
                                 origin_address.append(address)
-                            else:
+                            elif pc == origin_steps[2]:
                                 assert transfer.load == 0 and transfer.data == 0
                                 assert origin_address == [address]
+                            else:
+                                assert transfer.load == 0 and transfer.data == 2
+                                assert origin_address == [address + 5]
+                                assert address == stack - 5
+                            tokens = preserved_top if pc == origin_steps[4] else origin_memory
                             assert (
                                 lib.hpclang_rpl_code_origins_memory(
-                                    c.byref(origins), c.byref(transfer), origin_memory, 5
+                                    c.byref(origins), c.byref(transfer), tokens, 5
                                 )
                                 == 0
                             )
                             origin_path.append(pc)
                             if len(origin_path) == 3:
                                 assert list(origin_memory) == [0x100 + i for i in range(5)]
+                            if len(origin_path) == 5:
+                                assert list(origin_memory) == [0x100 + i for i in range(5)]
+                                assert list(preserved_top) == [0x200 + i for i in range(5)]
                         reg_at = cpu + 0x90C + 8 * transfer.data
                         register = int.from_bytes(uc.mem_read(reg_at, 8), "little")
                         values = [live_nibble(address + i) for i in range(transfer.nibbles)]
@@ -440,10 +895,11 @@ for cursor in range(8):
 
             uc.hook_add(UC_HOOK_CODE, hook)
             uc.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, access)
-            uc.emu_start(0x28828, 0x400000, count=30000)
+            uc.emu_start(0x28898 if args.continuous_return else 0x28828, 0x400000, count=30000)
             assert trace[-1] == 0x3130 and cursor_steps == [1, 7, 1, 7, 7]
             assert memory_checks and not pending_memory
-            assert len(origin_path) == (3 if flags == 1 else 0)
+            assert not pending_address_step
+            assert len(origin_path) == (5 if flags == 1 else 0)
             assert 0x88CA2 + delta in trace and 0x88CA9 + delta in trace
             assert word(0x806F8) == stack - (5 if flags == 1 else 0)
             assert word(0x8076B) == 0x88D67 + delta
@@ -467,13 +923,33 @@ for cursor in range(8):
                 assert word(stack - 5) == old_top
                 assert (word(stack) == target + delta) == (mode != "stale-r0")
             assert int.from_bytes(uc.mem_read(cpu + 0x998, 4), "little") == caller_slot
+            if args.continuous_return:
+                assert uc.reg_read(UC_ARM_REG_SP) == boundary_sp
+                final_extent = c.c_uint32(0x12345678)
+                final_query = lib.bank_temp_allocation(
+                    c.byref(allocation_reader), word(stack), c.byref(final_extent)
+                )
+                assert final_query == (-7 if mode == "stale-r0" else 0)
+                assert final_extent.value == (
+                    0x12345678 if mode == "stale-r0" else allocation_bounds[1]
+                )
             for i in range(8):
                 assert int.from_bytes(uc.mem_read(cpu + 0x978 + 4 * i, 4), "little") == (
-                    0 if i in (cursor, caller_slot) else 0xA1000 + 0x101 * i
+                    0 if i in (cursor, caller_slot) else return_cells[i]
                 )
             rows.append(
                 dict(
                     allocation_trace=[hex(x) for x in allocation_trace],
+                    arm_return=args.arm_return,
+                    continuous_return=args.continuous_return,
+                    boundary_sp=boundary_sp if args.continuous_return else None,
+                    arm_arguments=arm_arguments,
+                    arm_trace=arm_trace,
+                    allocation_origin_path=allocation_origin_path,
+                    allocation_bounds=allocation_bounds,
+                    allocation_guard_rejections=guard_rejections,
+                    register_guard_rejections=register_guard_rejections,
+                    post_move_allocation=post_move_allocation,
                     target=hex(target),
                     cursor=cursor,
                     flags=flags,
@@ -481,6 +957,11 @@ for cursor in range(8):
                     r0_read=used,
                     memory_transfers=memory_checks,
                     r0_origin_path=origin_path,
+                    stack_origin_slots=(
+                        {str(stack): list(origin_memory), str(stack - 5): list(preserved_top)}
+                        if flags == 1
+                        else {}
+                    ),
                     writes=writes.value,
                     stack_peak=1,
                     stack_final=-1,

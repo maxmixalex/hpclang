@@ -3,12 +3,178 @@
 #include <hpclang/bootstrap.h>
 #include <hpclang/target.h>
 #include "rpl-stock-memory.h"
+#include "rpl-port.h"
 #include "launch-services.h"
+
+static int state_word(const struct hpclang_rpl_reader *state, uint32_t at, unsigned width,
+                      uint32_t *word, hpclang_rpl_reference_dependency_fn dependency, void *context)
+{
+    uint32_t next = 0;
+    for (unsigned j = 0; j < width; ++j) {
+        uint8_t value;
+        if (!state->read_nibble(state->context, at + j, &value))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (value > 15)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        int result = dependency(context, at + j, value);
+        if (result)
+            return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        next |= (uint32_t)value << (4u * j);
+    }
+    *word = next;
+    return 0;
+}
+
+int hpclang_rpl_stock_bank_window_capture(const struct hpclang_rpl_reader *state,
+                                          struct hpclang_rpl_stock_bank_window *window,
+                                          hpclang_rpl_reference_dependency_fn dependency,
+                                          void *context)
+{
+    if (!state || !state->read_nibble || !window || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct hpclang_rpl_stock_bank_window next;
+    for (unsigned i = 0; i < 64; ++i) {
+        int result =
+            state_word(state, (0x100u + 4u * i) * 2u, 8, &next.pages[i], dependency, context);
+        if (result)
+            return result;
+        uint32_t owner;
+        result = state_word(state, (0x848u + i) * 2u, 2, &owner, dependency, context);
+        if (result)
+            return result;
+        next.owners[i] = (uint8_t)owner;
+    }
+    *window = next;
+    return 0;
+}
+
+int hpclang_rpl_stock_bank_route_capture(const struct hpclang_rpl_reader *state,
+                                         struct hpclang_rpl_stock_bank_route *route,
+                                         hpclang_rpl_reference_dependency_fn dependency,
+                                         void *context)
+{
+    if (!state || !state->read_nibble || !route || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    static const uint32_t offsets[] = {0xb9c, 0xba0, 0xba8, 0xbb8, 0xbc4};
+    uint32_t words[5];
+    for (unsigned i = 0; i < 5; ++i) {
+        int result = state_word(state, offsets[i] * 2u, 8, &words[i], dependency, context);
+        if (result)
+            return result;
+    }
+    *route =
+        (struct hpclang_rpl_stock_bank_route){words[0], words[1], words[2], words[3], words[4]};
+    return 0;
+}
+
+int hpclang_rpl_stock_bank_route_check(const struct hpclang_rpl_stock_bank_route *route,
+                                       uint32_t selector, uint32_t configuration)
+{
+    if (!route)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (selector > 0xffffbu || configuration > 0xffffeu)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if ((route->flags & ~0x18u) != 3u || route->io > 0x3fffu || route->ram > 255u ||
+        ((route->flags & 8u) && route->eram > 255u) || ((route->flags & 16u) && route->port > 255u))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t io_first = route->io << 6, page = configuration >> 12;
+    if ((selector < io_first + 64u && io_first < selector + 5u) ||
+        (configuration < io_first + 64u && io_first < configuration + 2u) || page == route->ram ||
+        ((route->flags & 8u) && page == route->eram) ||
+        ((route->flags & 16u) && page == route->port))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    return 0;
+}
 
 static int valid_page(uint32_t page)
 {
     return !(page & 0x7ffu) &&
            (page <= 0x200000u - 0x800u || (page >= 0x08000000u && page <= 0x08080000u - 0x800u));
+}
+
+int hpclang_rpl_stock_bank_window_select(const uint32_t previous[64], const uint8_t owners[64],
+                                         const struct hpclang_rpl_rom_bank *bank,
+                                         uint32_t selected[64])
+{
+    if (!previous || !owners || !bank || !selected)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!bank->bytes || bank->bytes > 0x20000u || (bank->bytes & 1023u) ||
+        (bank->physical & 0x7ffu) || bank->physical > 0x200000u - 0x20000u)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t result[64];
+    for (unsigned i = 0; i < 64; ++i) {
+        result[i] = owners[i] ? previous[i] : bank->physical + i * 0x800u;
+        if (!valid_page(result[i]))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    for (unsigned i = 0; i < 64; ++i)
+        selected[i] = result[i];
+    return 0;
+}
+
+int hpclang_rpl_stock_bank_map_capture(const struct hpclang_rpl_reader *state,
+                                       struct hpclang_rpl_stock_bank_map *map,
+                                       hpclang_rpl_reference_dependency_fn dependency,
+                                       void *context)
+{
+    if (!state || !state->read_nibble || !map || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct hpclang_rpl_stock_bank_map next;
+    for (unsigned i = 0; i < 256; ++i) {
+        int result = state_word(state, i * 8u, 8, &next.pages[i], dependency, context);
+        if (result)
+            return result;
+        uint32_t owner;
+        result = state_word(state, (0x808u + i) * 2u, 2, &owner, dependency, context);
+        if (result)
+            return result;
+        next.owners[i] = (uint8_t)owner;
+    }
+    static const uint32_t offsets[] = {0xbcc, 0xbd0, 0xc48, 0xc5c};
+    uint32_t *fields[] = {&next.lower, &next.upper, &next.overlay_page, &next.overlay_physical};
+    for (unsigned i = 0; i < 4; ++i) {
+        int result = state_word(state, offsets[i] * 2u, 8, fields[i], dependency, context);
+        if (result)
+            return result;
+    }
+    *map = next;
+    return 0;
+}
+
+int hpclang_rpl_stock_bank_map_select(const struct hpclang_rpl_stock_bank_map *state,
+                                      const struct hpclang_rpl_rom_bank *banks, uint32_t lower,
+                                      uint32_t upper, uint32_t selected[256])
+{
+    if (!state || !banks || !selected)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (lower > 3 || upper > 15 || state->lower > 3 || state->upper > 15 ||
+        state->overlay_page > 254)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    for (unsigned i = 0; i < 256; ++i)
+        if (!valid_page(state->pages[i]))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (state->overlay_page &&
+        (!valid_page(state->overlay_physical) || !valid_page(state->overlay_physical + 0x800u)))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t result[256];
+    for (unsigned quadrant = 0; quadrant < 4; ++quadrant) {
+        unsigned at = quadrant * 64u;
+        int status = hpclang_rpl_stock_bank_window_select(state->pages + at, state->owners + at,
+                                                          &banks[quadrant & 1u ? upper : lower],
+                                                          result + at);
+        if (status)
+            return status;
+    }
+    if (lower == state->lower && upper == state->upper) {
+        for (unsigned i = 0; i < 256; ++i)
+            result[i] = state->pages[i];
+    } else if (state->overlay_page) {
+        result[state->overlay_page] = state->overlay_physical;
+        result[state->overlay_page + 1u] = state->overlay_physical + 0x800u;
+    }
+    for (unsigned i = 0; i < 256; ++i)
+        selected[i] = result[i];
+    return 0;
 }
 
 int hpclang_rpl_stock_resolve_span(const uint32_t read_map[256], uint32_t address, uint32_t span,
@@ -111,6 +277,51 @@ static int flash_read(void *context, uint32_t address, uint8_t *value)
     return 1;
 }
 
+static int rom_bank_read(void *context, uint32_t address, uint8_t *value)
+{
+    const struct hpclang_rpl_stock_rom_bank *memory = context;
+    if (!memory || !value || !memory->bytes || address < 0x40000u ||
+        address - 0x40000u >= memory->size * 2u)
+        return 0;
+    uint32_t offset = address - 0x40000u;
+    *value = (memory->bytes[offset / 2u] >> (4u * (offset & 1u))) & 15u;
+    return 1;
+}
+
+int hpclang_rpl_stock_rom_bank_capture(struct hpclang_rpl_stock_rom_bank *memory,
+                                       struct hpclang_rpl_reader *reader,
+                                       const volatile uint8_t *bank_bytes,
+                                       const struct hpclang_rpl_rom_bank *bank,
+                                       const uint32_t flash_sections[2])
+{
+    if (!memory || !reader || !bank_bytes || !bank || !flash_sections || !bank->bytes ||
+        bank->bytes > 0x20000u || (bank->physical & 1023u) || (bank->bytes & 1023u) ||
+        bank->physical >= 0x200000u || bank->bytes > 0x200000u - bank->physical)
+        return 0;
+    uint32_t first = bank->physical >> 20;
+    uint32_t last = (bank->physical + bank->bytes - 1u) >> 20;
+    for (uint32_t section = first; section <= last; ++section)
+        if ((flash_sections[section] & UINT32_C(0xfff00803)) != ((section << 20) | UINT32_C(0x802)))
+            return 0;
+    *memory = (struct hpclang_rpl_stock_rom_bank){bank_bytes, bank->bytes};
+    *reader = (struct hpclang_rpl_reader){rom_bank_read, memory};
+    return 1;
+}
+
+int hpclang_rpl_stock_rom_bank_reader(struct hpclang_rpl_stock_rom_bank *memory,
+                                      struct hpclang_rpl_reader *reader,
+                                      const struct hpclang_rpl_rom_bank *bank)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (!memory || !reader || !bank || !boot || !boot->saturn_state ||
+        (boot->model != HPCLANG_MODEL_HP49GPLUS && boot->model != HPCLANG_MODEL_HP50G))
+        return 0;
+    volatile const uint32_t *l1 = (const void *)(uintptr_t)0x07f00000u;
+    const uint32_t sections[] = {l1[0], l1[1]};
+    return hpclang_rpl_stock_rom_bank_capture(
+        memory, reader, (const void *)(uintptr_t)bank->physical, bank, sections);
+}
+
 int hpclang_rpl_stock_port2_capture(struct hpclang_rpl_reader *reader,
                                     const volatile uint8_t *bank_bytes, uint32_t flash_section)
 {
@@ -165,7 +376,9 @@ int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     const struct hpclang_rpl_memory_bounds *bounds = hpclang_launch_rpl_bounds(boot);
     struct hpclang_rpl_reader reader;
-    if (!io || !limit || !bounds || bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
+    if (!io || !limit || !bounds ||
+        (bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC &&
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4) ||
         bounds->port1_limit > HPCLANG_RPL_PORT1_NIBBLES || !hpclang_rpl_stock_port1_reader(&reader))
         return 0;
     *limit = hpclang_launch_port1_limit(boot);
@@ -252,6 +465,7 @@ int hpclang_rpl_stock_mutation_io(struct hpclang_rpl_mutation_io *io,
         .stack_reserve_nibbles = bounds->stack_reserve_nibbles,
         .native_roots = bounds->native_roots,
         .native_root_count = bounds->native_root_count,
+        .native_root_masks = hpclang_launch_native_root_masks(bounds),
         .library_table = boot->model >= HPCLANG_MODEL_HP48GII && boot->model <= HPCLANG_MODEL_HP50G
                              ? 0x8611du
                              : 0u,

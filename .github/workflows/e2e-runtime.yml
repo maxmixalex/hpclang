@@ -154,6 +154,7 @@ jobs:
             build/e2e/*/e2e.stock-*.json
             build/e2e/*/launchers/*.bin
             build/e2e/*/launchers/*.hp
+            build/e2e/code-relocation*/launchers/objects/stage1.elf
             build/e2e/*/launchers/memory.json
           if-no-files-found: error
 
@@ -325,7 +326,9 @@ jobs:
     name: Stock / ${{ matrix.suite.mode }} / ${{ matrix.model.target }}
     needs: [build, x50ng, stock-assets]
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # Code relocation includes 14 independent native call/catalog launches;
+    # a passing HP50g job took nearly 25 minutes including setup.
+    timeout-minutes: ${{ matrix.suite.mode == 'code-relocation' && 35 || 25 }}
     strategy:
       fail-fast: false
       matrix:
@@ -382,6 +385,36 @@ jobs:
             bash tools/install-ci-packages.sh dosfstools mtools
           fi
           bash tests/e2e/harness/run-family.sh stock "$FAMILY" "build/e2e/$APPLICATION" "build/assets/$APPLICATION"
+
+      - name: Verify execution references against original interpreter
+        if: matrix.suite.mode == 'code-relocation'
+        run: |
+          bash tools/install-ci-packages.sh gcc python3-venv
+          python3 -m venv build/relocation-venv
+          build/relocation-venv/bin/pip install --disable-pip-version-check \
+            -r tests/e2e/code-relocation/requirements.txt
+          build/relocation-venv/bin/python tests/e2e/code-relocation/incoming_carry.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/pc_exchange.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/pc-exchange"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/register_roots.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --stage1-elf "build/e2e/$APPLICATION/launchers/objects/stage1.elf" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/register-roots"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/return_underflow.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --stage1-elf "build/e2e/$APPLICATION/launchers/objects/stage1.elf" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/return-underflow"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/bank_switch_maps.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/bank-switch-maps"
 
       - name: Verify suite-specific evidence
         if: matrix.suite.verifier != ''
@@ -442,6 +475,7 @@ jobs:
             build/stock-${{ matrix.model.family }}-targets.txt
             build/*-stock-media.img
             build/*-code-relocation/**
+            build/*-incoming-carry/**
             build/resource-snapshots/**
             build/e2e/${{ matrix.suite.artifact }}/e2e.hpc
             build/e2e/${{ matrix.suite.artifact }}/e2e.stock-*.json

@@ -799,6 +799,115 @@ int hpclang_rpl_reference_visit(const struct hpclang_rpl_reader *source, uint32_
     }
 }
 
+struct graph_traversal
+{
+    const struct hpclang_rpl_reference_reader *reader;
+    struct hpclang_rpl_reference_graph_node *workspace;
+    struct hpclang_rpl_reference_graph_node current;
+    uint32_t capacity, budget, count;
+    hpclang_rpl_graph_visit_fn visit;
+    hpclang_rpl_graph_resolve_fn resolve;
+    hpclang_rpl_graph_dependency_fn dependency;
+    void *context;
+    int error;
+};
+
+static int graph_schedule(struct graph_traversal *walk,
+                          const struct hpclang_rpl_reference_graph_node *node)
+{
+    const struct hpclang_rpl_reference_node *object = &node->object;
+    if (!object->limit || object->address >= 0x100000u ||
+        object->limit > 0x100000u - object->address || object->body_prologue > 0xfffffu)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    for (uint32_t i = 0; i < walk->count; ++i) {
+        const struct hpclang_rpl_reference_graph_node *old = &walk->workspace[i];
+        if (old->mapping == node->mapping && old->object.address == object->address &&
+            old->object.limit == object->limit &&
+            old->object.body_prologue == object->body_prologue)
+            return 0;
+    }
+    if (walk->count == walk->capacity || walk->count == walk->budget)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    walk->workspace[walk->count++] = *node;
+    return 0;
+}
+
+static int graph_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct graph_traversal *walk = context;
+    if (walk->error ||
+        !walk->reader->read_nibble(walk->reader->context, walk->current.mapping, address, value))
+        return 0;
+    if (*value <= 15) {
+        walk->error = walk->dependency(walk->context, walk->current.mapping, address, *value);
+        if (walk->error)
+            return 0;
+    }
+    return 1;
+}
+
+static int graph_reference(void *context, const struct hpclang_rpl_reference *edge)
+{
+    struct graph_traversal *walk = context;
+    int result = walk->visit(walk->context, &walk->current, edge);
+    if (result)
+        return result;
+    struct hpclang_rpl_reference_graph_node target = {UINT32_MAX, {UINT32_MAX, 0, 0}};
+    if (edge->kind == HPCLANG_RPL_REFERENCE_INLINE || edge->kind == HPCLANG_RPL_REFERENCE_COMPACT) {
+        target = (struct hpclang_rpl_reference_graph_node){
+            walk->current.mapping,
+            {edge->target, edge->extent,
+             edge->kind == HPCLANG_RPL_REFERENCE_COMPACT ? edge->auxiliary : 0}};
+    } else {
+        if (!walk->resolve)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        result = walk->resolve(walk->context, &walk->current, edge, &target);
+        if (result <= 0)
+            return result;
+        if (result != 1)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    return graph_schedule(walk, &target);
+}
+
+int hpclang_rpl_reference_visit_graph(
+    const struct hpclang_rpl_reference_reader *reader,
+    const struct hpclang_rpl_reference_graph_node *roots, uint32_t root_count,
+    struct hpclang_rpl_reference_graph_node *workspace, uint32_t capacity, uint32_t node_budget,
+    hpclang_rpl_graph_visit_fn visit, hpclang_rpl_graph_resolve_fn resolve,
+    hpclang_rpl_graph_dependency_fn dependency, void *context, uint32_t *visited_count)
+{
+    if (!reader || !reader->read_nibble || !roots || !workspace || !visit || !dependency ||
+        !visited_count)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!root_count || !capacity || !node_budget)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct graph_traversal walk = {.reader = reader,
+                                   .workspace = workspace,
+                                   .capacity = capacity,
+                                   .budget = node_budget,
+                                   .visit = visit,
+                                   .resolve = resolve,
+                                   .dependency = dependency,
+                                   .context = context};
+    for (uint32_t i = 0; i < root_count; ++i) {
+        int result = graph_schedule(&walk, &roots[i]);
+        if (result)
+            return result;
+    }
+    const struct hpclang_rpl_reader observed = {graph_read, &walk};
+    for (uint32_t i = 0; i < walk.count; ++i) {
+        walk.current = workspace[i];
+        int result = hpclang_rpl_reference_visit(
+            &observed, walk.current.object.address, walk.current.object.limit,
+            walk.current.object.body_prologue, graph_reference, &walk);
+        if (walk.error || result)
+            return walk.error ? walk.error : result;
+    }
+    *visited_count = walk.count;
+    return 0;
+}
+
 struct nested_traversal
 {
     struct hpclang_rpl_reference_node *workspace;

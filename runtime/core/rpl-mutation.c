@@ -225,7 +225,9 @@ struct pointer_scan_request
     hpclang_rpl_root_source_visit_fn source_visit;
     enum hpclang_rpl_root_source source;
     void *visit_context;
-    int (*capture)(void *context, uint32_t slot, uint32_t value, uint32_t *native_slot);
+    uint32_t native_mask;
+    int (*capture)(void *context, uint32_t slot, uint32_t value, uint32_t *native_slot,
+                   uint32_t mask);
 };
 
 static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint32_t slot,
@@ -237,7 +239,8 @@ static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint3
 
     if (request->mode == POINTER_SCAN_VISIT) {
         if (request->capture)
-            return request->capture(request->visit_context, slot, value, native_slot);
+            return request->capture(request->visit_context, slot, value, native_slot,
+                                    request->native_mask);
         if (request->source_visit)
             return request->source_visit(request->visit_context, request->source, slot, value);
         return request->visit(request->visit_context, slot, value);
@@ -276,7 +279,7 @@ static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint3
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
     if (native_slot != NULL) {
-        *native_slot = shifted;
+        *native_slot = (*native_slot & ~request->native_mask) | shifted;
         return HPCLANG_RPL_MUTATION_OK;
     }
     return write_word(io, slot, 5u, shifted);
@@ -581,6 +584,16 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
             if (slot < io->display_roots[j] + 5 && io->display_roots[j] < slot + 5)
                 return HPCLANG_RPL_MUTATION_MALFORMED;
     }
+    /* Validate all descriptors before callbacks or writes, including aliases. */
+    for (uint32_t i = 0; i < io->native_root_count; ++i) {
+        uint32_t mask = io->native_root_masks ? io->native_root_masks[i] : UINT32_MAX;
+        if (!io->native_roots[i] || (mask != UINT32_MAX && mask != 0xfffffu))
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        for (uint32_t j = 0; j < i; ++j)
+            if (io->native_roots[i] == io->native_roots[j] && io->native_root_masks &&
+                mask != io->native_root_masks[j])
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
     struct pointer_scan_request classified = *original;
     struct pointer_scan_request *request = &classified;
     request->source = HPCLANG_RPL_ROOT_NATIVE;
@@ -600,7 +613,8 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
         }
         if (repeated)
             continue;
-        int result = inspect_pointer_value(io, 0u, *root, request, root);
+        request->native_mask = io->native_root_masks ? io->native_root_masks[i] : UINT32_MAX;
+        int result = inspect_pointer_value(io, 0u, *root & request->native_mask, request, root);
         if (result != HPCLANG_RPL_MUTATION_OK)
             return result;
     }
@@ -693,6 +707,34 @@ int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
     return 0;
 }
 
+struct temp_allocation_query
+{
+    uint32_t address, nibbles;
+};
+
+static int match_temp_allocation(void *context, uint32_t first, uint32_t nibbles)
+{
+    struct temp_allocation_query *query = context;
+    if (first == query->address)
+        query->nibbles = nibbles;
+    return 0;
+}
+
+int hpclang_rpl_mutation_find_temp(const struct hpclang_rpl_mutation_io *io, uint32_t address,
+                                   uint32_t *nibbles)
+{
+    if (!nibbles)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct temp_allocation_query query = {address, 0};
+    int result = hpclang_rpl_mutation_visit_temp(io, match_temp_allocation, &query);
+    if (result)
+        return result;
+    if (!query.nibbles)
+        return HPCLANG_RPL_MUTATION_NOT_FOUND;
+    *nibbles = query.nibbles;
+    return 0;
+}
+
 int hpclang_rpl_mutation_visit_root_sources(const struct hpclang_rpl_mutation_io *io,
                                             hpclang_rpl_root_source_visit_fn visit, void *context)
 {
@@ -767,6 +809,25 @@ int hpclang_rpl_mutation_visit_guarded_temp(const struct hpclang_rpl_mutation_io
     return scan.error ? scan.error : result;
 }
 
+int hpclang_rpl_mutation_find_guarded_temp(const struct hpclang_rpl_mutation_io *io,
+                                           uint32_t address, uint32_t *nibbles,
+                                           hpclang_rpl_root_dependency_fn dependency, void *context)
+{
+    if (!io_ready(io) || !nibbles || !dependency)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct guarded_root_scan scan = {io, dependency, context, 0};
+    struct hpclang_rpl_mutation_io observed = *io;
+    observed.read_nibble = guarded_root_read;
+    observed.write_nibble = guarded_root_write;
+    observed.context = &scan;
+    uint32_t extent;
+    int result = hpclang_rpl_mutation_find_temp(&observed, address, &extent);
+    if (scan.error || result)
+        return scan.error ? scan.error : result;
+    *nibbles = extent;
+    return 0;
+}
+
 int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
                                      hpclang_rpl_root_visit_fn visit, void *context)
 {
@@ -794,11 +855,13 @@ struct catalog_edits
     int32_t delta;
 };
 
-static int catalog_count_root(void *context, uint32_t slot, uint32_t value, uint32_t *native)
+static int catalog_count_root(void *context, uint32_t slot, uint32_t value, uint32_t *native,
+                              uint32_t mask)
 {
     (void)slot;
     (void)value;
     (void)native;
+    (void)mask;
     size_t *count = context;
     if (*count == SIZE_MAX)
         return HPCLANG_RPL_MUTATION_NOMEM;
@@ -843,7 +906,8 @@ static int catalog_add_edit(struct catalog_edits *plan, const struct catalog_edi
     return 0;
 }
 
-static int catalog_capture_root(void *context, uint32_t slot, uint32_t value, uint32_t *native)
+static int catalog_capture_root(void *context, uint32_t slot, uint32_t value, uint32_t *native,
+                                uint32_t mask)
 {
     struct catalog_edits *plan = context;
     /* These boundaries have independently computed publication values, including
@@ -862,7 +926,10 @@ static int catalog_capture_root(void *context, uint32_t slot, uint32_t value, ui
     uint32_t replacement = value;
     if (value >= plan->first && value < plan->end)
         replacement = (uint32_t)((int64_t)value + plan->delta);
-    const struct catalog_edit edit = {slot, value, replacement, 5, native};
+    uint32_t expected = native ? *native : value;
+    if (native)
+        replacement |= expected & ~mask;
+    const struct catalog_edit edit = {slot, expected, replacement, 5, native};
     return catalog_add_edit(plan, &edit);
 }
 

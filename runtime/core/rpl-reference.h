@@ -119,6 +119,46 @@ struct hpclang_rpl_reference_node
     uint32_t address, limit, body_prologue;
 };
 
+struct hpclang_rpl_reference_graph_node
+{
+    uint32_t mapping;
+    struct hpclang_rpl_reference_node object;
+};
+
+struct hpclang_rpl_reference_reader;
+typedef int (*hpclang_rpl_graph_visit_fn)(void *context,
+                                          const struct hpclang_rpl_reference_graph_node *source,
+                                          const struct hpclang_rpl_reference *edge);
+typedef int (*hpclang_rpl_graph_resolve_fn)(void *context,
+                                            const struct hpclang_rpl_reference_graph_node *source,
+                                            const struct hpclang_rpl_reference *edge,
+                                            struct hpclang_rpl_reference_graph_node *target);
+typedef int (*hpclang_rpl_graph_dependency_fn)(void *context, uint32_t mapping, uint32_t address,
+                                               uint8_t value);
+
+/* Bounded, nonrecursive scheduling across caller-qualified mappings. Every
+ * edge reaches visit. INLINE/COMPACT children retain the source mapping; all
+ * other kinds require resolve: 1 schedules its fully initialized target, 0 is
+ * an explicit caller-proven terminal edge, a negative result rejects the scan.
+ * Missing resolve rejects nonstructural edges, including opaque/execution
+ * obligations. No mapping is inferred from a selector or an address alone.
+ * Deduplicate the exact (mapping,address,limit,body_prologue) tuple, including
+ * already queued nodes; distinct bounds remain distinct work. Capacity and
+ * node_budget limit unique nodes, not parser reads or callback count.
+ * Record valid parser nibble reads with their mapping through dependency.
+ * Resolver-owned reads/identity checks need their own dependency capture.
+ * Caller owns immutable mappings, roots, policy and exclusive disjoint workspace
+ * through scan and later use. Nonzero results invalidate all partial callbacks
+ * and workspace; visited_count changes only on success. No allocation or writes.
+ * Success closes only the supplied roots under the caller's resolution policy;
+ * it does not establish root completeness, firmware identity or mutation safety. */
+int hpclang_rpl_reference_visit_graph(
+    const struct hpclang_rpl_reference_reader *reader,
+    const struct hpclang_rpl_reference_graph_node *roots, uint32_t root_count,
+    struct hpclang_rpl_reference_graph_node *workspace, uint32_t capacity, uint32_t node_budget,
+    hpclang_rpl_graph_visit_fn visit, hpclang_rpl_graph_resolve_fn resolve,
+    hpclang_rpl_graph_dependency_fn dependency, void *context, uint32_t *visited_count);
+
 /* Enumerate structural edges through all INLINE/COMPACT descendants in one
  * stable mapping. Caller supplies an exclusive, disjoint work array and a
  * positive node budget. The scheduler allocates no memory and uses no recursion;

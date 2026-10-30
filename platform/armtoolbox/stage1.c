@@ -1403,12 +1403,15 @@ static int stage_rpl_memory_bounds(const void *saturn_state, volatile const uint
     if (temp_limit < rsktop || user_limit > dsktop)
         return 0;
 
+    /* Existing roots use whole-word addresses. Keep the RPL3 prefix readable
+     * by older embedded runtimes; publish RPL4 only when masks are needed. */
     bounds->magic = HPCLANG_RPL_BOUNDS_MAGIC;
     bounds->temp_limit = temp_limit;
     bounds->user_limit = user_limit;
     bounds->stack_reserve_nibbles = 0u;
     bounds->native_roots = NULL;
     bounds->native_root_count = 0u;
+    bounds->native_root_masks = NULL;
     bounds->port1_limit = 0u;
     if (!hpclang_stage_port1_limit(model, pool_l2, pool_pages, &bounds->port1_limit))
         bounds->magic = HPCLANG_RPL_BOUNDS_MAGIC_V2;
@@ -1552,7 +1555,10 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
     struct hpclang_launch_context launch;
     struct hpclang_rpl_memory_bounds rpl_bounds;
     struct stage_launcher_bias launcher_bias = {0u, 0u};
-    uint32_t *native_roots[10];
+    uint32_t *native_roots[12];
+    uint32_t native_root_masks[12];
+    native_root_masks[0] = UINT32_MAX;
+    native_root_masks[1] = UINT32_MAX;
     native_roots[0] = &launcher_bias.object;
     native_roots[1] = (uint32_t *)stock_frame;
 
@@ -1639,14 +1645,25 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         rpl_bounds.native_roots = native_roots;
         rpl_bounds.native_root_count = 2u;
         if ((model == HPCLANG_MODEL_HP49GPLUS || model == HPCLANG_MODEL_HP50G) && stock_frame) {
-            /* Consecutive resumed returns establish each consumed cell's use.
+            /* Followed returns and register jumps establish consumed address uses.
              * The validated 49/50 SAT_CPU layout has eight cells at 0x978 and
              * its next-push cursor at 0x998. Stop at any unclassified instruction. */
             uint32_t *cpu = (uint32_t *)saturn_state;
             const struct hpclang_stage_stack_io io = {(void *)saturn_state, stage_stack_read, NULL};
-            rpl_bounds.native_root_count += hpclang_stage_return_roots(
+            /* Carry belongs to this same suspended SAT_CPU. Preserve unknown
+             * semantics for noncanonical values instead of guessing a branch. */
+            uint32_t saved_carry = cpu[0x970u / sizeof(uint32_t)];
+            int carry = saved_carry <= 1u ? (int)saved_carry : -1;
+            rpl_bounds.native_root_count += hpclang_stage_execution_roots(
                 &io, *(uint32_t *)stock_frame, cpu + 0x978u / sizeof(uint32_t),
-                cpu[0x998u / sizeof(uint32_t)], native_roots + 2);
+                cpu[0x998u / sizeof(uint32_t)], carry, cpu + 0x90cu / sizeof(uint32_t),
+                cpu + 0x91cu / sizeof(uint32_t), native_roots + 2, native_root_masks + 2);
+            for (uint32_t i = 2; i < rpl_bounds.native_root_count; ++i)
+                if (native_root_masks[i] != UINT32_MAX) {
+                    rpl_bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V4;
+                    rpl_bounds.native_root_masks = native_root_masks;
+                    break;
+                }
         }
         /* Do not publish Saturn's machine return stack as unconditional roots:
          * RSTK=C can also save numbers. Operations that move TEMP code must

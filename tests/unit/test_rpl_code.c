@@ -4,7 +4,7 @@
 
 struct image
 {
-    uint8_t data[64];
+    uint8_t data[128];
     uint32_t address, size, fail;
 };
 
@@ -828,6 +828,45 @@ static void literal_loads(void)
 {
     struct hpclang_rpl_code_literal untouched;
     memset(&untouched, 0x5a, sizeof untouched);
+    static const unsigned address_opcodes[] = {9, 10, 11, 13, 14, 15};
+    static const unsigned address_widths[] = {2, 4, 5, 2, 4, 5};
+    for (unsigned op = 0; op < 6; ++op)
+        for (unsigned p = 0; p < 16; ++p) {
+            unsigned width = address_widths[op];
+            struct image image = {
+                .address = 0x80000, .size = width + 2, .fail = UINT32_MAX, .data = {1}};
+            image.data[1] = address_opcodes[op];
+            uint64_t expected = 0;
+            for (unsigned i = 0; i < width; ++i) {
+                image.data[2 + i] = (i * 7 + 3) & 15;
+                expected |= (uint64_t)image.data[2 + i] << (4 * i);
+            }
+            const struct hpclang_rpl_reader reader = {read_nibble, &image};
+            struct hpclang_rpl_code_literal value = untouched;
+            assert(
+                !hpclang_rpl_code_literal_inspect(&reader, image.address, image.size, p, &value));
+            assert(value.destination == (op < 3 ? HPCLANG_RPL_CODE_D0 : HPCLANG_RPL_CODE_D1));
+            assert(value.instruction == image.address && value.length == width + 2 &&
+                   value.field == image.address + 2 && value.nibbles == width &&
+                   value.value == expected && value.mask == ((UINT64_C(1) << (4 * width)) - 1));
+            for (unsigned i = 0; i < image.size; ++i) {
+                value = untouched;
+                assert(hpclang_rpl_code_literal_inspect(&reader, image.address, i, p, &value) ==
+                       HPCLANG_RPL_SPAN_BOUNDS);
+                assert(!memcmp(&value, &untouched, sizeof value));
+                image.fail = image.address + i;
+                assert(hpclang_rpl_code_literal_inspect(&reader, image.address, image.size, p,
+                                                        &value) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+                assert(!memcmp(&value, &untouched, sizeof value));
+                image.fail = UINT32_MAX;
+                uint8_t saved = image.data[i];
+                image.data[i] = 16;
+                assert(hpclang_rpl_code_literal_inspect(&reader, image.address, image.size, p,
+                                                        &value) == HPCLANG_RPL_SPAN_MALFORMED);
+                assert(!memcmp(&value, &untouched, sizeof value));
+                image.data[i] = saved;
+            }
+        }
     for (unsigned a = 0; a < 2; ++a)
         for (unsigned width = 1; width <= 16; ++width)
             for (unsigned p = 0; p < 16; ++p) {
@@ -1117,6 +1156,63 @@ static void memory_transfers(void)
     }
 }
 
+static void pc_exchanges(void)
+{
+    struct image image = {{0}, 0x90001, 4, UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    struct hpclang_rpl_code_pc_exchange unchanged, value;
+    memset(&unchanged, 0xa5, sizeof unchanged);
+    for (unsigned opcode = 0; opcode < 0x10000; ++opcode) {
+        encode(&image, 0, 4, opcode);
+        value = unchanged;
+        int result = hpclang_rpl_code_pc_exchange_inspect(&reader, image.address, 4, 0xabc12345,
+                                                          0xdef67890, &value);
+        if (opcode != 0x6b18 && opcode != 0x7b18) {
+            assert(result == HPCLANG_RPL_SPAN_UNSUPPORTED);
+            assert(!memcmp(&value, &unchanged, sizeof value));
+            continue;
+        }
+        unsigned destination = opcode == 0x6b18 ? HPCLANG_RPL_CODE_A : HPCLANG_RPL_CODE_C;
+        assert(!result && value.target == (opcode == 0x6b18 ? 0x12345u : 0x67890u));
+        assert(value.capture.instruction == image.address && value.capture.length == 4);
+        assert(value.capture.destination == destination && value.capture.nibbles == 5);
+        assert(value.capture.source == HPCLANG_RPL_CODE_NEXT_PC);
+        assert(!value.capture.source_first && !value.capture.destination_first);
+        assert(value.capture.constant == image.address + 4);
+        struct hpclang_rpl_code_origins origins, before;
+        seed_origins(&origins);
+        before = origins;
+        const uint32_t pc[5] = {901, 902, 903, 904, 905};
+        assert(!hpclang_rpl_code_origins_assign(&origins, &value.capture, pc));
+        memcpy(before.registers[destination], pc, sizeof pc);
+        assert(!memcmp(&origins, &before, sizeof origins));
+        for (unsigned fault = 0; fault < 4; ++fault) {
+            image.fail = image.address + fault;
+            value = unchanged;
+            assert(hpclang_rpl_code_pc_exchange_inspect(&reader, image.address, 4, 0, 0, &value) ==
+                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(!memcmp(&value, &unchanged, sizeof value));
+        }
+        image.fail = UINT32_MAX;
+    }
+    encode(&image, 0, 4, 0x6b18);
+    for (unsigned limit = 0; limit < 4; ++limit) {
+        value = unchanged;
+        assert(hpclang_rpl_code_pc_exchange_inspect(&reader, image.address, limit, 0, 0, &value) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&value, &unchanged, sizeof value));
+    }
+    image.address = 0xffffb;
+    assert(!hpclang_rpl_code_pc_exchange_inspect(&reader, image.address, 4, 0, 0, &value));
+    assert(value.capture.constant == 0xfffff);
+    for (image.address = 0xffffc; image.address <= 0x100000; ++image.address) {
+        value = unchanged;
+        assert(hpclang_rpl_code_pc_exchange_inspect(&reader, image.address, 4, 0, 0, &value) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&value, &unchanged, sizeof value));
+    }
+}
+
 static void pc_capture_bounds(void)
 {
     for (unsigned destination = 4; destination <= 5; ++destination) {
@@ -1137,8 +1233,252 @@ static void pc_capture_bounds(void)
     }
 }
 
+static void address_adjustments(void)
+{
+    const unsigned opcodes[] = {6, 7, 8, 12};
+    const struct hpclang_rpl_code_address_adjust unchanged = {123, 456, HPCLANG_RPL_CODE_P, 789};
+    struct image image = {.address = 0x90001, .size = 3, .fail = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    for (unsigned op = 0; op < 4; ++op) {
+        for (unsigned immediate = 0; immediate < 16; ++immediate) {
+            image.data[0] = 1;
+            image.data[1] = opcodes[op];
+            image.data[2] = immediate;
+            struct hpclang_rpl_code_address_adjust actual = unchanged;
+            assert(hpclang_rpl_code_address_adjust_inspect(&reader, image.address, 3, &actual) ==
+                   0);
+            assert(actual.instruction == image.address && actual.length == 3);
+            assert(actual.address == (op % 2 ? HPCLANG_RPL_CODE_D1 : HPCLANG_RPL_CODE_D0));
+            assert(actual.delta == (int32_t)(immediate + 1) * (op < 2 ? 1 : -1));
+            for (unsigned byte = 0; byte < 3; ++byte) {
+                actual = unchanged;
+                assert(hpclang_rpl_code_address_adjust_inspect(&reader, image.address, byte,
+                                                               &actual) == HPCLANG_RPL_SPAN_BOUNDS);
+                assert(!memcmp(&actual, &unchanged, sizeof actual));
+                image.fail = image.address + byte;
+                assert(hpclang_rpl_code_address_adjust_inspect(
+                           &reader, image.address, 3, &actual) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+                assert(!memcmp(&actual, &unchanged, sizeof actual));
+                image.fail = UINT32_MAX;
+                uint8_t saved = image.data[byte];
+                image.data[byte] = 16;
+                assert(hpclang_rpl_code_address_adjust_inspect(
+                           &reader, image.address, 3, &actual) == HPCLANG_RPL_SPAN_MALFORMED);
+                assert(!memcmp(&actual, &unchanged, sizeof actual));
+                image.data[byte] = saved;
+            }
+        }
+    }
+    for (unsigned opcode = 0; opcode < 16; ++opcode) {
+        if (opcode == 6 || opcode == 7 || opcode == 8 || opcode == 12)
+            continue;
+        image.data[1] = opcode;
+        struct hpclang_rpl_code_address_adjust actual = unchanged;
+        assert(hpclang_rpl_code_address_adjust_inspect(&reader, image.address, 3, &actual) ==
+               HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!memcmp(&actual, &unchanged, sizeof actual));
+    }
+    image.data[1] = 6;
+    image.address = 0xFFFFD;
+    struct hpclang_rpl_code_address_adjust actual = unchanged;
+    assert(hpclang_rpl_code_address_adjust_inspect(&reader, image.address, 3, &actual) == 0);
+    actual = unchanged;
+    assert(hpclang_rpl_code_address_adjust_inspect(&reader, 0xFFFFE, 3, &actual) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_code_address_adjust_inspect(&reader, 0x100000, 1, &actual) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_code_address_adjust_inspect(NULL, image.address, 3, &actual) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_code_address_adjust_inspect(&reader, image.address, 3, NULL) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!memcmp(&actual, &unchanged, sizeof actual));
+}
+
+static void address_origin_invalidation(void)
+{
+    struct hpclang_rpl_code_origins initial;
+    memset(&initial, 0x5a, sizeof initial);
+    for (int reg = -1; reg <= HPCLANG_RPL_CODE_D1 + 1; ++reg) {
+        for (int delta = -17; delta <= 17; ++delta) {
+            struct hpclang_rpl_code_origins state = initial, expected = initial;
+            struct hpclang_rpl_code_address_adjust adjust = {
+                0x90000, 3, (enum hpclang_rpl_code_register)reg, delta};
+            int valid = (reg == HPCLANG_RPL_CODE_D0 || reg == HPCLANG_RPL_CODE_D1) && delta &&
+                        delta >= -16 && delta <= 16;
+            if (valid)
+                memset(expected.registers[reg], 0, 5 * sizeof(uint32_t));
+            assert(hpclang_rpl_code_origins_adjust(&state, &adjust) ==
+                   (valid ? 0 : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(!memcmp(&state, &expected, sizeof state));
+        }
+    }
+    const int32_t extremes[] = {INT32_MIN, INT32_MAX};
+    for (unsigned i = 0; i < 2; ++i) {
+        struct hpclang_rpl_code_address_adjust adjust = {0, 3, HPCLANG_RPL_CODE_D0, extremes[i]};
+        struct hpclang_rpl_code_origins state = initial;
+        assert(hpclang_rpl_code_origins_adjust(&state, &adjust) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&state, &initial, sizeof state));
+        assert(hpclang_rpl_code_origins_adjust(NULL, &adjust) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    }
+    assert(hpclang_rpl_code_origins_adjust(&initial, NULL) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
+struct bank_entry_observations
+{
+    unsigned count, stop;
+    uint8_t seen[128];
+};
+
+static int bank_entry_observe(void *context, uint32_t address, uint8_t value)
+{
+    struct bank_entry_observations *state = context;
+    assert(address >= 0x80000 && address < 0x80080 && value <= 15);
+    state->seen[address - 0x80000] = 1;
+    return ++state->count == state->stop ? -79 : 0;
+}
+
+static void bank_entry_program(void)
+{
+    struct image image = {.address = 0x80000, .size = 61, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    image.data[0] = 1;
+    image.data[1] = 11;
+    encode(&image, 2, 5, 0x12345);
+    image.data[7] = 6;
+    encode(&image, 8, 3, 8);
+    image.data[16] = 8;
+    image.data[17] = 9;
+    image.data[18] = 0;
+    encode(&image, 19, 2, 13);
+    const uint8_t body[] = {2, 0, 3, 4, 0, 0, 0, 15, 15, 8, 0, 5, 1, 4, 6,
+                            1, 3, 4, 8, 0, 5, 1, 4,  12, 8, 0, 4, 0, 3};
+    memcpy(image.data + 32, body, sizeof body);
+    struct hpclang_rpl_code_bank_entry output, sentinel;
+    memset(&sentinel, 0x5a, sizeof sentinel);
+    struct bank_entry_observations observations = {0};
+    assert(!hpclang_rpl_code_bank_entry_inspect(&reader, image.address, image.address + image.size,
+                                                image.address, 0, &output, bank_entry_observe,
+                                                &observations));
+    assert(output.selector == 0x12345 && output.dispatch == image.address + 16 &&
+           output.body == image.address + 32);
+    unsigned count = observations.count;
+    for (unsigned stop = 1; stop <= count; ++stop) {
+        output = sentinel;
+        observations = (struct bank_entry_observations){.stop = stop};
+        assert(hpclang_rpl_code_bank_entry_inspect(
+                   &reader, image.address, image.address + image.size, image.address, 0, &output,
+                   bank_entry_observe, &observations) == -79);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+    }
+    for (unsigned at = 0; at < image.size; ++at) {
+        if ((at >= 11 && at < 16) || (at >= 21 && at < 32))
+            continue;
+        observations = (struct bank_entry_observations){0};
+        image.fail = image.address + at;
+        assert(hpclang_rpl_code_bank_entry_inspect(
+                   &reader, image.address, image.address + image.size, image.address, 0, &output,
+                   bank_entry_observe, &observations) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+        image.fail = UINT32_MAX;
+        if (at < 32)
+            continue;
+        image.data[at] ^= 1;
+        assert(hpclang_rpl_code_bank_entry_inspect(
+                   &reader, image.address, image.address + image.size, image.address, 0, &output,
+                   bank_entry_observe, &observations) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+        image.data[at] ^= 1;
+    }
+    for (unsigned p = 2; p <= 16; ++p) {
+        observations = (struct bank_entry_observations){0};
+        assert(hpclang_rpl_code_bank_entry_inspect(&reader, image.address,
+                                                   image.address + image.size, image.address, p,
+                                                   &output, bank_entry_observe, &observations) ==
+               (p == 16 ? HPCLANG_RPL_SPAN_MALFORMED : HPCLANG_RPL_SPAN_UNSUPPORTED));
+        assert(!observations.count && !memcmp(&output, &sentinel, sizeof output));
+    }
+    assert(hpclang_rpl_code_bank_entry_inspect(
+               &reader, image.address, image.address + image.size - 1, image.address, 0, &output,
+               bank_entry_observe, &observations) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!memcmp(&output, &sentinel, sizeof output));
+}
+
+static void bank_exit_program(void)
+{
+    struct image image = {.address = 0x80000, .size = 107, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    encode(&image, 0, 2, 0xb1);
+    encode(&image, 2, 5, 0x12345);
+    encode(&image, 7, 4, 0x86);
+    const unsigned order[] = {0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1};
+    for (unsigned i = 0; i < sizeof order / sizeof *order; ++i) {
+        unsigned at = 16 + i * 5;
+        encode(&image, at, 3, 0x98 | (order[i] << 8));
+        encode(&image, at + 3, 2, (order[i] == 1 ? 71 : 78) - (at + 3));
+    }
+    encode(&image, 71, 2, 0xb1);
+    encode(&image, 73, 5, 0x54321);
+    const uint8_t body[] = {2, 0, 3, 4, 0, 0, 0, 15, 15, 8, 0, 5, 1, 4, 6,
+                            1, 3, 4, 8, 0, 5, 1, 4,  12, 8, 0, 4, 0, 3};
+    memcpy(image.data + 78, body, sizeof body);
+    struct hpclang_rpl_code_bank_entry output, sentinel;
+    memset(&sentinel, 0x5a, sizeof sentinel);
+    struct bank_entry_observations failures = {0};
+    for (unsigned p = 0; p <= 1; ++p) {
+        struct bank_entry_observations observations = {0};
+        assert(!hpclang_rpl_code_bank_entry_inspect(&reader, image.address,
+                                                    image.address + image.size, image.address, p,
+                                                    &output, bank_entry_observe, &observations));
+        assert(output.selector == (p ? 0x54321u : 0x12345u));
+        assert(output.dispatch == image.address + 16 && output.body == image.address + 78);
+        struct bank_entry_observations consumed = observations;
+        for (unsigned stop = 1; stop <= consumed.count; ++stop) {
+            output = sentinel;
+            observations = (struct bank_entry_observations){.stop = stop};
+            assert(hpclang_rpl_code_bank_entry_inspect(
+                       &reader, image.address, image.address + image.size, image.address, p,
+                       &output, bank_entry_observe, &observations) == -79);
+            assert(!memcmp(&output, &sentinel, sizeof output));
+        }
+        for (unsigned at = 0; at < image.size; ++at) {
+            if (!consumed.seen[at])
+                continue;
+            image.fail = image.address + at;
+            assert(hpclang_rpl_code_bank_entry_inspect(
+                       &reader, image.address, image.address + image.size, image.address, p,
+                       &output, bank_entry_observe, &failures) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(!memcmp(&output, &sentinel, sizeof output));
+        }
+        image.fail = UINT32_MAX;
+    }
+    for (unsigned end = 71; end < image.size; ++end) {
+        assert(hpclang_rpl_code_bank_entry_inspect(&reader, image.address, image.address + end,
+                                                   image.address, 1, &output, bank_entry_observe,
+                                                   &failures) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+    }
+    for (unsigned at = 78; at < image.size; ++at) {
+        image.data[at] ^= 1;
+        assert(hpclang_rpl_code_bank_entry_inspect(
+                   &reader, image.address, image.address + image.size, image.address, 1, &output,
+                   bank_entry_observe, &failures) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+        image.data[at] ^= 1;
+    }
+    /* No matching P=1 test must not reinterpret the following D0 literal. */
+    image.data[68] = 2;
+    assert(hpclang_rpl_code_bank_entry_inspect(&reader, image.address, image.address + image.size,
+                                               image.address, 1, &output, bank_entry_observe,
+                                               &failures) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&output, &sentinel, sizeof output));
+}
+
 int main(void)
 {
+    bank_exit_program();
+    bank_entry_program();
+    address_origin_invalidation();
+    address_adjustments();
     exhaustive();
     native_cross_object_call();
     failures_and_wrap();
@@ -1152,6 +1492,7 @@ int main(void)
     literal_loads();
     register_exchanges();
     pc_capture_bounds();
+    pc_exchanges();
     memory_transfers();
     origin_aliases_and_failures();
     return 0;

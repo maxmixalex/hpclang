@@ -283,6 +283,11 @@ int hpclang_rpl_code_literal_inspect(const struct hpclang_rpl_reader *reader, ui
     } else if (op[0] == 8 && op[1] == 0 && op[2] == 8 && op[3] == 2) {
         prefix = 5;
         destination = HPCLANG_RPL_CODE_A;
+    } else if (op[0] == 1 && (op[1] == 9 || op[1] == 10 || op[1] == 11 || op[1] == 13 ||
+                              op[1] == 14 || op[1] == 15)) {
+        prefix = 2;
+        destination = op[1] < 12 ? HPCLANG_RPL_CODE_D0 : HPCLANG_RPL_CODE_D1;
+        p = 0; /* Address literals always replace low nibbles, independent of P. */
     } else {
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     }
@@ -423,6 +428,33 @@ int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uin
     return 0;
 }
 
+int hpclang_rpl_code_address_adjust_inspect(const struct hpclang_rpl_reader *reader,
+                                            uint32_t instruction, uint32_t limit,
+                                            struct hpclang_rpl_code_address_adjust *adjust)
+{
+    if (!reader || !reader->read_nibble || !adjust)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || !limit || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct instruction_cursor cursor = {.reader = reader, .at = instruction, .limit = limit};
+    int result = instruction_take(&cursor, 2);
+    if (result)
+        return result;
+    unsigned opcode = cursor.code[1];
+    if (cursor.code[0] != 1 || (opcode != 6 && opcode != 7 && opcode != 8 && opcode != 12))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if ((result = instruction_take(&cursor, 3)))
+        return result;
+    struct hpclang_rpl_code_address_adjust next = {
+        .instruction = instruction,
+        .length = 3,
+        .address = opcode == 6 || opcode == 8 ? HPCLANG_RPL_CODE_D0 : HPCLANG_RPL_CODE_D1,
+        .delta = ((int32_t)cursor.code[2] + 1) * (opcode < 8 ? 1 : -1),
+    };
+    *adjust = next;
+    return 0;
+}
+
 static unsigned origin_register_width(enum hpclang_rpl_code_register reg)
 {
     if ((unsigned)reg <= HPCLANG_RPL_CODE_R4)
@@ -516,6 +548,19 @@ int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
     return 0;
 }
 
+int hpclang_rpl_code_origins_adjust(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_address_adjust *adjust)
+{
+    if (!state || !adjust)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if ((adjust->address != HPCLANG_RPL_CODE_D0 && adjust->address != HPCLANG_RPL_CODE_D1) ||
+        !adjust->delta || adjust->delta < -16 || adjust->delta > 16)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned i = 0; i < 5; ++i)
+        state->registers[adjust->address][i] = 0;
+    return 0;
+}
+
 int hpclang_rpl_code_exchange_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
                                       uint32_t limit, unsigned p,
                                       struct hpclang_rpl_code_exchange *exchange)
@@ -580,6 +625,34 @@ static int read_word(const struct hpclang_rpl_reader *reader, uint32_t at, unsig
             return HPCLANG_RPL_SPAN_MALFORMED;
         *value |= (uint32_t)nibble << (4 * i);
     }
+    return 0;
+}
+
+int hpclang_rpl_code_pc_exchange_inspect(const struct hpclang_rpl_reader *reader,
+                                         uint32_t instruction, uint32_t limit, uint32_t a_low,
+                                         uint32_t c_low,
+                                         struct hpclang_rpl_code_pc_exchange *exchange)
+{
+    if (!reader || !reader->read_nibble || !exchange)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction > 0xffffbu || limit < 4 || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(reader, instruction, 4, &opcode);
+    if (result)
+        return result;
+    if (opcode != 0x6b18u && opcode != 0x7b18u)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    int selects_c = opcode == 0x7b18u;
+    struct hpclang_rpl_code_pc_exchange next = {
+        .capture = {.instruction = instruction,
+                    .length = 4,
+                    .source = HPCLANG_RPL_CODE_NEXT_PC,
+                    .destination = selects_c ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A,
+                    .nibbles = 5,
+                    .constant = instruction + 4},
+        .target = (selects_c ? c_low : a_low) & 0xfffffu};
+    *exchange = next;
     return 0;
 }
 
@@ -710,6 +783,136 @@ int hpclang_rpl_code_branch_inspect(const struct hpclang_rpl_reader *reader, uin
     next.target = (uint32_t)((int32_t)next.base + displacement) & 0xfffffu;
     *branch = next;
     return 0;
+}
+
+struct bank_entry_reader
+{
+    const struct hpclang_rpl_reader *reader;
+    uint32_t first, end;
+    hpclang_rpl_reference_dependency_fn dependency;
+    void *context;
+    int error;
+};
+
+static int bank_entry_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct bank_entry_reader *state = context;
+    if (state->error)
+        return 0;
+    if (address < state->first || address >= state->end) {
+        state->error = HPCLANG_RPL_SPAN_BOUNDS;
+        return 0;
+    }
+    if (!state->reader->read_nibble(state->reader->context, address, value))
+        return 0;
+    if (*value <= 15u) {
+        state->error = state->dependency(state->context, address, *value);
+        if (state->error > 0)
+            state->error = HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    return !state->error;
+}
+
+static int bank_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t end, uint32_t entry,
+                              unsigned p, struct hpclang_rpl_code_bank_entry *view)
+{
+    struct hpclang_rpl_code_literal literal;
+    int result = hpclang_rpl_code_literal_inspect(reader, entry, end - entry, 0, &literal);
+    if (result)
+        return result;
+    if (literal.destination != HPCLANG_RPL_CODE_D0 || literal.nibbles != 5)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (literal.value > 0xffffbu || end - entry < 11u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    result = read_word(reader, entry + 7, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode != 6)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_code_branch branch;
+    result = hpclang_rpl_code_branch_inspect(reader, entry + 7, 4, &branch);
+    if (result)
+        return result;
+    uint32_t dispatch = branch.target;
+    if (dispatch >= end || end - dispatch < 5)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t selected = dispatch;
+    unsigned compared;
+    for (compared = 0; compared < 16; ++compared) {
+        if (selected >= end || end - selected < 5)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        /* Each untaken ?P= test falls through without changing P. Capture
+         * its complete encoding, including the unselected displacement. */
+        result = read_word(reader, selected, 5, &opcode);
+        if (result)
+            return result;
+        if ((opcode & 0xffu) != 0x98u)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (((opcode >> 8u) & 15u) == p)
+            break;
+        selected += 5;
+    }
+    if (compared == 16)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    result = hpclang_rpl_code_branch_inspect(reader, selected, 5, &branch);
+    if (result)
+        return result;
+    uint32_t body_address = branch.target;
+    if (p == 1) {
+        if (body_address >= end || end - body_address < 7u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        /* The exit path replaces the entry's selector. It does not promise
+         * restoration of the caller's previous bank. */
+        result =
+            hpclang_rpl_code_literal_inspect(reader, body_address, end - body_address, p, &literal);
+        if (result)
+            return result;
+        if (literal.destination != HPCLANG_RPL_CODE_D0 || literal.nibbles != 5)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (literal.value > 0xffffbu || end - body_address < 7u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        body_address += 7;
+    }
+    static const uint8_t body[] = {
+        2, 0, 3, 4, 0, 0, 0, 15, 15, 8, 0, 5, 1, 4, 6, 1, 3, 4, 8, 0, 5, 1, 4, 12, 8, 0, 4, 0, 3,
+    };
+    if (body_address >= end || sizeof body > end - body_address)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    for (unsigned i = 0; i < sizeof body; ++i) {
+        result = read_word(reader, body_address + i, 1, &opcode);
+        if (result)
+            return result;
+        if (opcode != body[i])
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    *view = (struct hpclang_rpl_code_bank_entry){(uint32_t)literal.value, dispatch, body_address};
+    return 0;
+}
+
+int hpclang_rpl_code_bank_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                        uint32_t end, uint32_t entry, unsigned p,
+                                        struct hpclang_rpl_code_bank_entry *view,
+                                        hpclang_rpl_reference_dependency_fn dependency,
+                                        void *context)
+{
+    if (!reader || !reader->read_nibble || !view || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (first >= end || end > 0x100000u || entry < first || entry >= end)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (p > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (p > 1)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct bank_entry_reader state = {reader, first, end, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_entry_read, &state};
+    struct hpclang_rpl_code_bank_entry next;
+    int result = bank_entry_inspect(&observed, end, entry, p, &next);
+    if (state.error)
+        return state.error;
+    if (!result)
+        *view = next;
+    return result;
 }
 
 static int plan_shift(const struct hpclang_rpl_reader *reader, uint32_t instruction, uint32_t limit,

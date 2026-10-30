@@ -220,11 +220,84 @@ int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t fl
                             uint32_t eram_entry, uint32_t bank_switch,
                             struct hpclang_rpl_bank_binding *binding);
 
+/* Record every valid nibble read from the switch table, including nonmatching
+ * entries needed to rule out an ambiguous match. The caller binds addresses to
+ * the reader's proven mapping and retains them as commit guards. The callback
+ * returns zero or a negative error, propagated unchanged; positive returns are
+ * MALFORMED, never a successful lookup. Discard partial dependencies on error. Output changes
+ * only on a complete successful match. No writes or allocation. This observes
+ * lookup dependencies, not switch-code identity, populated-bank geometry or all
+ * live references. Keep reader, table and callback state stable throughout. */
+typedef int (*hpclang_rpl_bank_dependency_fn)(void *context, uint32_t address, uint8_t value);
+/* Configuration lookup with dependencies for the library ID and relative
+ * configuration pointer, including a zero (absent) pointer. Same stable selected
+ * mapping contract as library_configuration; retain mapping/catalog guards too.
+ * Callback errors discard partial observations: negative propagates, positive
+ * becomes MALFORMED. Target changes only on found (1), not absence or error.
+ * This does not inspect the target or qualify startup order/execution safety. */
+int hpclang_rpl_library_configuration_guarded(const struct hpclang_rpl_reader *reader,
+                                              uint32_t first, uint32_t end, uint32_t header,
+                                              uint32_t number, uint32_t *target,
+                                              hpclang_rpl_bank_dependency_fn dependency,
+                                              void *context);
+
+/* Capture/validate all sixteen bank geometries from an independently qualified
+ * layout. operands is the ROM BYTE offset of two little-endian ARM pointers:
+ * count byte, then KiB-size directory. bases_address is the CPU-state BYTE offset
+ * of sixteen 32-bit bases. Reader/dependency addresses are NIBBLE offsets in
+ * their respective physical-ROM/native-state mappings; never conflate them.
+ * Metadata must fit the first 512 KiB of its mapping (20-bit guard coordinates).
+ * flash_bytes and operand/base provenance require independent qualification;
+ * no scanning for plausible metadata. Record every pointer/count/size/base read.
+ * Return zero with sixteen entries (unused banks zeroed), or a negative error
+ * preserving all output. Discard partial dependencies on failure; positive
+ * callback errors are MALFORMED. Caller holds mappings stable and validates
+ * guards before use. Geometry validation does not identify firmware or authorize
+ * reads, switches or mutation. banks points to sixteen output entries. */
+int hpclang_rpl_rom_bank_capture_guarded(
+    const struct hpclang_rpl_reader *rom, const struct hpclang_rpl_reader *state, uint32_t operands,
+    uint32_t bases_address, uint32_t flash_bytes, struct hpclang_rpl_rom_bank *banks,
+    hpclang_rpl_bank_dependency_fn rom_dependency, void *rom_context,
+    hpclang_rpl_bank_dependency_fn state_dependency, void *state_context);
+
+int hpclang_rpl_bank_lookup_guarded(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
+                                    uint32_t eram_entry, uint32_t bank_switch,
+                                    struct hpclang_rpl_bank_binding *binding,
+                                    hpclang_rpl_bank_dependency_fn dependency, void *context);
+
 struct hpclang_rpl_banked_target
 {
     struct hpclang_rpl_bank_binding bank;
     uint32_t offset;
 };
+
+struct hpclang_rpl_bank_identity_range
+{
+    uint32_t address, length;
+    const uint8_t *nibbles;
+};
+
+/* Match a separately reviewed switch alias to a canonical table entry. Expected
+ * ranges must be independent immutable evidence, not a copy of the current
+ * reader. They must include both entry addresses and all code/data needed by
+ * the caller's equivalence proof, including mutable selector data when the
+ * handler reads it. Equal entry code alone does not prove a fixed bank index.
+ * This routine checks bytes, not completeness
+ * of that proof or machine-code semantics. Calling-context assumptions, page
+ * owners, geometry, firmware identity and executable references remain caller
+ * obligations. No fixed ROM addresses or alias arithmetic are inferred.
+ * Returns 1 for a validated alias and canonical binding, 0 for a different
+ * requested switch/absent canonical entry, negative on mismatch/error. Output
+ * changes only on 1; discard partial dependencies on any other result. Positive
+ * dependency errors become MALFORMED. All inputs/read mappings stay stable. */
+int hpclang_rpl_bank_alias_lookup_guarded(const struct hpclang_rpl_reader *reader,
+                                          uint32_t flash_table, uint32_t eram_entry,
+                                          uint32_t requested_switch, uint32_t alias,
+                                          uint32_t canonical,
+                                          const struct hpclang_rpl_bank_identity_range *ranges,
+                                          uint32_t range_count,
+                                          struct hpclang_rpl_bank_binding *binding,
+                                          hpclang_rpl_bank_dependency_fn dependency, void *context);
 
 struct hpclang_rpl_flashptr
 {
@@ -236,6 +309,13 @@ struct hpclang_rpl_flashptr
 int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_t address,
                                 uint32_t limit, struct hpclang_rpl_flashptr *pointer);
 
+/* Observe all 12 source nibbles without resolving selector/index or reading a
+ * target. Same dependency/error contract as bank_lookup_guarded; preserve output
+ * on failure. Keep the source mapping identity with these dependencies. */
+int hpclang_rpl_flashptr_decode_guarded(const struct hpclang_rpl_reader *source, uint32_t address,
+                                        uint32_t limit, struct hpclang_rpl_flashptr *pointer,
+                                        hpclang_rpl_bank_dependency_fn dependency, void *context);
+
 /* Match a logical FlashPtr selector's live configuration against a separate
  * physical-bank configuration table. Both tables contain 16 five-nibble cells
  * at caller-validated RAM addresses. Zero/unknown configuration returns 0;
@@ -244,6 +324,14 @@ int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_
  * the entire lookup. Output changes only on a unique match (1). */
 int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t selectors,
                               uint32_t banks, uint32_t selector, uint32_t *bank);
+
+/* Observe the selected configuration and all physical-bank configurations,
+ * including nonmatches needed to exclude ambiguity. Same dependency/error
+ * contract as bank_lookup_guarded; output changes only on a unique match.
+ * Does not qualify the source FlashPtr, table mapping or selected bank geometry. */
+int hpclang_rpl_flashptr_bank_guarded(const struct hpclang_rpl_reader *reader, uint32_t selectors,
+                                      uint32_t banks, uint32_t selector, uint32_t *bank,
+                                      hpclang_rpl_bank_dependency_fn dependency, void *context);
 
 /* Look up one index in a caller-mapped native ROM bank header. Validate the
  * 0F bank identity and declared table count within the 0x40000..0x80000 window.
@@ -256,6 +344,14 @@ int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t 
 int hpclang_rpl_flashptr_lookup(const struct hpclang_rpl_reader *mapped, uint32_t header,
                                 uint32_t bank, uint32_t index, uint32_t *target);
 
+/* Retain identity, count and selected target nibbles as lookup dependencies.
+ * Same callback/error contract as bank_lookup_guarded. This does not observe
+ * the source FlashPtr or configuration tables, authenticate mapping/geometry,
+ * or dereference the target. Keep those proofs and dependencies separately. */
+int hpclang_rpl_flashptr_lookup_guarded(const struct hpclang_rpl_reader *mapped, uint32_t header,
+                                        uint32_t bank, uint32_t index, uint32_t *target,
+                                        hpclang_rpl_bank_dependency_fn dependency, void *context);
+
 /* Resolve a count-prefixed table after the caller has validated its mapping
  * and format. first/end bound the readable native bank window; table points
  * at the five-nibble count followed by absolute five-nibble targets. This
@@ -265,6 +361,16 @@ int hpclang_rpl_flashptr_lookup(const struct hpclang_rpl_reader *mapped, uint32_
 int hpclang_rpl_flashptr_table_lookup(const struct hpclang_rpl_reader *mapped, uint32_t first,
                                       uint32_t end, uint32_t table, uint32_t index,
                                       uint32_t *target);
+
+/* Observe count and selected target for a separately proven special table.
+ * Does not infer table identity, format or mapping from plausible bytes. Retain
+ * those proofs and their dependencies separately. Same callback/error contract
+ * as bank_lookup_guarded; absent/error results preserve output. */
+int hpclang_rpl_flashptr_table_lookup_guarded(const struct hpclang_rpl_reader *mapped,
+                                              uint32_t first, uint32_t end, uint32_t table,
+                                              uint32_t index, uint32_t *target,
+                                              hpclang_rpl_bank_dependency_fn dependency,
+                                              void *context);
 
 /* Resolve a bounded DOACPTR through caller-validated ROM switch tables. The
  * source and ROM may have distinct readers. Return a bank-qualified nibble
@@ -276,6 +382,19 @@ int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t 
                               uint32_t limit, const struct hpclang_rpl_reader *rom,
                               uint32_t flash_table, uint32_t eram_entry,
                               struct hpclang_rpl_banked_target *target);
+
+/* Resolve with independent dependency streams for the source object's 15
+ * nibbles and every switch-table nibble. Addresses are local to each reader;
+ * the caller must qualify their mappings, even when numeric addresses coincide.
+ * Callbacks follow bank_lookup_guarded's error contract. On any error discard
+ * both streams; target changes only on success. Does not observe target contents
+ * or establish switch-code identity, bank geometry or complete live references.
+ * Both mappings, readers and callback state must remain stable throughout. */
+int hpclang_rpl_acptr_resolve_guarded(
+    const struct hpclang_rpl_reader *source, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_reader *rom, uint32_t flash_table, uint32_t eram_entry,
+    struct hpclang_rpl_banked_target *target, hpclang_rpl_bank_dependency_fn source_dependency,
+    void *source_context, hpclang_rpl_bank_dependency_fn rom_dependency, void *rom_context);
 
 /* A read-only visitor: each callback's limit excludes the library CRC; the
  * input object limit must include it. Nonzero return aborts

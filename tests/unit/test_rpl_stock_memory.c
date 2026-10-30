@@ -6,11 +6,225 @@
 #include <hpclang/bootstrap.h>
 #include <hpclang/target.h>
 #include "rpl-stock-memory.h"
+#include "rpl-port.h"
 
 static const struct hpclang_boot_info *active_boot;
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
     return active_boot;
+}
+
+struct route_fixture
+{
+    uint8_t bytes[0xc60];
+    unsigned reads, observations, stop, mode;
+};
+
+static int route_read(void *context, uint32_t at, uint8_t *value)
+{
+    struct route_fixture *fixture = context;
+    assert(at < sizeof fixture->bytes * 2u);
+    *value = (fixture->bytes[at / 2u] >> (4u * (at & 1u))) & 15u;
+    if (++fixture->reads == fixture->stop) {
+        if (fixture->mode == 1)
+            return 0;
+        if (fixture->mode == 2)
+            *value = 16;
+    }
+    return 1;
+}
+
+static int route_observe(void *context, uint32_t at, uint8_t value)
+{
+    struct route_fixture *fixture = context;
+    assert(value == ((fixture->bytes[at / 2u] >> (4u * (at & 1u))) & 15u));
+    if (++fixture->observations == fixture->stop && fixture->mode >= 3)
+        return fixture->mode == 3 ? -73 : 73;
+    return 0;
+}
+
+static void test_bank_route_capture(void)
+{
+    struct route_fixture fixture = {0};
+    const uint32_t offsets[] = {0xb9c, 0xba0, 0xba8, 0xbb8, 0xbc4};
+    const uint32_t words[] = {3, 4, 0x80, 0x40, UINT32_MAX};
+    for (unsigned i = 0; i < 5; ++i)
+        for (unsigned j = 0; j < 4; ++j)
+            fixture.bytes[offsets[i] + j] = (uint8_t)(words[i] >> (8u * j));
+    struct hpclang_rpl_reader reader = {route_read, &fixture};
+    struct hpclang_rpl_stock_bank_route route, expected = {3, 4, 0x80, 0x40, UINT32_MAX};
+    assert(!hpclang_rpl_stock_bank_route_capture(&reader, &route, route_observe, &fixture));
+    assert(!memcmp(&route, &expected, sizeof route));
+    assert(fixture.reads == 40 && fixture.observations == 40);
+    for (unsigned mode = 1; mode <= 4; ++mode) {
+        for (unsigned stop = 1; stop <= 40; ++stop) {
+            fixture.mode = mode;
+            fixture.stop = stop;
+            fixture.reads = fixture.observations = 0;
+            memset(&route, 0xa5, sizeof route);
+            struct hpclang_rpl_stock_bank_route before = route;
+            int result =
+                hpclang_rpl_stock_bank_route_capture(&reader, &route, route_observe, &fixture);
+            assert(result == (mode == 1   ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                              : mode == 3 ? -73
+                                          : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(fixture.reads == stop && !memcmp(&route, &before, sizeof route));
+        }
+    }
+    assert(hpclang_rpl_stock_bank_route_capture(NULL, &route, route_observe, &fixture) < 0);
+    assert(hpclang_rpl_stock_bank_route_capture(&reader, &route, NULL, &fixture) < 0);
+}
+
+static void test_bank_window_capture(void)
+{
+    struct route_fixture fixture = {0};
+    struct hpclang_rpl_stock_bank_window window, expected;
+    for (unsigned i = 0; i < 64; ++i) {
+        expected.pages[i] = 0x08020000u + i * 0x800u;
+        expected.owners[i] = (uint8_t)(i * 3);
+        for (unsigned j = 0; j < 4; ++j)
+            fixture.bytes[0x100 + i * 4 + j] = (uint8_t)(expected.pages[i] >> (8u * j));
+        fixture.bytes[0x848 + i] = expected.owners[i];
+    }
+    struct hpclang_rpl_reader reader = {route_read, &fixture};
+    assert(!hpclang_rpl_stock_bank_window_capture(&reader, &window, route_observe, &fixture));
+    assert(!memcmp(&window, &expected, sizeof window));
+    assert(fixture.reads == 640 && fixture.observations == 640);
+    for (unsigned mode = 1; mode <= 4; ++mode) {
+        for (unsigned stop = 1; stop <= 640; ++stop) {
+            fixture.mode = mode;
+            fixture.stop = stop;
+            fixture.reads = fixture.observations = 0;
+            memset(&window, 0xa5, sizeof window);
+            struct hpclang_rpl_stock_bank_window before = window;
+            int result =
+                hpclang_rpl_stock_bank_window_capture(&reader, &window, route_observe, &fixture);
+            assert(result == (mode == 1   ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                              : mode == 3 ? -73
+                                          : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(fixture.reads == stop && !memcmp(&window, &before, sizeof window));
+        }
+    }
+}
+
+static void test_bank_map_capture(void)
+{
+    struct route_fixture fixture = {0};
+    struct hpclang_rpl_stock_bank_map map, expected = {0};
+    for (unsigned i = 0; i < 256; ++i) {
+        expected.pages[i] = 0x08000000u + i * 0x800u;
+        expected.owners[i] = (uint8_t)i;
+        for (unsigned j = 0; j < 4; ++j)
+            fixture.bytes[i * 4 + j] = (uint8_t)(expected.pages[i] >> (8u * j));
+        fixture.bytes[0x808 + i] = (uint8_t)i;
+    }
+    expected.lower = fixture.bytes[0xbcc] = 1;
+    expected.upper = fixture.bytes[0xbd0] = 2;
+    expected.overlay_page = fixture.bytes[0xc48] = 63;
+    expected.overlay_physical = 0x08060000;
+    fixture.bytes[0xc5e] = 6;
+    fixture.bytes[0xc5f] = 8;
+    struct hpclang_rpl_reader reader = {route_read, &fixture};
+    assert(!hpclang_rpl_stock_bank_map_capture(&reader, &map, route_observe, &fixture));
+    assert(!memcmp(&map, &expected, sizeof map));
+    assert(fixture.reads == 2592 && fixture.observations == 2592);
+    for (unsigned mode = 1; mode <= 4; ++mode) {
+        for (unsigned stop = 1; stop <= 2592; ++stop) {
+            fixture.mode = mode;
+            fixture.stop = stop;
+            fixture.reads = fixture.observations = 0;
+            memset(&map, 0xa5, sizeof map);
+            struct hpclang_rpl_stock_bank_map before = map;
+            int result = hpclang_rpl_stock_bank_map_capture(&reader, &map, route_observe, &fixture);
+            assert(result == (mode == 1   ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                              : mode == 3 ? -73
+                                          : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(fixture.reads == stop && !memcmp(&map, &before, sizeof map));
+        }
+    }
+}
+
+static void test_bank_map(void)
+{
+    struct hpclang_rpl_rom_bank banks[16] = {0};
+    for (unsigned i = 0; i < 14; ++i)
+        banks[i] = (struct hpclang_rpl_rom_bank){0x40000u + i * 0x20000u, 0x20000u};
+    struct hpclang_rpl_stock_bank_map state = {.lower = 1, .upper = 2};
+    for (unsigned i = 0; i < 256; ++i) {
+        state.pages[i] = 0x08020000u + (i % 64) * 0x800u;
+        state.owners[i] = (uint8_t)(i % 3 ? 0 : 2);
+    }
+    uint32_t out[256], before[256];
+    memset(before, 0xa5, sizeof before);
+    memcpy(out, before, sizeof out);
+    for (unsigned i = 0; i < 256; ++i) {
+        uint32_t saved = state.pages[i];
+        state.pages[i] = 0x200000u;
+        assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, out) < 0);
+        assert(!memcmp(out, before, sizeof out));
+        state.pages[i] = saved;
+    }
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 4, 5, out) < 0);
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 16, out) < 0);
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 14, out) < 0);
+    state.overlay_page = 255;
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, out) < 0);
+    state.overlay_page = 63;
+    state.overlay_physical = 0x0807f800u;
+    assert(hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, out) < 0);
+    assert(!memcmp(out, before, sizeof out));
+    state.overlay_physical = 0x08060000u;
+    assert(!hpclang_rpl_stock_bank_map_select(&state, banks, 1, 2, out));
+    assert(!memcmp(out, state.pages, sizeof out)); /* No-op skips overlay restore. */
+    assert(!hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, out));
+    assert(out[63] == 0x08060000u && out[64] == 0x08060800u);
+    assert(!hpclang_rpl_stock_bank_map_select(&state, banks, 3, 5, state.pages));
+    assert(!memcmp(out, state.pages, sizeof out)); /* In-place publication. */
+    assert(hpclang_rpl_stock_bank_map_select(NULL, banks, 3, 5, out) < 0);
+}
+
+static void test_bank_route(void)
+{
+    struct hpclang_rpl_stock_bank_route route = {3, 4, 0x80, 0x40, 0x40};
+    assert(!hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024));
+    for (unsigned flags = 0; flags < 256; ++flags) {
+        route.flags = flags;
+        int result = hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024);
+        assert((result == 0) == ((flags & ~0x18u) == 3u));
+    }
+    route.flags = 0x1b;
+    for (unsigned i = 0; i < 3; ++i) {
+        uint32_t *base = i == 0 ? &route.ram : i == 1 ? &route.eram : &route.port;
+        uint32_t saved = *base;
+        *base = 0x7f;
+        assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+        *base = 256;
+        assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+        *base = saved;
+    }
+    /* IO overlap includes reads straddling either end of a 64-nibble block. */
+    route.io = 0x86040 >> 6;
+    for (uint32_t selector = 0x8603b; selector <= 0x86080; ++selector)
+        assert((hpclang_rpl_stock_bank_route_check(&route, selector, 0x7f024) == 0) ==
+               (selector == 0x8603b || selector == 0x86080));
+    route.io = 0x7f024 >> 6;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+    route.io = 0x7f040 >> 6;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f03f) < 0);
+    assert(!hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f03e));
+    route.flags = 3;
+    route.eram = route.port = UINT32_MAX; /* Disabled device fields are ignored. */
+    route.io = 4;
+    assert(!hpclang_rpl_stock_bank_route_check(&route, 0xffffb, 0xffffe));
+    route.flags |= 0x80000000u;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+    route.flags = 3;
+    route.io = 0x4000;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x7f024) < 0);
+    route.io = 4;
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0xffffc, 0x7f024) < 0);
+    assert(hpclang_rpl_stock_bank_route_check(&route, 0x86063, 0x100000) < 0);
+    assert(hpclang_rpl_stock_bank_route_check(NULL, 0x86063, 0x7f024) < 0);
 }
 
 struct span_walk
@@ -204,8 +418,131 @@ static void test_physical_spans(void)
     assert(physical == 123);
 }
 
+static void test_rom_bank_reader(void)
+{
+    static uint8_t bytes[0x20000];
+    for (unsigned i = 0; i < sizeof bytes; ++i)
+        bytes[i] = (uint8_t)(i * 37u + 11u);
+    const struct hpclang_rpl_rom_bank banks[] = {
+        {0x48000, 0x18000}, {0x80000, 0x20000}, {0xffc00, 0x800}, {0x1e0000, 0x20000}};
+    uint32_t sections[] = {0x00000802, 0x00100c02};
+    struct hpclang_rpl_stock_rom_bank memory = {0};
+    struct hpclang_rpl_reader reader = {0};
+    assert(!hpclang_rpl_stock_rom_bank_reader(&memory, &reader, banks));
+    for (unsigned i = 0; i < sizeof banks / sizeof banks[0]; ++i) {
+        const struct hpclang_rpl_rom_bank *bank = &banks[i];
+        assert(hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, bank, sections));
+        assert(memory.bytes == bytes && memory.size == bank->bytes && reader.context == &memory);
+        uint8_t value;
+        for (unsigned at = 0; at < bank->bytes * 2u; ++at) {
+            assert(reader.read_nibble(reader.context, 0x40000u + at, &value));
+            assert(value == ((bytes[at / 2u] >> (4u * (at & 1u))) & 15u));
+        }
+        const uint32_t invalid[] = {0, 0x3ffff, 0x40000 + bank->bytes * 2u, 0x80000, UINT32_MAX};
+        for (unsigned j = 0; j < sizeof invalid / sizeof invalid[0]; ++j) {
+            value = 99;
+            assert(!reader.read_nibble(reader.context, invalid[j], &value) && value == 99);
+        }
+        assert(!reader.read_nibble(reader.context, 0x40000, NULL));
+        unsigned first = bank->physical >> 20, last = (bank->physical + bank->bytes - 1u) >> 20;
+        for (unsigned section = first; section <= last; ++section) {
+            const uint32_t masks[] = {2, 0x800, 0x100000};
+            for (unsigned j = 0; j < sizeof masks / sizeof masks[0]; ++j) {
+                sections[section] ^= masks[j];
+                struct hpclang_rpl_reader before = reader;
+                assert(
+                    !hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, bank, sections));
+                assert(memory.bytes == bytes && memory.size == bank->bytes);
+                assert(reader.context == before.context &&
+                       reader.read_nibble == before.read_nibble);
+                sections[section] ^= masks[j];
+            }
+        }
+    }
+    const struct hpclang_rpl_rom_bank invalid[] = {{0, 0},
+                                                   {0x48000, 1},
+                                                   {0x48001, 0x18000},
+                                                   {0x48000, 0x20400},
+                                                   {0x200000, 0x400},
+                                                   {0x1ffc00, 0x800},
+                                                   {UINT32_MAX, 0x400}};
+    for (unsigned i = 0; i < sizeof invalid / sizeof invalid[0]; ++i)
+        assert(!hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, &invalid[i], sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(NULL, &reader, bytes, banks, sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(&memory, NULL, bytes, banks, sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(&memory, &reader, NULL, banks, sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, NULL, sections));
+    assert(!hpclang_rpl_stock_rom_bank_capture(&memory, &reader, bytes, banks, NULL));
+    for (unsigned i = 0; i < sizeof bytes; ++i)
+        assert(bytes[i] == (uint8_t)(i * 37u + 11u));
+}
+
+static void test_bank_window_select(void)
+{
+    uint32_t previous[64], selected[64], untouched[64];
+    uint8_t owners[64] = {0};
+    struct hpclang_rpl_rom_bank bank = {0x48000u, 0x18000u};
+    for (unsigned i = 0; i < 64; ++i) {
+        previous[i] = 0x08020000u + i * 0x800u;
+        untouched[i] = 0xdeadbeefu;
+    }
+    assert(!hpclang_rpl_stock_bank_window_select(previous, owners, &bank, selected));
+    for (unsigned i = 0; i < 64; ++i)
+        assert(selected[i] == 0x48000u + i * 0x800u);
+    /* Whole-window prediction must not widen the bank's payload extent. */
+    assert(bank.bytes == 0x18000u && selected[48] == bank.physical + bank.bytes);
+    for (unsigned page = 0; page < 64; ++page) {
+        owners[page] = 2;
+        assert(!hpclang_rpl_stock_bank_window_select(previous, owners, &bank, selected));
+        for (unsigned i = 0; i < 64; ++i)
+            assert(selected[i] == (i == page ? previous[i] : bank.physical + i * 0x800u));
+        owners[page] = 0;
+    }
+    memset(owners, 255, sizeof owners);
+    assert(!hpclang_rpl_stock_bank_window_select(previous, owners, &bank, selected));
+    assert(!memcmp(previous, selected, sizeof previous));
+    memcpy(selected, previous, sizeof previous);
+    assert(!hpclang_rpl_stock_bank_window_select(selected, owners, &bank, selected));
+    assert(!memcmp(previous, selected, sizeof previous));
+    /* Even a fully hidden bank must have nonempty, bounded geometry. */
+    const struct hpclang_rpl_rom_bank invalid[] = {{0, 0},
+                                                   {0, 0x20400},
+                                                   {0, 1},
+                                                   {0x48001, 0x18000},
+                                                   {0x1e0800, 0x1000},
+                                                   {UINT32_MAX, 0x20000}};
+    for (unsigned i = 0; i < sizeof invalid / sizeof invalid[0]; ++i) {
+        memcpy(selected, untouched, sizeof selected);
+        assert(hpclang_rpl_stock_bank_window_select(previous, owners, &invalid[i], selected) < 0);
+        assert(!memcmp(selected, untouched, sizeof selected));
+    }
+    for (unsigned page = 0; page < 64; ++page) {
+        uint32_t saved = previous[page];
+        previous[page] = 1;
+        memcpy(selected, untouched, sizeof selected);
+        assert(hpclang_rpl_stock_bank_window_select(previous, owners, &bank, selected) < 0);
+        assert(!memcmp(selected, untouched, sizeof selected));
+        previous[page] = saved;
+    }
+    assert(hpclang_rpl_stock_bank_window_select(NULL, owners, &bank, selected) < 0);
+    assert(hpclang_rpl_stock_bank_window_select(previous, NULL, &bank, selected) < 0);
+    assert(hpclang_rpl_stock_bank_window_select(previous, owners, NULL, selected) < 0);
+    assert(hpclang_rpl_stock_bank_window_select(previous, owners, &bank, NULL) < 0);
+    memset(owners, 0, sizeof owners);
+    bank = (struct hpclang_rpl_rom_bank){0x1e0000, 0x20000};
+    assert(!hpclang_rpl_stock_bank_window_select(previous, owners, &bank, previous));
+    assert(previous[0] == 0x1e0000 && previous[63] == 0x1ff800);
+}
+
 int main(void)
 {
+    test_bank_route();
+    test_bank_route_capture();
+    test_bank_window_capture();
+    test_bank_map();
+    test_bank_map_capture();
+    test_bank_window_select();
+    test_rom_bank_reader();
     test_discontinuous_spans();
     test_mapping_overlap();
     test_physical_spans();

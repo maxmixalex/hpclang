@@ -3,6 +3,30 @@
 
 #include "rpl-reference.h"
 
+struct hpclang_rpl_code_bank_entry
+{
+    uint32_t selector, dispatch, body;
+};
+
+/* Recognize the reviewed P=0/P=1 switch-program shapes in a caller-qualified
+ * code mapping: full D0 literal, GOTO, at most 16 ?P= tests, then (for P=1)
+ * a replacement full D0 literal, followed by P=0 / LC FF000 / CONFIG /
+ * C=DAT0.A / D0=C.A / CONFIG / DAT0=C.B / UNCONFIG / opcode 03 return.
+ * first/end bound the code mapping, not the selector data. Observe every code
+ * nibble read; output changes only on zero. Callback errors invalidate all
+ * partial dependencies; positive errors become MALFORMED. Other P values and
+ * code shapes are unsupported. P=1 reports the exit selector, not the entry's
+ * selector or a claim to restore the prior bank. No fixed addresses are used.
+ * This proves syntax/operands, NOT firmware interpreter identity or the device
+ * semantics of CONFIG and DAT0. Caller still qualifies those, mutable selector
+ * contents, owner/geometry state, pending interrupts and return-stack roots.
+ * No execution, data access, mapping change or mutation authorization. */
+int hpclang_rpl_code_bank_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                        uint32_t end, uint32_t entry, unsigned p,
+                                        struct hpclang_rpl_code_bank_entry *view,
+                                        hpclang_rpl_reference_dependency_fn dependency,
+                                        void *context);
+
 /* Frame one Saturn/Saturn+ instruction at a caller-proven boundary. limit is
  * the available nibble count, not an end address. Validate every consumed nibble
  * and stop at unsupported encodings; never fall back to treating 80B as the
@@ -67,8 +91,10 @@ struct hpclang_rpl_code_literal
     uint64_t mask, value;
 };
 
-/* Decode LC/LA at a caller-proven instruction boundary with the proven P value.
- * The loaded nibbles wrap modulo 16 from P; other register bits survive.
+/* Decode LC/LA or D0/D1 immediate loads at a caller-proven instruction boundary.
+ * LC/LA require the proven P value. D0/D1 loads replace their low 2, 4 or 5
+ * nibbles independently of P, preserving any remaining address nibbles.
+ * LC/LA loaded nibbles wrap modulo 16 from P; other register bits survive.
  * next_register = (old_register & ~mask) | value. field is the first encoded
  * literal nibble, not a pointer field. Constants do not establish address
  * provenance, mapping identity or permission to relocate. Preserve guards on
@@ -85,6 +111,25 @@ struct hpclang_rpl_code_assignment
     unsigned source_first, destination_first, nibbles;
     uint32_t constant;
 };
+
+struct hpclang_rpl_code_pc_exchange
+{
+    struct hpclang_rpl_code_assignment capture;
+    uint32_t target;
+};
+
+/* APCEX/CPCEX consume the OLD low 20 register bits as the next PC and replace
+ * those bits with instruction+4. The upper register bits, flags and machine
+ * return stack are unchanged. capture describes that NEXT_PC assignment and
+ * can propagate caller-proven instruction-mapping origins. The target needs
+ * independent register provenance and mapping qualification; the captured PC
+ * is not an ordinary scalar literal. Both effects belong to one instruction.
+ * Inputs describe the registers AT this proven instruction boundary. No writes
+ * or relocation authorization. Reject next-PC wrap; errors preserve output. */
+int hpclang_rpl_code_pc_exchange_inspect(const struct hpclang_rpl_reader *reader,
+                                         uint32_t instruction, uint32_t limit, uint32_t a_low,
+                                         uint32_t c_low,
+                                         struct hpclang_rpl_code_pc_exchange *exchange);
 
 /* Describe one plain register copy/zero or P literal/nibble transfer. Nibble
  * indices refer to 64-bit A/B/C/D/R0..R4, 20-bit D0/D1 or one-nibble P. Other destination
@@ -121,6 +166,25 @@ struct hpclang_rpl_code_memory
     enum hpclang_rpl_code_register data, address;
     unsigned first, nibbles, load;
 };
+
+struct hpclang_rpl_code_address_adjust
+{
+    uint32_t instruction, length;
+    enum hpclang_rpl_code_register address;
+    int32_t delta;
+};
+
+/* Describe D0/D1 plus or minus an immediate 1..16 at a proven instruction
+ * boundary. This is arithmetic, not a nibble copy: carries/borrows invalidate
+ * copied origin tokens. Execution wraps the address at 20 bits and replaces
+ * carry: one for overflow/underflow, zero otherwise. Any tracked carry fact
+ * must also be updated or invalidated. The caller must establish the incoming address and
+ * retain the instruction/mapping dependencies, then independently qualify the
+ * resulting address (including wrap and mapping boundaries). No data access,
+ * pointer provenance or relocation authorization. Errors preserve output. */
+int hpclang_rpl_code_address_adjust_inspect(const struct hpclang_rpl_reader *reader,
+                                            uint32_t instruction, uint32_t limit,
+                                            struct hpclang_rpl_code_address_adjust *adjust);
 
 /* Describe DAT0/DAT1 transfers to/from A/C at a proven instruction boundary.
  * load=1 reads memory into the register, load=0 writes the register to memory.
@@ -165,6 +229,14 @@ int hpclang_rpl_code_origins_exchange(struct hpclang_rpl_code_origins *state,
 int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
                                     const struct hpclang_rpl_code_memory *transfer,
                                     uint32_t *memory, unsigned count);
+
+/* Address arithmetic destroys all five copied nibble origins of D0/D1,
+ * including when some resulting digits happen to be unchanged. Other slots
+ * are preserved. Validate a nonzero signed immediate in [-16,16] before any
+ * change. Carry is not represented here; callers must separately replace or
+ * invalidate their carry fact. This does not qualify the resulting address. */
+int hpclang_rpl_code_origins_adjust(struct hpclang_rpl_code_origins *state,
+                                    const struct hpclang_rpl_code_address_adjust *adjust);
 
 /* Describe a simultaneous exchange of the same field in two registers. Both
  * sources are the pre-instruction values; preserve all nibbles outside the field.

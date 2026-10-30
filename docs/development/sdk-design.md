@@ -854,6 +854,128 @@ capture stable inputs; plausible bytes or a successful parse do not identify a R
 or authorize recovery. Both native saved-state inventories use this parser and
 the first bank's actual 96 KiB bound when resolving configuration entries.
 
+`hpclang_rpl_bank_lookup_guarded()` records every valid nibble read while
+resolving a switch, including nonmatching entries needed to exclude ambiguity.
+The caller qualifies these addresses with a proven mapping and feeds them into
+the existing reference guard builder. Callback failures invalidate the lookup;
+the output changes only on a complete match. Positive callback errors are
+rejected as malformed, never mistaken for lookup success. Discard partial
+dependencies after failure. This records table dependencies only: switch-code
+identity, bank geometry and complete live-reference coverage remain separate
+requirements, with stable ownership required through commit.
+
+`hpclang_rpl_acptr_resolve_guarded()` additionally observes the source ACPTR's
+prologue, pointer and switch operand. Separate callback/context pairs retain
+source and ROM mapping identities even when their numeric addresses coincide.
+Both dependency streams must be discarded on failure; output is published only
+after the complete resolution succeeds. The target contents are not read.
+
+`tests/e2e/code-relocation/bank_switch_maps.py` compares all sixteen Flash
+switches and the ERAM switch with original ROM execution on both HP49g+/HP50g
+fixtures. Populated banks match all 64 read-map cells; ERAM maps to physical
+`0x08020000`. Unused Flash entries 14/15 still have callable switches, but install
+a repeated dummy page and return no usable geometry. A successful switch lookup
+alone therefore cannot qualify a target. The mapped window can also exceed a
+bank's declared size: callers must retain the geometry bound. These checks do
+not establish a complete banked-reference graph or authorize Port1 edits.
+The mapping comparison uses the fixture's `P=0` calling context. A separate
+controlled probe over both carry values and all 16 P values found that entry
+identity alone is insufficient: for `P=1`, all 17 entries in these saved contexts
+return with the same physical bank-2 mapping, while `P=0` selects the expected
+bank. Other altered contexts can fault or exceed the instruction budget. These
+are deliberately changed register contexts, not failures of valid Stock calls.
+Production qualification must establish the supported handler's calling contract
+and relevant register dependencies before treating a table match as a target map.
+P=0 alone is also insufficient when the ERAM overlay is already enabled. The
+maintained `bank_overlay.py` sequences ERAM entry, Flash selection, ERAM exit and
+Flash exit for all sixteen Flash selectors. The visible window remains ERAM
+through Flash selection, then exposes the selected Flash bank on ERAM exit;
+the final Flash exit selects bank 2. These are controlled original-ROM sequences,
+not complete caller qualification. For unused selectors 14/15, ERAM exit can
+expose a continuous physical-zero window instead of the isolated switch's dummy
+page. Geometry validation must still reject them: neither contiguity nor a
+successful switch establishes populated storage. Production qualification must
+include overlay state and the intended entry/exit sequence.
+In these reviewed fixtures the interpreter stores mapping flags at state+0xb9c,
+the selected Flash bank at +0xbd0, and the bank-window Read[] ownership bytes at
++0x848..+0x887. The maintained sequence verifies ERAM bit 8 and owner 2 during
+overlay, then cleared bit 8 and owner 0 after exit, independently of the selected
+Flash bank. Original ARM code at 0x249a0..0x249ac skips updating each read-map cell
+whose owner byte is nonzero. Controlled per-page owner changes confirm that even
+with the ERAM flag clear, a page can retain its previous mapping. These offsets
+are fixture evidence, not a production firmware identity check; flags or selected
+bank alone must not substitute for qualifying all affected page mappings.
+
+`hpclang_rpl_stock_bank_window_select()` models the reviewed Flash-selection
+update of the 64-page bank window from stable prior pages, per-page owners and
+separately proven bank geometry. Zero-owner pages select the new Flash page;
+nonzero-owner pages retain their old mapping. It validates retained physical
+pages and geometry before publishing any output, supports in-place output and
+does not access native memory. The predicted 128-KiB window does not widen the
+bank's separately retained payload extent. Original-ROM overlay and independent
+per-page controls compare the C prediction with actual mappings. This helper
+does not infer the switch handler, P/entry/exit semantics or owner provenance,
+model other windows/write maps, or authorize Port1 mutation; those remain caller
+obligations for the complete reference integration.
+For each switch it also retains all 85 table nibbles as 17 guards, verifies the
+unchanged table, rejects every individually changed nibble through the C guard
+validator, and rejects insufficient guard capacity without publishing a binding.
+Controlled ACPTR objects combined with these ROM tables produce 20 guards for
+100 observed nibbles. Separate source/ROM identities preserve overlapping numeric
+addresses, and changes in either stream reject validation. These constructed
+objects test dependency composition, not discovery of all live Stock pointers.
+
+For ordinary FlashPtr tables, `hpclang_rpl_flashptr_bank_guarded()` retains the
+selected logical configuration and every physical-bank configuration needed to
+exclude ambiguous matches. `hpclang_rpl_flashptr_lookup_guarded()` retains the
+bank header identity, table count and selected target. Callers preserve separate
+mapping identities while accumulating both streams in one guard builder. Errors
+leave output unchanged; callback errors follow the bank-lookup contract. These
+entries do not authenticate the mapping or geometry or dereference targets.
+`hpclang_rpl_flashptr_decode_guarded()` records the source object's 12 nibbles,
+including both indices; decoding alone does not resolve a selector, so all
+three-nibble selector values remain representable. The separate bank resolver
+rejects unsupported selectors. `hpclang_rpl_flashptr_table_lookup_guarded()`
+records the count and selected target of a separately proven special table;
+it must not be used to infer table format or location from plausible bytes.
+Both entries use the same failure/output contract. Source, configuration and
+target dependencies compose under their respective mapping identities; discard
+the whole accumulated plan after any failure. Proven mappings, table locations,
+geometry and complete live-reference discovery remain required before mutation.
+
+The maintained bank-map test also runs `flashptr_guards.py` against both saved
+Stock fixtures. It resolves seven configured logical selectors to physical
+banks whose read maps were independently checked against original ROM switch
+execution. Six ordinary tables and selector 15's special table are read within
+the declared physical geometry. All 3,976 entries per model agree with direct
+ROM data, including one absent entry. Constructed source objects feed the C
+decode/configuration/lookup chain; exact dependency sets are checked for every
+entry. Mutating each dependency of the first, middle and last entries produces
+2,319 rejected validations per model. Fixture-specific locations are reviewed
+test inputs, not runtime ROM identification or complete live-pointer discovery.
+
+`hpclang_rpl_stock_rom_bank_capture()` supplies the bank reader used by that
+integration test. It accepts separately proven geometry, checks the Flash extent
+and each touched ARM identity section's user-read permission, then bounds native
+reads to `0x40000 + 2 * bank.bytes`. The 96 KiB first bank cannot expose the tail
+of the 128 KiB switch window. Invalid captures preserve both caller-owned outputs;
+invalid reads preserve the nibble output. `hpclang_rpl_stock_rom_bank_reader()`
+uses the current launcher identity mappings on HP49g+/HP50g. Neither entry changes
+the Saturn bank, allocates memory or writes Flash. The caller retains geometry
+provenance, context storage and stable mappings; shape checks do not identify a
+ROM. Host tests supply explicit section descriptors and compare each captured
+read with the independently indexed ROM bytes; they do not inspect live ARM L1.
+
+The code-relocation Stock witness runs `rom-banks.c` before its existing native
+call/movement checks. For the reviewed two-model fixtures it captures the actual
+launcher L1 descriptors, validates all 14 populated ROM geometries and two unused
+entries, compares 3,520 page-edge nibble samples against physical bytes, and
+rejects reads below/after each bank. It verifies all 64 Saturn bank-window read
+map entries remain unchanged. Any failure prevents the application's normal
+return, so a passing native post-call marker also gates this witness. Firmware
+locations remain fixture-specific; this does not qualify arbitrary firmware or
+complete the production live-reference graph.
+
 The maintained installation witness exercises this capture on ARM, using the
 supported Stock 2.15 fixture's verified initializer literal-pool addresses and
 state layout. Its existing missing-library and matched-installation invocations
@@ -1069,6 +1191,17 @@ bound their reads. External targets remain for bank-qualified resolution, and
 opaque/execution entries remain explicit unresolved obligations. A successful
 structural walk therefore does not certify a complete relocation graph.
 
+`hpclang_rpl_reference_visit_graph()` adds a bounded worklist across explicitly
+qualified mappings. It deduplicates exact mapping/address/bound/prologue tuples,
+including nodes still queued, so cycles terminate without confusing equal numeric
+addresses in different mappings. Inline/compact children keep their source mapping.
+Every other edge requires the caller's resolver to supply a bounded target, prove
+it terminal, or reject it; a missing resolver cannot silently drop opaque or
+execution obligations. Parser-read dependencies retain their mapping identity;
+resolver reads need separate dependency capture. Counts publish only on success,
+and any failure invalidates partial callbacks/workspace. This supplies scheduling,
+not complete root discovery, handler identity or permission to mutate.
+
 `hpclang_rpl_reference_edits_begin()` and `edits_add()` merge separately
 discovered fields into a caller-owned, sorted batch. Identical edits consume
 one slot, including unchanged fields retained for preflight. Conflicting old
@@ -1215,16 +1348,136 @@ checked before changes. These are abstract origins, not numeric execution,
 pointer classification or a general control-flow interpreter. Callers must stop
 or invalidate facts at unmodeled writes and retain all code/mapping dependencies.
 
-`alternate_return.py` now composes the original three-instruction R0.A-to-A.A,
-DAT1-to-C.A, A.A-to-DAT1 segment using these C operations. Across both models,
-all 192 controlled return cases pass: 96 follow that segment and carry exactly
-the R0 nibble tokens into its stack cell; the other 96 do not enter it. Original
-allocation variants are included. Unit tests cover descriptor composition,
+`alternate_return.py` composes the original R0.A-to-A.A, DAT1-to-C.A,
+A.A-to-DAT1, D1=D1-5, C.A-to-DAT1 segment. Copies and transfers use these C
+operations; `hpclang_rpl_code_address_adjust_inspect` decodes the address step.
+The fixture checks the resulting D1, replaced carry and unchanged remaining
+register/flag/return-stack state, and invalidates D1 origins rather than copying
+tokens through arithmetic borrow. Both stack slots
+have independently checked addresses and distinct token storage.
+Across both models, all 192 controlled return cases pass: 96 follow all five
+instructions, carry R0 tokens into the original stack cell, and preserve the
+old top's tokens in the adjacent cell; the other 96 do not enter it. The 48
+original-allocation variants additionally qualify the new TEMP allocation
+through the current C whole-chain visitor, requiring its exact start at the
+preceding TEMPTOP plus one and the corresponding new TEMPTOP. They compose
+`AD0EX`, `D0=A`, `AR0EX` at `5bc2/5bc5/5bc8` using the C exchange/assignment
+operations, then reject any later write to R0 before allocation return, even
+if a write preserves its numeric value. The completed object's parsed span
+must equal the allocation extent. These qualified R0 tokens feed the return
+segment instead of fresh symbolic seeds. Interior/adjacent candidates and
+unreadable chain metadata are rejected with query output unchanged (six checks
+per allocated case). This covers the exercised no-GC allocation path; it does
+not establish every allocator/launcher path or safe execution across native ARM.
+The allocation proof's captured instruction, chain and object-span reads are
+revalidated by catalog transaction guards before writing: main-RAM dependencies
+use mutation IO and ROM dependencies use a distinct read-only mapping. Across
+the 32 allocated move attempts, 96 deliberately mismatched witnesses reject
+before any memory, entry or register update. The register repair also receives
+the full R0 word captured at qualification, rather than rereading it when
+constructing the repair. Another 64 cases alter either its address bits or its
+non-address bits after qualification; all reject with memory, entry and register
+values unchanged. After successful movement, a new
+whole-chain query and span parse must find the same-sized allocation and all
+object nibbles must match. The 32 baseline/repaired cases retain qualified R0;
+the 16 deliberately stale-R0 controls fail the exact-allocation query. These
+guards bind the recorded inputs, not unobserved launcher or caller behavior.
+Unit tests cover descriptor composition,
 overlapping copies, simultaneous exchanges, clearing constants, and unchanged
-state on invalid inputs. `/work/oct28-origins-return` retains hash-bound reports.
+state on invalid inputs. `/work/oct28-continuous-return/matrix` retains current
+hash-bound reports; the earlier three-step and fixed-address-step evidence
+remain in `/work/oct28-origins-return` and `/work/oct28-origin-stack`.
 Seeding R0 tokens identifies their origin; it does not by itself prove the
 incoming value is a valid object, establish the whole caller path, or authorize
 movement. The deliberately stale-R0 controls retain that distinction.
+
+`alternate_return.py --arm-return preserve` additionally executes a six-instruction
+ARM leaf through the original ARMSYS handler before the controlled relocation
+and return checks. It changes ARM r1/r2/r3/r12 and condition flags, preserves the
+incoming r0 continuation, and returns with BX LR. The observed boundary supplies
+Saturn PC `88c73` in ARM r0 and SAT_CPU in r1. This is the Stock boundary contract,
+not an ordinary C return value; stage0's saved r0 has the same role. Both models
+pass all eight cursors and three relocation/control modes (48 cases). With
+`--arm-return clobber`, a seventh instruction changes ARM r0 to `11`; all 16
+cases observe Saturn PC `11` at the next dispatch and stop before executing it.
+This 256-case subset includes the preceding 192 cases and 320 pre-write
+guard rejections. These leaves establish this boundary behavior, not arbitrary
+application side effects, an installed SDK application run, or continuous
+launcher-to-application-to-Stock acceptance. By default, the later controlled
+return sets up its caller context explicitly.
+
+`--continuous-return` instead retains the actual allocation/ARM boundary state.
+Its controlled caller is initialized before allocation; after ARM returns,
+the real Saturn registers, flags, circular return stack and ARM SP survive the
+catalog operation unchanged except for the explicitly proven PC/R0 repairs.
+Execution resumes at the suspended interpreter dispatch, not its entry point.
+After the Saturn return, ARM SP must match its boundary value and the pushed
+object must still pass the exact TEMP-allocation query (or fail for stale-R0
+controls). Both models pass all eight cursors and three modes: 48 additional
+cases, for 304 total cases and 480 pre-write guard rejections. This closes the
+state-reset gap in this controlled path. The initial caller and ARM leaf remain
+test fixtures, and catalog mutation runs on the host at a suspended boundary;
+it is not an installed SDK application performing the operation itself.
+
+The address-adjust inspector describes D0/D1 immediate addition/subtraction
+(`16n`, `17n`, `18n`, `1cn`) with signed deltas of 1..16. It reads only instruction
+nibbles and preserves its output on errors. Execution wraps at 20 bits and
+sets carry on overflow/underflow, clearing it otherwise. Consequently both
+address-origin and carry facts need updating or invalidation. This descriptor
+does not qualify an incoming pointer, resolve aliases or authorize wrapping
+across mapping boundaries. Unit checks cover every opcode/immediate, each
+truncated/unreadable/malformed nibble and output preservation. The maintained
+`address_adjust.py` fixture verifies 1,024 cases per model against the original
+interpreter: both registers, both signs, all immediates, eight initial addresses,
+both incoming carry values, and unchanged surrounding state. Reports are in
+`/work/oct28-address-adjust/{hp49gplus,hp50g}`. The 192 return cases also pass
+using this decoder, including 96 five-step origin paths.
+
+`hpclang_rpl_code_origins_adjust` applies the address-origin invalidation in
+production code: every valid D0/D1 immediate adjustment clears all five address
+tokens, preserving other slots. Invalid registers, zero/out-of-range deltas
+and missing inputs fail before writes. Carry facts remain the caller's separate
+obligation. The return fixture now calls this operation instead of clearing tags
+in Python. The updated matrix in `/work/oct29-origin-adjust/matrix` passes all
+304 return cases and 480 pre-write rejections with current source hashes;
+sanitized origin/decoder unit tests and ARM compilation/static analysis pass.
+
+Native mutation IO accepts an optional parallel `native_root_masks` array.
+NULL retains whole-word address semantics; each explicit mask must be
+`UINT32_MAX` or `0xfffff`. The latter declares a caller-proven low-20-bit
+address and preserves the other bits during movement. Root visitors report the
+masked address. Duplicate cell identities must have equal masks and move once;
+distinct cells with equal addresses still move independently. Invalid masks or
+conflicting duplicate descriptions fail before root callbacks or writes. Keep
+root/mask arrays stable and disjoint from writable state. Catalog plans retain
+full-word expected values, so high-bit changes still fail guards and overlapping
+register repairs coalesce only when both expected and replacement words agree.
+This interface carries proven addresses; it does not discover register roots.
+The private launch descriptor has an RPL4 extension for these masks. Runtime
+services read that field only after checking its version; RPL2/RPL3 descriptors
+retain full-word semantics without accessing the extension. Port1 fences work
+with RPL3 and RPL4, including the Port1 mutation entry. Whole-word-only paths
+retain the earlier descriptor version and a NULL mask array. When bounded
+execution analysis identifies an initial A/C register consumed as a jump target,
+the HP49g+/HP50g launcher publishes RPL4 with low-20-bit register masks and
+whole-word masks for its other roots. That path requires an RPL4-aware runtime;
+an older embedded runtime cannot use the extended descriptor.
+
+The production `hpclang_rpl_mutation_find_temp` query now supplies exact TEMP
+payload-start lookup; the native return fixture delegates to it rather than
+implementing its own allocation matcher. It validates the entire footer chain,
+rejects interior/marker/footer addresses, and preserves the output on failure.
+A matching newer block cannot mask a malformed or unreadable older footer.
+It performs no native writes and proves only allocation bounds; stable mappings,
+read-dependency guards, object parsing and execution-use proof remain separate.
+The guarded variant, `hpclang_rpl_mutation_find_guarded_temp`, records every
+chain-read dependency and preserves the output if recording fails. Partial
+observations must be discarded on errors, including NOT_FOUND. The allocation
+fixture now uses this production callback path for initial qualification before
+building its catalog guards. Reports in `/work/oct29-guarded-temp-query/matrix`
+pass 304 cases and 480 pre-write rejections. Unit checks reject every one of the
+35 dependency callbacks and all 25 unreadable chain-metadata nibbles without
+publishing an extent or performing a native write.
 
 The reproducible `tests/e2e/code-relocation/dispatch_prefix.py` check accepts
 `--state`, `--model` and `--output`, with optional `--through-dispatch`. It compiles
@@ -1376,7 +1629,49 @@ instructions nor classifies opaque payloads or authorizes catalog movement.
 Absolute transfers use five-nibble operands and do not change when only the
 instruction moves; target relocation still requires independently qualified
 mapping identity.
-Indirect transfers and complete execution coverage remain open.
+The PC-exchange inspector describes APCEX/CPCEX as two simultaneous effects:
+the old A.A/C.A value supplies the jump target, and the next instruction address
+replaces that register field. Its capture descriptor uses NEXT_PC origins;
+target provenance and instruction mapping still require separate proof. It
+does not push a return-stack cell. `pc_exchange.py` checks the descriptor against
+original interpreter execution on both models, including preserved high register
+bits, flags and stack state. This gate runs alongside incoming-carry tests in
+Stock code-relocation CI. Indirect-transfer provenance and complete execution
+coverage remain open.
+
+`hpclang_stage_execution_roots()` follows the existing bounded return/call path
+and PC=A/C, A/C=PC and APCEX/CPCEX. It tracks private register values separately
+from their initial storage: a capture kills the old value's origin, while an
+exchange consumes that value before replacing it. Only consumed original cells
+are reported, once each. The walk stops at unknown instructions, invalid reads,
+wrapping captures or its 64-instruction limit; inputs and unrelated high digits
+remain unchanged. It supplies at most eight stack cells and two masked register
+cells. This is partial execution-use discovery, not complete opaque/banked
+provenance, operand relocation or public-library authorization. The maintained
+`register_roots.py` checks all six register PC operations against original ROM
+execution (288 cases/model); the host suite covers use/overwrite paths and faults.
+With `--stage1-elf`, the same gate also executes the linked Thumb collector in
+Unicorn, checking its actual ABI, root-cell identities, masks, untouched output
+slots and input preservation. CI retains the code-relocation stage1 ELF for this
+check. This isolates the collector; it does not execute the full stage1/MMU path.
+Both host and linked-ARM tests exercise the full ten-root capacity across all
+eight return-stack cursors, preserving mixed masks, root order and input values.
+The private stack simulation clears each consumed slot like ROM, so a later
+underflow cannot revisit a stale return address and invent a register use.
+`return_underflow.py` compares nine-pop paths against ROM and the linked ARM
+collector for all eight cursors; it stops at the unqualified zero continuation.
+
+`pc_exchange_move.py` adds a controlled catalog-growth contrast using the pinned
+Stock caller snapshot (`--state`, `--model`, `--output`). It executes APCEX/CPCEX
+and a register return around an actual 16-nibble catalog move, both before and
+after the exchange. Repairing the suspended PC and selected register preserves
+the trace and unrelated CPU state; omitting either produces an observed stale
+dispatch address. The test patches known caller instruction locations and
+supplies their provenance explicitly. The launcher scanner must identify the
+selected register and its mask from the guarded path before the move. Both four-nibble instruction identities
+are guarded through transaction preflight. Changed or invalid values at every
+instruction nibble reject without RAM or register writes. It neither discovers arbitrary callers
+nor proves that all opaque references in the snapshot are safe to move.
 
 ## Capabilities
 
