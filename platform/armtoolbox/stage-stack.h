@@ -72,10 +72,16 @@ unsigned hpclang_stage_return_roots_with_carry(const struct hpclang_stage_stack_
  * a_low/c_low point to the low words of the SAME suspended A/C registers.
  * Report an initial register only when its original value is consumed as a
  * jump target; captures replace the private value and kill that original fact.
+ * RSTK=C/C=RSTK transfer provenance through the private stack/register state;
+ * copying alone does not report a root. A later return or register jump reports
+ * the original source cell, with a low-20-bit mask after register transfer.
+ * Overwritten/popped/generated values lose their old source. Repeated uses of
+ * one source are deduplicated and their required masks are combined.
  * Exchange consumes the old value before capturing the following PC. Captures
  * that wrap the address space are unsupported. No caller storage is modified.
- * roots/masks provide ten disjoint output slots. Stack cells use UINT32_MAX;
- * register cells use 0xfffff, preserving high register digits during repair.
+ * roots/masks provide ten disjoint output slots. Direct stack returns use
+ * UINT32_MAX; register uses/transfers use 0xfffff, preserving upper source
+ * digits during repair.
  * Each original cell is reported once. Unknown instructions stop the walk;
  * this does not infer addresses from numeric resemblance or prove complete
  * execution coverage, bank identity, code relocation or public-library safety.

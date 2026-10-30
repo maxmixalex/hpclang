@@ -32,6 +32,23 @@ uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_i
     return *root < RPL_MAIN_END ? root : NULL;
 }
 
+static unsigned record_execution_root(uint32_t *cell, uint32_t mask, uint32_t **roots,
+                                      uint32_t *masks, unsigned count)
+{
+    if (!cell)
+        return count;
+    for (unsigned i = 0; i < count; ++i)
+        if (roots[i] == cell) {
+            if (masks)
+                masks[i] |= mask;
+            return count;
+        }
+    roots[count] = cell;
+    if (masks)
+        masks[count] = mask;
+    return count + 1;
+}
+
 static unsigned execution_roots(const struct hpclang_stage_stack_io *io, uint32_t continuation,
                                 uint32_t *machine_stack, uint32_t cursor, int carry,
                                 uint32_t *a_low, uint32_t *c_low, uint32_t **roots, uint32_t *masks)
@@ -42,10 +59,14 @@ static unsigned execution_roots(const struct hpclang_stage_stack_io *io, uint32_
     uint32_t stack[8];
     for (unsigned i = 0; i < 8u; ++i)
         stack[i] = machine_stack[i];
-    unsigned original = 255u;
-    uint32_t *register_cells[2] = {a_low, c_low};
+    uint32_t *stack_origins[8];
+    uint32_t stack_masks[8];
+    for (unsigned i = 0; i < 8u; ++i) {
+        stack_origins[i] = machine_stack + i;
+        stack_masks[i] = UINT32_MAX;
+    }
+    uint32_t *register_origins[2] = {a_low, c_low};
     uint32_t registers[2] = {a_low ? *a_low & 0xfffffu : 0, c_low ? *c_low & 0xfffffu : 0};
-    unsigned register_original = 3u, reported_registers = 0u;
     unsigned capacity = a_low && c_low ? 10u : 8u;
     /* Track call-generated continuations separately: a push overwrites that
      * cell's original value, which must never be reported as a consumed root. */
@@ -53,6 +74,24 @@ static unsigned execution_roots(const struct hpclang_stage_stack_io *io, uint32_
         uint8_t opcode;
         if (continuation > RPL_MAIN_END - 2u || !read_byte(io, continuation, &opcode))
             break;
+        if ((opcode == 0x60u || opcode == 0x70u) && a_low && c_low) {
+            if (continuation > RPL_MAIN_END - 3u)
+                break;
+            if (opcode == 0x60u) { /* RSTK=C: transfer, not an address use. */
+                stack[cursor] = registers[1];
+                stack_origins[cursor] = register_origins[1];
+                stack_masks[cursor] = 0xfffffu;
+                cursor = (cursor + 1u) & 7u;
+            } else { /* C=RSTK: only a later control-flow use proves a root. */
+                cursor = (cursor + 7u) & 7u;
+                registers[1] = stack[cursor] & 0xfffffu;
+                register_origins[1] = stack_origins[cursor];
+                stack[cursor] = 0;
+                stack_origins[cursor] = NULL;
+            }
+            continuation += 2u;
+            continue;
+        }
         if (opcode == 0x18u && a_low && c_low) {
             uint32_t instruction;
             if (continuation > RPL_MAIN_END - 4u ||
@@ -67,18 +106,14 @@ static unsigned execution_roots(const struct hpclang_stage_stack_io *io, uint32_
             unsigned selected = operation & 1u;
             uint32_t target = registers[selected];
             if (operation < 4u || operation >= 6u) {
-                if ((register_original & ~reported_registers) & (1u << selected)) {
-                    if (masks)
-                        masks[count] = 0xfffffu;
-                    roots[count++] = register_cells[selected];
-                    reported_registers |= 1u << selected;
-                }
+                count = record_execution_root(register_origins[selected], 0xfffffu, roots, masks,
+                                              count);
             }
             if (operation >= 4u) {
                 /* The captured next PC has no backing initial-register cell.
                  * Reject wrap rather than introduce an unqualified address. */
                 registers[selected] = continuation + 4u;
-                register_original &= ~(1u << selected);
+                register_origins[selected] = NULL;
             }
             continuation = operation == 4u || operation == 5u ? continuation + 4u : target;
             continue;
@@ -111,12 +146,9 @@ static unsigned execution_roots(const struct hpclang_stage_stack_io *io, uint32_
         }
         if (root) {
             cursor = (cursor + 7u) & 7u;
-            if (original & (1u << cursor)) {
-                if (masks)
-                    masks[count] = UINT32_MAX;
-                roots[count++] = machine_stack + cursor;
-                original &= ~(1u << cursor);
-            }
+            count = record_execution_root(stack_origins[cursor], stack_masks[cursor], roots, masks,
+                                          count);
+            stack_origins[cursor] = NULL;
             continuation = *root;
             /* ROM pop clears the consumed cell, including generated returns.
              * Clear only the private simulation, never the suspended input. */
@@ -143,7 +175,7 @@ static unsigned execution_roots(const struct hpclang_stage_stack_io *io, uint32_
         uint32_t next = (continuation + prefix + width) & 0xfffffu;
         if (call) {
             stack[cursor] = next;
-            original &= ~(1u << cursor);
+            stack_origins[cursor] = NULL;
             cursor = (cursor + 1u) & 7u;
         }
         if (width == 5u) {

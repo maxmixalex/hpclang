@@ -22,8 +22,87 @@ static void put(uint32_t at, uint32_t value, unsigned width)
     for (unsigned i = 0; i < width; ++i)
         data[at + i] = (value >> (4 * i)) & 15u;
 }
+static void test_stack_transfers(void)
+{
+    const struct hpclang_stage_stack_io io = {NULL, read_word, NULL};
+    for (unsigned cursor = 0; cursor < 8; ++cursor)
+        for (unsigned scenario = 0; scenario < 10; ++scenario) {
+            memset(data, 15, sizeof data);
+            fault = UINT32_MAX;
+            uint32_t stack[8], saved[8];
+            for (unsigned i = 0; i < 8; ++i)
+                stack[i] = 0x93000 + i * 16;
+            unsigned top = (cursor + 7u) & 7u;
+            stack[top] = 0xabc92000;
+            uint32_t a = 0xabc94000, cv = 0xdef91000;
+            uint32_t *roots[11] = {0}, masks[11] = {0};
+            unsigned pop =
+                scenario == 1 || scenario == 2 || scenario == 4 || scenario == 6 || scenario == 8;
+            put(0x90000, pop ? 0x70 : 0x60, 2);
+            put(0x90002, pop ? 0x3b18 : 0x10, pop ? 4 : 2);
+            if (scenario == 2 || scenario == 3)
+                put(0x90002, 0xffff, 4); /* Copy alone is not an address use. */
+            if (scenario == 4) {
+                put(0x90002, 0x5b18, 4); /* C=PC discards the popped source. */
+                put(0x90006, 0x3b18, 4);
+            }
+            if (scenario == 5) {
+                put(0x90002, 0x60, 2); /* Two copies of one initial C. */
+                put(0x90004, 0x10, 2);
+                put(0x91000, 0x10, 2);
+            }
+            if (scenario == 6) {
+                put(0x90002, 0x60, 2); /* Pop/push retains the stack origin. */
+                put(0x90004, 0x10, 2);
+            }
+            if (scenario == 7) {
+                put(0x90000, 0x1c7, 4); /* Generated call return has no root. */
+                put(0x90004, 0xffff, 4);
+                put(0x90020, 0x70, 2);
+                put(0x90022, 0x3b18, 4);
+            }
+            if (scenario == 8)
+                put(0x92000, 0x10, 2); /* Then consume another original cell. */
+            if (scenario == 9) {
+                put(0x90002, 0x5b18, 4); /* Capturing C does not erase its copy. */
+                put(0x90006, 0x10, 2);
+            }
+            memcpy(saved, stack, sizeof stack);
+            unsigned count = hpclang_stage_execution_roots(&io, 0x90000, stack, cursor, 1, &a, &cv,
+                                                           roots, masks);
+            unsigned expected = scenario == 2 || scenario == 3 || scenario == 4 || scenario == 7
+                                    ? 0u
+                                : scenario == 8 ? 2u
+                                                : 1u;
+            assert(count == expected);
+            if (count) {
+                assert(roots[0] == (pop ? stack + top : &cv));
+                assert(masks[0] == 0xfffff);
+                if (scenario == 8) {
+                    assert(roots[1] == stack + ((cursor + 6) & 7));
+                    assert(masks[1] == UINT32_MAX);
+                }
+            }
+            for (unsigned i = count; i < 11; ++i)
+                assert(!roots[i] && !masks[i]);
+            assert(a == 0xabc94000 && cv == 0xdef91000);
+            assert(!memcmp(stack, saved, sizeof stack));
+            /* A failed transfer instruction cannot fabricate a source. */
+            for (unsigned nibble = 0; nibble < 2; ++nibble) {
+                fault = 0x90000 + nibble;
+                memset(roots, 0, sizeof roots);
+                memset(masks, 0, sizeof masks);
+                assert(!hpclang_stage_execution_roots(&io, 0x90000, stack, cursor, 1, &a, &cv,
+                                                      roots, masks));
+                assert(!roots[0] && !masks[0]);
+                assert(!memcmp(stack, saved, sizeof stack));
+            }
+        }
+}
+
 int main(void)
 {
+    test_stack_transfers();
     const struct hpclang_stage_stack_io io = {NULL, read_word, NULL};
     for (unsigned cursor = 0; cursor < 8; ++cursor)
         for (int carry = -1; carry <= 1; ++carry)

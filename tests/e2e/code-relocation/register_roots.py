@@ -166,6 +166,119 @@ for address in (0x90000, 0x90001, 0xFFFE0):
             assert trace == [address, target]
             assert bytes(uc.mem_read(cpu + 0x90C, len(before))) == expected
             rows.append(dict(address=address, opcode=opcode, p=p, carry=p & 1, cursor=p % 8))
+stack_transfer_cases = []
+for cursor in range(8):
+    for pop in (False, True):
+        uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
+        uc.mem_map(0, len(flash))
+        uc.mem_write(0, flash)
+        uc.mem_map(0x08000000, len(ram))
+        uc.mem_write(0x08000000, ram)
+        uc.mem_map(0x300000, 0x10000)
+        sequence = [
+            (0x90000, 0x70 if pop else 0x60, 2),
+            (0x90002, 0x3B18 if pop else 0x10, 4 if pop else 2),
+        ]
+        for address, value, width in sequence:
+            for i in range(width):
+                at = address + i
+                physical = mapping.physical(at)
+                shift = 4 * (at & 1)
+                old = uc.mem_read(physical, 1)[0]
+                uc.mem_write(
+                    physical, bytes([(old & ~(15 << shift)) | (((value >> (4 * i)) & 15) << shift)])
+                )
+        for i in range(9):
+            uc.mem_write(cpu + 0x90C + 8 * i, struct.pack("<Q", 0xABCDEF1234591000 + i))
+        cells = [0x93000 + i * 16 for i in range(8)]
+        cells[(cursor - 1) & 7] = 0xABC92000
+        uc.mem_write(cpu + 0x978, struct.pack("<8I", *cells))
+        for offset, value in ((0x95C, 13), (0x970, 1), (0x998, cursor), (0xC24, 0)):
+            uc.mem_write(cpu + offset, struct.pack("<I", value))
+        before = bytes(uc.mem_read(cpu + 0x90C, 0x99C - 0x90C))
+        expected = bytearray(before)
+
+        @Read
+        def transfer_read(_, at, width, value):
+            for address, encoded, length in sequence:
+                if address <= at and at + width <= address + length:
+                    value[0] = (encoded >> (4 * (at - address))) & ((1 << (4 * width)) - 1)
+                    return 1
+            return 0
+
+        transfer_reader = Reader(None, transfer_read, None)
+        av = c.c_uint32(struct.unpack_from("<I", before, 0)[0])
+        cv = c.c_uint32(struct.unpack_from("<I", before, 16)[0])
+        stack = (c.c_uint32 * 8)(*cells)
+        roots = (c.POINTER(c.c_uint32) * 10)()
+        masks = (c.c_uint32 * 10)()
+        count = inspect(
+            c.byref(transfer_reader),
+            0x90000,
+            stack,
+            cursor,
+            1,
+            c.byref(av),
+            c.byref(cv),
+            roots,
+            masks,
+        )
+        expected_cell = c.addressof(stack) + 4 * ((cursor - 1) & 7) if pop else c.addressof(cv)
+        assert (
+            count == 1 and c.addressof(roots[0].contents) == expected_cell and masks[0] == 0xFFFFF
+        )
+        assert all(not roots[i] and not masks[i] for i in range(1, 10))
+        assert list(stack) == cells
+        assert (
+            av.value == struct.unpack_from("<I", before, 0)[0]
+            and cv.value == struct.unpack_from("<I", before, 16)[0]
+        )
+        if arm:
+
+            def transfer_arm_read(at, width):
+                value = c.c_uint32()
+                return value.value if transfer_read(None, at, width, c.pointer(value)) else None
+
+            actual_roots = arm.inspect(
+                0x90000, bytes(stack), cursor, 1, av.value, cv.value, transfer_arm_read
+            )
+            assert actual_roots == [(f"stack-{(cursor - 1) & 7}" if pop else "c", 0xFFFFF)]
+
+        if pop:
+            old = struct.unpack_from("<Q", expected, 16)[0]
+            struct.pack_into("<Q", expected, 16, (old & ~0xFFFFF) | cells[(cursor - 1) & 7])
+            struct.pack_into("<I", expected, 0x978 - 0x90C + 4 * ((cursor - 1) & 7), 0)
+            struct.pack_into("<I", expected, 0x998 - 0x90C, (cursor - 1) & 7)
+            target = cells[(cursor - 1) & 7] & 0xFFFFF
+        else:
+            struct.pack_into("<I", expected, 0x978 - 0x90C + 4 * cursor, 0)
+            target = struct.unpack_from("<I", before, 16)[0] & 0xFFFFF
+        for reg, value in (
+            (UC_ARM_REG_R4, cpu),
+            (UC_ARM_REG_R5, struct.unpack_from("<I", flash, 0x296F8)[0]),
+            (UC_ARM_REG_R7, 0x90000),
+            (UC_ARM_REG_SP, 0x308000),
+        ):
+            uc.reg_write(reg, value)
+        trace = []
+
+        def hook(uc, at, size, unused):
+            trace.append(uc.reg_read(UC_ARM_REG_R7))
+            if len(trace) == 3:
+                uc.emu_stop()
+
+        uc.hook_add(UC_HOOK_CODE, hook, begin=0x28898, end=0x28898)
+        uc.emu_start(0x28828, 0x400000, count=10000)
+        assert trace == [0x90000, 0x90002, target], (args.model, cursor, pop, trace, target)
+        actual = bytes(uc.mem_read(cpu + 0x90C, len(before)))
+        assert actual == expected, (
+            args.model,
+            cursor,
+            pop,
+            [(i, a, b) for i, (a, b) in enumerate(zip(actual, expected)) if a != b],
+        )
+        stack_transfer_cases.append(dict(cursor=cursor, pop=pop, trace=trace))
+
 capacity_cases = []
 if arm:
     for cursor in range(8):
@@ -194,6 +307,7 @@ report.write_text(
         dict(
             model=args.model,
             cases=rows,
+            stack_transfer_cases=stack_transfer_cases,
             linked_arm_capacity_cases=capacity_cases,
             sources={
                 str(path): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -210,7 +324,7 @@ report.write_text(
             ).hexdigest()
             if arm
             else None,
-            scope="One instruction compared to ROM; no complete execution-root coverage or relocation authorization",
+            scope="Register instructions and two-instruction stack transfers compared to ROM; no complete execution-root coverage or relocation authorization",
         ),
         indent=2,
     )
