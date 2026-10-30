@@ -2081,3 +2081,66 @@ also pass all 88 branch/control cases with the heap workspace. Results are under
 matrices continue under `full-hp49gplus` and `full-hp50g`; do not infer their
 completion from these targeted results. Formatting and the compiler regression
 pass. No new remote CI acceptance or milestone completion is claimed.
+
+
+## 2026-10-30 — Port C++ full SDK gate and additional PR26 failures
+
+Port C++ local integration `3ab04c07` passes the full maintained SDK gate:
+installed/relocated external C/C++ (including the owner example), public ARMv4T
+assembly checks, six model-specific Notebook builds, three HP39 Aplet variants,
+incremental missing-output regeneration and rejected model configurations.
+Two builds produce 517 byte-identical outputs. Log:
+`/work/oct30-port-cpp-sdk-full.log`; runner:
+`research/oct30-port-cpp-sdk-full.py`. Prepared reset assets were byte-checked
+against the generator and a fresh hp2aplet host tool compiled; temporary SDK/tool
+workspaces are removed by the test. This is local SDK validation, not CI or M8.5
+acceptance. New Object Basics application/all launchers also build.
+
+Six-model Direct/Stock owner verification is running under
+`/work/oct30-port-cpp-integration/runner`, with application/emulator/server hashes
+in `runtime-inputs.json`. The first local wrapper incorrectly enabled keyboard
+progression for Object Basics, while runtime-suites.json specifies false. All
+three HP39 payloads passed but that wrapper run failed; its log is retained as
+`runtime-keyboard-config-failure.log`. The corrected wrapper reads the maintained
+suite flag and reruns. Do not count the failed wrapper run as an accepted gate.
+The runner uses the separately tested PR29 retry-pacing server; this dependency
+is explicit in the input hash and is not remote CI acceptance.
+
+PR26 exact-head audit: 341 successful, one skipped, four running, thirty queued
+and four failed jobs. HP50g job 123960552981 in run 41024016583 has the same first
+missing-message ARM-abort snapshot as HP49g+: PC 0x10, CPSR 0x1d7, fault address
+0x53000000. Its artifact is `research/oct30-pr26-hp50-relocation-failure`.
+
+Console job 123962113880 belongs to run 41024024226 (not 41024016583). The latter
+run's passing console artifact was initially downloaded, identified by its
+returned/PASS evidence, and retained separately as `hp39-console-pass-control`.
+The correctly matched failure artifact is `research/oct30-pr26-hp39-console-failure`.
+It stops before payload entry at packet 36: 90 seconds without acknowledged
+progress, three NAKs and four resends. All 1218 checked captured data/ACK/NAK
+frames pass; the terminal Timeout frame also has valid length/sequence/CRC.
+The passing control has 2505 checked frames without failures. These host capture
+results do not establish the source of packet loss or accept a failed gate.
+Audits are `research/oct30-pr26-console-{packet-audit,pass-packet-audit}.json`.
+
+
+## 2026-10-30 — Complete workspace-fix matrices and delivery preparation
+
+Both `oct30-relocation-workspace-full.py` processes complete successfully: all
+fourteen call/return cases per model. Independent audit checks all 28 post-call
+markers, eighteen original and ten rewritten returns, all 36 saved Flash images
+and normal CPU state after every producing/query phase. A fresh temporary build
+reproduces sixteen release artifacts byte-for-byte, including HPC1, stage1,
+metadata and six launcher pairs. Source/artifact manifests and final audit are
+`/work/oct30-relocation-workspace/{reproduction,verified}.json`. Both baseline
+paths are explicit: HP49g+ uses the CI-derived baseline; HP50g uses the retained
+maintained baseline. No full startup or hardware qualification is inferred.
+
+Full tracked-file format/Ruff/ShellCheck pass in a temporary LF-normalized tree;
+logs are `/work/oct30-relocation-quality`. ARM static analysis of the changed
+branch workspace allocation/use/release also passes. Strict docs pass. The
+previous exact-head CI was inspected before delivery: 370 successful, one
+skipped, five failed, three running and one queued job. Job 123962117215 in the
+PR workflow repeats the HP50g missing-message second-launch failure; its log is
+`research/oct30-pr26-hp50-relocation-pr-failure.log`. It is not a new accepted
+result. All old failure evidence remains retained; HP39g+ transfer failures are
+not waived by the relocation correction.
