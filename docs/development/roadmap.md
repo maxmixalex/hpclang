@@ -1,11 +1,11 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-10-29. **M8 is incomplete; only M8.1 is accepted complete.**
+Current checkpoint: 2026-10-30. **M8 is incomplete; only M8.1 is accepted complete.**
 Docker/WSL is restored. Earlier ID1701 two-model reservation retests pass guarded
 recovery, repeat restart, absent recovery and 16 rejection cases per model.
 Supported ID769 reservation matrices now pass on both models; full startup
 safety and M8.0 remain incomplete.
-Accepted main: `3c484673` (guarded dispatch/origin foundations #25, native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
+Accepted main: `3b77453a` (resource snapshots #20, guarded dispatch/origin foundations #25, native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
@@ -110,16 +110,29 @@ revision-driven canvas. A superficially similar imperative API is not completion
 
 ## Current work: M8.0
 
+The local bank planner now requires the inspected switch body to retain its
+physical mapping. Both-model maintained regressions pass normal entries and
+28 forced-remap rejections with unchanged output; ARM analysis and the rebuilt
+application/six launchers pass. A fresh full Stock campaign is running for this
+integration. Complete execution qualification remains open.
+
 Guarded references, bounded ROM readers, mapped-graph scheduling and bank-alias
-primitives/regressions and program/selector follow-ups are submitted in #26; CI is pending. Earlier 28 Stock cases remain scoped to their recorded reader build.
+primitives/regressions and program/selector follow-ups are submitted in #26; that head has passed CI. Earlier 28 Stock cases remain scoped to their recorded reader build.
 
 Under the controlled saved profiles, all 20 attachment payloads per model resolve
 through inspected P=0 code, dynamic selectors, captured bank geometry, device
 routing and full read-map prediction. Separate execution edges still reject.
-Mapping-qualified guards cover code, selectors, routing, read pages/owners,
-bank/overlay fields and ROM/native geometry; 11,744 stale-nibble changes reject.
+A local runtime planning API now composes code inspection, unique bank lookup,
+routing checks, geometry capture and full effect prediction in one call. It
+publishes only complete results and rejects table/control-bit disagreement.
+Two aliases and their alternate selectors match the independent staged path on
+both models; 144 failure controls preserve output. Each alias retains 5,024
+nibble dependencies; all 20,096 individual stale changes reject. Standard entry
+coverage passes all fourteen populated banks and rejects both absent banks per
+model. Controlled HOME now uses the single-call API: all forty payload results
+match the prior path and all forty separate execution obligations remain open.
 The submitted read-map predictor passes its original-handler comparisons.
-A local runtime predictor now covers read/write maps, the sentinel and overlay
+The submitted runtime predictor covers read/write maps, the sentinel and overlay
 caches. It agrees with 672 original-handler executions across both models;
 96 absent-bank cases reject without publishing output. Complete SRAM/write-scope
 checks cover unchanged selectors and independent overlay repair/cache branches.
@@ -132,10 +145,14 @@ locations; mutable user Flash is excluded. The read-only physical backend runs
 with IRQ/FIQ masked in the Stock witness. Both models now pass all 28 call/return
 cases locally: 18 original returns and ten fixture-rewritten returns. Independent
 audits confirm all return markers, all 28 saved-memory profile/bank witnesses,
-36 unchanged Flash snapshots and 16 byte-identical artifacts rebuilt from the
-current source. Production exclusive integration, complete execution roots,
-public libraries and Port1 edits remain open; ROM identity alone does not
-authorize mutation.
+36 unchanged Flash snapshots and 16 byte-identical artifacts rebuilt from
+that campaign's source. A new bounded Stock view now supplies native, physical
+ROM and mapped Saturn readers to the planner. Sanitizer/ARM checks and 16 artifact
+reproductions pass. The new Stock matrix now passes all 28 returns; independent
+saved-memory inspection confirms all 28 planning witnesses (16 accepted and two
+absent entries each), with unchanged native state checked by the witness. Production exclusive integration, complete execution roots, public
+libraries and Port1 edits remain open; ROM identity alone does not authorize
+mutation.
 
 The active dependencies are complete execution-reference handling for safe
 movement/library management, and Port2 trusted installation, authority lifecycle,
@@ -158,12 +175,12 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `b5891517` | **CI pending:** one successful and nine queued workflows; sixteen successful, two running and 217 queued jobs. ROM-profile/backend and guarded bank-effects follow-up is locally validated and prepared for submission. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `bdeb3227` | **Prior head CI passed:** eleven workflows, 379 successful jobs and two conditional skips. Main integration resolves workflow/document conflicts and passes 18 resource/UI tests, full source quality and strict docs locally; fresh CI is required. Unified planning remains a separate local follow-up. Historical HP39g+ pre-entry Kermit failure remains unexplained. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
 | #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
-| #20 / `4f2ce605` | **CI pending:** seven successful and five queued workflow records; jobs report 300 successful, eighteen running, 71 queued and one skipped. Current main integration still requires fresh CI acceptance. |
+| #20 / `4f2ce605` | **Accepted and merged as `3b77453a`.** All twelve workflows pass: 390 successful jobs and two conditional publisher skips. Resource snapshot delivery does not complete M8.2/M8.3. |
 
 Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
 #23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head

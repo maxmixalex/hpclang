@@ -1602,3 +1602,19 @@ successful/two running/217 queued jobs, with no failed jobs. #20 4f2ce605 has
 seven successful/five queued workflow records and 300 successful/18 running/71
 queued/one skipped jobs. Neither head is accepted. Historical unexplained
 pre-entry Kermit/PWM failures remain recorded separately.
+
+
+## 2026-10-30 — Main integration and HOME continuation regression
+
+PR #26 needs fresh CI after integrating accepted main `3b77453a`: the workflow
+conflicts retain both code-relocation stage1/incoming-carry artifacts and resource
+memory metadata/snapshots. Historical evidence from both parents is retained.
+Eighteen resource snapshot/verifier/UI tests, full format/Ruff/ShellCheck and
+strict docs pass in the isolated integration worktree. The previous exact head
+`bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips).
+This integration does not include the separate local bank-planner follow-ups.
+
+The locally integrated continuation check also passes the controlled HOME
+regression under `/work/oct30-home-plan`: forty payload resolutions match the
+previous effects path and forty separate execution obligations remain rejected.
+The fresh Stock campaign is still running; both initial native cases pass.
