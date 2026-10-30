@@ -323,6 +323,7 @@ jobs:
             build/*-frame-memory-*.json
             build/*-frame-stack-pointer.jsonl
             build/*-frame-stack-pointer-budget.json
+            build/*-frame-update-budget.json
             build/*-frame-*.lcd
             build/*-summary.png
             build/direct-${{ matrix.family }}-targets.txt

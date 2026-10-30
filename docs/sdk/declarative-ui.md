@@ -488,6 +488,17 @@ Both runs pass independent pixel checks and normal return; HP50g Direct also
 passes with the instrumentation. These observations do not impose a hardware
 performance guarantee or complete the remaining whole-application budget work.
 
+The maintained nine-frame/34-input-edge fixture now enforces common processing
+ceilings of 100,000 µs per frame and 5,000 µs per input edge. These are regression
+limits for this workload, including its theme/font and pressure updates, rather
+than an application-wide or physical-device latency guarantee. The retained
+six-model Direct/Stock matrix measures maxima of 50,416 µs and 1,708 µs; the
+ceilings leave room for emulator scheduling variation while rejecting large
+regressions. A failure requires investigation, not an automatic limit increase.
+The verifier emits `*-update-budget.json` with measured maxima, limits, sample
+counts and the raw timing report's SHA-256; it removes stale passing output
+before checking. Polling delays and queued input are outside this measurement.
+
 For the ARM ABI, the renderer with the example's two styles requests 188 bytes
 for its descriptors and copied styles, plus its two raster buffers:
 

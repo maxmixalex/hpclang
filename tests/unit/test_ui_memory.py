@@ -223,6 +223,30 @@ class UiMemoryTests(unittest.TestCase):
             with self.subTest(report=invalid), self.assertRaises(AssertionError):
                 VERIFY.verify_updates(self.prefix)
 
+    def test_update_processing_budgets_reject_regression_and_remove_stale_pass(self):
+        path = Path(f"{self.prefix}-memory-2.json")
+        output = Path(f"{self.prefix}-update-budget.json")
+        report = {"version": 1, "id": 2, "words": [1, 100_000, 5_000, 9, 34]}
+        path.write_text(json.dumps(report))
+        self.assertEqual(VERIFY.verify_updates(self.prefix), (100_000, 5_000, 9, 34))
+        accepted = json.loads(output.read_text())
+        self.assertEqual(accepted["frame_limit_us"], 100_000)
+        self.assertEqual(accepted["input_limit_us"], 5_000)
+        for index, value in ((1, 100_001), (2, 5_001)):
+            with self.subTest(index=index):
+                invalid = dict(report, words=report["words"].copy())
+                invalid["words"][index] = value
+                path.write_text(json.dumps(invalid))
+                output.write_text(json.dumps(accepted))
+                with self.assertRaises(AssertionError):
+                    VERIFY.verify_updates(self.prefix)
+                self.assertFalse(output.exists())
+        output.write_text(json.dumps(accepted))
+        path.unlink()
+        with self.assertRaises(FileNotFoundError):
+            VERIFY.verify_updates(self.prefix)
+        self.assertFalse(output.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,6 +7,12 @@ import json
 from pathlib import Path
 
 
+# Processing ceilings for the maintained device-manager workload, not a
+# hardware key-to-pixel latency guarantee. Keep common limits across models.
+FRAME_BUDGET_US = 100_000
+INPUT_BUDGET_US = 5_000
+
+
 def read_frame(path: Path, height: int) -> bytes:
     data = path.read_bytes()
     header = f"P5\n132 {height}\n255\n".encode()
@@ -95,7 +101,11 @@ def verify_stack_pointer(prefix: Path) -> dict:
 
 
 def verify_updates(prefix: Path) -> tuple[int, int, int, int]:
-    report = json.loads(Path(f"{prefix}-memory-2.json").read_text())
+    output = Path(f"{prefix}-update-budget.json")
+    output.unlink(missing_ok=True)
+    source = Path(f"{prefix}-memory-2.json")
+    source_bytes = source.read_bytes()
+    report = json.loads(source_bytes)
     assert set(report) == {"version", "id", "words"}, f"{prefix}: update report fields"
     assert type(report["version"]) is int and type(report["id"]) is int
     assert report["version"] == 1 and report["id"] == 2, f"{prefix}: update report schema"
@@ -109,6 +119,25 @@ def verify_updates(prefix: Path) -> tuple[int, int, int, int]:
     # Six timed application/theme updates, one font update and two pressure updates.
     assert frames == 9, f"{prefix}: incomplete frame timing coverage"
     assert inputs == 34, f"{prefix}: incomplete key-edge timing"
+    assert frame_us <= FRAME_BUDGET_US, f"{prefix}: frame processing exceeds {FRAME_BUDGET_US} us"
+    assert input_us <= INPUT_BUDGET_US, f"{prefix}: input processing exceeds {INPUT_BUDGET_US} us"
+    output.write_text(
+        json.dumps(
+            dict(
+                version=1,
+                frame_max_us=frame_us,
+                input_max_us=input_us,
+                frame_limit_us=FRAME_BUDGET_US,
+                input_limit_us=INPUT_BUDGET_US,
+                frames=frames,
+                inputs=inputs,
+                source_sha256=hashlib.sha256(source_bytes).hexdigest(),
+                scope="Fixed UI workload processing in the emulator; excludes polling/queued input latency and hardware performance guarantees.",
+            ),
+            indent=2,
+        )
+        + "\n"
+    )
     return frame_us, input_us, frames, inputs
 
 
