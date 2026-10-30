@@ -10,5 +10,7 @@ The loop must poll it; `delay` is a busy wait, not an operating-system sleep.
 Start/poll failures return an error and preserve the old schedule (and poll
 output). Check each result. Negative chrono durations are invalid. Destruction
 discards the local schedule; there is no hardware lease to release. The C clock's
-model/context limits still apply. This example's native execution is pending;
-building an SDK package alone does not establish device acceptance.
+model/context limits still apply. Six-model Direct emulator execution passes
+with an external observer checking stdout progress, elapsed time and return.
+The timer wrapper also passes six-model Direct/Stock system-services integration;
+this does not claim Stock execution of the standalone example or hardware testing.
