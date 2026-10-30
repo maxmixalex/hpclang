@@ -16,6 +16,8 @@ add_executable(hpclang_system_services_e2e
     main.c
     checks.c
     timer.cpp
+    timer-example.cpp
+    "${HPCLANG_ROOT}/examples/timer-cpp/main.cpp"
     irq.c
     irq.S
     watchdog-irq.c
@@ -24,6 +26,9 @@ add_executable(hpclang_system_services_e2e
     kos-sound.c
     power.c
     console.c)
+
+set_source_files_properties("${HPCLANG_ROOT}/examples/timer-cpp/main.cpp" PROPERTIES
+    COMPILE_DEFINITIONS "main=hpclang_timer_example_main")
 
 target_include_directories(
     hpclang_system_services_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
