@@ -1808,3 +1808,23 @@ IDs 226, 227 and 229 have configuration-object bytes in mutable user Flash beyon
 immutable-ROM identification alone cannot qualify all earlier startup effects.
 This supplies concrete next inputs for execution-reference qualification and
 trusted startup ordering, not permission to erase Flash or publish recovery.
+
+
+## 2026-10-30 — Maintained startup configuration regression
+
+`startup_configs.py` is now part of the maintained bank-switch suite and source
+hash manifest. The two reports under `/work/oct30-startup-maintained` pass the
+full existing bank/alias/effects matrix plus configuration-root classification.
+The helper also passes both retained recovery baselines. Initial fixed-count
+assertions exposed a real fixture difference: the launch states additionally
+contain ARMToolbox 275, whose configuration object is in mutable user Flash.
+Recovery baseline: 59 lower-ID catalog entries, fourteen configuration roots,
+mutable IDs 226/227/229. Launch fixture: 60 entries, fifteen roots, additionally
+mutable ID 275. The test checks absent configuration output preservation,
+program framing, the entire object's physical extent and explicit unqualified
+execution status. This is mapping/root coverage, not startup execution proof.
+
+Independent source-hash readback confirms both completed reports match current
+sources. Exact-head #26 CI has eight queued/four running workflows and three
+successful/six running/fourteen queued jobs, with no failure at inspection.
+The separate live Stock continuation campaign remains in progress.

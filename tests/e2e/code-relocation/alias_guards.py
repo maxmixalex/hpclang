@@ -516,4 +516,18 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
                 body_remap_rejected=bool(banks[index]["populated"]),
             )
         )
-    return rows, entries
+    from startup_configs import verify_startup_configurations
+
+    def select_startup(switch):
+        plan, workspace = Plan(), Workspace()
+        accept = plan_dependency(lambda *_: 0)
+        assert (
+            lib.hpclang_rpl_bank_plan_prepare(
+                c.byref(sources), switch, c.byref(workspace), c.byref(plan), accept, None
+            )
+            == 0
+        )
+        return list(plan.effects.map.pages)
+
+    startup = verify_startup_configurations(lib, read, ram, flash, cpu, profile, select_startup)
+    return rows, entries, startup
