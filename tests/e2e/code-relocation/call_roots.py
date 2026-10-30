@@ -3,7 +3,7 @@
 import json
 import struct
 
-from verify import home_string, home_object
+from verify import home_string, home_object, require_stock_pc
 
 from fixtures import word
 
@@ -177,6 +177,9 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             ],
         )
         state = case / "run/state"
+        # Check the producing run before restarting it for message/cache probes.
+        # A saved ARM exception otherwise appears as a later USB/key failure.
+        require_stock_pc(state)
         if name in ("native-new-message", "native-missing-message"):
             transfer(
                 args,
@@ -189,6 +192,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                 remote_commands=["IFERR #7B01h DOERR THEN ERRM 'NEWMSG' STO END"],
             )
             state = case / "message-run/state"
+            require_stock_pc(state)
         if name in ("native-cache-lookup", "native-cache-message"):
             transfer(
                 args,
@@ -205,6 +209,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                 ],
             )
             state = case / "lookup-run/state"
+            require_stock_pc(state)
         flash = (state / "flash").read_bytes()
         if flash != original_flash:
             raise ValueError("Call-root fixture changed Flash")

@@ -1860,3 +1860,188 @@ planning, live Stock readers, continuation mapping checks, the latest completed
 and source manifests were rechecked before delivery. No new-head CI was polled
 in the push turn. Local passing evidence remains distinct from remote acceptance
 and from completion of M8.0. The PR description now reflects this full batch.
+
+## 2026-10-30 — Guarded configuration and independent migration tooling
+
+Local M8.0 commit `9e220d9b` records all eight configuration-header nibble
+dependencies, including absent configuration. The focused sanitizer test covers
+64 observer/read/malformed-input faults; ARM compilation/analysis and maintained
+HP49g+/HP50g regressions pass. Saved reports under `/work/oct30-config-guard`
+record 480 dependencies per model across 60 catalog entries. This does not prove
+configuration execution safety and was not included in submitted `6a582958`.
+
+M8.5 `tools/check-migration.py` adds six lexical review categories, original
+source locations after line splicing, text/JSON output and explicit check/error
+exit codes. Five unit tests cover comments, ordinary/raw literals, line splices,
+identifier boundaries, discovery/deduplication, read-only behavior and input
+errors. Actual CMake SDK installation followed by relocation runs the installed
+tool on external source and checks diagnostics, source preservation and installed
+file identity; `/work/oct30-migration-install.json` retains the result. Temporary
+SDK trees were removed. The maintained SDK validator now checks this tool too;
+the full existing SDK compiler/application matrix was not rerun for this slice.
+Full tracked formatting, Ruff, ShellCheck and strict documentation checks pass.
+These are local results, not M8.5 acceptance or a source-compatibility certificate.
+
+The preceding #26 head `6a582958` was audited before further delivery: four
+successful/seven queued workflows, with 118 successful, twelve running and
+248 queued jobs; no failures in this snapshot. Historical failures remain above.
+
+Migration delivery: `b59fb56d` pushed in draft PR #27; new-head CI was not
+polled in the submission turn. M8.5 remains incomplete.
+
+## 2026-10-30 — Full migration SDK client validation
+
+Submitted migration head `b59fb56d` passes the complete maintained relocated SDK
+validator with prepared HP39 assets: external C/C++ applications, ARMv4T return
+checks, generated fonts/HPC1, six-model launchers, all six model-specific
+Notebook builds, incremental-output restoration, invalid-model rejection and
+HP39g+/HP39gs/HP40gs Aplet packaging. Two clean builds produce 517 byte-identical
+release files. Log: `/work/oct30-migration-sdk-full-prepared.log`, exit 0.
+The installed migration checker runs as part of this gate. Temporary SDK/build
+and freshly compiled host-tool directories were removed by their context managers.
+This supersedes the earlier note that the complete SDK matrix was not rerun.
+
+The first invocation failed during configuration because the selected raw
+HPGCC39 asset directory lacked HPCRESET.000; it is not passing evidence.
+The corrected run used the prepared SDK assets, checked reset bytes against the
+maintained generator and compiled the packaging tool afresh. Its complete run
+passed. The original failure log remains `/work/oct30-migration-sdk-full.log`.
+
+Preceding remote audit: #26 `6a582958` has 125 successful, fourteen running and
+239 queued jobs, no failures; #27 `b59fb56d` has ten queued workflows and sixteen
+materialized queued jobs. Neither branch is CI-accepted. M8 remains incomplete.
+
+## 2026-10-30 — UI native heap return regression
+
+The optional `--ui-return` lifecycle-verifier mode is enabled for Stock UI CI.
+It requires the HP39 fetch-complete or classic ARMToolbox baseline before PASS,
+and checks each heap's usable bytes and largest free block after settled return
+against that baseline. Reduced capacity or increased fragmentation fails even
+when linked-list structure and the normal return status are valid.
+Fifteen snapshot/verifier tests pass, including missing/late baselines, a valid
+but depleted free list and equal total bytes split into smaller free blocks.
+All 79 original SRAM captures across six models replay with unchanged existing
+proof fields; each model restores both capacity measures exactly. Evidence:
+`/work/oct30-ui-return-capacity.json`. This is saved-capture validation, not a
+new live emulator run, total-memory accounting or a peak bound. M8.2/M8.3 remain
+open. Ruff passes with its cache disabled for the read-only source mount.
+
+Preceding CI audit: #26 `6a582958`, 157 successful/eighteen running/203 queued
+jobs, no failures; #27 `b59fb56d`, ten queued workflows and sixteen materialized
+queued jobs. Neither has completed CI acceptance.
+
+UI return-capacity delivery: `8849b85f` submitted in draft PR #28 after the
+preceding CI audit. New-head CI was not polled this submission turn.
+
+## 2026-10-30 — PR26 HP39g+ runtime transfer failure and retry pacing
+
+PR26 head `6a582958`, run 41024016583, job 123960548578 fails before application
+entry: host-gate-failed, no PASS/return, zero payload keyboard frames, PC 0x44c4.
+Directory transfer completed; payload send-window 57 stalled for 90 seconds,
+with three NAKs and repeated identical retransmissions. All 1,668 audited data
+and short ACK/NAK packets have valid length, sequence and CRC at socat. The
+final device Timeout packet has a valid CRC but an invalid sequence field.
+Evidence: `research/oct30-pr26-runtime-packet-audit.json` and downloaded artifacts
+under `research/oct30-pr26-hp39-runtime-failure`. This does not locate the fault
+inside the device/emulator or prove a native runtime regression.
+
+The current mainline omitted `ckermit-resend-pacing.patch`, previously tested
+on the still-unaccepted pacing branch. An isolated follow-up now applies it
+and its PTY regression: retransmissions honor configured SET SEND PAUSE before
+updating the RTT timestamp and sending the unchanged packet. Both the older
+local server and the exact downloaded failing CI server fail the turnaround
+negative test; a freshly compiled patched server passes the entire PTY suite.
+Logs, binary and input hashes: `/work/oct30-kermit-retry`. Ruff and ShellCheck
+pass. Existing x50ng cache keys already include the build script and all Kermit
+patches, so this change invalidates the stale server bundle.
+A replay under `/work/oct30-pr26-runtime-replay` uses exact CI application and
+assets/emulator with only the Kermit executable replaced; it is still running.
+Neither this diagnosis nor local protocol success waives remote CI failures.
+
+The replay completed with exit 0: application PASS, all 52 keyboard frames
+checked by the maintained harness, normal return and four settled-return
+observations. Original CI asset files compare byte-for-byte; the final status,
+input hashes and retained keyboard montage hash are recorded in
+`/work/oct30-pr26-runtime-replay/verified.json`. Individual keyboard frames are
+removed by the maintained harness after its count check and montage creation.
+This local result supports delivery of the pacing correction, not acceptance
+of #26 or proof that it explains every original packet-loss event.
+
+Retry-pacing delivery: `fce14d73` pushed in draft PR #29 after auditing and
+investigating preceding CI failures. New-head CI was not polled this turn.
+
+## 2026-10-30 — Installed public API conventions
+
+The M8.5 guide `docs/sdk/api-conventions.md` documents service-specific results,
+errno handling, versioned output initialization, failure-safe output replacement,
+C++ owner/view/lexical-guard distinctions, close errors and exit behavior. Public
+object-store iterator declarations now state 1/0/-1 results and output/name rules,
+matching the existing implementation. The guide is linked from Getting started,
+migration and navigation and installed with the SDK. It does not freeze pending
+UI names or imply cross-version object/layout compatibility. The obsolete note
+claiming opt-in formatting still awaited remote acceptance was removed.
+
+Strict docs pass. Actual CMake installation and prefix relocation preserve the
+new guide byte-for-byte; installed navigation links resolve, and its complete
+C11 example compiles for ARMv4T with Wall/Wextra/Werror. Temporary installation
+and build directories are removed. Evidence: `/work/oct30-api-contracts-installed.json`.
+This documentation/header-comment change adds no runtime behavior; the prior
+517-output full SDK result remains separately scoped to `b59fb56d`.
+
+CI audit: #26 `6a582958` has 228 successful/twenty running/129 queued/one skipped
+and one failed job (the previously investigated HP39g+ runtime transfer).
+#27 and #29 each have ten queued workflows/sixteen materialized queued jobs;
+#28 has eight queued workflows/twelve materialized queued jobs. No new failure
+was found and no branch was accepted.
+
+M8.5 delivery: guide follow-up `5d5195dc` pushed to existing PR #27 after the
+preceding exact-head audit; new-head CI was not polled in this submission turn.
+
+
+## 2026-10-30 — Port C++ integration and second PR26 failure
+
+The local PR14 merge preserves the native-allocation parent PR13 and accepted
+main resource snapshots. Combining `--artifact` with `--native-release` had
+skipped the latter through an `elif`; independent dispatch and a combined-CLI
+regression retain both gates. Eight UI verifier tests and Ruff pass. GCC
+ASan/UBSan tests `port` (including the real C++ owner fixture), `native_allocation`
+and `pool_checkpoint` pass. The first Clang configuration failed because the
+container lacks its host ASan runtime; that environment failure is retained in
+`/work/oct30-port-cpp-integration/clang-environment-failure.log`. GCC reused the
+build directory with a fresh configuration. ARMv4T Object Basics links and strict
+docs pass. Logs: `/work/oct30-port-cpp-integration/{unit,arm}.log` and
+`/work/oct30-port-cpp-docs.log`. No merged emulator or full SDK result is claimed.
+
+PR26 exact head `6a582958` audit now has two failed jobs. Job 123960552830 passed
+Stock execution and original-interpreter verification, then failed in the
+`native-missing-message/message-run` transfer before USB server readiness.
+The saved emulator log reports `key=6 down=1 ready=1 sampled=0 pressed=1` and
+`phase=input-not-sampled`. This is distinct from the HP39g+ packet-57 failure;
+its root cause is not established. Downloaded evidence is retained at
+`research/oct30-pr26-relocation-failure`, with the job log beside it. Neither
+failure is waived. The original 88 native reference/control cases and preceding
+native/new-message checks passed, but do not accept the remaining cases.
+
+
+## 2026-10-30 — Reproduced first-run relocation abort
+
+Audit of all six saved code-relocation CPU states rejects both missing-message
+states (first execution and second launch); the other four return-state checks
+pass. First-run PC is 0x10, CPSR 0x1d7, data fault status 0x15, fault address
+0x53000000. The earlier key failure diagnosis described a secondary symptom.
+`research/oct30-pr26-relocation-cpu-audit.json` retains each state result.
+
+`research/oct30-pr26-relocation-replay.py` uses the original CI emulator/server,
+application artifacts and archived missing-message package. A fresh Stock
+baseline passes; first missing-message execution reproduces ARM abort locally,
+before any second launch. Logs and states remain in
+`/work/oct30-pr26-relocation-replay`; input hashes and CPU values are recorded in
+`research/oct30-pr26-relocation-reproduction.json`. The recorded fault address
+may be secondary to an earlier exception; the initial fault is not yet known.
+
+The local code-relocation verifier now applies the existing Stock CPU-return
+check after each producing run, before message/cache relaunch and at the initial
+branch probe. An orchestration regression covers abort and undefined modes and
+requires that no second transfer occurs; it and 47 recovery-verifier tests pass.
+Ruff and formatting pass. This is a diagnostic/acceptance correction, not a
+runtime fix, and does not accept PR26 or complete M8.0.

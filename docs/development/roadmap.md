@@ -108,12 +108,55 @@ UI must retain the user's declarative C design: nested ordinary C declarations,
 stable keyed identity, controlled inputs, explicit asynchronous state and
 revision-driven canvas. A superficially similar imperative API is not completion.
 
-## Current work: M8.0
+## Current work: M8.0 mainline and independent M8.5 tooling
 
 The mainline remains safe movement and execution-reference coverage for native
 library management and Port1 edits, followed by Port2 trusted recovery
 installation, authority lifecycle, safe startup and reclamation. Sound
 compatibility is independent.
+
+M8.5 Port C++ integration `3ab04c07` is committed locally, not submitted: PR #14 still depends on
+unaccepted parent #13 and its previous CI contains cancellations. The local
+merge with accepted main retains both native allocation/release and image-budget
+checks; a regression test prevents one gate from silently skipping the other.
+Three ASan/UBSan host tests, eight UI verifier tests, the ARMv4T Object Basics
+build, Ruff and strict documentation build pass. Fresh merged emulator/SDK and
+remote CI acceptance remain required; this does not complete M8.5.
+
+M8.5 migration tools and API guide `5d5195dc` are submitted in draft PR #27;
+CI has one successful, three running and six queued workflows. Checker head `b59fb56d` passed the full relocated
+SDK gate, six model-specific Notebook builds, three HP39 Aplet variants and 517
+byte-identical release outputs. The later guide/header-comment follow-up passes
+installation/relocation, links, strict ARMv4T C11 example compilation and docs.
+Remaining ownership/application migration acceptance is still required;
+this submission does not complete M8.5.
+
+M8.2/M8.3 UI return-capacity gate `8849b85f` is submitted in draft PR #28;
+two workflows pass and six remain queued; fourteen jobs pass and 208 are queued. It checks native free capacity and largest-block
+recovery after settled return. Fifteen tests, all 79 retained snapshots across
+six models, the actual CI commands and strict docs pass locally. This is not a
+new emulator run or complete physical-memory admission; whole-application
+resource acceptance remains open.
+
+CI follow-up `fce14d73` is submitted in draft PR #29; one workflow passes, two run and seven are queued; twelve jobs pass, three run
+and 106 are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
+a fresh build with the isolated patch passes. Original packet CRC checks pass
+at the host capture point; loss inside the emulator/device remains unproven.
+The local replay with original CI payload/assets/emulator and only the server
+replaced passes application execution, 52 keyboard frames and settled Stock
+return. No failing remote gate is waived; the initial packet-loss cause remains
+unproven.
+
+M8.0 relocation follow-up: original CI payload/emulator replay reproduces ARM
+abort after the first missing-message library-removal execution (PC `0x10`,
+CPSR `0x1d7`, recorded fault address `0x53000000`). The later key/USB failure is
+secondary. A local verifier change rejects exception states before subsequent
+launches; its orchestration regression and 47 recovery tests pass. This improves
+diagnosis only; the runtime fault and full reference coverage remain open.
+
+M8.0 local follow-up `9e220d9b` captures library-configuration read dependencies;
+sanitisers, ARM analysis and both-model maintained regressions pass. It is not
+part of submitted head `6a582958` and does not qualify startup execution.
 
 PR #26 now includes the accepted resource-snapshot mainline, unified bank
 planning, bounded live Stock readers, continuation mapping checks and startup
@@ -158,7 +201,7 @@ All prior artifact-specific evidence and limitations are retained in
 
 | PR / head | State |
 | --- | --- |
-| #26 / `6a582958` | **Submitted, CI pending:** new head not polled this turn. Before push, `d0795413` had one successful/two running/nine queued workflows and 24 successful/four running/340 queued jobs, none failed. Earlier `bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips). Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+| #26 / `6a582958` | **Two CI failures, not accepted:** HP39g+ runtime packet-57 transfer and HP49g+ code-relocation second-launch key delivery. Audit: 290 successful, one skipped, 74 queued, twelve running and two failed jobs; eight successful and three queued workflows. The relocation key failure is secondary: the preceding `native-missing-message/run` already saved ARM abort mode. Original CI payload/emulator replay reproduces the first-run abort locally; its initial cause remains unresolved. Neither failure is waived. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
 | #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
 | #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
