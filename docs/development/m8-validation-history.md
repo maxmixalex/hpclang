@@ -2144,3 +2144,252 @@ PR workflow repeats the HP50g missing-message second-launch failure; its log is
 `research/oct30-pr26-hp50-relocation-pr-failure.log`. It is not a new accepted
 result. All old failure evidence remains retained; HP39g+ transfer failures are
 not waived by the relocation correction.
+
+### 2026-10-30 — M8.5 merged UI resource gate execution
+
+The Port C++ integration source remains `3ab04c07`. All six Direct Object
+Basics runs and Stock HP39g+/HP39gs/HP40gs runs pass. The same live process
+continues to HP48gII and then HP49g+/HP50g; no restart or six-Stock acceptance
+is inferred. Inputs and runtime evidence remain in
+`/work/oct30-port-cpp-integration`.
+
+The merged UI application and freshly patched pinned x50ng build pass, using
+`research/oct30-port-cpp-ui-build.py`; source hashes and the build log are in
+`/work/oct30-port-cpp-ui`. The fresh emulator contains both native-allocation
+and resource-snapshot capture support. `oct30-port-cpp-ui-run.py` exercises the
+actual combined CI verifier arguments (`--pool --allocation --native-release
+--artifact`) and separately checks lifecycle snapshots. The first HP48gII run
+is active, not accepted. Verified existing firmware assets and the separately
+tested PR #29 Kermit server are reused; this local dependency does not imply
+remote acceptance of PR #29 or parent PR #13. Application ownership, whole-UI
+acceptance and M8.5 completion remain open.
+
+### 2026-10-30 — Port C++ full runtime matrix and first integrated UI pass
+
+`oct30-port-cpp-runtime-audit.py` passes after the six Direct/six Stock runner
+finishes. `/work/oct30-port-cpp-integration/runtime-verified.json` records twelve
+Stock reports, settled returns, all target completion markers and unchanged
+application/emulator/Kermit hashes. Direct JSON files were replaced by Stock
+reports; Direct acceptance retains the per-target log and successful family
+completion, not independent retained Direct JSON. The actual owner fixture
+exercises move assignment, release/re-adoption, independent snapshot digests
+and errno-preserving destruction on the three classic Stock models. Other
+contexts explicitly require ENOSYS.
+
+Fresh merged UI integration passes on HP48gII, including both artifact-budget
+and native-release checks plus 14 lifecycle snapshots. Native release identifies
+6164 released block bytes, including 20 metadata bytes. The snapshot report confirms observed capacity
+returns to 12540 bytes and largest free block to 11516 bytes. This is sampled
+allocator evidence, not complete physical peak admission. Reports are under
+`/work/oct30-port-cpp-ui/{runner/build,snapshots/hp48gii}`.
+
+Two local-wrapper setup errors remain archived: `capture-disabled-*` lacks
+CI's pool/allocation capture flags; `missing-firmware` is an explicitly stopped
+HP49g+ attempt that lacked the nested firmware directory. The wrapper now sets
+both capture flags and checks the shared verified firmware file before launch.
+It retains the HP48gII pass and resumes HP49g+ with identical application and
+emulator hashes. Remaining UI models and parent #13 integration remain open.
+
+### 2026-10-30 — Native allocation parent reconciled with accepted main
+
+Local parent #13 merge `19e19700` integrates accepted `3b77453a`, retaining
+the later Aplet identity and Kermit retry-pacing fixes absent from the current
+Port C++ branch. Conflict resolutions match the tested combined UI verifier,
+workflow arguments and emulator capture-header set; the CLI regression requires
+both image-budget and native-release checks. Eighteen host tests, Ruff and strict
+docs pass. A fresh UI build reproduces fifteen delivery files exactly, including
+the application, result address, memory layout and six raw/wrapped launchers.
+Core runtime, platform, UI and emulator harness source identity also matches the
+currently tested C++ integration. The Kermit patch/build/regression files match
+PR #29. Six actual HP39 Aplet identities and six mixed-application negatives pass.
+Evidence: `/work/oct30-allocation-main-integration/{verified,aplet-verified}.json`.
+
+The first integration audit was stopped before checks to correct its artifact
+list and avoid re-reading unrelated generated font assets. Subsequent attempts
+identified inherited Python formatting and an incorrect audit-only stage1 path;
+those logs are retained as `format-failure.log` and `audit-path-failure.log`.
+The final audit passes; temporary builds are removed. No failed attempt counts
+as acceptance. Parent #13 remains local/unpushed, and C++ still needs its ancestry
+integrated. Fresh combined UI gates pass HP48gII, HP49g+ and HP50g; HP39 runs
+remain active. Neither the parent nor M8.5 is remotely accepted.
+
+### 2026-10-30 — C++ parent ancestry integrated
+
+Local C++ merge `ed93a9bd` includes parent `19e19700`. Git confirms the parent
+is an ancestor and no changes from tested `3ab04c07` in runtime, platform,
+public headers, CMake, examples, Object Basics/UI sources or their build and
+emulator preparation tools. The only non-document additions are the parent's
+Aplet preflight and Kermit patch/regression/build files. Their sources match
+the validated parent. Eighteen host tests, LF-normalized Ruff checks and strict
+docs pass (`/work/oct30-cpp-parent-merge.log`); Windows checkout CRLF caused an
+initial format-only diagnostic, with no source formatting change required.
+
+Fresh combined UI verification now also passes HP39g+. HP39gs remains live;
+HP40gs is pending. `oct30-cpp-ui-final-audit.py` is prepared to independently
+recompute all six budgets, native-release checks and lifecycle reports once
+the actual runner finishes; it has not yet passed. Parent #13 and C++ #14
+remain unpushed. Previous #14 CI retains 319 successes, one skip and fourteen
+cancellations; cancelled gates are not accepted. #26 remains queued.
+
+### 2026-10-30 — Preserve pending evidence publishers
+
+GitHub check annotation for job 121289451878 (run 40208342087, parent head
+`4a4b36bd`) states that a higher-priority waiting request for
+`ci-evidence-publisher` cancelled it. The job had no runner or executed steps.
+The retained API evidence is `research/oct30-publisher-cancellation.json`.
+
+Parent commit `700be00e`, merged into C++ as `80fdda5f`, adds `queue: max` to
+both Runtime and Font Gallery publisher concurrency groups, retaining
+`cancel-in-progress: false` and single-writer serialization. Parsed YAML checks
+both groups exactly. [GitHub's concurrency documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+specifies up to 100 pending jobs instead of the default replacement of the
+single pending job. Queue overflow can still cancel additional jobs; this
+does not repair old cancellations or prove remote behavior before CI. No
+application code changes. Fresh combined UI gates now pass HP39gs as well;
+HP40gs remains active. Both delivery heads remain local and unpushed.
+
+### 2026-10-30 — Complete combined UI matrix and delivery audit
+
+The resumed UI runner finishes all six models. Independent audit
+`oct30-cpp-ui-final-audit.py` recomputes 79 lifecycle snapshots, six linked
+image budgets and native-release outcomes, including actual SRAM/Flash hashes
+when an optional native block is present. Application and emulator hashes still
+match the original run manifest. `/work/oct30-port-cpp-ui/independent-verified.json`
+contains the final model reports. The first three-model reports survive the
+local-wrapper corrections; neither invalid setup attempt is counted as a pass.
+
+The Port C++ application/runtime/launcher/owner implementation remains identical
+to tested `3ab04c07`; later ancestry and queue commits change transport checks,
+publisher policy and documentation. Object Basics six Direct/six Stock, the
+517-output installed SDK gate, sanitizer tests and ARM analysis retain their
+recorded scope. Independent parent UI reproduction covers fifteen delivery files.
+Before delivery, exact remote heads were inspected: #13 `4a4b36bd` has 371
+successful, two skipped and one cancelled publisher job; #14 `492926e1` has
+319 successful, one skipped and fourteen cancelled jobs. No cancelled gate is
+accepted. New-head remote validation remains required, and M8 is incomplete.
+
+### Saved startup configuration shape audit (2026-10-30)
+
+The exploratory shape reader previously stopped at library 223 because its
+configuration crosses a logical page. It now reads banked nibbles using the
+retained per-page bank-switch maps, checks each entry's first physical address
+against the inventory and verifies the unchanged input Flash digest. Both models
+complete all fourteen configured roots. Libraries 226, 227 and 229 each contain
+DOCOL, inline binary integer equal to the library ID, `0x7709`, and SEMI.
+This focuses subsequent execution analysis on a shared entry; it does not prove
+its effects, qualify startup or authorize Flash writes. Library 226's shape was
+already known; this confirms 227 and 229 in both retained fixtures as well.
+Evidence: `research/oct30-config-program-shapes.py` and container artifact
+`/work/oct30-startup-config/program-shapes.json`. No product runtime change.
+
+The follow-up runs the actual saved configuration bodies of libraries 226, 227
+and 229 on both models in ordinary Stock. Each of six independent runs adds
+exactly the expected existing HOME record again: `(226, 550234, 0)`,
+`(227, 550264, 550249)` or `(229, 550294, 550279)`. Catalog and Flash are unchanged;
+the child header, HOME sentinel and empty stack are checked. Six wrong-record
+controls are rejected. Independent snapshot replay passes all six reports, and
+the current C traversal recognizes 130 attachment edges;
+130 unreadable null-field-nibble controls fail as required.
+These tests establish ordinary attachment/reference behavior, not startup
+safety, idempotence or complete execution-reference coverage. The copies run
+from uploaded RAM; they do not prove execution from damaged Flash during boot.
+Read-only ROM listings locate catalog lookup `0x843a`, indirect bank-switch call
+`0x21c9e`, wrapper allocation `0x21840` and HOME insertion under `0x7719`.
+Listings are exploratory and do not constitute a control-flow proof.
+Evidence: `research/oct30-mutable-config-run.py`,
+`research/oct30-mutable-config-audit.py`, container
+`/work/oct30-mutable-config/independent-verified.json` and its six saved states.
+No product runtime change or new CI submission is claimed.
+
+### Application SP observation control (2026-10-30, local only)
+
+The resource-observer worktree adds opt-in `HPCLANG_X50NG_STACK_POINTER`
+instrumentation to translated application SP writes. Records separate CPSR modes;
+native firmware instructions and exception bank switches are outside this scope.
+Four host tests cover untouched reservations, mode separation, disabled output,
+existing evidence preservation and invalid destinations. A linked-helper symbol
+check ensures the QEMU archive was rebuilt, rather than merely relinking stale
+objects. The initial op_helper stdio conflict was corrected by placing the helper
+in helper.c; the first stale-archive build is not runtime evidence.
+HP39g+ Direct completes full UI pixel/resource/return gates in three runs:
+baseline, a temporary control reserving 4096 untouched bytes, and tracing disabled.
+Independent checks retain identical memory reports (2424 touched stack bytes),
+but SP excursions are 2424 and 4144 bytes. The reported deepest PC is verified
+against the control ELF's `mov sp, r2` instruction. Disabled tracing creates no
+trace. The control does not alter the shipped application source.
+Evidence: `/work/oct30-stack-pointer/independent-verified.json`, retained traces,
+runtime reports and control disassembly; drivers `research/oct30-stack-pointer-*.py`.
+The follow-up is not submitted and does not establish six-model/Stock coverage,
+complete stack bounds or whole-system peak memory admission.
+
+The SP follow-up now has a maintained budget verifier and both Direct/Stock
+UI workflow gates. CI artifacts retain raw JSONL traces and budget reports.
+Eight observer/budget tests and five existing UI memory tests pass; Ruff,
+ShellCheck and workflow structure checks pass. The gate rejects absent,
+duplicate, truncated, invalid-mode, inconsistent-watermark and exhausted-stack
+reports and removes stale success output. A fresh current-branch emulator
+contains the linked helper; its UI HPC matches the earlier accepted local image.
+All six Direct runs pass UI pixels, update timing, SP budget and return. Current
+verifier replay checks all six stored cases and unchanged application/emulator
+hashes. Each observes 2424 bytes of System-mode SP use. The original matrix
+process continues into Stock; these six Direct cases are not a completed matrix.
+Evidence: `/work/oct30-stack-pointer/matrix-independent-verified.json` and
+`matrix-runtime.log`; runner `research/oct30-stack-pointer-matrix.py` and replay
+`research/oct30-stack-pointer-matrix-audit.py`. Setup first rejected obsolete
+firmware filenames before running any target; the corrected setup uses the
+model profiles' `boot-49g+.bin` and `boot-50g.bin`. No new push or CI acceptance.
+
+## 2026-10-30 — P=1 bank-exit recognition and Stock SP gate failure
+
+Local, unsubmitted M8.0 recognition now covers the reviewed P=1 bank-exit
+shape, including its replacement selector and consumed dispatch bytes.
+P=0/P=1 unit regressions pass ASan/UBSan and ARM compilation/static
+analysis. This does not restore an arbitrary prior bank, qualify startup
+execution, or enable public storage mutation.
+
+The maintained unit fixture follows the reviewed comparison order
+(0,2,3,4,5,6,7,8,9,10,1), distinguishes entry/exit selectors, and
+rejects each consumed unreadable nibble, callback stop, truncated exit,
+body mismatch and absent matching test without changing output.
+Host ASan/UBSan and ARM compile/static analysis pass locally; no push.
+Artifacts: `/work/oct30-bank-exit/`; reproduction script:
+`research/oct30-bank-exit-check.py`.
+
+The Stock matrix stopped at HP39g+: execution/UI/return passed, but the
+SP gate rejected the recorded User-mode application because it requires
+System mode. Mode qualification and the remaining Stock cases are open.
+The process is terminal, not waiting. The retained trace records modes
+16 and 19; the gate requires 31. Six Direct passes remain valid; no
+Stock SP acceptance is inferred. Runtime log and trace remain under
+`/work/oct30-stack-pointer/`.
+
+## 2026-10-30 — Explicit exit planning and shared-stack gate
+
+Local, unsubmitted M8.0 planning now accepts explicit P=0/P=1 and retains
+the existing P=0 entry point. Both-model original-interpreter comparisons
+pass 32 P=1 page-map predictions and 96 unsupported-P rejection controls.
+ASan/UBSan, ARM compile/analysis and current-source artifact checks pass.
+This is mapping prediction, not arbitrary-bank restoration, startup
+qualification or authorization for public storage mutation.
+
+The maintained `alias_guards.py` runs 16 P=1 ROM entries per model
+through the original ARM interpreter, checks return/P reset and compares
+all 256 predicted page mappings. P=2/15/16 preserve plan output and emit
+no dependencies. Existing P=0, overlay, alias and startup tests pass.
+Reports and source hashes: `/work/oct30-bank-exit/plan-verified.json`.
+PR #26 exact head `b8d38497` remains ten queued workflows/16 jobs.
+
+SP use). The gate now combines the shared User/System SP bank, matching
+bootstrap caller-mode preservation. Nine host tests and replay of all six
+Direct cases plus HP39g+ Stock pass, including its nine lifecycle snapshots.
+The remaining five Stock cases have resumed; their acceptance stays open.
+The original failed gate/log is retained. Replayed artifacts retain
+application/emulator hashes; no failed runtime was replaced.
+Proof: `/work/oct30-stack-pointer/matrix-user-mode-verified.json`;
+remaining Stock runner: `research/oct30-stack-mode-resume.py`.
+Shared-bank transition and overflow regressions pass. Exception-stack
+and whole-system peak coverage remain outside this local result.
+
+Delivery preparation: functional commit `84fa1a70` passes full tracked-file
+format/Ruff/ShellCheck and strict docs. Pre-push audit of `b8d38497` finds
+ten queued workflows/16 queued jobs; no preceding CI acceptance is claimed.
