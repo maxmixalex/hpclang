@@ -1402,6 +1402,7 @@ def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
     arm = root / "src/qemu/target-arm"
     shutil.copy2(args.headless_header.parent / "stack-pointer-observer.h", arm)
     shutil.copy2(args.headless_header.parent / "stack-region-observer.h", arm)
+    shutil.copy2(args.headless_header.parent / "stack-bank-observer.h", arm)
     replace_once(
         arm / "helpers.h",
         '#include "def-helper.h"',
@@ -1413,10 +1414,19 @@ def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
         '#include "helpers.h"',
         '#include "helpers.h"\n#include "stack-pointer-observer.h"\n'
         '#include "stack-region-observer.h"\n'
+        '#include "stack-bank-observer.h"\n'
         "void HELPER(hpclang_stack_pointer)(void *opaque, uint32_t sp, uint32_t pc)\n"
         "{ CPUState *env = opaque; uint32_t mode = env->uncached_cpsr & 31u;\n"
         "  stack_pointer_observe(sp, pc, mode); stack_region_observe(sp, pc, mode); }\n",
         "stack pointer helper implementation",
+    )
+    replace_once(
+        arm / "helper.c",
+        "    i = bank_number(mode);\n    env->regs[13] = env->banked_r13[i];",
+        "    i = bank_number(mode);\n"
+        "    stack_bank_observe(old_mode, mode, env->regs[13], env->banked_r13[i]);\n"
+        "    env->regs[13] = env->banked_r13[i];",
+        "implicit banked stack switch",
     )
     replace_once(
         arm / "translate.c",
