@@ -1787,3 +1787,24 @@ The exact-head CI audit of #26 `d0795413fad89345a52ad20dc89b7ea018f34f61` found
 12 queued workflow records and 20 queued jobs, with no completed jobs yet.
 Current status text was shortened; M0–M7 summaries, all M8 stage requirements,
 acceptance boundaries and detailed historical evidence remain retained.
+
+
+## 2026-10-30 — Port2 startup configuration mapping inventory
+
+During the live Stock wait, the new bank planner was applied read-only to the
+retained reservation baselines for both models. `/work/oct30-startup-config/inventory.json`
+records source script/shared-library hashes, unchanged SRAM/Flash hashes, native
+catalog bindings, configuration entry framing and physical locations. Both
+inventories match: 59 catalog IDs below 769, of which fourteen have configurations:
+0, 1, 2, 12, 13, 171, 221, 222, 223, 226, 227, 229, 255 and 256. All fourteen
+configuration roots frame as programs; this does not classify their transitive
+execution references or establish startup behavior.
+
+The first exploratory assertion incorrectly equated all lower-ID catalog entries
+with configured libraries. The final inventory resolves each library header
+through its predicted bank mapping and distinguishes absent configuration fields.
+IDs 226, 227 and 229 have configuration-object bytes in mutable user Flash beyond
+0x140000; all other configuration roots are below that physical boundary. Thus
+immutable-ROM identification alone cannot qualify all earlier startup effects.
+This supplies concrete next inputs for execution-reference qualification and
+trusted startup ordering, not permission to erase Flash or publish recovery.

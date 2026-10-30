@@ -145,7 +145,10 @@ history below.
 
 Guarded ID769 tests retain 23,900 user elements. Earlier complete two-model
 matrices used ID1701. Fourteen configured Stock libraries precede supported
-ID769; passing these recovery fixtures does not prove complete startup safety.
+ID769 among 59 lower-ID catalog entries in both saved fixtures. Their mapped
+configuration objects are now resolved; IDs 226, 227 and 229 lie in mutable user
+Flash, outside immutable-ROM identity coverage. Their execution dependencies
+still require qualification. Passing recovery fixtures does not prove startup safety.
 All prior artifact-specific evidence and limitations are retained in
 [M8 validation history](m8-validation-history.md).
 
