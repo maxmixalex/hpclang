@@ -8,13 +8,15 @@ struct hpclang_rpl_code_bank_entry
     uint32_t selector, dispatch, body;
 };
 
-/* Recognize the reviewed P=0 switch-program shape in a caller-qualified code
- * mapping: full D0 literal, GOTO, ?P=0 branch, then P=0 / LC FF000 / CONFIG /
+/* Recognize the reviewed P=0/P=1 switch-program shapes in a caller-qualified
+ * code mapping: full D0 literal, GOTO, at most 16 ?P= tests, then (for P=1)
+ * a replacement full D0 literal, followed by P=0 / LC FF000 / CONFIG /
  * C=DAT0.A / D0=C.A / CONFIG / DAT0=C.B / UNCONFIG / opcode 03 return.
  * first/end bound the code mapping, not the selector data. Observe every code
  * nibble read; output changes only on zero. Callback errors invalidate all
  * partial dependencies; positive errors become MALFORMED. Other P values and
- * code shapes are unsupported. No fixed entry or selector addresses are used.
+ * code shapes are unsupported. P=1 reports the exit selector, not the entry's
+ * selector or a claim to restore the prior bank. No fixed addresses are used.
  * This proves syntax/operands, NOT firmware interpreter identity or the device
  * semantics of CONFIG and DAT0. Caller still qualifies those, mutable selector
  * contents, owner/geometry state, pending interrupts and return-stack roots.

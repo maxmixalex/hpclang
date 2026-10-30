@@ -39,4 +39,12 @@ int hpclang_rpl_bank_plan_prepare(const struct hpclang_rpl_bank_sources *sources
                                   struct hpclang_rpl_bank_workspace *workspace,
                                   struct hpclang_rpl_bank_plan *plan,
                                   hpclang_rpl_graph_dependency_fn dependency, void *context);
+/* Explicit reviewed P=0 entry or P=1 exit prediction, with the same qualification
+ * and failure contract. P=1 selects the exit program's configuration, not an
+ * arbitrary caller bank. Other P values are rejected. The caller must qualify
+ * the actual incoming P; this function does not read or change CPU registers. */
+int hpclang_rpl_bank_plan_prepare_p(const struct hpclang_rpl_bank_sources *sources, uint32_t entry,
+                                    unsigned p, struct hpclang_rpl_bank_workspace *workspace,
+                                    struct hpclang_rpl_bank_plan *plan,
+                                    hpclang_rpl_graph_dependency_fn dependency, void *context);
 #endif

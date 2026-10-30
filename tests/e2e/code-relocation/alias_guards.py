@@ -110,6 +110,11 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
         plan_dependency,
         c.c_void_p,
     ]
+    lib.hpclang_rpl_bank_plan_prepare_p.argtypes = [
+        *lib.hpclang_rpl_bank_plan_prepare.argtypes[:2],
+        c.c_uint,
+        *lib.hpclang_rpl_bank_plan_prepare.argtypes[2:],
+    ]
 
     class Guard(c.Structure):
         _fields_ = [(name, c.c_uint32) for name in ("mapping", "field", "expected", "width")]
@@ -516,6 +521,70 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
                 body_remap_rejected=bool(banks[index]["populated"]),
             )
         )
+    # Exercise the complete exit planner against the original interpreter,
+    # including entries whose P=0 target bank is unpopulated.
+    import struct
+
+    from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE
+    from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
+
+    for item in entries:
+        observed.clear()
+        plan, workspace = Plan(), Workspace()
+        switch = item["entry"]
+        assert (
+            lib.hpclang_rpl_bank_plan_prepare_p(
+                c.byref(sources), switch, 1, c.byref(workspace), c.byref(plan), capture, None
+            )
+            == 0
+        )
+        assert plan.bank == 2 and plan.program.selector == 0x860B8
+        assert plan.configuration == read(0x860B8)
+        uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
+        for address, data in ((0, flash), (0x08000000, ram)):
+            uc.mem_map(address, len(data))
+            uc.mem_write(address, data)
+        uc.mem_map(0x300000, 0x10000)
+        for reg, value in (
+            (UC_ARM_REG_R4, cpu),
+            (UC_ARM_REG_R5, 0xFFFFF),
+            (UC_ARM_REG_SP, 0x308000),
+            (UC_ARM_REG_R7, switch),
+        ):
+            uc.reg_write(reg, value)
+        for offset, value in ((0x998, 1), (0x978, 0x3130), (0x95C, 1), (0x970, 0)):
+            uc.mem_write(cpu + offset, struct.pack("<I", value))
+        returned = []
+
+        def stop(_, pc, size, user):
+            if pc == 0x28898 and uc.reg_read(UC_ARM_REG_R7) == 0x3130:
+                returned.append(True)
+                uc.emu_stop()
+
+        uc.hook_add(UC_HOOK_CODE, stop)
+        uc.emu_start(0x28828, 0x400000, count=100000)
+        assert returned
+        assert list(plan.effects.map.pages) == list(struct.unpack("<256I", uc.mem_read(cpu, 1024)))
+        assert struct.unpack("<I", uc.mem_read(cpu + 0x95C, 4))[0] == 0
+        item["exit_p1"] = dict(
+            bank=plan.bank,
+            selector=plan.program.selector,
+            dependencies=len(observed),
+            original_mapping_match=True,
+        )
+        # No unsupported incoming context may publish a plan or dependencies.
+        for p in (2, 15, 16):
+            observed.clear()
+            c.memset(c.byref(plan), 0xA5, c.sizeof(plan))
+            before = bytes(plan)
+            assert (
+                lib.hpclang_rpl_bank_plan_prepare_p(
+                    c.byref(sources), switch, p, c.byref(workspace), c.byref(plan), capture, None
+                )
+                < 0
+            )
+            assert bytes(plan) == before and not observed
+
     from startup_configs import verify_startup_configurations
 
     def select_startup(switch):

@@ -814,7 +814,7 @@ static int bank_entry_read(void *context, uint32_t address, uint8_t *value)
 }
 
 static int bank_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t end, uint32_t entry,
-                              struct hpclang_rpl_code_bank_entry *view)
+                              unsigned p, struct hpclang_rpl_code_bank_entry *view)
 {
     struct hpclang_rpl_code_literal literal;
     int result = hpclang_rpl_code_literal_inspect(reader, entry, end - entry, 0, &literal);
@@ -837,27 +837,56 @@ static int bank_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t 
     uint32_t dispatch = branch.target;
     if (dispatch >= end || end - dispatch < 5)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    result = read_word(reader, dispatch, 3, &opcode);
-    if (result)
-        return result;
-    if (opcode != 0x098)
+    uint32_t selected = dispatch;
+    unsigned compared;
+    for (compared = 0; compared < 16; ++compared) {
+        if (selected >= end || end - selected < 5)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        /* Each untaken ?P= test falls through without changing P. Capture
+         * its complete encoding, including the unselected displacement. */
+        result = read_word(reader, selected, 5, &opcode);
+        if (result)
+            return result;
+        if ((opcode & 0xffu) != 0x98u)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (((opcode >> 8u) & 15u) == p)
+            break;
+        selected += 5;
+    }
+    if (compared == 16)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
-    result = hpclang_rpl_code_branch_inspect(reader, dispatch, 5, &branch);
+    result = hpclang_rpl_code_branch_inspect(reader, selected, 5, &branch);
     if (result)
         return result;
+    uint32_t body_address = branch.target;
+    if (p == 1) {
+        if (body_address >= end || end - body_address < 7u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        /* The exit path replaces the entry's selector. It does not promise
+         * restoration of the caller's previous bank. */
+        result =
+            hpclang_rpl_code_literal_inspect(reader, body_address, end - body_address, p, &literal);
+        if (result)
+            return result;
+        if (literal.destination != HPCLANG_RPL_CODE_D0 || literal.nibbles != 5)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (literal.value > 0xffffbu || end - body_address < 7u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        body_address += 7;
+    }
     static const uint8_t body[] = {
         2, 0, 3, 4, 0, 0, 0, 15, 15, 8, 0, 5, 1, 4, 6, 1, 3, 4, 8, 0, 5, 1, 4, 12, 8, 0, 4, 0, 3,
     };
-    if (branch.target >= end || sizeof body > end - branch.target)
+    if (body_address >= end || sizeof body > end - body_address)
         return HPCLANG_RPL_SPAN_BOUNDS;
     for (unsigned i = 0; i < sizeof body; ++i) {
-        result = read_word(reader, branch.target + i, 1, &opcode);
+        result = read_word(reader, body_address + i, 1, &opcode);
         if (result)
             return result;
         if (opcode != body[i])
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
     }
-    *view = (struct hpclang_rpl_code_bank_entry){(uint32_t)literal.value, dispatch, branch.target};
+    *view = (struct hpclang_rpl_code_bank_entry){(uint32_t)literal.value, dispatch, body_address};
     return 0;
 }
 
@@ -873,12 +902,12 @@ int hpclang_rpl_code_bank_entry_inspect(const struct hpclang_rpl_reader *reader,
         return HPCLANG_RPL_SPAN_BOUNDS;
     if (p > 15)
         return HPCLANG_RPL_SPAN_MALFORMED;
-    if (p)
+    if (p > 1)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     struct bank_entry_reader state = {reader, first, end, dependency, context, 0};
     const struct hpclang_rpl_reader observed = {bank_entry_read, &state};
     struct hpclang_rpl_code_bank_entry next;
-    int result = bank_entry_inspect(&observed, end, entry, &next);
+    int result = bank_entry_inspect(&observed, end, entry, p, &next);
     if (state.error)
         return state.error;
     if (!result)

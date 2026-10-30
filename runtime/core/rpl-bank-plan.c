@@ -13,10 +13,10 @@ static int observe(void *context, uint32_t address, uint8_t value)
     return observation->dependency(observation->context, observation->mapping, address, value);
 }
 
-int hpclang_rpl_bank_plan_prepare(const struct hpclang_rpl_bank_sources *sources, uint32_t entry,
-                                  struct hpclang_rpl_bank_workspace *workspace,
-                                  struct hpclang_rpl_bank_plan *plan,
-                                  hpclang_rpl_graph_dependency_fn dependency, void *context)
+int hpclang_rpl_bank_plan_prepare_p(const struct hpclang_rpl_bank_sources *sources, uint32_t entry,
+                                    unsigned p, struct hpclang_rpl_bank_workspace *workspace,
+                                    struct hpclang_rpl_bank_plan *plan,
+                                    hpclang_rpl_graph_dependency_fn dependency, void *context)
 {
     if (!sources || !workspace || !plan || !dependency || !sources->profile || !sources->saturn ||
         !sources->saturn->read_nibble || !sources->native || !sources->native->read_nibble ||
@@ -32,7 +32,7 @@ int hpclang_rpl_bank_plan_prepare(const struct hpclang_rpl_bank_sources *sources
     struct hpclang_rpl_bank_plan *next = &workspace->next;
     int result =
         hpclang_rpl_code_bank_entry_inspect(sources->saturn, sources->code_first, sources->code_end,
-                                            entry, 0, &next->program, observe, &saturn);
+                                            entry, p, &next->program, observe, &saturn);
     if (result)
         return result;
     result = hpclang_rpl_flashptr_bank_guarded(sources->saturn, next->program.selector,
@@ -85,4 +85,12 @@ int hpclang_rpl_bank_plan_prepare(const struct hpclang_rpl_bank_sources *sources
     next->geometry = workspace->banks[next->bank];
     *plan = *next;
     return 0;
+}
+
+int hpclang_rpl_bank_plan_prepare(const struct hpclang_rpl_bank_sources *sources, uint32_t entry,
+                                  struct hpclang_rpl_bank_workspace *workspace,
+                                  struct hpclang_rpl_bank_plan *plan,
+                                  hpclang_rpl_graph_dependency_fn dependency, void *context)
+{
+    return hpclang_rpl_bank_plan_prepare_p(sources, entry, 0, workspace, plan, dependency, context);
 }
