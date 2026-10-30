@@ -1828,3 +1828,22 @@ Independent source-hash readback confirms both completed reports match current
 sources. Exact-head #26 CI has eight queued/four running workflows and three
 successful/six running/fourteen queued jobs, with no failure at inspection.
 The separate live Stock continuation campaign remains in progress.
+
+
+## 2026-10-30 — Complete Stock continuation-check campaign
+
+Both `/work/oct30-stock-plan-execution/{hp49gplus,hp50g}/result.json` reports
+completed successfully with fourteen cases each. The independent `verified.json`
+audit confirms all 28 post-call markers, 18 original and ten fixture-rewritten
+returns, 36 byte-identical Flash snapshots and sixteen reproduced artifacts.
+`plan-memory-all-verified.json` independently reads all 28 saved SRAM witnesses
+through ELF symbols and original pool descriptors: ROM/profile identity, fourteen
+banks/3,520 sampled edges and sixteen accepted/two absent planning entries match.
+Source manifests include the execution-map predicate; the planner's full native
+state comparison remains mandatory. This completes the local campaign only.
+
+The resource-snapshot main integration `d0795413` was merged into the local
+planner branch, resolving only roadmap/history conflicts and retaining both
+workflow artifact sets. Eighteen resource/verifier/UI regression tests pass.
+The tested application sources and eight-module analysis inputs remain unchanged.
+Remote CI has not yet tested the combined planner follow-up.

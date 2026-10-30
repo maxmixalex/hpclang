@@ -124,11 +124,11 @@ Local planner tests cover ROM identity, code/selector/routing/geometry guards,
 full bank effects and unchanged switch-body physical mappings. Original-handler
 comparisons, failure-output preservation and forty controlled HOME payload
 resolutions pass; forty separate execution obligations remain open. The previous
-live-reader build passed 28 Stock cases. For the latest continuation-check build,
-eight ARM analyses and sixteen independently reproduced artifacts pass; both
-first native cases have verified saved-memory planning witnesses. Its full
-28-case Stock campaign is still running, so earlier results do not establish
-acceptance of this build.
+live-reader build passed 28 Stock cases. The latest continuation-check build
+now also passes all 28 cases locally: independent audits confirm every saved
+planning witness, 18 original/ten fixture-rewritten returns, 36 unchanged Flash
+snapshots and sixteen reproduced artifacts. Eight ARM analyses pass. This is
+local validation; the planner follow-up still needs remote CI acceptance.
 
 Complete execution roots and CONFIG semantics, production exclusive integration,
 public library operations and Port1 edits remain open. ROM identity and a valid
