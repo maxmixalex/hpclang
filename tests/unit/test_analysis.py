@@ -15,6 +15,30 @@ compile_key = runpy.run_path(str(Path(__file__).resolve().parents[2] / "tools/an
 
 
 class AnalysisCommands(unittest.TestCase):
+    def test_move_contract_exception_is_limited_to_timer_fixtures(self):
+        arguments = runpy.run_path(str(Path(__file__).resolve().parents[2] / "tools/analyze.py"))[
+            "contract_test_analyzer_args"
+        ]
+        for source in (
+            "tests/unit/test_timer_cpp.cpp",
+            "tests/e2e/system-services/timer.cpp",
+        ):
+            self.assertEqual(
+                arguments(source),
+                [
+                    "--extra-arg=-Xanalyzer",
+                    "--extra-arg=-analyzer-disable-checker=cplusplus.Move",
+                ],
+            )
+        for source in (
+            "include/hpclang/timer.hpp",
+            "runtime/core/timer.c",
+            "examples/timer-cpp/main.cpp",
+            "tests/unit/other.cpp",
+            "examples/test_timer_cpp.cpp",
+        ):
+            self.assertEqual(arguments(source), [], source)
+
     def key(self, extra=(), directory="/build/a", output="first.o"):
         return compile_key(
             [
@@ -52,7 +76,11 @@ class AnalysisCommands(unittest.TestCase):
         self.assertNotEqual(self.key(["-I/sdk/alias"]), self.key(["-I/sdk/real"]))
 
     def test_unknown_options_and_response_files_keep_context(self):
-        for option in ("@options", "-fmodule-map-file=module.map", "-new-compiler-option"):
+        for option in (
+            "@options",
+            "-fmodule-map-file=module.map",
+            "-new-compiler-option",
+        ):
             with self.subTest(option=option):
                 self.assertNotEqual(self.key([option]), self.key([option], directory="/build/b"))
 

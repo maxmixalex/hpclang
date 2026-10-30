@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(hpclang_system_services_e2e LANGUAGES C ASM)
+project(hpclang_system_services_e2e LANGUAGES C CXX ASM)
 
 if(NOT DEFINED HPCLANG_ROOT)
     get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
@@ -15,6 +15,7 @@ add_executable(hpclang_system_services_e2e
     ${HPCLANG_LIBC}
     main.c
     checks.c
+    timer.cpp
     irq.c
     irq.S
     watchdog-irq.c
@@ -26,7 +27,9 @@ add_executable(hpclang_system_services_e2e
 
 target_include_directories(
     hpclang_system_services_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
-target_compile_features(hpclang_system_services_e2e PRIVATE c_std_11)
+target_compile_features(hpclang_system_services_e2e PRIVATE c_std_11 cxx_std_17)
+target_compile_options(hpclang_system_services_e2e PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
 set(HPCLANG_E2E_SOUND_EXIT "blocking" CACHE STRING "Sound exit fixture: blocking, exit, _Exit")
 if(NOT HPCLANG_E2E_SOUND_EXIT STREQUAL "blocking")
     if(NOT HPCLANG_E2E_SOUND_EXIT MATCHES "^(exit|_Exit)$")

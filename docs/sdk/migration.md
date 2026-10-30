@@ -166,6 +166,17 @@ unwind those scopes; release local resources explicitly before that path.
 `_Exit()` skips language callbacks. SDK-owned hardware restoration does not
 substitute for saving application data or running application cleanup.
 
+For cooperative schedules, `<hpclang/timer.hpp>` provides the move-only C++17
+`cooperative_timer`. Pass `hpclang::microseconds` to `start(delay, period)` and
+call `poll(count)` from your loop; a zero period is one-shot. Moving disarms the
+source, while move assignment discards the destination's previous schedule.
+Failed start/poll calls retain the old schedule and failed polls leave `count`
+unchanged. Negative durations return `-1/EINVAL`; other errors follow the C
+timer/clock API. `armed()` observes the stored state without sampling time; a
+due one-shot remains armed until polled. No allocation or IRQ is involved.
+The installed `examples/timer-cpp` demonstrates periodic polling and moving.
+Use the C API when you need durations beyond signed chrono microseconds.
+
 The legacy `gets` / `_gets` aliases accept fixed character arrays with a known
 capacity. For a pointer or variable-length buffer, call
 `hpclang_hpgcc_gets(buffer, capacity)` explicitly; capacity includes the final

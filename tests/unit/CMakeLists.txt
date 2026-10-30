@@ -482,6 +482,14 @@ hpclang_unit(timer test_timer.c
 target_include_directories(test_timer PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(timer_cpp test_timer_cpp.cpp
+    "${HPCLANG_ROOT}/runtime/core/timer-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/timer.c")
+target_compile_features(test_timer_cpp PRIVATE cxx_std_17)
+target_compile_options(test_timer_cpp PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+target_include_directories(test_timer_cpp PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(sound_api test_sound_api.c "${HPCLANG_ROOT}/runtime/core/sound.c")
 target_include_directories(test_sound_api PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
