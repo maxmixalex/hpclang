@@ -997,6 +997,7 @@ hpclang_unit(rpl_bank_target test_rpl_bank_target.c
 target_include_directories(test_rpl_bank_target PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(rpl_execution_map test_rpl_execution_map.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-code.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-execution-map.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
 target_include_directories(test_rpl_execution_map PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")

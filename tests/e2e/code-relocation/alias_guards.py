@@ -11,6 +11,17 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
     class Reader(c.Structure):
         _fields_ = [("read", read_fn), ("context", c.c_void_p)]
 
+    lib.hpclang_rpl_execution_instruction_preserved.argtypes = [
+        c.POINTER(Reader),
+        c.POINTER(c.c_uint32),
+        c.POINTER(c.c_uint32),
+        c.c_uint32,
+        c.c_uint32,
+        c.POINTER(c.c_uint32),
+        dependency_fn,
+        c.c_void_p,
+    ]
+
     class MappedReader(c.Structure):
         _fields_ = [("read", mapped_fn), ("context", c.c_void_p)]
 
@@ -545,8 +556,12 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
     from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP
 
-    for item, context_p in (
-        (item, p) for item in entries for p in (0, 1) if p or item["populated"]
+    for item, context_p, known_return in (
+        (item, p, known)
+        for item in entries
+        for p in (0, 1)
+        if p or item["populated"]
+        for known in (False, True)
     ):
         observed.clear()
         plan, workspace = Plan(), Workspace()
@@ -567,6 +582,10 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
         expected_selector = 0x860B8 if context_p else 0x860CC + 5 * expected_bank
         assert plan.bank == expected_bank and plan.program.selector == expected_selector
         assert plan.configuration == read(expected_selector)
+        # Retain the original sentinel-return cases and add a return to the
+        # syntax inspector's proven first body-instruction boundary. Stop before
+        # executing that continuation; this does not qualify arbitrary callers.
+        continuation = plan.program.body if known_return else 0x3130
         uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
         for address, data in ((0, flash), (0x08000000, ram)):
             uc.mem_map(address, len(data))
@@ -579,12 +598,12 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
             (UC_ARM_REG_R7, switch),
         ):
             uc.reg_write(reg, value)
-        for offset, value in ((0x998, 1), (0x978, 0x3130), (0x95C, context_p), (0x970, 0)):
+        for offset, value in ((0x998, 1), (0x978, continuation), (0x95C, context_p), (0x970, 0)):
             uc.mem_write(cpu + offset, struct.pack("<I", value))
         uc.mem_write(cpu + 0xC24, bytes(4))
         for offset, value in (
             (0x998, 1),
-            (0x978, 0x3130),
+            (0x978, continuation),
             (0x95C, context_p),
             (0x970, 0),
             (0xC24, 0),
@@ -651,7 +670,11 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
         returned = []
 
         def stop(_, pc, size, user):
-            if pc == 0x28898 and uc.reg_read(UC_ARM_REG_R7) == 0x3130:
+            if (
+                pc == 0x28898
+                and uc.reg_read(UC_ARM_REG_R7) == continuation
+                and struct.unpack("<I", uc.mem_read(cpu + 0x998, 4))[0] == 0
+            ):
                 returned.append(True)
                 uc.emu_stop()
 
@@ -661,14 +684,79 @@ def verify_alias_selectors(lib, read, ram, flash, cpu, banks, profile):
         assert list(plan.effects.map.pages) == list(struct.unpack("<256I", uc.mem_read(cpu, 1024)))
         assert struct.unpack("<I", uc.mem_read(cpu + 0x95C, 4))[0] == 0
         assert bytes(transition.cpu.state) == bytes(uc.mem_read(cpu + 0x90C, 0x90))
-        assert transition.cpu.continuation == 0x3130
-        item["exit_p1" if context_p else "entry_p0"] = dict(
+        assert transition.cpu.continuation == continuation
+        fetch = None
+        if known_return:
+            reads, dependencies = [], []
+
+            @read_fn
+            def instruction_read(_, address, value):
+                reads.append(address)
+                value[0] = read(address, 1)
+                return 1
+
+            @dependency_fn
+            def instruction_dependency(_, address, value):
+                dependencies.append((address, value))
+                return 0
+
+            instruction_reader = Reader(instruction_read, None)
+            length = c.c_uint32(99)
+            prior = transition_workspace.planning.prior.map.pages
+            predicted = transition.mapping.effects.map.pages
+            assert (
+                lib.hpclang_rpl_execution_instruction_preserved(
+                    c.byref(instruction_reader),
+                    prior,
+                    predicted,
+                    continuation,
+                    29,
+                    c.byref(length),
+                    instruction_dependency,
+                    None,
+                )
+                == 0
+            )
+            # Reviewed body starts P=0, independently required by its inspector.
+            assert length.value == 2 and dependencies == [(continuation, 2), (continuation + 1, 0)]
+            assert reads == [continuation, continuation + 1]
+            remapped = (c.c_uint32 * 256)(*predicted)
+            page = continuation >> 12
+            remapped[page] = 0x08000000 if prior[page] != 0x08000000 else 0x08000800
+            reads.clear()
+            dependencies.clear()
+            length.value = 99
+            assert (
+                lib.hpclang_rpl_execution_instruction_preserved(
+                    c.byref(instruction_reader),
+                    prior,
+                    remapped,
+                    continuation,
+                    29,
+                    c.byref(length),
+                    instruction_dependency,
+                    None,
+                )
+                < 0
+            )
+            assert length.value == 99 and not reads and not dependencies
+            fetch = dict(
+                address=continuation,
+                instruction_nibbles=2,
+                remap_rejected_before_read=True,
+                scope="Controlled return to inspected bank-body boundary; not arbitrary continuation qualification",
+            )
+        key = "exit_p1" if context_p else "entry_p0"
+        if known_return:
+            key += "_known_continuation"
+        item[key] = dict(
             bank=plan.bank,
             selector=plan.program.selector,
             dependencies=len(observed),
             original_mapping_match=True,
             composed_cpu_match=True,
             combined_output_failures_preserved=4,
+            continuation_fetch=fetch,
         )
         # No unsupported incoming context may publish a plan or dependencies.
         for p in (2, 15, 16):

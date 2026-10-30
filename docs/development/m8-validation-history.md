@@ -2553,3 +2553,299 @@ new resolver, Flash data reader, code decoder and profile against reproduced
 source identities. Ten ARM analyses, main-frame budget (1064 < 2048) and full
 source format/Ruff/ShellCheck pass. This local result does not enable public
 Port1 edits or close graph/execution qualification, startup safety or M8.0.
+
+## 2026-10-30 — Bank-program CPU and return-slot prediction
+
+Original-ROM experiments with distinct return cells showed that RTN clears
+the consumed slot, correcting the initial assumption that all eight cells
+survive. Added `hpclang_rpl_bank_cpu_predict`: configuration replaces C's low
+five nibbles and D0; P/carry reset; RTN returns the popped address, clears its
+cell and decrements the cursor. Other captured bytes survive. Invalid inputs
+preserve output, including in-place-use and domain-rejection unit coverage.
+
+Both maintained `bank_switch_maps.py` regressions pass with the new `bank_cpu.py`
+comparison: fourteen populated switches, two P contexts, eight cursors and two
+register patterns per model (896 cases total). All 144 CPU bytes and continuation
+match actual original-ROM execution; Flash and seven unconsumed cells survive.
+Unit ASan/UBSan, ARM compilation/analysis, formatting and Ruff pass. Evidence:
+`/work/oct30-bank-cpu-effects/{hp49gplus,hp50g}/bank-switch-maps.json`; the earlier
+independent observation/model comparison is in `verified.json`. The experiment
+clears pending Saturn interrupts; no interrupt or execution-target qualification
+is claimed. This follow-up is local, unsubmitted, and does not enable mutation.
+
+## 2026-10-30 — Guarded native CPU capture
+
+`hpclang_rpl_bank_cpu_capture_predict` captures the pending word and CPU slice
+through native-relative reads, observing all 296 valid nibbles, checks actual P
+against the prepared context and publishes only on success. Original dispatch
+at 0x28898 loads native word 0xc24 before instruction execution; nonzero values
+are rejected rather than treated as normal-return execution. Caller still
+qualifies identity, configuration dependencies and exclusive lifetime.
+All 296 read/callback failure positions, positive callback normalization,
+32 pending-word bits and P mismatch preserve output under ASan/UBSan.
+Both-model original-ROM comparison passes 896 captured/predicted CPU slices
+with exact ordered dependency coverage. ARM compilation/analysis and Ruff pass.
+Evidence: `/work/oct30-bank-cpu-effects/guarded-verified.json`. This local path
+does not model interrupt execution or authorize movement. UI #28 `a181a6d2`
+CI audit finds ten queued/two pending workflows and twenty queued jobs.
+
+## 2026-10-30 — Combined bank mapping and CPU transition
+
+Added `hpclang_rpl_bank_transition_prepare` with caller-owned planning storage.
+It uses the same P and source snapshot for the existing map planner and guarded
+CPU capture, preserving mapping IDs in dependency callbacks. Output publishes
+only after both checks succeed; the continuation remains a separate unresolved
+mapping/ownership/code obligation. No native writes or allocation are added.
+Both maintained ROM regressions pass for P=0 populated entries and all reviewed
+P=1 exits: sixty combined map/144-byte CPU/continuation matches, plus 240
+pending-word, P-mismatch and signed callback-failure controls preserving the
+complete output. The 896 varied-CPU comparisons also remain passing.
+Evidence/source identities: `/work/oct30-bank-transition/both-p-hp49gplus/`
+and `both-p-hp50g/bank-switch-maps.json`. ASan/UBSan unit, Ruff, ARM compile/
+analysis pass; the combined ARM frame is 208 bytes. Changes remain local;
+interrupt execution and public mutation authorization are not established.
+
+## 2026-10-30 — Live Stock transition probe integration (in progress)
+
+rom-banks.c now invokes the combined planner for every successful P=0/P=1
+mapping probe (32 per application). The expected CPU result uses the original
+native snapshot; the live source is neither seeded nor repaired. Pending
+interrupts/P mismatch or invalid CPU state must reject, preserving the entire
+sentinel-filled transition. Successful results must match the separate mapping
+plan and CPU predictor. Original-ROM CPU comparisons remain the separate 896-case
+gate; comparing two C paths here is not a replacement for that evidence.
+Native state is checked byte-for-byte after the probes, under the existing IRQ
+guard. The probe does not install mappings or authorize execution/mutation.
+
+ARM application/six launchers, ten ARM analyses, full source quality and an
+independent rebuild pass. All sixteen delivery artifacts reproduce identically;
+main frame remains 1064 bytes. Evidence: /work/oct30-bank-transition-device/
+reproduction.json and quality/. Both 14-case Stock matrices are running; first
+native cases produced entry.json and normal post-call markers on both models.
+No full-matrix result or remote acceptance is claimed. Changes remain local.
+
+## 2026-10-30 — Combined-transition Stock completion and delivery
+
+Both original Stock matrices completed normally: fourteen cases/model, sessions
+14273 and 72742 exit 0. Independent current-source audit confirms 28 markers,
+eighteen original/ten rewritten returns, 36 identical Flash snapshots and
+sixteen independently reproduced delivery artifacts. Evidence is
+/work/oct30-bank-transition-device/verified.json and reproduction.json.
+The current live probe tests the real unmodified suspended CPU and preserves
+its output on qualification failures; this does not mean all sampled launch
+contexts qualify for execution. Both earlier maintained ROM results still match
+all 26 recorded source identities, retaining 60 combined comparisons, 240 failure
+controls and 896 varied-CPU comparisons. Ten ARM analyses, main-frame 1064-byte
+budget, full source quality and strict docs pass.
+
+Submitted nine implementation/test files as 2e7885a4 in PR #26. Immediately prior
+21e0822e audit: two successful/nine queued workflows; 20 successful/224 queued jobs.
+The new head was not polled in this submission turn. No milestone acceptance,
+public Port1 mutation authority or safe startup claim is made.
+
+## 2026-10-30 — Current status consolidation
+
+The following is the previous roadmap status, preserved verbatim. Its queue states and active-process statements are historical, not current acceptance.
+
+## Current work: M8.0 mainline and independent UI/C++ acceptance
+
+The mainline remains safe movement and execution-reference coverage for native
+library management and Port1 edits, followed by Port2 trusted recovery
+installation, authority lifecycle, safe startup and reclamation. Sound
+compatibility is independent.
+
+M8.5 Port C++ `3b06b8c0` is submitted in PR #14 on allocation parent
+`97d5ba74` (PR #13). Both await new-head CI acceptance: the latest #13 audit has two successful,
+two running and eight queued workflows (70 jobs pass, fourteen run, 304 queue).
+#14 retains ten queued workflows at its last audit. Neither branch is accepted.
+All six Direct/six Stock Object Basics runs pass; live Port owners are exercised
+on classic Stock models and other contexts require ENOSYS. All six Stock UI
+budget/allocation/release/lifecycle gates also pass. Independent replay checks
+79 lifecycle snapshots, six image budgets and six release outcomes against
+unchanged application/emulator hashes. The installed SDK gate reproduces 517
+outputs; the parent independently reproduces fifteen UI delivery files.
+Parent integration retains Aplet identity and retry-pacing checks; eighteen
+host tests, lint and strict docs pass. The publisher queue fix is locally checked.
+Previous #13 CI retains one cancelled publisher; #14 retains cancelled gates.
+Remote acceptance, whole-application peak admission and M8.5 completion remain open.
+
+M8.5 migration tools, API guide and explicit-format hint `583f38e6` are
+submitted in draft PR #27. The preceding `5d5195dc` audit found seven successful
+and three queued workflows: 295 successful, fourteen running, 58 queued and one
+cancelled job. HP39gs Stock Object Basics was cancelled during execution;
+verification/upload did not complete and its log endpoint returned BlobNotFound.
+The new head has not been polled this submission turn and is not accepted.
+HP007 explains explicit legacy-format opt-in; six checker tests, full source
+quality and strict docs pass. A fresh SDK installation relocated to a path with
+spaces passes the installed-checker gate without changing its input. Earlier
+six-model builds and 517-output reproduction remain evidence for the earlier
+source. A local SDK documentation correction removes obsolete pending-CI
+claims for accepted decimal formatting and KOS sound adapters; strict docs pass.
+Ownership/application migration acceptance and M8.5 completion remain open.
+
+M8.2/M8.3 stack, return-capacity and update-cost gates `4bcd3fb6` are submitted
+in draft PR #28. The preceding `a181a6d2` audit found two successful and ten
+queued workflows; 23 jobs passed, two ran and 133 queued. New-head CI was not
+polled in the submission turn. The branch checks application SP, native capacity
+recovery and fixed-workload processing ceilings, with optional ROM/launcher SP
+diagnostics. Local evidence does not replace CI or whole-application acceptance.
+
+The UI SP follow-up `79a5fe36` is submitted in PR #28; CI acceptance is pending.
+All six Direct and six Stock UI/SP/return cases pass; independent replay
+checks all 79 lifecycle snapshots, pool/artifact budgets and unchanged
+application/emulator identities. Shared User/System stack use is
+2424–2432 bytes of 8192. Nine host tests and full source-quality/strict
+docs checks pass. The untouched 4 KiB control detects 4144 bytes while
+the watermark stays 2424. CI, native/exception stacks and whole-system
+peak admission remain open.
+
+The optional all-PC SP observer in `a181a6d2` separates CPU modes and 1 MiB stack
+address regions, including ROM/launcher assignments. Thirteen host tests, Ruff,
+strict docs and a fresh emulator build pass. HP39g+ Direct UI/return and the
+existing application SP gate pass on the unchanged application; additional
+stage-region observations span `0x0131d3b0–0x0131dff8`. Independent
+image/pool reconciliation measures 3152/4096 bytes for this Direct stage
+stack, deepest in image decompression. HP39g+ Stock UI/return also passes;
+reconciliation against its observed 34-page stage pool measures the same
+3152/4096-byte stage stack. Full source quality checks pass. Native-stack
+bounds and full peak admission remain open.
+
+The M8.2/M8.3 update-cost gate submitted in `4bcd3fb6` caps the UI workload at
+100 ms/frame and 5 ms/input edge. All twelve retained six-model Direct/Stock
+timing records pass (maxima 50.416/1.708 ms); six verifier tests include exact
+limits, over-limit failures and stale-pass removal. Ruff, Actionlint and strict
+docs pass. This is saved-evidence revalidation, not new device execution or a
+hardware latency guarantee. Whole-application resource acceptance remains open.
+
+
+CI follow-up `fce14d73` is submitted in draft PR #29. Nine workflows now
+pass; one is queued. The audit has 375 successful jobs, two skipped and one
+queued job. The prior HP39gs Stock object-composite job failed in runner setup
+when three Action v7 tags could not be resolved. All three tags now resolve;
+the failed job was rerun and attempt 2 remains queued, not accepted. The local
+retransmission-pause regression/replay passes; initial packet-loss origin remains
+unproven and no gate is waived.
+
+M8.0 `2e7885a4` is submitted in PR #26. It combines bank-map and guarded
+CPU-return prediction from one P context and exclusive snapshot, publishing
+neither output on failure. Pending interrupts or P mismatch reject. Both
+maintained ROM regressions pass: 60 combined P=0/P=1 comparisons, 240 failure
+controls and 896 varied-CPU comparisons; all 26 source identities per model
+still match. The combined entry uses a 208-byte ARM frame.
+
+The actual Stock probe leaves the suspended CPU unchanged and checks successful
+predictions or complete output preservation on rejection. Both fourteen-case
+Stock matrices pass locally. Independent audits confirm 28 return markers,
+eighteen original/ten rewritten returns, 36 unchanged Flash snapshots and
+sixteen reproduced artifacts. Ten ARM analyses, full source quality and strict
+docs pass; main remains 1064 bytes. The pre-push audit of `21e0822e` found two
+successful/nine queued workflows and 20 successful/224 queued jobs. New-head
+CI was not polled in the submission turn. Interrupt execution, continuation
+qualification and production mutation integration remain open.
+
+M8.0 follow-up `9e220d9b` captures library-configuration read dependencies;
+sanitisers, ARM analysis and both-model maintained regressions pass. It is included
+in this delivery, but does not qualify startup execution.
+
+PR #26 now includes the accepted resource-snapshot mainline, unified bank
+planning, bounded live Stock readers, continuation mapping checks and startup
+configuration regressions. Previous head `6a582958` failed CI; this delivery
+adds the verified workspace fix and return-state checks, and awaits CI acceptance.
+
+Local planner tests cover ROM identity, code/selector/routing/geometry guards,
+full bank effects and unchanged switch-body physical mappings. Original-handler
+comparisons, failure-output preservation and forty controlled HOME payload
+resolutions pass; forty separate execution obligations remain open. The previous
+live-reader build passed 28 Stock cases. The latest continuation-check build
+now also passes all 28 cases locally: independent audits confirm every saved
+planning witness, 18 original/ten fixture-rewritten returns, 36 unchanged Flash
+snapshots and sixteen reproduced artifacts. Eight ARM analyses pass. This is
+local validation; the planner follow-up still needs remote CI acceptance.
+
+Complete execution roots and CONFIG semantics, production exclusive integration,
+public library operations and Port1 edits remain open. ROM identity and a valid
+predicted data mapping alone do not authorize mutation. Detailed tests, counts,
+artifact identities and historical limitations are retained in the validation
+history below.
+
+| Work | Verified state | Remaining gate |
+| --- | --- | --- |
+| Native references and libraries | #25 accepted; #26 follow-up submitted. Guarded TEMP lookup and masked roots pass 304 controlled return cases/480 rejections, sanitizer/API checks and ARM builds. The corrected register-root build passes all 28 HP49g+/HP50g Stock call/catalog cases, with source/artifact hashes and unchanged Flash independently checked. This exercises default RPL3; explicit RPL4 masks retain host/controlled-fixture coverage only. | Complete launcher/opaque/banked provenance, full handler semantics, RAM continuations across exhausted-stack collection, library configuration/public management and a production banked-reference guard for Port1 replace/remove |
+| Port0 growth / HOME snapshots | #24 fixes pass 54 six-model lifecycle phases and ten HP49g+/HP50g native library cases locally; sanitizers, ARM analysis, package checks and strict docs pass | Accepted in #24; retain lifecycle regressions |
+| Port2 supported binding 769 | Both HP49g+ and HP50g pass guarded/repeated/absent recovery and all 16 rejection cases per model; independent saved-state checks pass | Complete trusted installation, authority lifecycle, safe startup and reclamation |
+| Explicit recovery ID | Local primary `4c0f6044`, delivery `2dcb4aa5`; 73 recovery tests and Ruff pass on both; generated witnesses match retained native packages | Accepted in #25. HP49g+ used the preceding harness, HP50g continuation uses the explicit-ID helper |
+
+Guarded ID769 tests retain 23,900 user elements. Earlier complete two-model
+matrices used ID1701. Fourteen configured Stock libraries precede supported
+ID769 among 59 lower-ID catalog entries in both saved fixtures. Their mapped
+configuration objects are now resolved; IDs 226, 227 and 229 lie in mutable user
+Flash, outside immutable-ROM identity coverage. Their configuration bodies invoke `0x7709`. All six ordinary-Stock executions
+add the expected HOME record and preserve catalog/Flash/child/sentinel/stack;
+current C traversal recognizes the resulting references. Startup execution,
+bank-switch calls and allocation effects still require qualification. Maintained tests cover this baseline and the Stock
+launcher fixture, which adds ARMToolbox 275: 60 entries, 15 configuration roots
+and a fourth mutable-Flash configuration. Passing these checks does not prove startup safety.
+All prior artifact-specific evidence and limitations are retained in
+[M8 validation history](m8-validation-history.md).
+
+Submitted M8.0 planning `84fa1a70` accepts explicit P=0/P=1 and retains
+the existing P=0 entry point. Both-model original-interpreter comparisons
+pass 32 P=1 page-map predictions and 96 unsupported-P rejection controls.
+ASan/UBSan, ARM compile/analysis and current-source artifact checks pass.
+This is mapping prediction, not arbitrary-bank restoration, startup
+qualification or authorization for public storage mutation.
+The mapped reader submitted in `21e0822e` consumes caller-qualified predicted
+pages without installing them. Unit sanitizers, ARM checks and both-model
+saved-state physical-read comparisons pass. The device probe now checks
+32 P=0/P=1 plans per launch with unchanged native state; both 14-case Stock
+matrices pass. Independent audits confirm 28 return markers, 36 unchanged
+Flash snapshots and 16 reproduced artifacts.
+The C data-target resolver submitted in `21e0822e` joins planning, bounded reads
+and object spans, including observed mutable-Flash data. All 40 saved HOME
+targets resolve and their execution edges remain rejected. Unit/ARM checks
+pass. The device build passes ten ARM analyses and reproduces sixteen
+delivery files byte-for-byte; its main frame remains 1064 bytes. Both
+models pass all fourteen Stock cases. Independent replay verifies 28
+return markers, 36 unchanged Flash states and sixteen reproduced
+artifacts, binding the new resolver/reader sources. Full source quality
+passes. CI acceptance and complete graph/execution policy remain open.
+
+## Pending delivery
+
+| PR / head | State |
+| --- | --- |
+| #26 / `2e7885a4` | Submitted; new-head CI not polled this turn. Combined map/CPU prediction and both complete Stock matrices pass locally. Remote acceptance remains open. |
+| #26 previous head / `6a582958` | **Five failed jobs retained:** HP39g+ runtime/console pre-entry transfer, plus three HP49g+/HP50g relocation jobs across push/PR runs. Final pre-push audit: 370 successful, one skipped, five failed, three running and one queued job; nine successful, one running and one queued workflow. The workspace fix passes all 28 local call/return cases. HP39g+ packet-loss origin remains unproven; no failing gate is waived. |
+| #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
+| #24 / `6ff8a1e9` | **Accepted and merged as `fee4e4b9`.** All 12 workflows pass: 390 successful jobs; two PR evidence publishers intentionally skipped. Follow-ups are tracked below. |
+| #21 / `969ade88` | **CI accepted and merged into #20 as `1ce01859`.** Seven workflows pass: 319 successful jobs and one conditional PR evidence-publisher skip. This does not complete M8.2/M8.3 or accept the parent branch. |
+| #18 / `439339b1` | **Three failed jobs remain unresolved.** HP49g+ Direct system-services fails (recorded PWM IRQ `0x46417b03`). HP40gs UI and HP39g+ notebook stall in pre-entry payload transfer. All 3,539 audited data/ACK/NAK frames pass length/sequence/CRC checks at the socat capture point; final device Timeout frames have invalid sequence fields but valid CRCs. Root causes remain unproven. |
+| #20 / `4f2ce605` | **Accepted and merged as `3b77453a`.** All twelve workflows pass: 390 successful jobs and two conditional publisher skips. Resource snapshot delivery does not complete M8.2/M8.3. |
+
+Accepted deliveries: #25 merged as `3c484673` (355 successful jobs, one conditional publisher skip); #24 merged as `fee4e4b9` (390 successful jobs, two conditional publisher skips); #22 merged as `038b0f41` (354 successful jobs, two skipped),
+#23 as `f806b299` (373 successful jobs, one skipped). The earlier #24 head
+`0e68b3b1` failed eight jobs: four insufficient Stock-growth reservations and
+four oversized test snapshots. All eight saved states were investigated; the
+current submitted head contains both fixes. A separate publisher cancellation
+was caused by a higher-priority pending request, not accepted as a passing job.
+
+Next: complete execution-reference coverage
+and public library/Port1 operations; inspect outstanding CI before delivery and
+accept only proven gates. Continue Port2 installation/startup/reclamation within
+M8, and retain every M8.2–M8.6 requirement above.
+
+## 2026-10-30 — Guarded instruction fetch continuity (local)
+
+Added hpclang_rpl_execution_instruction_preserved: framing at a caller-proven code boundary uses the real decoder, checks each nibble mapping before the source read and observes every valid consumed nibble. A cross-page instruction cannot pass by checking only its first address. Errors preserve length and invalidate partial dependencies; ownership, instruction semantics, interrupts and mutation authority remain separate obligations.
+
+The rpl_code and rpl_execution_map CTest targets pass GCC ASan/UBSan in /work/oct30-continuation-fetch-host. Tests exercise a four-nibble instruction crossing two discontiguous physical pages, changed second-page mapping without reading that page, read failures and positive/negative observer failures at each position, truncation and malformed nibble rejection. ARM compile/static analysis pass using the established native-probe compile command. System Clang lacked host ASan libraries, so the installed GCC sanitizer runtime was used. No native execution or push of this follow-up is claimed.
+
+## 2026-10-30 — Kermit retry pacing accepted
+
+Exact PR #29 head fce14d7385878542a52fffce8a79280e9011d328 passed all ten workflows: 376 successful jobs, two intentional pull-request publisher skips. Full audit: research/oct30-pr29-final-ci.json. The formerly setup-failed HP39gs Stock object-composite retry passed. Marked ready and merged with exact-head protection; readback confirms merge 1c0d1e3544f2afa0e4c95518daa483383270fc22 at 15:25:05 UTC. No milestone completion or initial packet-loss root-cause claim.
+
+## 2026-10-30 — Controlled ROM continuation fetch integration (local)
+
+The maintained alias-selector gate retains its original thirty returns per model and adds thirty returns per model to the inspected bank-body first instruction. Original ROM execution must pop the return stack before the observer stops, preventing confusion with initial entry at the same address. The first attempt exposed that observer bug and is retained at /work/oct30-continuation-fetch-rom/hp49gplus.log; it did not pass.
+
+Corrected runs in /work/oct30-continuation-fetch-rom-return pass on HP49g+ and HP50g. Independent verified.json confirms sixty original plus sixty known-boundary returns, 480 complete-output failure controls and 896 varied-CPU comparisons; all 26 source hashes per model and original SRAM/Flash identities match. Each added continuation frames P=0 and rejects a changed physical page before any instruction read. Ruff passes. These are controlled saved-state ROM regressions, not live arbitrary-return qualification or storage-mutation authorization.
