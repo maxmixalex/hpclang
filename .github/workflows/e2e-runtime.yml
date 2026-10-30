@@ -387,6 +387,8 @@ jobs:
             mkdir -p "$(dirname "$snapshot_dir")"
             mkdir "$snapshot_dir"
             export HPCLANG_X50NG_RESOURCE_SNAPSHOT="$snapshot_dir/$HPCLANG_E2E_TARGET"
+            export HPCLANG_X50NG_STACK_REGIONS="$PWD/build/$HPCLANG_E2E_TARGET-frame-stack-regions.jsonl"
+            rm -f "$HPCLANG_X50NG_STACK_REGIONS" "$PWD/build/$HPCLANG_E2E_TARGET-frame-stage-stack-budget.json"
           fi
           if [[ -f "build/e2e/$APPLICATION/e2e.stock-media.json" ]]; then
             bash tools/install-ci-packages.sh dosfstools mtools
@@ -400,7 +402,7 @@ jobs:
         run: |
           args=(stock "$FAMILY")
           if [[ "$SUITE" == ui ]]; then
-            args+=(--pool --artifact "build/e2e/$APPLICATION" --stack-pointer)
+            args+=(--pool --artifact "build/e2e/$APPLICATION" --stack-pointer --stage-stack)
           fi
           python3 "$VERIFIER" "${args[@]}"
 
@@ -444,6 +446,7 @@ jobs:
             build/*-*.pgm.png
             build/*-*.json
             build/*-frame-stack-pointer.jsonl
+            build/*-frame-stack-regions.jsonl
             build/*-frame-*.lcd
             build/*-kermit*
             build/*-socat.log

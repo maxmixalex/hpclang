@@ -961,3 +961,14 @@ Ruff without a read-only mount cache, strict documentation and whitespace checks
 pass. b15ad2ff clears stale stage reports before earlier CLI gates can fail.
 The completed five-model Stock matrix and independent audit are retained above;
 this delivery does not claim native/exception bounds or milestone completion.
+
+## 2026-10-31 — Stock UI launcher-stack CI integration
+
+The Stock UI workflow now enables the all-PC stack-region observer, removes
+prior trace/report files before launch, requires --stage-stack verification and
+uploads the raw JSONL alongside existing JSON reports. This promotes the locally
+validated launcher reservation check to a recurring six-model CI gate.
+Actionlint and four observer unit tests pass; the retained five-model Stock
+matrix independently replays successfully. No fresh device run is claimed.
+Prior remote e0581c5d has four queued workflows/six queued jobs, no failures
+or cancellations. Native/exception bounds and full UI resource acceptance remain open.
