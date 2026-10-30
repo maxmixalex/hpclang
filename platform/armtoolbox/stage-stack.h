@@ -30,11 +30,13 @@ int hpclang_stage_stack_restore(const struct hpclang_stage_stack_io *io,
                                 const struct stage_launcher_bias *bias);
 
 /* A proven suspended Saturn PC names the next instruction, not arbitrary data.
- * RTN, RTNSC and RTNCC unconditionally consume the circular machine-stack top
+ * RTNSXM, RTN, RTNSC and RTNCC unconditionally consume the circular machine-stack top
  * as their next execution address. Return that cell, or NULL for unreadable /
  * unsupported instructions or invalid state. No writes, allocation or scan
  * of lower slots. The caller supplies eight stable cells and a next-push cursor;
- * this does not classify other execution roots or certify a complete call chain. */
+ * this does not classify other execution roots or certify a complete call chain.
+ * RTNSXM's XM flag change does not affect these unconditional transfers; the
+ * immediate selector does not interpret conditional returns. */
 uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_io *io,
                                               uint32_t continuation, uint32_t *machine_stack,
                                               uint32_t cursor);
@@ -45,6 +47,10 @@ uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_i
  * does not consume a cell; each reported cell requires reaching a proven return.
  * Calls push into a private circular-stack copy. Generated return addresses and
  * overwritten original cells are not reported; the supplied stack is unchanged.
+ * RTNSC/RTNCC establish carry for later GOC/GONC, including zero-displacement
+ * RTNC/RTNNC. Initial carry is unknown: these instructions stop discovery until
+ * a followed return establishes it. RTN/RTNSXM and followed calls/jumps preserve
+ * carry. No other flag-setting or predicate instructions are interpreted.
  * Stop at the step limit or an unreadable, unsupported or invalid continuation;
  * previously proven cells remain valid. Instruction mappings must remain stable.
  * This identifies consumed cells, not relocation repairs for call/jump operands.
@@ -53,5 +59,13 @@ uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_i
  * instruction storage. Only the returned number of output slots is written. */
 unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uint32_t continuation,
                                     uint32_t *machine_stack, uint32_t cursor, uint32_t **roots);
+
+/* Invert a physical 4 KiB page through the 256-entry Stock Read map.
+ * Return 1 only for one complete, consecutive pair of 2 KiB mappings in
+ * main RAM, 0 for no overlap, -1 for partial/ambiguous/invalid mappings.
+ * On 0/-1 leave the output untouched. Only main-RAM aliases are classified;
+ * banked mappings require their own ownership proof. */
+int hpclang_stage_main_page(const uint32_t *read_map, uint32_t physical_page,
+                            uint32_t *saturn_start);
 
 #endif

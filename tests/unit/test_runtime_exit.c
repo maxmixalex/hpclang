@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <limits.h>
+#include <setjmp.h>
 #include <stddef.h>
 #include <string.h>
 #include <hpclang/abi.h>
@@ -13,6 +14,16 @@ static int status;
 int hpclang_start(const struct hpclang_boot_info *boot);
 __attribute__((noreturn)) void fixture_immediate_exit(int value);
 __attribute__((noreturn)) void fixture_exit(int value);
+
+__attribute__((noreturn)) void hpclang_runtime_stop(void);
+static jmp_buf stop_context;
+static int stopping;
+uint32_t hpclang_irq_save_disable(void)
+{
+    assert(stopping);
+    /* Observe the terminal boundary without hanging the host test. */
+    longjmp(stop_context, 1);
+}
 
 static void event(char value)
 {
@@ -107,5 +118,13 @@ int main(void)
             assert(strcmp(trace, expected[scenario]) == 0);
         }
     }
+    used = 0;
+    trace[0] = 0;
+    stopping = 1;
+    if (!setjmp(stop_context)) {
+        hpclang_runtime_stop();
+        assert(!"Terminal stop returned");
+    }
+    assert(!used); /* No destructors, cleanup or Stock-return hooks ran. */
     return 0;
 }

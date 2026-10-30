@@ -657,3 +657,528 @@ observations. A blank repaint interval resets stability instead of becoming an
 immediate `stock-resume` failure. The existing return deadline still bounds a
 screen that never recovers. Gallery artifacts retain each shard's result and
 before/PASS/return images so later shards cannot hide the failing screen.
+
+### Native launcher observation in call-root cases
+
+`tests/e2e/code-relocation/call_roots.py` creates a fixed 128-byte `ENTRYOBS`
+string before launching its two original-return cases and five controlled call-root
+cases. The native
+payload fills that string after bootstrap, before creating its test library or
+rewriting the suspended return path. It captures the native page-pool count and
+table, saved Saturn PC/IP/caller, machine-stack cursor, hidden launcher root,
+R0–R4 and the stage0 source prefix. Recording does not resize the string.
+
+The verifier requires a complete versioned record and matches 32 source bytes
+against the current model's generated stage0 image. `entry.json` keeps the
+observed values separately from the later controlled mutation results. C still
+names ROM helper `0x1596fc`; R3.H identifies the stage0 source. These fields must
+not be conflated with an ARM PC sample. The record proves that the native
+payload reached its observation point through Stock; it is not a trace of every
+instruction before entry, nor proof of arbitrary live-register/banked safety.
+Existing complete catalog bindings, fixture operands, final return marker and
+unchanged Flash checks remain required after the observation.
+
+The `native` case uses only the `HPCSCALL` marker string, with no encoded call.
+After validating that exact string, the payload preserves the original suspended
+PC and launcher-collected return roots, grows the catalog and resumes Stock.
+The marker string must remain byte-identical, the real caller must reach the
+post-launch marker, all existing catalog bindings must survive, and library 123
+must resolve to its new Port0 record. This covers the unmodified launcher return
+in the controlled clean-state fixture; it does not establish complete opaque
+object or banked-reference safety for arbitrary applications.
+
+The `native-remove` case adds a zero-byte selector to that marker. It inserts
+the fixture binding, independently rescans the resulting roots and objects,
+then removes the binding using a negative relocation delta. Before returning,
+the payload compares every nibble from the original catalog through the original
+return-stack end against its pre-insertion snapshot, and checks native roots,
+TEMP boundaries, HOME and AVMEM. The host requires the original catalog exactly,
+the still-stored Port0 library, unchanged Flash and the real caller's marker.
+This exercises internal registration/unregistration geometry without deleting
+the payload or proving general-purpose detachment and execution liveness.
+
+The `native-detach` case uses selector byte one and first completes the same
+catalog insertion/removal round trip. It then detaches library 275 from HOME,
+requiring HOME to advance by 13 nibbles, its attachment count to decrease by one,
+and Port0 to remain fixed. A separate snapshot checks every nibble of the HOME
+directory body through Port0 at its original address; obsolete round-trip
+buffers are freed before allocating this snapshot. After the original caller
+returns, the host requires the complete original catalog and all surviving HOME
+attachment records, including both pointer fields, in their original order.
+This tests internal HOME detachment in the controlled fixture, not public unload
+or arbitrary execution-reference safety.
+
+The `native-reattach` case uses selector byte two. It saves library 275's two
+genuine attachment fields, requiring both to lie below the moving USEROB prefix
+in this fixture, then performs detachment followed by attachment. HOME, its count
+and Port0 return to their original values, and the full directory body remains
+byte-identical. The host requires the original attachment records with library
+275 moved to the last position, preserving both fields and all other records'
+order. After reattachment, another removal probe must reject the attached library
+with BUSY and zero write attempts. These operations still do not execute library
+configuration or establish general-purpose public registration safety.
+
+The `native-cache` case uses selector byte three and follows the reattachment
+case with a cache ownership round trip. It copies the target/switch identities
+from library 275's genuine DOACPTRs, detaches the library, creates two new wrappers
+at TEMPBOTTOM and attaches their new addresses. Both wrappers must reject removal
+with BUSY and zero write attempts while HOME still references them. After a second
+detachment, the test removes the wrappers in reverse order and restores the
+original fields. Each movement collects fresh guarded object/root repairs.
+The full original catalog/cache/TEMP/return-stack extent, five geometry/accounting
+fields and three native roots must match the pre-operation snapshot. The host
+also checks the original Stock return marker, catalog, HOME records and unchanged
+Flash. This verifies storage/attachment/reclamation in the controlled fixture;
+it does not execute a ROM table lookup through the new wrappers or run library
+configuration, and does not establish arbitrary opaque-reference coverage.
+
+The `native-cache-lookup` case (selector four) retains the new wrappers when
+returning to Stock. A separate USB server session then parses a program containing
+`PrRUN` and stores it as `CACHELOOK`, without executing that command. C-Kermit
+numeric escapes transmit the actual Stock program delimiters (bytes 171/187);
+ASCII `<< >>` is not a substitute. The checker requires the complete 31-nibble
+Stock program encoding, including its two compiler markers and ROMPTR library
+275/command zero. It also requires distinct new adjacent DOACPTR addresses,
+matching target/switch identities, intact catalog/other attachments, original
+return marker and unchanged Flash. An unmodified Stock parse provides the
+independent full-encoding control. In the HP50g negative saved-state control,
+clearing only HOME's hash pointer makes the parser emit the unresolved global
+name `PrRUN` instead of the library ROMPTR; Flash remains unchanged. Individual
+program-nibble corruptions must also be rejected. This case covers hash-table
+name resolution only.
+
+The `native-cache-message` case uses the same retained-wrapper selector four,
+then a separate Stock session executes
+`IFERR #11301h DOERR THEN ERRM 'CACHEMSG' STO END`. The captured library-275
+message one must be exactly `Invalid user RAM block`, independently present in
+the original ROM table and returned by the unmodified Stock control. It retains
+the same wrapper identity, attachment, catalog, return and Flash checks. Corrupt
+message-object header/content nibbles must reject. This is a compatibility check,
+not proof that DOERR/ERRM dereferences the new HOME message wrapper: in the HP50g
+control, clearing that HOME field still returns the same library message, with
+the zero field and Flash preserved. Redirecting it to library 227's existing
+same-bank string array (whose first message is `Starting Solver`) also leaves
+DOERR/ERRM's library-275 result unchanged. The message lookup source path remains
+unproven. Configuration execution, complete lifetime/transaction integration and
+public library ownership remain open.
+
+The Port0 library-123 fixture now contains one packed string-array message,
+`hpclang library message`, with a relative message-table offset and a valid
+library CRC. The `native-new-message` case retains its new catalog record;
+`native-missing-message` removes that record before returning. Both retain the
+same library object in Port0 and add no HOME attachment for 123. A subsequent
+Stock session executes `IFERR #7B01h DOERR THEN ERRM 'NEWMSG' STO END`; only the
+registered case may return the fixture message. Host checks retain exact catalog
+bindings, original Stock return, Flash and HOME attachment checks.
+
+When insertion is retained, reviewed original HOME cache pointers must advance
+by 16 nibbles; zero and direct-ROM pointers stay fixed. The verifier rejects
+main-RAM attachment fields outside the original complete-wrapper cache bounds.
+Requiring the old numeric pointers after a retained insertion would incorrectly
+reject the successful repair. Removal cases still require the original values.
+
+Before catalog edits, all original-return cases also attempt removal of the
+fixture's genuinely HOME-attached library 275. A rejecting writer counts any
+write attempt. The payload requires `BUSY`, zero write attempts and unchanged
+native roots; it never edits the attachment table to manufacture that result.
+
+Catalog-growth fixtures record native nibble dependencies from root scans,
+TEMP allocation-chain traversal and nested object traversal, coalesce them into
+a bounded guard array and pass
+them to the repaired catalog commit. Guard exhaustion or observation failure
+stops before commit. Only bytes actually read by the parsers are guarded;
+compact synthetic prologues are excluded and opaque contents remain unresolved.
+The unit regression changes each observed field and requires stale-plan rejection,
+and checks callback failures, read faults, invalid nibbles and guard capacity.
+The guarded TEMP regression covers all 35 read-observation interruption points
+and all 25 geometry/sentinel/footer read faults in its two-allocation fixture.
+A malformed older footer rejects before any payload callback; payload bytes
+remain the responsibility of the separate object traversal.
+
+### Offline HOME attachment table check
+
+`tests/e2e/code-relocation/attachment_tables.py` compiles the current C library
+header resolver, executes each attached library's original bank-switch routine
+when needed, and compares its hash/message coordinates with the complete HOME
+attachment fields. Banked fields must point to DOACPTR wrappers with exactly the
+resolved target and catalog switch identity; direct fields must retain the table
+pointer, including tables that are themselves DOACPTR objects. Absent fields must
+be zero. Each header's 13 ID/offset nibbles is separately corrupted and must be
+rejected or disagree with the independently captured HOME record.
+
+```sh
+python tests/e2e/code-relocation/attachment_tables.py \
+  --state hp50g:/path/to/hp50g-state \
+  --state hp49gplus:/path/to/hp49gplus-state --output /tmp/attachment-tables
+```
+
+This read-only private-state check records input/source hashes. It does not
+allocate wrappers, mutate attachments, prove arbitrary table bodies safe or
+establish complete public registration and execution-reference coverage.
+
+### Offline original-ROM bank-switch check
+
+`tests/e2e/code-relocation/bank_switch.py` accepts repeatable
+`--state hp50g:/path/to/state` or `--state hp49gplus:/path/to/state` arguments,
+an `--output` directory and optional host `--cc`. Each state contains `sram`
+and `flash`; the Python environment requires Unicorn. For example:
+
+```sh
+python tests/e2e/code-relocation/bank_switch.py \
+  --state hp50g:/work/saved-state --output /work/bank-switch-check
+```
+
+For each saved state it executes all sixteen profiled ROM Flash switch entries
+and the ERAM entry at every return-stack cursor, using the original ARM Saturn
+interpreter. Only the synthetic caller return and cursor are installed; no
+switch body is skipped. Execution must return within the instruction bound.
+All 256 resulting Read-map entries are checked: the window must match the
+captured bank bases, and entries outside it must stay unchanged. The production
+span resolver must accept real windows and reject unused-bank placeholders
+without changing its output. The report retains traces and state hashes.
+
+Four HP50g/HP49g+ saved states pass 544 cases and 9,632 executed-map
+overlap/alias comparisons locally. Bank 0 maps 128 KiB despite its 96 KiB
+allocation: its last 32 KiB aliases bank 1 at different Saturn addresses.
+The comparisons include these aliases, opposite-parity non-aliases, every
+pair of selected windows and rejection of bank 14/15's unaligned placeholders.
+The caller must normalize physical identity and address offsets before using
+qualified reference plans; unequal bank indices alone cannot prove disjointness.
+The offset planner additionally passes 160 hypothetical alias repairs using
+translations derived from these executed maps. Resolving each patched native
+address must yield the canonical destination's physical nibble. This does not
+write ROM or treat the aliased tail as a writable allocation. Unit regressions
+cover independent relative endpoints, split fields, native encoding overflow
+and unchanged output on rejection. The checker removes stale reports on entry.
+Catalog-plan integration checks payload and switch offsets independently,
+including sentinel preservation and invalidation of partial output. A controlled
+alias catalog feeds its generated edits/guards into actual catalog insertion:
+19 changed nibbles and 19 read failures reject with no native/ARM-root writes
+and an unchanged memory snapshot; the unchanged case repairs the encoded alias,
+moves the catalog/root and completes insertion. This synthetic mapping test
+does not establish complete live roots for public library operations.
+Physical field checks add 320 executed-map comparisons: aliased fields reject
+while adjacent fields pass. RAM replay regressions cover 55 width/offset
+combinations, repeated-page aliases, resolver errors, late invalid metadata,
+physical-address overflow and idempotent replay. Conflicts and resolution
+failures must precede every target read/write.
+Both ordinary and mapped replay run the complete 25 width-pair fault matrix:
+each target read and write boundary is interrupted, including writes that took
+effect before reporting failure. Retries must reproduce the complete expected
+memory image; late corruption must prevent writes and silent writes must fail
+verification. These are RAM replay tests, not a persistent recovery protocol.
+This is a reviewed firmware-profile check, not general ROM discovery,
+allocation/liveness proof, hardware acceptance or permission to relocate.
+
+### Offline original-ROM threaded return check
+
+`tests/e2e/code-relocation/threaded_return.py` checks the reviewed HP49g+/HP50g
+command-4 ARM-return/GETPTR/dispatch path independently of the Stock transfer harness.
+Run on Linux with a host C compiler and Python `unicorn==2.1.4` in a virtual
+environment. Supply a complete saved `sram`/`flash` pair and the corresponding
+normal-return register trace from the diagnostic emulator; these private inputs
+are not distributed with the repository.
+
+```sh
+python tests/e2e/code-relocation/threaded_return.py \
+  --model hp50g --state /path/to/before-registration \
+  --trace /path/to/normal-register-trace.log --output /tmp/threaded-return
+```
+
+The gate checks the reviewed instruction/entry layout and ordered trace evidence,
+compiles the current C catalog mover, and runs all eight return-stack cursor
+positions from both the GETPTR tail and original post-ARMSYS RTNCC. The latter
+runs the condition, full GETPTR call and final ROM dispatch. The production
+stage return-root collector identifies the original caller slot before the C
+catalog mover repairs it and the suspended PC. The GETPTR return is generated by the
+moved call instruction. Baseline/move runs must agree on the complete trace,
+shifted RAM PCs, saved-IP reload and register results. Omitted saved-IP, caller
+return and (for the RAM entry) suspended-PC repairs must fail. Each model runs
+32 accepted baseline/move cases and 40 omission controls.
+
+Seven distinct nonzero ring sentinels must survive and the consumed caller slot
+must clear. Native cursor writes show no extra stack capacity is needed beyond
+one existing caller slot. R0–R4 must have no observed reads or writes through
+this bounded path. Initial carry is deliberately set for the ARM entry; RTNCC
+must clear it before the conditional branch. Trace input must include the
+original return-stack pop and ordered GETPTR/dispatch register evidence.
+It writes `getptr-move.json` with source/input hashes only after all checks pass;
+a rerun removes a prior report before validation. Python optimization is refused
+because assertions are part of the verifier. Output also contains the locally
+built `geometry.so`; use a separate output directory for each concurrent run.
+
+The saved IP is reconstructed from the trace, and CPU/return-stack state is
+controlled. CODE, SEMI and ROM contents remain original. This verifies catalog
+geometry and this bounded return path; it does not publish a catalog record, prove
+whole ARMJUMP reachability, or replace full Stock registration/startup acceptance.
+A different ROM or cached-program layout requires review before extending this
+gate. This optional offline check is not automatically included in CI.
+
+### Offline MMU entry/return check
+
+`tests/e2e/code-relocation/mmu_entry.py` connects the reviewed command-4 MMU
+entry (`889A5` to ARMSYS at `88B43`) with its bounded return through GETPTR
+and dispatch to `03130`. Use the same Linux/Unicorn environment and private
+saved state, plus a generated Launcher V3 file:
+
+```sh
+python tests/e2e/code-relocation/mmu_entry.py \
+  --model hp50g --state /path/to/before-registration \
+  --launcher /path/to/hp50g.hp --output /tmp/mmu-entry
+```
+
+The launcher supplies the reviewed memory policy; physical entry/code addresses
+and length are controlled. All eight cursors must reach the MMU ARM boundary.
+R0 retains the physical ARM entry, R1 receives code address/length, R3 receives
+entry/policy, R4 receives the ROM conversion entry, and R2's low field becomes
+the table extent. The bounded return must neither read nor write R0–R4.
+The original MMU helpers need three temporary return slots and the return
+consumes one caller: safe initial live depth is independently known 1–5.
+Four untouched sentinels survive; the other four slots end cleared.
+
+This skips the intervening ARM execution and does not prove initial descriptor
+loading, arbitrary memory geometry, actual code relocation, or later Stock
+execution. Original instructions run in both segments; controlled values are
+not evidence for every launcher. Changed policy/code guards remove stale
+reports; successful `mmu-entry.json` reports retain traces and input hashes.
+
+With `--descriptor` and a separate output directory, entry begins at `8890D`.
+A controlled 40-nibble launch descriptor is placed in a hex-string object and
+referenced by the data stack. Initial A/C/R0 values are poisoned; B retains the live RPL return-stack
+position required by SAVPTR. That position must survive both SAVPTR and the
+bounded return. Original
+instructions must load the descriptor fields, save pointers and generate the
+MMU caller return address. Each model checks all eight cursors. The full tested
+segment peaks at four extra return slots and ends at its original depth;
+four other stack sentinels survive. Independently known initial live depth must
+therefore be at most four. This connects descriptor consumption to MMU setup
+and return, but does not execute the earlier descriptor producer, validate an
+arbitrary object supplied by a user, or run the intervening ARM application.
+
+`--linked-descriptor` additionally places the supplied launcher at a controlled
+main-RAM address and executes the original GETOBJINFO and GETLINKINFO helpers.
+Their entry/address/size outputs feed the original allocation and descriptor
+field-writing instructions (`88378`–`883BA`). The resulting object, rather than
+a manually assembled descriptor, then feeds the descriptor/MMU/return segment.
+Each model checks all eight cursors. The helper invocations have controlled
+return boundaries and reset cursors; the published four-slot bound applies to
+the descriptor/MMU/return segment only. ARMLAUNCH lookup and its final address
+field remain controlled, and no ARM payload is executed. Traces retain these
+boundaries explicitly; this is not complete PrLNK or whole-launch acceptance.
+
+`--full-link` instead runs the cached PrLNK CODE continuously from `88311` to
+the Stock continuation at `05143`. It uses the original `XLIB 275 11` reference
+at `882F7`, as found in this saved state's PrLNK program, rather than the global
+ARMLAUNCH name used by another historical source version. Lookup, allocation,
+and all descriptor-field writes execute without helper-boundary resets. The
+resolved launch entry returned by GETLINKINFO must equal the final descriptor
+field and the MMU ARM target. The resulting descriptor then feeds the existing
+descriptor/MMU/return check, with a controlled boundary between the two CODE
+segments. The RPL preamble, intervening ARM payload, arbitrary bank lifetime
+and complete launch remain outside this gate; the four-slot bound applies only
+to the descriptor/MMU segment, not to the preceding PrLNK execution.
+
+Combine `--full-link --relocate` to compile the current C catalog mover and
+production return-root collector (a host C compiler is required). At the
+controlled ARM boundary, grow the catalog by 16 nibbles and repair its saved
+IP, suspended PC and proven caller slot before executing the original return.
+The mutated memory, not an independently reconstructed snapshot, feeds GETPTR
+and dispatch. R0–R4 remain untouched through this bounded return. Data-stack
+inputs reserve real slots below EDITLINE and adjust the available-cell count;
+stack bounds and the shifted RPL return-stack position are checked afterward.
+Source hashes and write counts are included in the report. This still skips
+the ARM payload and does not establish validity of its physical mappings
+during arbitrary application execution or complete public-registration safety.
+
+### Offline PrRUN prefix check
+
+`tests/e2e/code-relocation/prrun.py` uses the same `--model`, `--state`,
+`--launcher` and `--output` arguments as the MMU check. It executes the original
+PrRUN prefix from a controlled valid data-stack input without resetting CPU
+state. At the first encountered ARMSYS it follows the original ARM dispatch
+and requires the ROM helper target `0x1596fc`. **This is not the application
+entry.** By default the helper body is skipped; the check simulates its return and stops
+at the first ROM SEMI dispatch `03130`.
+
+Earlier descriptions overstated this gate as complete GC/link/MMU preparation
+and an application return. Those claims are withdrawn. Complete startup, actual
+application entry/execution and subsequent Stock behavior remain unverified.
+The separate segmented MMU gate and full native Stock tests retain their own
+explicit boundaries and evidence.
+
+Both input policy and initial cache layout are pinned. All eight cursors must
+reach the reviewed helper and simulated continuation, with valid data-stack
+bounds, no R0–R4 access in that continuation and unchanged saved registers.
+Observed peak extra depth is four; four unused sentinels survive and four used
+slots clear. This is only the prefix's depth budget, not a whole-launch budget.
+`prrun.json` records input hashes, entry/dispatch/continuation traces, helper
+identity and explicit execution flags for the helper and application. Failed
+guards remove stale reports.
+
+This is an opt-in offline check using a matching private saved state. The ordinary
+Stock CI fixture has a different PrRUN/cache layout and is rejected by this
+check; its native execution gates remain separate. Do not treat submission of
+this driver or a passing generic CI job as execution of the private-state matrix.
+
+With `--execute-helper`, the driver enters ARM user mode and models SVC exception
+entry into the original ROM vector. The ROM handler, allocator and free routine
+execute without substituted service results. The controlled fixtures require
+five allocation requests and one free request, preserve the existing 78-page
+table prefix, append 20 pages and reach the packaged stage0 address. The driver
+checks the appended descriptors, unique pages, zero terminator and restored ARM
+SP/LR/R0. Each model's vector branch target is decoded from its ROM; the helper
+bytes and SRAM handler pointer are checked against reviewed inputs.
+
+This executes the helper's direct tail-call branch, not its MMU branch or the
+stage0/application body. It uses isolated user/exception scratch stacks and
+simulates the subsequent payload return; it does not run pool cleanup or prove
+whole-launch lifetime safety. Reports distinguish this stage0 boundary from the
+default pre-helper boundary and record service requests and the resulting pool.
+
+`--reject-stage0-pool 0`, `1` or `257` enables the real helper and then injects
+an invalid page count at stage0 entry. The packaged stage0 executes its actual
+preflight rejection, calls the original ROM free service with the helper's
+allocation pointer exactly once, and returns through the original interpreter
+continuation to `03130`. Unlike the other modes, this return is not simulated.
+The check preserves the pool descriptors and SVC vector, restores ARM SP and
+user mode/interrupt masks, and retains the existing Saturn register, stack-bound
+and unused-return-slot checks. No application mapping is installed: that region
+is deliberately unmapped in this driver, so an attempted access fails.
+Reports record the injected count, release instruction/pointer and real-return
+flag. An omitted free instruction must fail even if the return itself succeeds.
+This covers preflight rejection and its cleanup, not normal application exit or
+whole-heap leak freedom. It cannot be combined with application-side relocation.
+
+`--stage0-entry path/to/launchers/objects/stage1.bin` instead continues from
+that helper into the packaged stage0, stopping before the first stage1
+instruction. The independent image must occur exactly once in the launcher.
+The check executes the three temporary supervisor handlers and verifies the
+published L1 descriptor, restored SWI vector, copied image, zeroed memory tail,
+model/CPU/HPC arguments, saved CPSR/frame and stack placement for all eight
+return-stack cursors. A write observer requires an actual write to every image
+and zero-tail byte, so initially zero memory cannot hide a missing clear loop.
+Omitting either copy/clear store or changing the model argument must reject and
+remove any stale report.
+
+This mode models translation with shared physical-RAM page aliases derived from
+the helper's validated pool descriptors and a controlled L1 table. It executes
+real stage0 instructions but does not emulate MMU/TLB/cache hardware behavior.
+Reports explicitly record `modeled-page-aliases`, the stage1-entry boundary,
+supervisor calls and image digest. No application or return is executed or
+simulated. This supplements native Stock gates; it does not establish complete
+startup/exit, mapping restoration or public-registration safety. It cannot be
+combined with relocation or invalid-pool rejection.
+
+With `--relocate`, the gate compiles the current C catalog mover and production
+return-root collector, grows the catalog by 16 nibbles at the selected boundary,
+and checks the repaired caller, PC and saved IP during the simulated return.
+It records source hashes and write counts. This is bounded synthetic mutation
+coverage; it does not prove mutation during an actual application or authorize
+public registration.
+
+### Offline alternate ARM return check
+
+`tests/e2e/code-relocation/alternate_return.py` checks the second reviewed
+command-4 ARMSYS return, from `88C73` through GETPTR, PUTPTR and RTNCC to a
+controlled ROM caller address (`03130`, stopped before execution), using the same
+Linux/Unicorn environment and private saved-state inputs:
+
+```sh
+python tests/e2e/code-relocation/alternate_return.py \
+  --model hp50g --state /path/to/before-registration \
+  --output /tmp/alternate-return
+```
+
+Run separately for HP49g+. Each model checks eight stack cursors and four R2
+low-bit combinations, before and after actual C catalog growth: 64 cases plus
+eight intentionally omitted R0 repairs. When the low two R2 bits equal one,
+the original code copies R0's low 20 bits into the RPL data stack. The C
+assignment inspector identifies that field, and the production guarded register
+repair preserves the upper bits while relocating the controlled address.
+Other flag combinations must not read R0. Omitting the needed repair must
+produce the stale address. All five saved registers remain unchanged during
+the original interpreter execution.
+
+GETPTR and PUTPTR each temporarily use the same free machine return-stack slot;
+RTNCC then consumes the controlled caller slot. The peak depth increases by one
+and the final depth decreases by one. Both used slots end cleared, while the
+other six distinct sentinels survive. Safe entry therefore requires independently
+known live depth 1–7; the cursor alone cannot establish this condition. Baseline
+and moved instruction traces must match after RAM-PC normalization. PUTPTR must
+publish the expected data-stack position and saved IP, and RTNCC must clear carry.
+
+Reviewed instruction and target guards reject changed inputs. The gate removes
+stale reports before checking and writes `alternate-return.json` with source
+and input hashes only on success. CPU/register values and the target are
+controlled: this does not establish incoming R0 provenance, reachability of
+this entry, arbitrary flags/register states, or execution beyond the controlled
+ROM caller. It supplements the first return-path gate and remains optional offline
+evidence, not complete relocation or public-registration acceptance.
+
+Add `--allocated-root` with a separate output directory to obtain R0 from the
+original legacy allocation path (`88BC1` to just before ARMSYS at `88C6E`).
+This uses a controlled 32-byte request with the leave-on-stack flag, runs the
+ROM allocator, and verifies that R0 identifies its new string object. Each
+model then runs 16 baseline/move cases and eight omitted-repair controls with
+that allocated object. The allocator-created memory is carried into the C
+mover and return check. The ARM program itself is not executed between those
+segments; the return CPU state remains controlled, so this does not prove
+preservation across arbitrary ARM execution or whole-launcher reachability.
+The current hpclang wrapper selects the separate MMU path; legacy allocation
+coverage must not be mistaken for a prerequisite of every generated launcher.
+
+### Offline ACCESSRAM return check
+
+`tests/e2e/code-relocation/accessram_return.py` checks four reviewed command-4
+ACCESSRAM1 call sites and their subsequent SAT2ARM conversion, using the same
+Linux/Unicorn environment and caller-supplied saved `sram`/`flash` inputs as the
+threaded return check (a host C compiler is also required):
+
+```sh
+python tests/e2e/code-relocation/accessram_return.py \
+  --state /path/to/hp50g-before-registration --model hp50g \
+  --output /tmp/accessram-hp50g
+```
+
+Run separately with `--model hp49gplus` and its saved state. Each run checks all
+eight return-stack cursors at four call sites: the ROM service must return to
+the original continuation without writing R4, and six subsequent main-RAM
+conversions must produce the expected physical byte addresses. It records input
+and driver fingerprints, executed paths and changed mapping words. The P=8
+call additionally walks one and two controlled library records and rejects an
+overflowing extent. These inputs are placed through the mapping established by
+the original CONFIG sequence; exact returned free space, carry, and traversal
+counts are checked. Each model runs 56 service cases, 336 conversions and 672
+original caller continuations. Input guards reject changed reviewed call,
+exchange and alignment encodings and remove any stale report on that failure.
+
+The gate compiles the current C literal/assignment inspectors and compares
+their register predictions with execution of the original LC→R4 initialization
+pair, after establishing P=0 through its original instruction. R4 is then
+preserved across the service and conversion checks. Decoder source fingerprints
+are retained; changed initialization/call encodings reject stale reports.
+The subsequent original call at `88A82` executes SAT2ARM, restores a caller-saved
+logical address through C=RSTK, and follows both ST-controlled paths to `88AA0`.
+For the alignment path, the C exchange inspector predicts both ACEX W swaps;
+the independent arithmetic expectation rounds the logical address to an 0x2000
+boundary modulo 20 bits. All nine working/saved registers, D0, P, ST, the
+return-stack cursor and mappings are checked. Every ring slot starts with a
+distinct nonzero sentinel: both nested-call slots and the consumed caller slot
+must end cleared, while the other five slots must retain their exact values.
+Native cursor writes independently measure a peak depth increase of two, a
+minimum of minus one and a final delta of minus one. Thus this path requires
+an independently established initial live depth of 1–6 to avoid ring overflow
+or underflow; the cursor and stale slot values cannot establish that depth.
+The skip path preserves D0. The maximum-address case wraps to zero; matching
+original arithmetic does not establish a usable address. Saved logical
+addresses are explicit caller inputs.
+Decoder and driver fingerprints must remain stable throughout the run.
+This is a controlled entry, not execution of all preceding launcher branches.
+
+The other entry registers and mappings are controlled. P=8 coverage tests the ROM
+size walk, not validation of library bodies, arbitrary contents or every service
+branch. Other bank configurations remain outside this gate.
+ACCESSRAM1 can change non-main mappings: only the main read mapping and the
+observed R4 lifetime are checked. This gate does not authorize general bank
+lifetimes, public registration, or complete launcher relocation, and requires
+private inputs rather than running automatically in CI.

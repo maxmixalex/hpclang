@@ -15,7 +15,12 @@ from pathlib import Path
 # D reserves 16-byte blocks for native stack growth. With M set, the low
 # 20 bits reserve free TEMPOB growth space; they are NOT a requested pool size.
 # MIN/MAX_RW_BYTES belong to stage admission/mapping, not this native policy.
-MEMORY_REQUEST = (1 << 22) | (1 << 23) | (1 << 24)
+# Keep the largest representable stack-growth reservation for native object
+# edits. One 16-byte block can leave less than a small Port0 replacement needs
+# after repeated launches. This is a reservation request, not permission to
+# cross the runtime's physical-page fences or a guarantee of later free space.
+STOCK_STACK_RESERVE_BYTES = 15 * 16
+MEMORY_REQUEST = (1 << 22) | (1 << 23) | ((STOCK_STACK_RESERVE_BYTES // 16) << 24)
 LINK_MARKER = 0x3176B34C
 
 

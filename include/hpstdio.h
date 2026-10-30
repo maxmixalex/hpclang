@@ -9,6 +9,7 @@
  * when no standard-stream owner has been bound.
  */
 #include <stdio.h>
+#include <hpclang/hpgcc-format.h>
 
 #ifndef HPCLANG_HPGCC_LONG_TYPES_DEFINED
 #define HPCLANG_HPGCC_LONG_TYPES_DEFINED

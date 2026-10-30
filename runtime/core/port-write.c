@@ -10,6 +10,7 @@
 #include "rpl-stock-memory.h"
 #include "rpl-flash-record.h"
 #include "stock-flash.h"
+#include "runtime-stop.h"
 
 static int snapshot_read(void *context, uint32_t offset, uint8_t *value)
 {
@@ -213,11 +214,16 @@ static int mutation_result(int result)
     switch (result) {
     case HPCLANG_RPL_MUTATION_OK:
         return 0;
+    case HPCLANG_RPL_MUTATION_INCOMPLETE:
+        hpclang_runtime_stop();
     case HPCLANG_RPL_MUTATION_EXISTS:
         errno = EEXIST;
         break;
     case HPCLANG_RPL_MUTATION_NOT_FOUND:
         errno = ENOENT;
+        break;
+    case HPCLANG_RPL_MUTATION_NOMEM:
+        errno = ENOMEM;
         break;
     case HPCLANG_RPL_MUTATION_NOSPACE:
         errno = ENOSPC;
