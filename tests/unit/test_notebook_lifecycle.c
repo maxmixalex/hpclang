@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* Execute the shipped entry point, including every cleanup path. */
 #define main notebook_main
@@ -68,6 +69,7 @@ const struct hpclang_font notebook_font = HPCLANG_BITMAP_FONT(font_data);
 static struct hpclang_device_info device;
 static struct hpclang_surface *screen;
 static unsigned begins, ends, polls, presents;
+static unsigned capabilities;
 enum fault
 {
     NONE,
@@ -89,14 +91,19 @@ const struct hpclang_device_info *hpclang_device_info(void)
 int hpclang_device_capability(enum hpclang_capability capability)
 {
     assert(capability == HPCLANG_CAPABILITY_STREAM_STORAGE);
-    return HPCLANG_CAPABILITY_UNSUPPORTED;
+    return capabilities == 2 ? HPCLANG_CAPABILITY_SUPPORTED : HPCLANG_CAPABILITY_UNSUPPORTED;
 }
 int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
 {
-    (void)port;
-    (void)info;
-    errno = ENOSYS;
-    return -1;
+    assert(port < 3 && info->size == sizeof(*info));
+    if (!capabilities) {
+        errno = ENOSYS;
+        return -1;
+    }
+    info->available = HPCLANG_PORT_READ_BACKUP;
+    if (capabilities == 2)
+        info->available |= HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP;
+    return 0;
 }
 int hpclang_datetime_read(struct hpclang_datetime *out)
 {
@@ -105,7 +112,12 @@ int hpclang_datetime_read(struct hpclang_datetime *out)
 }
 int notebook_load(char text[NOTEBOOK_CAPACITY])
 {
-    (void)text;
+    if (capabilities) {
+        /* Exercise the largest loaded editor alongside every optional control. */
+        memset(text, 'N', NOTEBOOK_CAPACITY - 1);
+        text[NOTEBOOK_CAPACITY - 1] = '\0';
+        return 0;
+    }
     errno = ENOENT;
     return -1;
 }
@@ -213,17 +225,20 @@ int main(void)
     for (unsigned model = HPCLANG_MODEL_HP39GPLUS; model <= HPCLANG_MODEL_HP50G; ++model) {
         device = (struct hpclang_device_info){
             .model = model, .display_width = 131, .display_height = model <= 4 ? 64 : 80};
-        unsigned count = run(NONE, -1, 0);
-        assert(count > 0);
-        for (unsigned at = 0; at < count; ++at) {
-            run(NONE, (int)at, 1);
+        /* Missing services, read-only ports, and writable ports plus export. */
+        for (capabilities = 0; capabilities < 3; ++capabilities) {
+            unsigned count = run(NONE, -1, 0);
+            assert(count > 0);
+            for (unsigned at = 0; at < count; ++at) {
+                run(NONE, (int)at, 1);
+                run(NONE, -1, 0);
+            }
+            run(BEGIN, -1, 1);
+            run(PRESENT, -1, 1);
+            run(KEYBOARD, -1, 1);
+            run(TIMEOUT, -1, 0);
             run(NONE, -1, 0);
         }
-        run(BEGIN, -1, 1);
-        run(PRESENT, -1, 1);
-        run(KEYBOARD, -1, 1);
-        run(TIMEOUT, -1, 0);
-        run(NONE, -1, 0);
     }
     return 0;
 }
