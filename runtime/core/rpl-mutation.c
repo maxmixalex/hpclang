@@ -751,6 +751,22 @@ int hpclang_rpl_mutation_visit_guarded_roots(const struct hpclang_rpl_mutation_i
     return scan.error ? scan.error : result;
 }
 
+int hpclang_rpl_mutation_visit_guarded_temp(const struct hpclang_rpl_mutation_io *io,
+                                            hpclang_rpl_temp_visit_fn visit,
+                                            hpclang_rpl_root_dependency_fn dependency,
+                                            void *context)
+{
+    if (!io_ready(io) || !visit || !dependency)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct guarded_root_scan scan = {io, dependency, context, 0};
+    struct hpclang_rpl_mutation_io observed = *io;
+    observed.read_nibble = guarded_root_read;
+    observed.write_nibble = guarded_root_write;
+    observed.context = &scan;
+    int result = hpclang_rpl_mutation_visit_temp(&observed, visit, context);
+    return scan.error ? scan.error : result;
+}
+
 int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
                                      hpclang_rpl_root_visit_fn visit, void *context)
 {
@@ -775,6 +791,7 @@ struct catalog_edits
     struct catalog_edit *items;
     size_t count, capacity;
     uint32_t first, end;
+    int32_t delta;
 };
 
 static int catalog_count_root(void *context, uint32_t slot, uint32_t value, uint32_t *native)
@@ -800,7 +817,10 @@ static int catalog_add_edit(struct catalog_edits *plan, const struct catalog_edi
         /* A field must move intact, and destination-only storage is overwritten. */
         if ((edit->field < plan->first && end > plan->first) ||
             (edit->field < plan->end && end > plan->end) ||
-            (edit->field >= plan->end && edit->field < plan->end + 16))
+            (plan->delta > 0 && edit->field >= plan->end &&
+             edit->field < plan->end + (uint32_t)plan->delta) ||
+            (plan->delta < 0 && edit->field < plan->first &&
+             end > plan->first - (uint32_t)-plan->delta))
             return HPCLANG_RPL_MUTATION_MALFORMED;
     }
     for (size_t i = 0; i < plan->count; ++i) {
@@ -831,16 +851,24 @@ static int catalog_capture_root(void *context, uint32_t slot, uint32_t value, ui
     if (!native &&
         (slot == RPL_TEMPBOTTOM || slot == RPL_TEMPTOP || slot == RPL_RSKTOP || slot == RPL_AVMEM))
         return 0;
+    /* The removed record/object has no surviving fields. Other roots into
+     * that extent prevent contraction, including native ARM roots. */
+    if (plan->delta < 0) {
+        if (!native && slot >= plan->first - (uint32_t)-plan->delta && slot + 5 <= plan->first)
+            return 0;
+        if (value >= plan->first - (uint32_t)-plan->delta && value < plan->first)
+            return HPCLANG_RPL_MUTATION_BUSY;
+    }
     uint32_t replacement = value;
     if (value >= plan->first && value < plan->end)
-        replacement += 16;
+        replacement = (uint32_t)((int64_t)value + plan->delta);
     const struct catalog_edit edit = {slot, value, replacement, 5, native};
     return catalog_add_edit(plan, &edit);
 }
 
-int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation_io *io,
-                                               uint32_t position,
-                                               const struct hpclang_rpl_catalog_repairs *repairs)
+static int catalog_resize_repaired(const struct hpclang_rpl_mutation_io *io, uint32_t position,
+                                   const struct hpclang_rpl_catalog_repairs *repairs, int shrink,
+                                   const uint32_t *acptr)
 {
     if (!io_ready(io) || io->library_table < RPL_MAIN_FIRST ||
         io->library_table > RPL_MAIN_END - 3u)
@@ -854,23 +882,45 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
         (result = read_word(io, RPL_AVMEM, 5u, &avmem)))
         return result;
     uint32_t records = io->library_table + 3u;
-    if (count == 0xfffu || count > (RPL_MAIN_END - records) / 16u || position < records ||
-        position > records + count * 16u || (position - records) % 16u ||
-        records + count * 16u > bottom || bottom > top || top > rstk || rstk >= dstk ||
-        dstk > RPL_MAIN_END || rstk > io->temp_limit)
+    uint32_t width = acptr ? 15u : 16u;
+    if (count > (RPL_MAIN_END - records) / 16u || records + count * 16u > bottom || bottom > top ||
+        top > rstk || rstk >= dstk || dstk > RPL_MAIN_END || rstk > io->temp_limit)
         return HPCLANG_RPL_MUTATION_MALFORMED;
-    /* Retain the same five-nibble guard used by TEMP allocation, in addition
-     * to the launcher's hidden data-stack-cell reservation. */
-    if (io->temp_limit - rstk < 21u || dstk - rstk < 21u ||
-        io->stack_reserve_nibbles > dstk - rstk - 21u)
+    if (acptr) {
+        if (acptr[0] > 0xfffffu || acptr[1] > 0xfffffu || position < records + count * 16u ||
+            position > bottom || (shrink ? bottom - position < width : position != bottom))
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        if (shrink) {
+            const uint32_t expected[] = {0x02baau, acptr[0], acptr[1]};
+            for (unsigned i = 0; i < 3; ++i) {
+                uint32_t value;
+                result = read_word(io, position + 5u * i, 5u, &value);
+                if (result)
+                    return result;
+                if (value != expected[i])
+                    return HPCLANG_RPL_MUTATION_MALFORMED;
+            }
+        }
+    } else if ((!shrink && count == 0xfffu) || (shrink && !count) || position < records ||
+               position > records + count * 16u || (shrink && position == records + count * 16u) ||
+               (position - records) % 16u) {
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+    /* Retain the TEMP guard and the launcher's hidden stack reservation. */
+    uint32_t cost = width + 5u;
+    if (!shrink && (io->temp_limit - rstk < cost || dstk - rstk < cost ||
+                    io->stack_reserve_nibbles > dstk - rstk - cost))
         return HPCLANG_RPL_MUTATION_NOSPACE;
+    int32_t delta = shrink ? -(int32_t)width : (int32_t)width;
+    uint32_t first = position + (shrink ? width : 0u);
+    uint32_t new_rstk = (uint32_t)((int64_t)rstk + delta);
     uint32_t new_avmem;
-    result = plan_free_cells(avmem, (dstk - rstk) / 5u, (dstk - rstk - 16u) / 5u, &new_avmem);
+    result = plan_free_cells(avmem, (dstk - rstk) / 5u, (dstk - new_rstk) / 5u, &new_avmem);
     if (result)
         return result;
     /* Read every source/destination nibble before modifying roots. A mapped
      * endpoint alone cannot establish a callback backend's readable extent. */
-    for (uint32_t at = position; at < rstk + 16u; ++at) {
+    for (uint32_t at = position; at < (shrink ? rstk : new_rstk); ++at) {
         uint8_t nibble;
         if (!io->read_nibble(io->context, at, &nibble))
             return HPCLANG_RPL_MUTATION_IO;
@@ -878,7 +928,8 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
             return HPCLANG_RPL_MUTATION_MALFORMED;
     }
     if (position < RPL_AVMEM + 5 || (repairs && ((repairs->edit_count && !repairs->edits) ||
-                                                 (repairs->guard_count && !repairs->guards))))
+                                                 (repairs->guard_count && !repairs->guards) ||
+                                                 (repairs->register_count && !repairs->registers))))
         return HPCLANG_RPL_MUTATION_MALFORMED;
     size_t capacity = 4;
     struct pointer_scan_request request = {
@@ -891,15 +942,19 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
         extra > SIZE_MAX / sizeof(struct catalog_edit) - capacity)
         return HPCLANG_RPL_MUTATION_NOMEM;
     capacity += extra;
-    struct catalog_edits plan = {malloc(capacity * sizeof(struct catalog_edit)), 0, capacity,
-                                 position, rstk};
+    size_t register_count = repairs ? repairs->register_count : 0;
+    if (register_count > SIZE_MAX / sizeof(struct catalog_edit) - capacity)
+        return HPCLANG_RPL_MUTATION_NOMEM;
+    capacity += register_count;
+    struct catalog_edits plan = {
+        malloc(capacity * sizeof(struct catalog_edit)), 0, capacity, first, rstk, delta};
     if (!plan.items)
         return HPCLANG_RPL_MUTATION_NOMEM;
     int committing = 0;
     const struct catalog_edit boundaries[] = {
-        {RPL_TEMPBOTTOM, bottom, bottom + 16, 5, NULL},
-        {RPL_TEMPTOP, top, top + 16, 5, NULL},
-        {RPL_RSKTOP, rstk, rstk + 16, 5, NULL},
+        {RPL_TEMPBOTTOM, bottom, (uint32_t)((int64_t)bottom + delta), 5, NULL},
+        {RPL_TEMPTOP, top, (uint32_t)((int64_t)top + delta), 5, NULL},
+        {RPL_RSKTOP, rstk, new_rstk, 5, NULL},
         {RPL_AVMEM, avmem, new_avmem, 5, NULL},
     };
     for (unsigned i = 0; i < 4; ++i) {
@@ -926,16 +981,60 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
         if (result)
             goto done;
     }
+    for (size_t i = 0; i < register_count; ++i) {
+        const struct hpclang_rpl_register_repair *source = &repairs->registers[i];
+        if (!source->word || (uintptr_t)source->word % _Alignof(uint32_t)) {
+            result = HPCLANG_RPL_MUTATION_MALFORMED;
+            goto done;
+        }
+        uint32_t address = source->expected & 0xfffffu;
+        uint32_t replacement = source->expected;
+        if (shrink && address >= position && address < first) {
+            result = HPCLANG_RPL_MUTATION_BUSY;
+            goto done;
+        }
+        if (address >= first && address < rstk)
+            replacement = (source->expected & 0xfff00000u) | (uint32_t)((int64_t)address + delta);
+        const struct catalog_edit edit = {0, source->expected, replacement, 5, source->word};
+        result = catalog_add_edit(&plan, &edit);
+        if (result)
+            goto done;
+    }
     for (uint32_t i = 0; repairs && i < repairs->guard_count; ++i) {
         const struct hpclang_rpl_reference_guard *guard = &repairs->guards[i];
         uint32_t value;
-        if (guard->mapping != repairs->main_mapping || !guard->width || guard->width > 5 ||
-            guard->field < RPL_MAIN_FIRST || guard->field > RPL_MAIN_END - guard->width ||
+        if (!guard->width || guard->width > 5 || guard->field > 0x100000u - guard->width ||
             guard->expected >> (4 * guard->width)) {
             result = HPCLANG_RPL_MUTATION_MALFORMED;
             goto done;
         }
-        result = read_word(io, guard->field, guard->width, &value);
+        if (guard->mapping == repairs->main_mapping) {
+            if (guard->field < RPL_MAIN_FIRST) {
+                result = HPCLANG_RPL_MUTATION_MALFORMED;
+                goto done;
+            }
+            result = read_word(io, guard->field, guard->width, &value);
+        } else {
+            const struct hpclang_rpl_reference_reader *reader = repairs->guard_reader;
+            if (!reader || !reader->read_nibble) {
+                result = HPCLANG_RPL_MUTATION_MALFORMED;
+                goto done;
+            }
+            value = 0;
+            for (unsigned j = 0; j < guard->width; ++j) {
+                uint8_t nibble;
+                if (!reader->read_nibble(reader->context, guard->mapping, guard->field + j,
+                                         &nibble)) {
+                    result = HPCLANG_RPL_MUTATION_IO;
+                    goto done;
+                }
+                if (nibble > 15u) {
+                    result = HPCLANG_RPL_MUTATION_MALFORMED;
+                    goto done;
+                }
+                value |= (uint32_t)nibble << (4 * j);
+            }
+        }
         if (result)
             goto done;
         if (value != guard->expected) {
@@ -967,12 +1066,51 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
         else if ((result = write_word(io, edit->field, edit->width, edit->value)))
             goto done;
     }
-    result = move_nibbles(io, position + 16, position, rstk - position);
+    result = move_nibbles(io, shrink ? position : position + width, first, rstk - first);
+    if (!result && acptr && !shrink) {
+        result = write_word(io, position, 5, 0x02baau);
+        if (!result)
+            result = write_word(io, position + 5, 5, acptr[0]);
+        if (!result)
+            result = write_word(io, position + 10, 5, acptr[1]);
+    }
     for (unsigned i = 0; !result && i < 4; ++i)
         result = write_word(io, boundaries[i].field, 5, boundaries[i].value);
 done:
     free(plan.items);
     return result && committing ? HPCLANG_RPL_MUTATION_INCOMPLETE : result;
+}
+
+int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation_io *io,
+                                               uint32_t position,
+                                               const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    return catalog_resize_repaired(io, position, repairs, 0, NULL);
+}
+
+int hpclang_rpl_mutation_catalog_shrink_repaired(const struct hpclang_rpl_mutation_io *io,
+                                                 uint32_t position,
+                                                 const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    return catalog_resize_repaired(io, position, repairs, 1, NULL);
+}
+
+int hpclang_rpl_mutation_cache_acptr_insert(const struct hpclang_rpl_mutation_io *io,
+                                            uint32_t position, uint32_t target,
+                                            uint32_t bank_switch,
+                                            const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    const uint32_t acptr[] = {target, bank_switch};
+    return catalog_resize_repaired(io, position, repairs, 0, acptr);
+}
+
+int hpclang_rpl_mutation_cache_acptr_remove(const struct hpclang_rpl_mutation_io *io,
+                                            uint32_t position, uint32_t target,
+                                            uint32_t bank_switch,
+                                            const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    const uint32_t acptr[] = {target, bank_switch};
+    return catalog_resize_repaired(io, position, repairs, 1, acptr);
 }
 
 int hpclang_rpl_mutation_catalog_grow(const struct hpclang_rpl_mutation_io *io, uint32_t position)
@@ -1524,6 +1662,129 @@ int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_i
      * carry the corrected value with them.
      */
     return commit_userob_shift(io, &geometry, &directory_plan);
+}
+
+int hpclang_rpl_mutation_home_attach(const struct hpclang_rpl_mutation_io *io, uint32_t number,
+                                     uint32_t first, uint32_t second)
+{
+    if (!io_ready(io))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (number > 0xfffu || first >= RPL_MAIN_END || second >= RPL_MAIN_END)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    uint32_t home, count;
+    int result = hpclang_rpl_store_home_object(&reader, &home);
+    if (result)
+        return store_result_to_mutation(result);
+    if (home > RPL_MAIN_END - 8)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = read_word(io, home + 5, 3, &count);
+    if (result)
+        return result;
+    if (count > (RPL_MAIN_END - home - 8) / 13)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    int exists = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t at = home + 8 + 13 * i, id, ignored;
+        result = read_word(io, at, 3, &id);
+        if (!result)
+            result = read_word(io, at + 3, 5, &ignored);
+        if (!result)
+            result = read_word(io, at + 8, 5, &ignored);
+        if (result)
+            return result;
+        exists |= id == number;
+    }
+    if (exists)
+        return HPCLANG_RPL_MUTATION_EXISTS;
+    if (count == 0xfffu)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    uint32_t body = home + 8 + 13 * count;
+    struct userob_shift_geometry geometry;
+    struct directory_patch_plan directories;
+    result = plan_userob_shift(io, body, 13, &geometry, &directories, NULL, 0);
+    if (!result)
+        result = map_structural_address(&geometry, first, 1, &first);
+    if (!result)
+        result = map_structural_address(&geometry, second, 1, &second);
+    if (result)
+        return result;
+    /* Prove all source nibbles readable before the first write, including
+     * stack padding not visited by structural/root scans. */
+    for (uint32_t at = geometry.old_dstk; at < body; ++at) {
+        uint8_t nibble;
+        if (!io->read_nibble(io->context, at, &nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (nibble > 15)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+    result = commit_userob_shift(io, &geometry, &directories);
+    if (!result)
+        result = write_word(io, body - 13, 3, number);
+    if (!result)
+        result = write_word(io, body - 10, 5, first);
+    if (!result)
+        result = write_word(io, body - 5, 5, second);
+    if (!result)
+        result = write_word(io, home - 13 + 5, 3, count + 1);
+    return result ? HPCLANG_RPL_MUTATION_INCOMPLETE : HPCLANG_RPL_MUTATION_OK;
+}
+
+int hpclang_rpl_mutation_home_detach(const struct hpclang_rpl_mutation_io *io, uint32_t number)
+{
+    if (!io_ready(io))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (number > 0xfffu)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    uint32_t home, count;
+    int result = hpclang_rpl_store_home_object(&reader, &home);
+    if (result)
+        return store_result_to_mutation(result);
+    if (home > RPL_MAIN_END - 8)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = read_word(io, home + 5, 3, &count);
+    if (result)
+        return result;
+    if (count > (RPL_MAIN_END - home - 8) / 13)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t slot = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t record = home + 8 + 13 * i, id, ignored;
+        result = read_word(io, record, 3, &id);
+        if (!result)
+            result = read_word(io, record + 3, 5, &ignored);
+        if (!result)
+            result = read_word(io, record + 8, 5, &ignored);
+        if (result)
+            return result;
+        if (id == number) {
+            if (slot)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            slot = record;
+        }
+    }
+    if (!slot)
+        return HPCLANG_RPL_MUTATION_NOT_FOUND;
+    struct userob_shift_geometry geometry;
+    struct directory_patch_plan directories;
+    result = plan_userob_shift(io, slot + 13, -13, &geometry, &directories, NULL, 0);
+    if (result)
+        return result;
+    /* The HOME header and earlier attachments move up; the following records
+     * and directory body stay at their original addresses. With the new count,
+     * HOME+13 names exactly the same directory chain and stored objects. */
+    for (uint32_t at = geometry.old_dstk; at < slot + 13; ++at) {
+        uint8_t nibble;
+        if (!io->read_nibble(io->context, at, &nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (nibble > 15)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+    result = commit_userob_shift(io, &geometry, &directories);
+    if (!result)
+        result = write_word(io, home + 13 + 5, 3, count - 1);
+    return result ? HPCLANG_RPL_MUTATION_INCOMPLETE : HPCLANG_RPL_MUTATION_OK;
 }
 
 int hpclang_rpl_mutation_port0_shift_before(const struct hpclang_rpl_mutation_io *io,

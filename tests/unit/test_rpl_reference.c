@@ -604,6 +604,84 @@ static void dispatch_schemas(void)
            HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+static void offset_relocation(void)
+{
+    const struct hpclang_rpl_reference_patch unchanged = {0xabcde, 0x12345};
+    struct hpclang_rpl_reference_patch patch = unchanged;
+    struct hpclang_rpl_reference_mappings maps = {2, 1, 1};
+    struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_ACPTR, 0x80000, 0x70011, 0, 123};
+    /* Bank 0's 70011 aliases bank 1's 40011; keep the original encoding. */
+    assert(hpclang_rpl_reference_plan_offset_shift(&edge, &maps, 0, -0x30000, 0x40000, 0x40100, 16,
+                                                   &patch) == 1);
+    assert(patch.field == edge.field && patch.value == 0x70021);
+    /* An equal-looking address in a proven-disjoint mapping does not move. */
+    maps.target = 3;
+    patch = unchanged;
+    assert(!hpclang_rpl_reference_plan_offset_shift(&edge, &maps, 0, -0x30000, 0x40000, 0x40100, 16,
+                                                    &patch));
+    assert(!memcmp(&patch, &unchanged, sizeof patch));
+    /* Independently translated relative endpoints; compare actual encoded
+     * subtraction, including cases where one or both endpoints move. */
+    for (unsigned field_moves = 0; field_moves < 2; ++field_moves) {
+        for (unsigned target_moves = 0; target_moves < 2; ++target_moves) {
+            for (int delta = -32; delta <= 32; delta += 64) {
+                maps = (struct hpclang_rpl_reference_mappings){1, 1, 1};
+                edge = (struct hpclang_rpl_reference){HPCLANG_RPL_REFERENCE_DIRECT, 0x70000,
+                                                      0x60000, 0, 1};
+                int32_t field_offset = field_moves ? -0x2fff0 : -0x30020;
+                int32_t target_offset = target_moves ? -0x1ffe0 : -0x1ff00;
+                uint32_t before = (edge.target - edge.field) & 0xfffff;
+                uint32_t expected =
+                    (uint32_t)((int64_t)edge.target + (int64_t)target_moves * delta - edge.field -
+                               (int64_t)field_moves * delta) &
+                    0xfffff;
+                patch = unchanged;
+                int result = hpclang_rpl_reference_plan_offset_shift(
+                    &edge, &maps, field_offset, target_offset, 0x40000, 0x40100, delta, &patch);
+                assert(result == (expected != before));
+                if (result)
+                    assert(patch.field == edge.field && patch.value == expected);
+                else
+                    assert(!memcmp(&patch, &unchanged, sizeof patch));
+            }
+        }
+    }
+    edge = (struct hpclang_rpl_reference){HPCLANG_RPL_REFERENCE_DIRECT, 0x70000, 0x60000, 0, 0};
+    /* Every split through the five-nibble field is rejected in translated coordinates. */
+    for (int split = 1; split < 5; ++split) {
+        patch = unchanged;
+        assert(hpclang_rpl_reference_plan_offset_shift(&edge, &maps, -0x30000 - split, 0, 0x40000,
+                                                       0x40100, 16,
+                                                       &patch) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(hpclang_rpl_reference_plan_offset_shift(&edge, &maps, -0x2ff00 - split, 0, 0x40000,
+                                                       0x40100, 16,
+                                                       &patch) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&patch, &unchanged, sizeof patch));
+    }
+    /* Normalized destinations fit, but native encoding may still overflow. */
+    for (unsigned endpoint = 0; endpoint < 2; ++endpoint) {
+        for (unsigned high = 0; high < 2; ++high) {
+            edge.field = endpoint ? 0x80000 : (high ? 0xffffb : 0);
+            edge.target = endpoint ? (high ? 0xfffff : 0) : 0x80000;
+            int32_t field_offset = endpoint ? 0 : 0x40010 - (int32_t)edge.field;
+            int32_t target_offset = endpoint ? 0x40010 - (int32_t)edge.target : 0;
+            patch = unchanged;
+            assert(hpclang_rpl_reference_plan_offset_shift(
+                       &edge, &maps, field_offset, target_offset, 0x40000, 0x40100, high ? 16 : -32,
+                       &patch) == HPCLANG_RPL_SPAN_BOUNDS);
+            assert(!memcmp(&patch, &unchanged, sizeof patch));
+        }
+    }
+    edge = (struct hpclang_rpl_reference){HPCLANG_RPL_REFERENCE_DIRECT, 0x70000, 0x60000, 0, 0};
+    assert(!hpclang_rpl_reference_plan_offset_shift(&edge, &maps, INT32_MIN, INT32_MAX, 0x40000,
+                                                    0x40100, 16, &patch));
+    edge.kind = HPCLANG_RPL_REFERENCE_EXECUTION;
+    assert(hpclang_rpl_reference_plan_offset_shift(&edge, &maps, 0, 0, 0x40000, 0x40100, 16,
+                                                   &patch) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_reference_plan_offset_shift(&edge, NULL, 0, 0, 0x40000, 0x40100, 16,
+                                                   &patch) == HPCLANG_RPL_SPAN_MALFORMED);
+}
+
 static void qualified_relocation(void)
 {
     struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_ACPTR, 0x100, 0x120, 0, 0x23456};
@@ -778,6 +856,108 @@ static void metadata_guards(void)
     }
 }
 
+struct alias_edit_memory
+{
+    uint8_t data[32];
+    int32_t bias;
+    unsigned reads, writes, locations, fail_location;
+};
+
+static int alias_field(void *context, uint32_t mapping, uint32_t field, uint32_t width,
+                       uint32_t *physical)
+{
+    struct alias_edit_memory *memory = context;
+    assert(mapping < 2 && width && width <= 5);
+    if (++memory->locations == memory->fail_location)
+        return 73;
+    *physical = (uint32_t)((int64_t)field + (mapping ? memory->bias : 0));
+    return 0;
+}
+
+static int alias_read(void *context, uint32_t mapping, uint32_t field, uint8_t *value)
+{
+    struct alias_edit_memory *memory = context;
+    int64_t at = (int64_t)field + (mapping ? memory->bias : 0);
+    assert(at >= 0 && at < 32);
+    ++memory->reads;
+    *value = memory->data[at];
+    return 1;
+}
+
+static int alias_write(void *context, uint32_t mapping, uint32_t field, uint8_t value)
+{
+    struct alias_edit_memory *memory = context;
+    int64_t at = (int64_t)field + (mapping ? memory->bias : 0);
+    assert(at >= 0 && at < 32);
+    ++memory->writes;
+    memory->data[at] = value;
+    return 1;
+}
+
+static int repeated_page_field(void *context, uint32_t mapping, uint32_t field, uint32_t width,
+                               uint32_t *physical)
+{
+    (void)context;
+    (void)mapping;
+    assert(width == 1);
+    *physical = field & 7;
+    return 0;
+}
+
+static void physical_alias_replay(void)
+{
+    assert(!hpclang_rpl_reference_edits_replay_mapped(NULL, NULL, 0, NULL, NULL));
+    const struct hpclang_rpl_reference_edit repeated[] = {{0, 5, 0, 1, 1}, {0, 13, 0, 1, 1}};
+    assert(hpclang_rpl_reference_edits_check_aliases(repeated, 2, repeated_page_field, NULL) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    for (uint32_t width = 1; width <= 5; ++width) {
+        for (int32_t bias = -8; bias <= 2; ++bias) {
+            struct alias_edit_memory memory = {.bias = bias};
+            const struct hpclang_rpl_reference_writer writer = {{alias_read, &memory}, alias_write};
+            const struct hpclang_rpl_reference_edit edits[] = {{0, 5, 0, 1, 5},
+                                                               {1, 9, 0, 1, width}};
+            int overlaps = 9 + bias < 10 && 9 + bias + (int32_t)width > 5;
+            int result =
+                hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field, &memory);
+            if (overlaps) {
+                assert(result == HPCLANG_RPL_SPAN_MALFORMED);
+                assert(!memory.reads && !memory.writes);
+                for (unsigned i = 0; i < sizeof memory.data; ++i)
+                    assert(!memory.data[i]);
+            } else {
+                assert(!result && memory.writes == 2);
+                /* Replay accepts replacement bytes from an earlier attempt. */
+                assert(!hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field,
+                                                                  &memory));
+                assert(memory.writes == 2);
+            }
+        }
+    }
+    struct alias_edit_memory memory = {0};
+    const struct hpclang_rpl_reference_writer writer = {{alias_read, &memory}, alias_write};
+    struct hpclang_rpl_reference_edit edits[] = {{0, 5, 0, 1, 5}, {1, 15, 0, 1, 5}};
+    for (unsigned fail = 1; fail <= 3; ++fail) {
+        memory = (struct alias_edit_memory){.fail_location = fail};
+        assert(hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field, &memory) ==
+               73);
+        assert(!memory.reads && !memory.writes);
+    }
+    memory = (struct alias_edit_memory){0};
+    edits[1].width = 6;
+    assert(hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field, &memory) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memory.locations && !memory.reads && !memory.writes);
+    edits[1].width = 5;
+    memory.bias = -16; /* Resolved start UINT32_MAX cannot contain five nibbles. */
+    assert(hpclang_rpl_reference_edits_replay_mapped(&writer, edits, 2, alias_field, &memory) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!memory.reads && !memory.writes);
+    edits[1].width = 1;
+    assert(!hpclang_rpl_reference_edits_check_aliases(edits, 2, alias_field, &memory));
+    assert(hpclang_rpl_reference_edits_check_aliases(edits, 2, NULL, NULL) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 struct edit_memory
 {
     uint8_t banks[2][32];
@@ -805,7 +985,25 @@ static int edit_write(void *context, uint32_t mapping, uint32_t at, uint8_t valu
     return !failed;
 }
 
-static void batch_replay(unsigned first_width, unsigned second_width)
+static int distinct_ram_field(void *context, uint32_t mapping, uint32_t field, uint32_t width,
+                              uint32_t *physical)
+{
+    (void)context;
+    assert(mapping < 2 && field + width <= 32);
+    *physical = mapping * 32 + field;
+    return 0;
+}
+
+static int mapped_batch_replay(const struct hpclang_rpl_reference_writer *writer,
+                               const struct hpclang_rpl_reference_edit *edits, uint32_t count)
+{
+    return hpclang_rpl_reference_edits_replay_mapped(writer, edits, count, distinct_ram_field,
+                                                     NULL);
+}
+
+static void batch_replay(unsigned first_width, unsigned second_width,
+                         int (*replay)(const struct hpclang_rpl_reference_writer *,
+                                       const struct hpclang_rpl_reference_edit *, uint32_t))
 {
     struct edit_memory initial = {0}, completed;
     memset(initial.banks, 7, sizeof initial.banks);
@@ -829,22 +1027,21 @@ static void batch_replay(unsigned first_width, unsigned second_width)
     struct hpclang_rpl_reference_writer writer = {{edit_read, &memory}, edit_write};
     assert(!hpclang_rpl_reference_edits_validate(&writer.reader, edits, 2));
     memory = initial;
-    assert(!hpclang_rpl_reference_edits_replay(NULL, NULL, 0));
-    assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+    assert(!replay(NULL, NULL, 0));
+    assert(!replay(&writer, edits, 2));
     assert(!memcmp(memory.banks, completed.banks, sizeof memory.banks));
     unsigned reads = memory.reads, writes = memory.writes;
     assert(writes == first_width + second_width);
-    assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+    assert(!replay(&writer, edits, 2));
     assert(memory.writes == writes);
     for (unsigned cut = 1; cut <= reads; ++cut) {
         memory = initial;
         memory.fail_read = cut;
-        assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) ==
-               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_UNAVAILABLE);
         if (cut <= first_width + second_width)
             assert(!memory.writes);
         memory.fail_read = 0;
-        assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+        assert(!replay(&writer, edits, 2));
         assert(!memcmp(memory.banks, completed.banks, sizeof memory.banks));
     }
     for (unsigned cut = 1; cut <= writes; ++cut) {
@@ -852,24 +1049,23 @@ static void batch_replay(unsigned first_width, unsigned second_width)
             memory = initial;
             memory.fail_write = cut;
             memory.acknowledge_failure = committed;
-            assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) ==
-                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_UNAVAILABLE);
             memory.fail_write = 0;
-            assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+            assert(!replay(&writer, edits, 2));
             assert(!memcmp(memory.banks, completed.banks, sizeof memory.banks));
         }
     }
     memory = initial;
     memory.banks[1][4 + second_width] = 0; /* Late corruption prevents all writes. */
-    assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
     assert(!memory.writes);
     memory = initial;
     edits[1].mapping = 0; /* Same-address edits in distinct banks above were valid. */
-    assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
     assert(!memory.reads && !memory.writes);
     edits[1].mapping = 1;
     memory.silent_write = 1;
-    assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
     assert(!memcmp(memory.banks, initial.banks, sizeof memory.banks));
 }
 
@@ -1087,6 +1283,67 @@ static void execution_address_planning(void)
     assert(hpclang_rpl_reference_plan_execution_shift(&edge, &maps, 0x103, 0x200, 16, &patch) ==
            HPCLANG_RPL_SPAN_BOUNDS);
     assert(!memcmp(&patch, &unchanged, sizeof patch));
+}
+
+static int catalog_alias_locations(void *context, const struct hpclang_rpl_library_binding *binding,
+                                   struct hpclang_rpl_catalog_locations *locations)
+{
+    (void)binding;
+    *locations = *(const struct hpclang_rpl_catalog_locations *)context;
+    return 0;
+}
+
+static void catalog_offset_plans(void)
+{
+    struct mapped_images images = {.banks = {{.size = 19, .fail = UINT32_MAX}}};
+    struct image *image = &images.banks[0];
+    put(image, 0, 1, 3);
+    put(image, 3, 275, 3);
+    put(image, 6, 0x70020, 5);
+    put(image, 11, 0x60030, 5);
+    put(image, 16, 7, 3);
+    const struct hpclang_rpl_reader reader = {read_nibble, image};
+    const struct hpclang_rpl_reference_reader mapped = {mapped_read, &images};
+    struct hpclang_rpl_reference_edit edits[2];
+    struct hpclang_rpl_reference_guard guards[3];
+    struct hpclang_rpl_catalog_reference_plan plan = {edits, 2, 0, guards, 3, 0};
+    struct hpclang_rpl_catalog_locations locations = {{1, 1}, -0x30000, -0x20000};
+    struct hpclang_rpl_catalog_move move = {0, 1, 0x40000, 0x40100, 16};
+    assert(!hpclang_rpl_catalog_plan_relocation_offsets(
+        &reader, 0, 19, &move, 0, catalog_alias_locations, &locations, &plan));
+    assert(plan.edit_count == 2 && plan.guard_count == 3);
+    assert(edits[0].field == 6 && edits[0].expected == 0x70020 && edits[0].value == 0x70030);
+    assert(edits[1].field == 11 && edits[1].expected == 0x60030 && edits[1].value == 0x60040);
+    assert(!hpclang_rpl_reference_edits_validate(&mapped, edits, 2));
+    assert(!hpclang_rpl_reference_guards_validate(&mapped, guards, 3));
+    for (unsigned nibble = 0; nibble < 19; ++nibble) {
+        image->data[nibble] ^= 1;
+        assert(hpclang_rpl_reference_edits_validate(&mapped, edits, 2) ||
+               hpclang_rpl_reference_guards_validate(&mapped, guards, 3));
+        image->data[nibble] ^= 1;
+    }
+    /* Partial translated field, missing resolver and changed function sentinel
+     * invalidate all output counts, including already prepared payload edits. */
+    move.catalog_mapping = 1;
+    assert(hpclang_rpl_catalog_plan_relocation_offsets(&reader, 0, 19, &move, 0x3fff8,
+                                                       catalog_alias_locations, &locations,
+                                                       &plan) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!plan.edit_count && !plan.guard_count);
+    move.catalog_mapping = 0;
+    assert(hpclang_rpl_catalog_plan_relocation_offsets(&reader, 0, 19, &move, 0, NULL, &locations,
+                                                       &plan) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!plan.edit_count && !plan.guard_count);
+    put(image, 11, 16, 5);
+    locations.bank_switch_offset = 0x40000;
+    move.delta = -16;
+    assert(hpclang_rpl_catalog_plan_relocation_offsets(&reader, 0, 19, &move, 0,
+                                                       catalog_alias_locations, &locations,
+                                                       &plan) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!plan.edit_count && !plan.guard_count);
+    put(image, 11, 0, 5);
+    assert(!hpclang_rpl_catalog_plan_relocation_offsets(
+        &reader, 0, 19, &move, 0, catalog_alias_locations, &locations, &plan));
+    assert(!edits[1].expected && !edits[1].value);
 }
 
 static void catalog_executable_switches(void)
@@ -1403,8 +1660,275 @@ static void mixed_width_metadata(void)
     assert(hpclang_rpl_reference_edits_add(&builder, &edit) == HPCLANG_RPL_SPAN_BOUNDS);
 }
 
+struct guarded_edges
+{
+    struct edges edges;
+    struct hpclang_rpl_reference_guard_builder builder;
+    struct hpclang_rpl_reference_guard guards[32];
+    uint8_t seen[128];
+    uint32_t observations, stop_at;
+};
+
+static int guarded_edge(void *context, const struct hpclang_rpl_reference *edge)
+{
+    struct guarded_edges *state = context;
+    return collect(&state->edges, edge);
+}
+
+static int observe_reference(void *context, uint32_t address, uint8_t value)
+{
+    struct guarded_edges *state = context;
+    assert(address < sizeof state->seen && value < 16);
+    if (++state->observations == state->stop_at)
+        return 73;
+    state->seen[address] = 1;
+    return hpclang_rpl_reference_guards_observe(&state->builder, 7, address, value);
+}
+
+static int guarded_mapped_read(void *context, uint32_t mapping, uint32_t address, uint8_t *value)
+{
+    return mapping == 7 && read_nibble(context, address, value);
+}
+
+static void begin_guarded_edges(struct guarded_edges *state)
+{
+    memset(state, 0, sizeof *state);
+    assert(!hpclang_rpl_reference_guards_begin(&state->builder, state->guards, 32));
+}
+
+static void guarded_dispatch_references(void)
+{
+    for (unsigned schema = 0; schema < 2; ++schema) {
+        struct image image = {.size = 20, .fail = UINT32_MAX};
+        put(&image, 0, 80, 5);
+        put(&image, 5, 0x81234, 5); /* Scalar type bits must not become a pointer. */
+        const struct image original = image;
+        const struct hpclang_rpl_reader reader = {read_nibble, &image};
+        const struct hpclang_rpl_reference_reader mapped = {guarded_mapped_read, &image};
+        const struct hpclang_rpl_dispatch_descriptor descriptor = {80, schema};
+        const unsigned consumed = schema ? 10 : 6;
+        struct guarded_edges state;
+        begin_guarded_edges(&state);
+        assert(!hpclang_rpl_dispatch_reference_visit_guarded(
+            &reader, 0, image.size, &descriptor, guarded_edge, observe_reference, &state));
+        assert(state.observations == consumed && state.edges.count == (schema ? 1u : 2u));
+        assert(state.edges.items[0].kind == HPCLANG_RPL_REFERENCE_EXECUTION);
+        assert(state.edges.items[0].target == 80);
+        if (!schema)
+            assert(state.edges.items[1].kind == HPCLANG_RPL_REFERENCE_EMBEDDED_ENTRY);
+        assert(!memcmp(&image, &original, sizeof image));
+        assert(!hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count));
+        for (unsigned i = 0; i < image.size; ++i) {
+            assert(state.seen[i] == (i < consumed));
+            image.data[i] ^= 1;
+            int result =
+                hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count);
+            assert(result == (i < consumed ? HPCLANG_RPL_SPAN_MALFORMED : 0));
+            image.data[i] ^= 1;
+        }
+        for (unsigned i = 0; i < consumed; ++i) {
+            begin_guarded_edges(&state);
+            state.stop_at = i + 1;
+            assert(hpclang_rpl_dispatch_reference_visit_guarded(&reader, 0, image.size, &descriptor,
+                                                                guarded_edge, observe_reference,
+                                                                &state) == 73);
+            assert(state.observations == i + 1 && !state.edges.count);
+            begin_guarded_edges(&state);
+            image.fail = i;
+            assert(hpclang_rpl_dispatch_reference_visit_guarded(
+                       &reader, 0, image.size, &descriptor, guarded_edge, observe_reference,
+                       &state) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(!state.seen[i] && !state.edges.count);
+            image.fail = UINT32_MAX;
+            begin_guarded_edges(&state);
+            image.data[i] = 16;
+            assert(hpclang_rpl_dispatch_reference_visit_guarded(
+                &reader, 0, image.size, &descriptor, guarded_edge, observe_reference, &state));
+            assert(!state.seen[i] && !state.edges.count);
+            image = original;
+        }
+        begin_guarded_edges(&state);
+        state.edges.stop = 81;
+        assert(hpclang_rpl_dispatch_reference_visit_guarded(&reader, 0, image.size, &descriptor,
+                                                            guarded_edge, observe_reference,
+                                                            &state) == 81);
+        assert(state.edges.count == 1);
+        begin_guarded_edges(&state);
+        assert(hpclang_rpl_dispatch_reference_visit_guarded(&reader, 0, image.size, &descriptor,
+                                                            guarded_edge, NULL, &state) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!state.observations && !state.edges.count);
+    }
+}
+
+static void identified_dispatch_references(void)
+{
+    struct image image = {.size = 128, .fail = UINT32_MAX};
+    put(&image, 0, 80, 5);
+    put(&image, 5, 0x81234, 5);
+    uint8_t expected[] = {1, 3, 2, 1, 6, 4, 0, 3};
+    memcpy(image.data + 80, expected, 5);
+    memcpy(image.data + 100, expected + 5, 3);
+    struct hpclang_rpl_dispatch_identity_range ranges[] = {{80, 5, expected},
+                                                           {100, 3, expected + 5}};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    const struct hpclang_rpl_reference_reader mapped = {guarded_mapped_read, &image};
+    for (unsigned schema = 0; schema < 2; ++schema) {
+        const struct hpclang_rpl_dispatch_descriptor descriptor = {80, schema};
+        struct guarded_edges state;
+        begin_guarded_edges(&state);
+        assert(!hpclang_rpl_dispatch_reference_visit_identified(
+            &reader, 0, 10, &descriptor, ranges, 2, guarded_edge, observe_reference, &state));
+        assert(state.edges.count == (schema ? 1u : 2u));
+        assert(state.observations == 8 + (schema ? 10u : 6u));
+        assert(!hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count));
+        for (unsigned i = 0; i < 8; ++i) {
+            unsigned at = i < 5 ? 80 + i : 100 + i - 5;
+            image.data[at] ^= 1;
+            assert(
+                hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count));
+            image.data[at] ^= 1;
+        }
+        for (unsigned i = 0; i < 8; ++i) {
+            unsigned at = i < 5 ? 80 + i : 100 + i - 5;
+            for (unsigned failure = 0; failure < 4; ++failure) {
+                begin_guarded_edges(&state);
+                if (failure == 0)
+                    image.data[at] ^= 1;
+                else if (failure == 1)
+                    image.fail = at;
+                else if (failure == 2)
+                    image.data[at] = 16;
+                else
+                    state.stop_at = i + 1;
+                int result = hpclang_rpl_dispatch_reference_visit_identified(
+                    &reader, 0, 10, &descriptor, ranges, 2, guarded_edge, observe_reference,
+                    &state);
+                assert(result == (failure == 0   ? HPCLANG_RPL_SPAN_UNSUPPORTED
+                                  : failure == 1 ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                                  : failure == 2 ? HPCLANG_RPL_SPAN_MALFORMED
+                                                 : 73));
+                assert(!state.edges.count);
+                image.data[at] = expected[i];
+                image.fail = UINT32_MAX;
+            }
+        }
+        for (unsigned invalid = 0; invalid < 5; ++invalid) {
+            struct hpclang_rpl_dispatch_identity_range bad = ranges[0];
+            if (invalid == 0)
+                bad.length = 0;
+            if (invalid == 1)
+                bad.address = 0xffffe;
+            if (invalid == 2)
+                bad.nibbles = NULL;
+            if (invalid == 3)
+                bad.address = 81;
+            if (invalid == 4)
+                expected[0] = 16;
+            begin_guarded_edges(&state);
+            assert(hpclang_rpl_dispatch_reference_visit_identified(
+                &reader, 0, 10, &descriptor, &bad, 1, guarded_edge, observe_reference, &state));
+            assert(!state.edges.count && !state.observations);
+            expected[0] = 1;
+        }
+    }
+}
+
+static void guarded_nested_references(void)
+{
+    struct image image = {.size = 45, .fail = UINT32_MAX};
+    put(&image, 0, 0x2a74, 5);
+    put(&image, 5, 0x29e8, 5);
+    put(&image, 10, 30, 5);
+    put(&image, 15, 0x2baa, 5);
+    put(&image, 20, 1, 5);
+    put(&image, 25, 1, 5);
+    put(&image, 30, 0x4001c, 5);
+    put(&image, 35, 0x23c21, 5);
+    put(&image, 40, 0x312b, 5);
+    const struct image original = image;
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    const struct hpclang_rpl_reference_reader mapped = {guarded_mapped_read, &image};
+    const struct hpclang_rpl_reference_node root = {0, 45, 0};
+    struct hpclang_rpl_reference_node work[1];
+    struct guarded_edges state;
+    begin_guarded_edges(&state);
+    assert(!hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                       observe_reference, &state));
+    assert(state.edges.count == 4 && state.seen[0] && state.seen[10] && state.seen[20] &&
+           state.seen[35] && state.seen[40]);
+    assert(!memcmp(&image, &original, sizeof image));
+    assert(!hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count));
+    for (unsigned i = 0; i < image.size; ++i) {
+        if (!state.seen[i])
+            continue;
+        image.data[i] ^= 1;
+        assert(hpclang_rpl_reference_guards_validate(&mapped, state.guards, state.builder.count) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        image.data[i] ^= 1;
+    }
+    /* Every callback failure must survive the parser's read-error conversion. */
+    uint32_t observations = state.observations;
+    for (uint32_t stop = 1; stop <= observations; ++stop) {
+        begin_guarded_edges(&state);
+        state.stop_at = stop;
+        assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                          observe_reference, &state) == 73);
+        assert(state.observations == stop);
+    }
+    for (uint32_t at = 30; at < 40; ++at) {
+        image.fail = at;
+        begin_guarded_edges(&state);
+        assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                          observe_reference,
+                                                          &state) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!state.seen[at]);
+    }
+    image.fail = UINT32_MAX;
+    const struct hpclang_rpl_reference_node compact = {30, 10, 0x2baa};
+    begin_guarded_edges(&state);
+    assert(!hpclang_rpl_reference_visit_guarded_nested(&reader, &compact, work, 1, 1, guarded_edge,
+                                                       observe_reference, &state));
+    for (unsigned i = 0; i < sizeof state.seen; ++i)
+        assert(state.seen[i] == (i >= 30 && i < 40));
+    begin_guarded_edges(&state);
+    state.edges.stop = 81;
+    assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                      observe_reference, &state) == 81);
+    assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                      NULL,
+                                                      &state) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    begin_guarded_edges(&state);
+    assert(!hpclang_rpl_reference_guards_begin(&state.builder, state.guards, 1));
+    assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &root, work, 1, 3, guarded_edge,
+                                                      observe_reference,
+                                                      &state) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!state.builder.count);
+    /* Opaque payload bytes are not fabricated into dependencies or silently
+     * declared reference-free; the unresolved edge must still reach the caller. */
+    image = (struct image){.size = 15, .fail = UINT32_MAX};
+    put(&image, 0, 0x2dcc, 5);
+    put(&image, 5, 10, 5);
+    put(&image, 10, 0x81234, 5);
+    const struct hpclang_rpl_reference_node opaque = {0, 15, 0};
+    begin_guarded_edges(&state);
+    assert(!hpclang_rpl_reference_visit_guarded_nested(&reader, &opaque, work, 1, 1, guarded_edge,
+                                                       observe_reference, &state));
+    assert(state.edges.count == 1 && state.edges.items[0].kind == HPCLANG_RPL_REFERENCE_OPAQUE);
+    for (unsigned i = 10; i < 15; ++i)
+        assert(!state.seen[i]);
+    image.data[0] = 16;
+    begin_guarded_edges(&state);
+    assert(hpclang_rpl_reference_visit_guarded_nested(&reader, &opaque, work, 1, 1, guarded_edge,
+                                                      observe_reference, &state));
+    assert(!state.seen[0]);
+}
+
 int main(void)
 {
+    identified_dispatch_references();
+    guarded_dispatch_references();
+    guarded_nested_references();
     mixed_width_metadata();
     code_operand_replay();
     cached_command_program();
@@ -1413,14 +1937,19 @@ int main(void)
     compact_guard_observations();
     catalog_relocation_plan();
     catalog_executable_switches();
+    catalog_offset_plans();
+    physical_alias_replay();
     execution_address_planning();
     rebuilt_catalog_replay();
     for (unsigned first = 1; first <= 5; ++first)
-        for (unsigned second = 1; second <= 5; ++second)
-            batch_replay(first, second);
+        for (unsigned second = 1; second <= 5; ++second) {
+            batch_replay(first, second, hpclang_rpl_reference_edits_replay);
+            batch_replay(first, second, mapped_batch_replay);
+        }
     metadata_guards();
     batch_preflight();
     qualified_relocation();
+    offset_relocation();
     dispatch_schemas();
     execution_entries();
     relocation_patches();

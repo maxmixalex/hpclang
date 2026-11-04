@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <errno.h>
+#include <setjmp.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +13,7 @@
 #include "rpl-stock-memory.h"
 #include "rpl-flash-write.h"
 #include "object-snapshot.h"
+#include "runtime-stop.h"
 
 static uint8_t memory[0x100000];
 static int unavailable;
@@ -24,6 +26,17 @@ static uint32_t port1_limit = 0x2000u;
 static unsigned flash_writes;
 static struct hpclang_boot_info boot = {.saturn_state = 1};
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
+
+static uint32_t failed_write = UINT32_MAX;
+static int expect_terminal;
+static int reject_next_write;
+static jmp_buf terminal_context;
+
+__attribute__((noreturn)) void hpclang_runtime_stop(void)
+{
+    assert(expect_terminal);
+    longjmp(terminal_context, 1);
+}
 
 static int flash_word_read(void *context, uint32_t address, uint16_t *value)
 {
@@ -118,7 +131,11 @@ static int mapped_read(void *context, uint32_t address, uint8_t *value)
 static int mapped_write(void *context, uint32_t address, uint8_t value)
 {
     (void)context;
-    if (address >= sizeof(memory))
+    if (reject_next_write) {
+        reject_next_write = 0;
+        return 0;
+    }
+    if (address >= sizeof(memory) || address == failed_write)
         return 0;
     memory[address] = value;
     return 1;
@@ -402,6 +419,68 @@ static void test_flash(void)
     hpclang_object_release(library);
 }
 
+static void check_port0_terminal(const struct hpclang_object *value,
+                                 const struct hpclang_object *library)
+{
+    uint8_t *before = malloc(sizeof memory);
+    assert(before);
+    memcpy(before, memory, sizeof memory);
+    struct hpclang_object *replacement = NULL;
+    assert(!hpclang_object_create_string((const uint8_t *)"different", 9, &replacement));
+    for (volatile unsigned operation = 0; operation < 4; ++operation) {
+        memcpy(memory, before, sizeof memory);
+        if (operation == 1 || operation == 2)
+            assert(!hpclang_port_backup_create(0, (const uint8_t *)"CUT", 3, value));
+        reject_next_write = expect_terminal = 1;
+        if (!setjmp(terminal_context)) {
+            if (operation == 0)
+                (void)hpclang_port_backup_create(0, (const uint8_t *)"CUT", 3, value);
+            else if (operation == 1)
+                (void)hpclang_port_backup_replace(0, (const uint8_t *)"CUT", 3, replacement);
+            else if (operation == 2)
+                (void)hpclang_port_backup_remove(0, (const uint8_t *)"CUT", 3);
+            else
+                (void)hpclang_port_library_create(0, library);
+            assert(!"Incomplete Port0 mutation returned to the application");
+        }
+        assert(!reject_next_write);
+        expect_terminal = 0;
+    }
+    memcpy(memory, before, sizeof memory);
+    hpclang_object_release(replacement);
+    free(before);
+}
+
+static void check_port1_terminal(const struct hpclang_object *value,
+                                 const struct hpclang_object *library)
+{
+    for (unsigned kind = 0; kind < 2; ++kind) {
+        /* Each prologue publication boundary must take the terminal path. */
+        for (failed_write = 0; failed_write < 5; ++failed_write) {
+            memset(memory, 0, port1_limit);
+            expect_terminal = 1;
+            if (!setjmp(terminal_context)) {
+                if (kind)
+                    (void)hpclang_port_library_create(1, library);
+                else
+                    (void)hpclang_port_backup_create(1, (const uint8_t *)"NEW", 3, value);
+                assert(!"Partial native publication returned to the application");
+            }
+            expect_terminal = 0;
+        }
+        /* An unpublished-body fault remains an ordinary recoverable IO error. */
+        memset(memory, 0, port1_limit);
+        failed_write = 5;
+        int result = kind ? hpclang_port_library_create(1, library)
+                          : hpclang_port_backup_create(1, (const uint8_t *)"NEW", 3, value);
+        assert(result == -1 && errno == EIO);
+        for (unsigned i = 0; i < 5; ++i)
+            assert(!memory[i]);
+    }
+    failed_write = UINT32_MAX;
+    memset(memory, 0, port1_limit);
+}
+
 int main(void)
 {
     test_discovery();
@@ -511,6 +590,7 @@ int main(void)
     put_word(0x8071b, 0x92000);
     put_word(0x92000, 0x02a96);
     put_word(0x80716, 0x9200d);
+    check_port0_terminal(object, library_snapshot);
     assert(hpclang_port_backup_create(0, (const uint8_t *)"NEW", 3, object) == 0);
     assert(hpclang_port_backup_create(0, (const uint8_t *)"NEW", 3, object) == -1 &&
            errno == EEXIST);
@@ -546,6 +626,7 @@ int main(void)
     assert(hpclang_port_backup_create(0, NULL, 0, NULL) == -1 && errno == EINVAL);
     device.family = HPCLANG_FAMILY_HP4950;
     port1_available = 1;
+    check_port1_terminal(object, library_snapshot);
     memory[port1_limit] = 11;
     assert(hpclang_port_backup_create(1, (const uint8_t *)"ERAM", 4, object) == 0);
     copy = hpclang_port_backup_get(1, (const uint8_t *)"ERAM", 4);

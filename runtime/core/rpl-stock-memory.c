@@ -5,6 +5,93 @@
 #include "rpl-stock-memory.h"
 #include "launch-services.h"
 
+static int valid_page(uint32_t page)
+{
+    return !(page & 0x7ffu) &&
+           (page <= 0x200000u - 0x800u || (page >= 0x08000000u && page <= 0x08080000u - 0x800u));
+}
+
+int hpclang_rpl_stock_resolve_span(const uint32_t read_map[256], uint32_t address, uint32_t span,
+                                   uint32_t *physical)
+{
+    if (!read_map || !physical)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!span || address >= 0x100000u || span > 0x100000u - address)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t first = address >> 12, last = (address + span - 1u) >> 12;
+    uint32_t base = read_map[first];
+    for (uint32_t i = first; i <= last; ++i) {
+        uint32_t page = read_map[i];
+        if (!valid_page(page))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (page != base + (i - first) * 0x800u)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    *physical = base * 2u + (address & 0xfffu);
+    return 0;
+}
+
+int hpclang_rpl_stock_visit_spans(const uint32_t read_map[256], uint32_t address, uint32_t span,
+                                  hpclang_rpl_stock_span_visit_fn visit, void *context)
+{
+    if (!read_map || !visit)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!span || address >= 0x100000u || span > 0x100000u - address)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t first = address >> 12, last = (address + span - 1u) >> 12;
+    for (uint32_t page = first; page <= last; ++page)
+        if (!valid_page(read_map[page]))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t end = address + span;
+    while (address < end) {
+        uint32_t page = address >> 12;
+        uint32_t physical = read_map[page] * 2u + (address & 0xfffu);
+        uint32_t stop = (page + 1u) << 12;
+        while (stop < end && read_map[page + 1u] == read_map[page] + 0x800u) {
+            ++page;
+            stop += 0x1000u;
+        }
+        if (stop > end)
+            stop = end;
+        int result = visit(context, address, physical, stop - address);
+        if (result)
+            return result;
+        address = stop;
+    }
+    return 0;
+}
+
+struct overlap_scan
+{
+    const uint32_t *right_map;
+    uint32_t right_address, right_span, physical, span;
+};
+
+static int overlap_right(void *context, uint32_t logical, uint32_t physical, uint32_t span)
+{
+    (void)logical;
+    const struct overlap_scan *scan = context;
+    return physical < scan->physical + scan->span && scan->physical < physical + span;
+}
+
+static int overlap_left(void *context, uint32_t logical, uint32_t physical, uint32_t span)
+{
+    (void)logical;
+    struct overlap_scan *scan = context;
+    scan->physical = physical;
+    scan->span = span;
+    return hpclang_rpl_stock_visit_spans(scan->right_map, scan->right_address, scan->right_span,
+                                         overlap_right, scan);
+}
+
+int hpclang_rpl_stock_spans_overlap(const uint32_t left_map[256], uint32_t left_address,
+                                    uint32_t left_span, const uint32_t right_map[256],
+                                    uint32_t right_address, uint32_t right_span)
+{
+    struct overlap_scan scan = {right_map, right_address, right_span, 0, 0};
+    return hpclang_rpl_stock_visit_spans(left_map, left_address, left_span, overlap_left, &scan);
+}
+
 static int port1_read(void *context, uint32_t address, uint8_t *value)
 {
     if (!context || !value || address >= HPCLANG_RPL_PORT1_NIBBLES)
@@ -97,9 +184,11 @@ int hpclang_rpl_stock_memory_capture(struct hpclang_rpl_stock_memory *memory,
     if ((ram_section & UINT32_C(0xfff00c03)) != UINT32_C(0x08000c02))
         return 0;
     for (uint32_t i = 0u; i < HPCLANG_RPL_MAIN_PAGES; ++i) {
-        uint32_t base = read_map[128u + i];
-        if ((base & UINT32_C(0xfff007ff)) != UINT32_C(0x08000000))
+        uint32_t physical;
+        if (hpclang_rpl_stock_resolve_span(read_map, 0x80000u + i * 0x1000u, 0x1000u, &physical) ||
+            physical < 0x10000000u)
             return 0;
+        uint32_t base = physical / 2u;
         for (uint32_t j = 0u; j < i; ++j)
             if (memory->pages[j] == (uintptr_t)base)
                 return 0;
