@@ -368,13 +368,16 @@ static int probe_cache_roundtrip(struct hpclang_rpl_mutation_io *io, int keep)
             return -1;
     }
     uint32_t size = end - io->library_table;
-    uint8_t *snapshot = malloc(size);
+    uint8_t *snapshot = calloc(((size_t)size + 1u) / 2u, 1u);
     if (!snapshot)
         return -1;
     int result = -1;
-    for (uint32_t i = 0; i < size; ++i)
-        if (!io->read_nibble(io->context, io->library_table + i, snapshot + i))
+    for (uint32_t i = 0; i < size; ++i) {
+        uint8_t value;
+        if (!io->read_nibble(io->context, io->library_table + i, &value) || value > 15u)
             goto done;
+        snapshot[i / 2u] |= (uint8_t)(value << (4u * (i & 1u)));
+    }
     if (hpclang_rpl_mutation_home_detach(io, 275) ||
         probe_cache_move(io, bottom, targets[0], banks[0], 0) ||
         probe_cache_move(io, bottom + 15, targets[1], banks[1], 0) ||
