@@ -9,6 +9,8 @@
 
 extern const struct hpclang_font notebook_font;
 volatile uint32_t hpclang_e2e_result;
+extern volatile uint32_t hpclang_notebook_stack_witness[3];
+uint32_t hpclang_notebook_stack_sample(void);
 
 static void hold(void)
 {
@@ -119,5 +121,6 @@ done:
     if (display)
         hpclang_display_end();
     free(storage);
+    hpclang_notebook_stack_witness[1] = hpclang_notebook_stack_sample();
     return 0;
 }

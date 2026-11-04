@@ -1064,7 +1064,10 @@ native-cache after missing-message/remove/detach/reattach passed. Marker
 0x46410ffd identifies failed round-trip validation: the candidate changed the
 cache comparison to packed reads but left its writer unpacked. The local fix
 packs that writer too, preserves all nibble comparisons and passes ARM build.
-Three focused cache regressions are running (90455). No public Port1
+All three focused HP50g cache regressions pass (90455), as does ARM static
+analysis. The correction is committed locally as 23a49bbc. Fresh corrected
+universal two-model validation is active at
+/work/nov04-packed-snapshot/cache-fixed-stock (25166); no full acceptance. No public Port1
 authority, whole M8.0 acceptance or remote acceptance is implied.
 
 Notebook build support 96bf5a2c accepts strong or weak defined startup symbols
@@ -1110,3 +1113,29 @@ packaging. Both HP49g+/HP50g Direct and Stock executions pass, with independent
 /work/nov04-fsystem-native/independent-audit.json; script
 research/nov04-fsystem-final-audit.py. Current-head CI remains pending; these
 results do not complete M8.4 or establish physical-device behavior.
+
+
+### 2026-11-04 — Notebook main-loop persistence interaction
+
+Local commit `3319087c` extends the shipped-entry lifecycle gate through actual keyboard events: type, save, edit again, reload the saved text, and exit. A separate ENOSPC case preserves the edit and succeeds on retry. All six model IDs and three service profiles pass the existing GCC ASan/UBSan build, with zero owned resources after exit and no added main-loop allocations. Storage calls are mocked: this proves interaction/error handling, not calculator persistence or save/export resource peaks. The commit is local; remote PR #14 remains `d2f1ba36`.
+
+
+### 2026-11-05 — Notebook persistence resource matrix complete locally
+
+All six Stock models pass initial save, replacement and reload/cleanup across
+three launches each. Independent replay verifies sealed source/artifact hashes,
+all 18 content frames and settled returns, and resource reports against the HPC1
+header and launcher memory layout. Evidence:
+`/work/nov04-notebook-persistence-resources/independent-persistence-audit.json`.
+Maximum touched stack / allocator-reserved heap are 2504 / 9476 bytes for HP39
+models, 6456 / 9988 for HP48gII, and 6464 / 12412 for HP49g+/HP50g, within
+the configured 8192-byte stack and each package's heap capacity.
+These measurements include instrumentation and cover the persistence fixture;
+they do not measure the shipped keyboard loop, export/backup peaks, untouched
+stack reservations, firmware/launcher RAM or physical hardware. The separate
+shipped-entry keyboard/ENOSPC sanitizer gate remains complementary evidence.
+Current remote CI and broader M8.6 acceptance remain pending.
+
+### 2026-11-04 — Independent checkpoints across Stock relaunches
+
+Notebook persistence resource instrumentation builds on HP48gII. Its initial run saves and returns normally; relaunch phase 1 replaces the note and reaches PASS, then the memory observer fails because stock-lifecycle.py inherited the initial frame prefix. Exclusive report creation correctly rejects overwriting the initial measurement. Local `cd8b1a11` assigns a separate frame prefix to every relaunch. Seven lifecycle tests pass, including exclusive-create checks for all three families; Ruff passes. The complete suite ran against a normalized container copy because Windows checkout CRLF breaks the unchanged sourced shell helper. Failed state, outputs and hashes remain under `/work/nov04-notebook-persistence-resources/failed-hp48gii`, `failed-artifacts.json`, `failed-inputs.json` and `failed-stock.log`. Terminal session 75078 is superseded by corrected run 10531. Six-model persistence-resource acceptance remains pending. Independent audit script `research/nov04-notebook-persistence-audit.py` checks all three launches and explicitly excludes physical hardware and unmeasured export/backup workloads. No new remote push.
