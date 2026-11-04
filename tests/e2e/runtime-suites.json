@@ -13,7 +13,7 @@
   {"mode": "ui", "keyboard": false, "verifier": "tests/e2e/ui/verify.py"},
   {"mode": "notebook", "keyboard": false, "verifier": "tests/e2e/notebook/verify.py",
    "contexts": ["stock"], "build": "model"},
-  {"mode": "notebook-entry", "keyboard": false,
+  {"mode": "notebook-entry", "keyboard": false, "verifier": "tests/e2e/notebook-entry/verify.py",
    "contexts": ["stock"], "build": "model"},
   {"mode": "notebook-backup", "keyboard": false,
    "contexts": ["stock"], "families": ["hp48", "hp4950"]},
