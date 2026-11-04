@@ -26,6 +26,9 @@ def packed(values):
 
 class ObservedIdentityTests(unittest.TestCase):
     def setUp(self):
+        self.make_library(RESERVATION.LIBRARY_ID)
+
+    def make_library(self, library_id):
         self.pack = RESERVATION.packager()
         image = bytes.fromhex("1eff2fe1") + bytes(12) + b"HPCBIND1" + bytes(8)
         image += b"HPCROOT1" + bytes(40)
@@ -40,7 +43,7 @@ class ObservedIdentityTests(unittest.TestCase):
             self.pack.package(image, len(image), model="hp50g", fresh_copy=True)
         )
         self.library = self.pack._configuration_library(
-            configuration, RESERVATION.LIBRARY_ID, (empty,) * 6 + (program,)
+            configuration, library_id, (empty,) * 6 + (program,)
         )
         layout = self.pack.recovery_layout(
             self.library, (("admission", 6, image, 16, True),), identity_offset=32
@@ -87,6 +90,38 @@ class ObservedIdentityTests(unittest.TestCase):
             observed,
             RESERVATION.observed_library(self.pack, self.library, identity_nibble=self.position),
         )
+
+    def test_explicit_ids_preserve_binding_without_global_changes(self):
+        for library_id in (769, 1791, RESERVATION.LIBRARY_ID):
+            with self.subTest(library_id=library_id):
+                self.make_library(library_id)
+                observed = RESERVATION.observed_library(
+                    self.pack, self.library, identity_nibble=self.position, library_id=library_id
+                )
+                self.check_identity(observed)
+                data = unpack(observed[8:])
+                header = 14 + 2 * (data[10] + 16 * data[11])
+                self.assertEqual(sum(data[header + i] << (4 * i) for i in range(3)), library_id)
+                wrong_id = 1701 if library_id != 1701 else 769
+                with self.assertRaisesRegex(ValueError, "requested binding"):
+                    RESERVATION.observed_library(self.pack, self.library, library_id=wrong_id)
+        self.assertEqual(RESERVATION.LIBRARY_ID, 1701)
+
+    def test_invalid_id_rejected_before_fixture_creation(self):
+        for library_id in (4, 768, 1792, True, 769.0, "769"):
+            with (
+                self.subTest(library_id=library_id),
+                self.assertRaisesRegex(ValueError, "user-library range"),
+            ):
+                RESERVATION.run_reservation(
+                    None,
+                    None,
+                    transfer=None,
+                    emulator=None,
+                    completed=None,
+                    verify_busy_reads=None,
+                    library_id=library_id,
+                )
 
     def test_wrong_owned_coordinate_is_rejected(self):
         for position in (0, self.position - 1, self.position + 1, len(self.library) * 2):

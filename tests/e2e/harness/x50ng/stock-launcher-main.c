@@ -21,6 +21,7 @@
 #include "frame-checkpoint.h"
 #include "memory-checkpoint.h"
 #include "pool-checkpoint.h"
+#include "resource-snapshot.h"
 #include "input-checkpoint.h"
 #include "media-checkpoint.h"
 
@@ -429,12 +430,35 @@ static unsigned capture(hdw_t *h, const char *path, int height)
     return nonzero;
 }
 
-static void capture_named(struct state *s, const char *name)
+static int resource_read(void *context, uint32_t address, void *bytes, size_t count)
+{
+    hdw_t *hdw = context;
+    return cpu_memory_rw_debug(hdw->cpu, address, bytes, count, 0);
+}
+
+static int capture_resources(struct state *s, const char *phase)
+{
+    const char *prefix = getenv("HPCLANG_X50NG_RESOURCE_SNAPSHOT");
+    if (!prefix || !*prefix)
+        return 0;
+    const char *target = getenv("TARGET");
+    static const char *const models[] = {"hp39gplus", "hp39gs",    "hp40gs",
+                                         "hp48gii",   "hp49gplus", "hp50g"};
+    unsigned model = 0;
+    for (unsigned i = 0; target && i < 6; ++i)
+        if (!strcmp(target, models[i]))
+            model = i + 1;
+    return resource_snapshot(prefix, phase, model, timer_get_clock(), s->hdw->cpu->regs[15],
+                             cpsr_read(s->hdw->cpu), resource_read, s->hdw);
+}
+
+static int capture_named(struct state *s, const char *name)
 {
     char path[512];
     snprintf(path, sizeof(path), "%s-%s.pgm", s->prefix, name);
     if (!capture(s->hdw, path, s->lcd_height))
         fprintf(stderr, "stock launcher: blank capture %s\n", name);
+    return capture_resources(s, name);
 }
 
 static int capture_keyboard_progress(struct state *s, size_t index)
@@ -592,7 +616,10 @@ static void fail(struct state *s, const char *why)
 static void finish_install(void *arg)
 {
     struct state *s = arg;
-    capture_named(s, "installed");
+    if (capture_named(s, "installed") < 0) {
+        fail(s, "resource-snapshot");
+        return;
+    }
     if (!is_display_on()) {
         fail(s, "install-display");
         return;
@@ -615,6 +642,10 @@ static void finish_return(void *arg)
         unsigned pixels = capture(s->hdw, s->return_pgm, s->lcd_height);
         if (pixels == 0u) {
             fail(s, "stock-resume");
+            return;
+        }
+        if (capture_resources(s, "settled-return") < 0) {
+            fail(s, "resource-snapshot");
             return;
         }
         s->returned = 1;
@@ -802,6 +833,10 @@ static void monitor(void *arg)
             }
             size_t keyboard_count =
                 sizeof(payload_keyboard_codes) / sizeof(payload_keyboard_codes[0]);
+            if (capture_resources(s, "application-pass") < 0) {
+                fail(s, "resource-snapshot");
+                return;
+            }
             s->saw_pass = 1;
             /*
              * KACK(51) can be replaced by PASS between monitor polls. In that
@@ -910,9 +945,11 @@ static struct seq_named_event *seq_named_event_new(struct state *s, const char *
 static int64_t seq_capture(void *arg)
 {
     struct seq_named_event *event = arg;
-    capture_named(event->state, event->text);
+    int result = capture_named(event->state, event->text);
+    if (result < 0)
+        fail(event->state, "resource-snapshot");
     free(event);
-    return 0;
+    return result < 0 ? -1 : 0;
 }
 
 static int64_t seq_fail(void *arg)

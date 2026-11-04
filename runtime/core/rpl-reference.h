@@ -138,6 +138,25 @@ int hpclang_rpl_reference_visit_nested(const struct hpclang_rpl_reader *reader,
                                        uint32_t capacity, uint32_t node_budget,
                                        hpclang_rpl_reference_visit_fn visit, void *context);
 
+/* Observe each successful native nibble read during the same nested traversal,
+ * including prologues, lengths and structural metadata. Repeated reads may
+ * repeat observations; compact synthetic prologues are not native dependencies.
+ * Feed these observations to a guard builder using the reader's independently
+ * resolved mapping. Both callbacks are read-only; any callback error propagates
+ * unchanged and invalidates all partial edges/dependencies. Failed reads and
+ * invalid nibbles are not reported as observations. Keep all inputs/mappings
+ * stable through traversal and any later validation/commit. This records only
+ * actual parser reads: opaque contents and unfollowed edges remain unresolved,
+ * and success does not establish complete references or authorize mutation. */
+typedef int (*hpclang_rpl_reference_dependency_fn)(void *context, uint32_t address, uint8_t value);
+int hpclang_rpl_reference_visit_guarded_nested(const struct hpclang_rpl_reader *reader,
+                                               const struct hpclang_rpl_reference_node *root,
+                                               struct hpclang_rpl_reference_node *workspace,
+                                               uint32_t capacity, uint32_t node_budget,
+                                               hpclang_rpl_reference_visit_fn visit,
+                                               hpclang_rpl_reference_dependency_fn dependency,
+                                               void *context);
+
 enum hpclang_rpl_dispatch_schema
 {
     HPCLANG_RPL_DISPATCH_DUPLICATE_THEN_ENTRY,
@@ -165,6 +184,40 @@ int hpclang_rpl_dispatch_reference_visit(const struct hpclang_rpl_reader *reader
                                          const struct hpclang_rpl_dispatch_descriptor *descriptor,
                                          hpclang_rpl_reference_visit_fn visit, void *context);
 
+/* Observe each successful native read used to decode a caller-proven dispatch,
+ * including the scalar type operand or first embedded-entry nibble. Callback
+ * errors propagate unchanged; discard partial edges/guards after any error.
+ * The descriptor and mappings must remain stable. This does not authenticate
+ * the descriptor, inspect the handler or bound the embedded executable body. */
+int hpclang_rpl_dispatch_reference_visit_guarded(
+    const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_dispatch_descriptor *descriptor, hpclang_rpl_reference_visit_fn visit,
+    hpclang_rpl_reference_dependency_fn dependency, void *context);
+
+struct hpclang_rpl_dispatch_identity_range
+{
+    uint32_t address, length;
+    const uint8_t *nibbles;
+};
+
+/* Bind a caller-reviewed descriptor to exact expected handler/dependency bytes
+ * before emitting any object edges. At least one nonempty range must contain
+ * descriptor->dispatch. All ranges and the object share the reader's stable
+ * mapping; record every matched nibble through dependency for commit guards.
+ * Expected bytes must come from an independently reviewed identity, not a fresh
+ * copy of the input being classified. The caller proves semantic coverage of
+ * the ranges, including callees and data; matching a prefix alone is not proof
+ * of a complete handler. This does not infer provenance or authorize movement.
+ * A mismatch returns UNSUPPORTED without edges. Invalid bytes/ranges and read
+ * or callback errors propagate; discard partial dependencies on any error.
+ * Keep descriptor, ranges, expected storage and mapping immutable throughout. */
+int hpclang_rpl_dispatch_reference_visit_identified(
+    const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_dispatch_descriptor *descriptor,
+    const struct hpclang_rpl_dispatch_identity_range *ranges, uint32_t range_count,
+    hpclang_rpl_reference_visit_fn visit, hpclang_rpl_reference_dependency_fn dependency,
+    void *context);
+
 struct hpclang_rpl_reference_patch
 {
     uint32_t field; /* Old address: apply before moving the containing bytes. */
@@ -183,8 +236,10 @@ int hpclang_rpl_reference_plan_shift(const struct hpclang_rpl_reference *referen
                                      struct hpclang_rpl_reference_patch *patch);
 
 /* Identities of resolved physical mappings, assigned by the caller. The field
- * and target must each be qualified separately; identical Saturn addresses in
- * different banks do not alias. These are not raw bank-switch entry addresses.
+ * and target must each be qualified separately; bank indices alone cannot
+ * establish disjointness. Equal identities require common address coordinates
+ * in plan_qualified_shift; translated aliases need plan_offset_shift below.
+ * These are not raw bank-switch entry addresses.
  * Resolve ACPTR switches and catalog bindings before supplying these identities.
  * Keep mappings stable throughout planning and commit. */
 struct hpclang_rpl_reference_mappings
@@ -201,6 +256,23 @@ int hpclang_rpl_reference_plan_qualified_shift(
     const struct hpclang_rpl_reference *reference,
     const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
     int32_t delta, struct hpclang_rpl_reference_patch *patch);
+
+/* As qualified_shift, but field+field_offset and target+target_offset locate
+ * each address in the moving region's coordinates. Offsets affect membership
+ * only: patches retain the old source field and native encoded addresses.
+ * Relative encodings account for movement of either endpoint independently.
+ * Caller must prove these affine translations and the same delta remain valid
+ * across the entire relevant old/new ranges; aliases spanning discontinuities
+ * require separate resolution. Distinct mapping identities mean proven physical
+ * disjointness, not merely unequal bank numbers. Out-of-range native encodings
+ * or partially moved five-nibble fields reject without changing output.
+ * No map discovery, switch changes, code inspection or write authorization.
+ * EXECUTION remains unsupported; its code obligations are not bypassed. */
+int hpclang_rpl_reference_plan_offset_shift(const struct hpclang_rpl_reference *reference,
+                                            const struct hpclang_rpl_reference_mappings *mappings,
+                                            int32_t field_offset, int32_t target_offset,
+                                            uint32_t first, uint32_t end, int32_t delta,
+                                            struct hpclang_rpl_reference_patch *patch);
 
 /* Explicitly plan the stored five-nibble address of an EXECUTION event after
  * independently resolving its field and target mappings. Accept only that event
@@ -320,12 +392,39 @@ int hpclang_rpl_catalog_plan_relocation(const struct hpclang_rpl_reader *reader,
                                         hpclang_rpl_catalog_mapping_fn resolve, void *context,
                                         struct hpclang_rpl_catalog_reference_plan *plan);
 
+struct hpclang_rpl_catalog_locations
+{
+    struct hpclang_rpl_catalog_mappings mappings;
+    int32_t payload_offset, bank_switch_offset;
+};
+typedef int (*hpclang_rpl_catalog_location_fn)(void *context,
+                                               const struct hpclang_rpl_library_binding *binding,
+                                               struct hpclang_rpl_catalog_locations *locations);
+
+/* Catalog plan with independently proven affine translations into the moving
+ * region's coordinates. catalog_offset applies to catalog fields; the resolver
+ * supplies payload and executable-switch offsets independently. Same proofs and
+ * old/native-address output contract as plan_offset_shift. Guards and edits
+ * retain catalog_mapping and original catalog addresses for validation/commit.
+ * Offsets never alter zero switch sentinels or permit a function target to become
+ * zero. Execution-code inspection and complete roots remain separate obligations.
+ * Same capacities, zero counts on error and stable-input requirements as above. */
+int hpclang_rpl_catalog_plan_relocation_offsets(const struct hpclang_rpl_reader *reader,
+                                                uint32_t address, uint32_t limit,
+                                                const struct hpclang_rpl_catalog_move *move,
+                                                int32_t catalog_offset,
+                                                hpclang_rpl_catalog_location_fn resolve,
+                                                void *context,
+                                                struct hpclang_rpl_catalog_reference_plan *plan);
+
 int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_reader *reader,
                                           const struct hpclang_rpl_reference_guard *guards,
                                           uint32_t count);
 
-/* Read-only preflight of a complete caller-owned edit array. Mapping IDs must
- * normalize physical aliases to the same identity. All fields/words and
+/* Read-only preflight of a complete caller-owned edit array. Aliased fields must
+ * already share both mapping identity and address coordinates, or callers must
+ * also use edits_check_aliases with independently resolved physical locations.
+ * All fields/words and
  * same-mapping overlaps (including duplicate fields) are checked before I/O;
  * then every five-nibble old value must equal expected. Returns a span result:
  * malformed plans or changed old values are MALFORMED, read errors UNAVAILABLE.
@@ -336,6 +435,25 @@ int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_rea
 int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_reader *reader,
                                          const struct hpclang_rpl_reference_edit *edits,
                                          uint32_t count);
+
+/* Resolve a complete 1..5-nibble field to an absolute physical nibble address.
+ * Zero means success; errors propagate. The caller proves stable map provenance
+ * and physical contiguity of the entire field, not only its first nibble.
+ * Split discontinuous fields before building the batch. No target reads/writes. */
+typedef int (*hpclang_rpl_reference_field_location_fn)(void *context, uint32_t mapping,
+                                                       uint32_t field, uint32_t width,
+                                                       uint32_t *physical);
+
+/* Validate all edit metadata and reject any physically overlapping fields,
+ * including aliases with different mapping IDs or logical coordinates. Equal
+ * replacements do not excuse overlap. Resolve callbacks may repeat (O(N^2));
+ * keep mappings and edits immutable. No allocation or target memory access.
+ * This checks field geometry only; expected bytes/guards require their separate
+ * preflight. Empty batches succeed without inputs. */
+int hpclang_rpl_reference_edits_check_aliases(const struct hpclang_rpl_reference_edit *edits,
+                                              uint32_t count,
+                                              hpclang_rpl_reference_field_location_fn resolve,
+                                              void *context);
 
 struct hpclang_rpl_reference_writer
 {
@@ -358,5 +476,15 @@ struct hpclang_rpl_reference_writer
 int hpclang_rpl_reference_edits_replay(const struct hpclang_rpl_reference_writer *writer,
                                        const struct hpclang_rpl_reference_edit *edits,
                                        uint32_t count);
+
+/* Same authorized-RAM replay contract, with physical field overlap preflight
+ * before any reader/writer callback. Mapping lifetime must cover both geometry
+ * checks and replay, including retries. Preserves expected-or-replacement
+ * admission for interrupted batches; it does not authorize writes by itself. */
+int hpclang_rpl_reference_edits_replay_mapped(const struct hpclang_rpl_reference_writer *writer,
+                                              const struct hpclang_rpl_reference_edit *edits,
+                                              uint32_t count,
+                                              hpclang_rpl_reference_field_location_fn resolve,
+                                              void *context);
 
 #endif

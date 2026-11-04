@@ -65,9 +65,37 @@ functions in `hpclang/object.h`. Keep this exact representation through editing
 and storage if rounding is unacceptable. Test negative, zero, boundary and
 out-of-range values instead of checking only small positive examples.
 
-Standard C formatting follows the SDK's C library. Historical numeric-format
-settings are not implicitly supplied by including `hpconio.h`. Set the format
-explicitly and verify rounding and displayed output for the application.
+Standard C formatting follows the SDK's C library. To migrate a source file
+that relies on HPGCC 1.1/2.0 decimal settings, opt in before its first
+compatibility include:
+
+```c
+#define HPCLANG_HPGCC_LEGACY_FORMAT 1
+#include <hpstdio.h>
+
+void format_value(char *text, size_t capacity)
+{
+    set_decimal_digits(2);
+    set_decimal_separator(',');
+    snprintf(text, capacity, "%f", 1.25); /* "1,25" when capacity >= 5 */
+}
+```
+
+Omitting the switch or setting it to zero preserves standard C formatting,
+including when compatibility headers are included. The switch redirects call
+expressions in that translation unit; settings are shared by opted-in calls
+throughout the application. Named `hpclang_hpgcc_snprintf` and its related
+entry points are available without macros. Prefer bounded `snprintf` and check
+its return value when truncation matters. Parenthesized calls such as
+`(snprintf)(...)` or `(std::snprintf)(...)`, and function addresses, retain the
+standard function.
+
+The legacy grammar is different: `%g` counts fractional places; 64-bit integers
+use `%L`/`%U`; standard length modifiers, `*`, `+`, `#` and `%n` are rejected.
+Precision is capped at 15 and historical malformed carry/zero-precision outputs
+are corrected. Audit each format string before opting in; see the
+[formatting contract and original-source comparisons](../development/hpgcc-compat.md#historical-console-output).
+This compatibility slice has local validation; remote acceptance is pending.
 
 Legacy HPG text and the default compatibility console use calculator bytes.
 The clean `hpclang_surface_draw_text` and `hpclang_surface_draw_utf8` functions

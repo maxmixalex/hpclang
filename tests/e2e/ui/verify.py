@@ -2,6 +2,7 @@
 """Verify the device-manager LCD checkpoints independently of guest assertions."""
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -151,6 +152,60 @@ def verify_pool(prefix: Path, model: int) -> int:
     return count
 
 
+def verify_budget(prefix: Path, model: str, artifact: Path) -> dict:
+    """Reconcile the observed pool and RW watermarks with this linked image."""
+    output = Path(f"{prefix}-budget.json")
+    output.unlink(missing_ok=True)
+    models = ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g")
+    count = verify_pool(prefix, models.index(model) + 1)
+    stack_peak, stack_limit, heap_peak, heap_limit = verify_memory(prefix)
+    payload = (artifact / "e2e.hpc").read_bytes()
+    layout_bytes = (artifact / "launchers/memory.json").read_bytes()
+    layout = json.loads(layout_bytes)
+    assert len(payload) >= 16 and payload[:4] == b"HPC1"
+    image, static = int.from_bytes(payload[4:8], "little"), int.from_bytes(payload[12:16], "little")
+    assert image > 0 and len(payload) == image + 16
+    assert layout["version"] == 1 and layout["page_bytes"] == 4096
+    app, stage, selected = layout["application"], layout["launcher"], layout["models"][model]
+    assert app["image_bytes"] == image and app["static_bytes"] == static
+    assert app["code_pages"] == (image + 4095) // 4096
+    assert app["boot_pages"] == 1 and app["stack_bytes"] == stack_limit
+    assert app["required_rw_bytes"] == app["rw_ceiling_bytes"] == 36864
+    keys = ("stage_and_prefix_pages", "stage_stack_pages", "mmu_workspace_pages")
+    assert all(type(stage[key]) is int and stage[key] > 0 for key in keys)
+    assert stage["stage_stack_pages"] == stage["mmu_workspace_pages"] == 1
+    assert 0 < stage["stage_extent_bytes"] <= stage["stage_and_prefix_pages"] * 4096
+    workspace = 2 if models.index(model) < 3 else 0
+    assert selected["stock_native_workspace_pages"] == workspace
+    required = sum(stage[key] for key in keys) + app["code_pages"] + 9 + workspace
+    assert selected["minimum_stock_pool_pages"] == required
+    assert selected["stock_pool_pages_for_rw_ceiling"] == required
+    assert required <= count <= layout["pool_capacity_pages"] == 256
+    arena_overhead = 36864 - 4096 - static - stack_limit - heap_limit
+    assert arena_overhead >= 0, f"{prefix}: static/stack/heap exceed RW arena"
+    report = dict(
+        version=1,
+        model=model,
+        payload_sha256=hashlib.sha256(payload).hexdigest(),
+        layout_sha256=hashlib.sha256(layout_bytes).hexdigest(),
+        pool_reserved_bytes=count * 4096,
+        pool_required_bytes=required * 4096,
+        pool_excess_bytes=(count - required) * 4096,
+        rw_bytes=36864,
+        static_bytes=static,
+        boot_bytes=4096,
+        stack_limit=stack_limit,
+        stack_touched=stack_peak,
+        heap_limit=heap_limit,
+        heap_extent_peak=heap_peak,
+        arena_other_bytes=arena_overhead,
+        scope="Observed pool and application arena; excludes native allocator overhead, stored objects and unsampled system peaks. Heap includes renderer and LCD allocations; do not add them again.",
+    )
+    output.write_text(json.dumps(report, indent=2) + "\n")
+    print(f"PASS: {prefix}: pool required/reserved {required * 4096}/{count * 4096} bytes")
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -158,16 +213,24 @@ def main() -> None:
     parser.add_argument(
         "--pool", action="store_true", help="require Stock native-pool observations"
     )
+    parser.add_argument(
+        "--artifact", type=Path, help="reconcile pool/RW with the linked UI artifact"
+    )
     args = parser.parse_args()
     if args.pool and args.mode != "stock":
         parser.error("--pool requires Stock mode")
+    if args.artifact and not args.pool:
+        parser.error("--artifact requires --pool")
     for target in Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines():
+        Path(f"build/{target}-frame-budget.json").unlink(missing_ok=True)
         verify(
             Path(f"build/{target}-frame"),
             80 if args.family == "hp4950" else 64,
             args.mode == "stock",
         )
-        if args.pool:
+        if args.artifact:
+            verify_budget(Path(f"build/{target}-frame"), target, args.artifact)
+        elif args.pool:
             models = ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g")
             verify_pool(Path(f"build/{target}-frame"), models.index(target) + 1)
 
