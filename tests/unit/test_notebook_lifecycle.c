@@ -6,6 +6,7 @@
 #include <hpclang/port.h>
 #include <assert.h>
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -24,10 +25,32 @@ void __real_free(void *pointer);
 static int remaining = -1;
 static unsigned live, attempts;
 static unsigned editing, changes, idle_attempts;
+static unsigned workflow, saves, loads;
+static char saved_note[NOTEBOOK_CAPACITY];
+/* Type, save (with an optional failed first attempt), edit, then reload. */
+static const unsigned workflow_keys[] = {
+    HPCLANG_KEY_1, HPCLANG_KEY_DOWN, HPCLANG_KEY_ENTER, HPCLANG_KEY_ENTER, HPCLANG_KEY_UP,
+    HPCLANG_KEY_2, HPCLANG_KEY_DOWN, HPCLANG_KEY_DOWN,  HPCLANG_KEY_ENTER, HPCLANG_KEY_ON};
 
 static int observed_update(struct notebook *note, const struct hpclang_ui_event *event)
 {
     int result = notebook_update(note, event);
+    if (workflow) {
+        if (event->action.type == SAVE) {
+            char expected[48];
+            if (workflow == 2 && saves == 1)
+                snprintf(expected, sizeof(expected), "Save error %d", ENOSPC);
+            else
+                strcpy(expected, "Saved; exit normally");
+            assert(!strcmp(note->text, "1"));
+            assert(!strcmp(note->status, expected));
+        } else if (event->action.type == LOAD) {
+            assert(!strcmp(note->text, "1") && !strcmp(note->status, "Loaded"));
+        } else if (event->kind == HPCLANG_UI_CHANGE) {
+            ++changes;
+            assert(!strcmp(note->text, changes == 1 ? "1" : "12"));
+        }
+    }
     if (editing && event->kind == HPCLANG_UI_CHANGE) {
         ++changes;
         assert(strlen(note->text) == changes && changes < NOTEBOOK_CAPACITY);
@@ -130,6 +153,11 @@ int hpclang_datetime_read(struct hpclang_datetime *out)
 }
 int notebook_load(char text[NOTEBOOK_CAPACITY])
 {
+    if (workflow) {
+        ++loads;
+        strcpy(text, saved_note);
+        return 0;
+    }
     if (editing) {
         text[0] = '\0';
         return 0;
@@ -145,6 +173,16 @@ int notebook_load(char text[NOTEBOOK_CAPACITY])
 }
 int notebook_save(const char *text)
 {
+    if (workflow) {
+        ++saves;
+        if (workflow == 2 && saves == 1) {
+            assert(!saved_note[0]);
+            errno = ENOSPC;
+            return -1;
+        }
+        strcpy(saved_note, text);
+        return 0;
+    }
     (void)text;
     assert(0);
     return -1;
@@ -212,7 +250,7 @@ void hpclang_keyboard_events_reset(void)
 }
 int hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
 {
-    assert(screen && ++polls <= (editing ? 514u : 3u));
+    assert(screen && ++polls <= (workflow ? 21u : editing ? 514u : 3u));
     if (polls == 1)
         idle_attempts = attempts;
     else
@@ -223,6 +261,14 @@ int hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
     }
     if (polls == 1)
         return 0;
+    if (workflow) {
+        unsigned index = (polls - 2) / 2;
+        assert(index < sizeof(workflow_keys) / sizeof(workflow_keys[0]));
+        *event = (struct hpclang_keyboard_event){.key = workflow_keys[index],
+                                                 .type = polls % 2 ? HPCLANG_KEYBOARD_EVENT_UP
+                                                                   : HPCLANG_KEYBOARD_EVENT_DOWN};
+        return 1;
+    }
     if (editing && polls <= 513) {
         *event = (struct hpclang_keyboard_event){.key = HPCLANG_KEY_1,
                                                  .type = polls % 2 ? HPCLANG_KEYBOARD_EVENT_UP
@@ -244,11 +290,16 @@ static unsigned run(enum fault selected, int allocations, int expected)
     fault = selected;
     remaining = allocations;
     attempts = begins = ends = polls = presents = changes = 0;
+    saves = loads = 0;
+    saved_note[0] = '\0';
     assert(notebook_main() == expected);
     assert(!live && !screen && ends == begins);
     if (!expected) {
-        assert(begins == 1 && polls == (editing ? 514u : 2u));
-        if (editing) {
+        assert(begins == 1 && polls == (workflow ? 20u : editing ? 514u : 2u));
+        if (workflow) {
+            assert(saves == 2 && loads == 2 && changes == 2);
+            assert(!strcmp(saved_note, "1") && presents > 1);
+        } else if (editing) {
             assert(changes == NOTEBOOK_CAPACITY - 1);
             assert(presents > 1);
         } else {
@@ -280,6 +331,9 @@ int main(void)
             run(NONE, -1, 0);
             editing = 0;
             run(NONE, -1, 0);
+            for (workflow = 1; workflow <= 2; ++workflow)
+                run(NONE, -1, 0);
+            workflow = 0;
         }
     }
     return 0;
