@@ -1,6 +1,7 @@
 name: CI / Core runtime
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "CMakeLists.txt"
