@@ -889,3 +889,120 @@ original input pixel gates and settled Stock return, and checks ARM calls to
 the C++ timer fixture, example observer and actual shipped example. Original
 failed console-selection evidence remains preserved. This completes the local
 integrated-example matrix, not remote acceptance or the broader M8.5 stage.
+
+## 2026-10-31 — Notebook public release instructions
+
+Local 26c78e2e corrects the installed README's stale native-persistence status
+and omitted HP49g+ Port 0 coverage, and supplies standalone model-specific
+CMake/launch instructions. app.c, store.c and export.c have no changes between
+recorded accepted 5959159a and current branch. The existing SDK gate covers
+all six model-specific Notebook builds; it was inspected, not rerun for prose.
+Historical run 39928737278 returns HTTP 404 on this audit: historical acceptance
+is retained from repository records, not represented as a fresh remote result.
+Whitespace validation passes. No runtime, hardware or milestone completion is
+claimed. Remaining M8.6 release gates include resource/error/Stock restoration
+and the retained independent-launcher evaluation. No push this turn.
+
+## 2026-11-04 — Notebook real-entry cleanup and ON regression
+
+Local 33a9206a executes the shipped main and actual UI/rendering/input code,
+with mocked device/storage services and link-wrapped allocations. Before the
+fix, ON at the initially focused text field emits CANCEL and main never exits;
+the bounded keyboard fixture fails after repeated ON events. Main now honors
+ON-down even when the UI emits a cancellation event. It performs no save.
+The test exercises all six model IDs/64- and 80-row layouts on the host, every
+allocation-failure position, display-begin/present and keyboard failures,
+timeout retry, normal ON return and immediate restart. All allocations and
+borrowed display ownership are released after each case. These are simulated
+services, not six calculator/emulator executions or complete native restoration.
+GCC 13 ASan/UBSan passes notebook_lifecycle, notebook_ui and notebook_store.
+Formatting/whitespace checks pass. Fresh ATfE 22.1 build of the actual HP39g+
+example and launcher passes: 45,128-byte payload and 1,048 static writable bytes,
+under /work/nov04-notebook-hp39gplus. Host build is /work/nov04-notebook-lifecycle.
+No new Stock/physical execution claimed. No push this turn. Parent Runtime
+41836305043 and object-mutation 41836338211 were confirmed queued at turn start.
+
+## 2026-11-04 — Actual Notebook entry target gate
+
+Local d849a22e adds notebook-entry to the maintained builder and six-model Stock
+matrix. It links shipped main/app/store/export, renaming main and wrapping
+display-present to capture the first frame and schedule GPIO ON scan 56 via
+the existing mailbox. Normal app return is required before PASS, followed by
+ordinary settled-Stock gates. Standard HP39g+ E2E application/launcher build
+passes (50,120-byte payload, 1,560 static writable bytes); eight matrix tests,
+ShellCheck, shell syntax, C format and whitespace checks pass. Maintained build
+/work/nov04-notebook-entry-gate has not yet run in an emulator.
+An earlier byte-checked copy of the actual example with the same observer is
+running Stock HP39g+ in session 92461. Do not restart: retain the watchdog.
+Logs/partial proof: /work/nov04-notebook-entry-stock; application/inputs:
+/work/nov04-notebook-entry. Identity and directory fetch pass, but no app
+PASS/return observed yet. Prior PR14 41bfa65d again passes seven workflows,
+337 successful jobs/one skip (nov04-notebook-prior-ci-14.json). No push.
+
+## 2026-11-04 — Notebook copied-entry Stock pass and maintained matrix
+
+Session 92461 is terminal: emulator/runtime/Stock gates pass with normal and
+settled return. The outer private aggregator then failed with KeyError because
+Stock JSON has no result field. No emulator was restarted. Independent audit
+checks actual status/saw_pass/returned/return_settled, input and artifact hashes,
+source equality, a disassembled call to notebook_application_main, focused blank
+editor pixels before GPIO ON, and retained return frame. Evidence:
+/work/nov04-notebook-entry-stock/independent-audit.json. Failed original aggregate
+is retained. This proves the copied actual entry on HP39g+ original-ROM emulator,
+not the maintained fixture binary or physical hardware.
+Local ca3da6cc adds a reusable verifier to notebook-entry. It validates title,
+input prompt and focused empty editor, tolerates only the known 131/132-column
+capture geometry, and requires settled Stock return. Retained actual pixels pass;
+blank image, missing image and nonreturned report are rejected in temporary
+copies. Originals are unchanged. Eight runtime-plan tests and Ruff pass.
+Maintained six-model Stock matrix is live in session 35941, starting HP39g+.
+Script: research/nov04-notebook-entry-matrix.py. Evidence/logs:
+/work/nov04-notebook-entry-matrix. Builds and runs are serial, inputs/artifacts
+are hashed and checked around each case. Do not restart this process; re-poll
+the same session or inspect its authoritative process state. No push this turn.
+
+## 2026-11-04 — Branch documentation and Notebook entry gates
+
+PR #13 head 92a09d6b: seven queued workflows, one success, one failure.
+Documentation job 126596148899 has no steps; annotations explicitly reject
+branch deployment under Pages protection. Local 5bc78efd splits strict builds
+from main-only deployment and scopes concurrency by ref. Actionlint and clean
+strict Zensical build pass; not pushed. PR #28 head 92e9e897 has two successful
+and nine queued workflows (18 successful/134 queued jobs). Audits:
+research/nov04-followup-ci-{13,28}.json. No acceptance claimed.
+
+Maintained Notebook matrix session 35941 passes HP39g+ pixel/return checks
+and continues on HP39gs. Independent readback confirms report SHA-256 and
+status/pass/returned/settled flags. Evidence:
+/work/nov04-notebook-entry-matrix/verified.json. Other models remain open.
+
+## 2026-11-04 — Notebook optional-service lifecycle coverage
+
+Local 246a5a66 runs the shipped entry point across six model IDs and three
+service configurations: unavailable ports/files, read-only ports, and writable
+ports plus file export. Available-port cases load NOTEBOOK_CAPACITY minus one
+characters. Each configuration injects every allocation failure and checks
+zero live allocations/display ownership, followed by healthy restart; display
+begin/present, keyboard failure, and retryable display timeout remain covered.
+GCC ASan/UBSan notebook_lifecycle, notebook_ui and notebook_store all pass;
+clang-format and whitespace checks pass. This is host lifecycle evidence,
+not hardware or whole-stage resource acceptance. The maintained Stock matrix
+continues unchanged in session 35941. Commit not pushed.
+
+## 2026-11-04 — Maintained Notebook entry matrix complete
+
+Session 35941 exits successfully on all six models. Independent audit verifies
+all recorded source/tool and artifact hashes, report hashes, real focused-editor
+pixels and pass/returned/settled flags per model. Evidence:
+/work/nov04-notebook-entry-matrix/independent-audit.json; reproducer
+research/nov04-notebook-matrix-audit.py. This covers the shipped application
+entry with physical GPIO ON injection in original-ROM emulators, not physical
+hardware or complete release acceptance. Local 246a5a66 adds host lifecycle
+coverage and 6abcb849 records independent-launcher packaging tradeoffs without
+retiring the option. Strict documentation build passes.
+
+Universal code-relocation session 37401 ended with failure at native-missing-message
+after native and native-new-message passed. Preserve its saved state at
+/work/nov04-code-relocation-universal/hp50g/verification/hp50g-code-relocation/.
+Model-specific session 57322 continues and has passed the first four native
+cases; this does not qualify the universal failure.
