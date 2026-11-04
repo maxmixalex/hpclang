@@ -705,3 +705,19 @@ documentation pass. This targeted gate does not rerun the complete ARM matrix.
 Before submission, exact remote f960876e audit reports one successful/five
 queued workflows; jobs: 29 successful, three running and 145 queued. No current
 failed/cancelled jobs; earlier Quality timeout remains recorded above.
+
+## 2026-11-04 — CI configuration acceptance and migration integration
+
+PR #30 head 97d9eb46 passes four workflows, 181 jobs and two intentionally
+skipped PR evidence publishers. Reviewed three-line diff and mergeable head;
+merged as dfb3ee874f3861a56da2117833f3f225ee8053ea. Live queue behavior is not
+claimed from skipped publishers. Migration branch integrates this exact change
+as 22802c34. Prior migration head 3d126411 passes two workflows/all 19 jobs.
+PR #14 has seven successful workflows/337 successful jobs/one skip; parent #13
+currently returns zero runs, so parent acceptance cannot be re-established.
+PR #28 has 195 successful jobs and one cancelled publisher; annotation confirms
+queue replacement, no executed steps. Targeted rerun requested for 124311891341.
+Reports: research/nov04-independent-ci-{14,27,28,30}.json. Batch audit terminated
+on missing #13 runs; no complete new audit is claimed for #26 or #19.
+Docker Desktop and existing development container restored; venv executable
+is present. No new environment or duplicate validation process was created.
