@@ -15,16 +15,21 @@ static int prepare_call(struct hpclang_rpl_mutation_io *, uint32_t **, int *);
 /* Controlled Stock fixture only: the clean test catalog and fixture programs
  * supply the input provenance. Opaque execution coverage stays unresolved;
  * this is not a public registration or recovery implementation. */
+struct probe_scratch
+{
+    uint32_t roots[2048];
+    struct hpclang_rpl_reference_node work[512];
+};
 struct live_probe
 {
     struct hpclang_rpl_mutation_io *io;
-    uint32_t first, end, roots[2048], root_count;
+    uint32_t first, end, root_count;
+    struct probe_scratch *scratch;
     int32_t delta;
     struct hpclang_rpl_reference_edit_builder builder;
     struct hpclang_rpl_reference_edit edits[4096];
     struct hpclang_rpl_reference_guard_builder guard_builder;
     struct hpclang_rpl_reference_guard guards[4096];
-    struct hpclang_rpl_reference_node work[512];
 };
 static int probe_read_word(struct hpclang_rpl_mutation_io *io, uint32_t at, unsigned width,
                            uint32_t *out)
@@ -55,7 +60,7 @@ static int probe_root(void *context, enum hpclang_rpl_root_source source, uint32
         return 0; /* catalog_grow owns these. */
     if (!slot || p->root_count == 2048)
         return -1;
-    p->roots[p->root_count++] = slot;
+    p->scratch->roots[p->root_count++] = slot;
     return 0;
 }
 static int probe_edge(void *context, const struct hpclang_rpl_reference *edge)
@@ -70,7 +75,7 @@ static int probe_edge(void *context, const struct hpclang_rpl_reference *edge)
         edge->kind != HPCLANG_RPL_REFERENCE_ATTACHMENT)
         return 0;
     for (uint32_t i = 0; i < p->root_count; ++i)
-        if (p->roots[i] == edge->field)
+        if (p->scratch->roots[i] == edge->field)
             return 0; /* Do not shift a known root twice. */
     uint32_t target = edge->target >= 0x80000 ? 1 : 0;
     if (edge->kind == HPCLANG_RPL_REFERENCE_ACPTR && edge->auxiliary) {
@@ -105,7 +110,7 @@ static int probe_node(struct live_probe *p, struct hpclang_rpl_reader *reader, u
                       uint32_t span)
 {
     struct hpclang_rpl_reference_node node = {at, span, 0};
-    return hpclang_rpl_reference_visit_guarded_nested(reader, &node, p->work, 512, 10000,
+    return hpclang_rpl_reference_visit_guarded_nested(reader, &node, p->scratch->work, 512, 10000,
                                                       probe_edge, probe_dependency, p);
 }
 static int probe_temp(void *context, uint32_t first, uint32_t span)
@@ -124,21 +129,31 @@ static int probe_temp(void *context, uint32_t first, uint32_t span)
 }
 static int probe_collect(struct live_probe *p, struct hpclang_rpl_reader *reader, uint32_t home)
 {
+    p->scratch = malloc(sizeof *p->scratch);
+    if (!p->scratch)
+        return 5;
+    p->root_count = 0;
     hpclang_rpl_reference_edits_begin(&p->builder, p->edits, 4096);
     hpclang_rpl_reference_guards_begin(&p->guard_builder, p->guards, 4096);
     int result = 6;
     if (hpclang_rpl_mutation_visit_guarded_roots(p->io, probe_root, probe_dependency, p))
-        return result;
+        goto done;
     result = 7;
     if (probe_node(p, reader, home, 0x100000 - home))
-        return result;
+        goto done;
     if (hpclang_rpl_mutation_visit_guarded_temp(p->io, probe_temp, probe_dependency, p))
-        return result;
+        goto done;
     const struct hpclang_rpl_reference_reader mapped = {probe_mapped_read, p->io};
     result = 8;
     if (hpclang_rpl_reference_edits_validate(&mapped, p->edits, p->builder.count))
-        return result;
-    return 0;
+        goto done;
+    result = 0;
+done:
+    /* Only edits and guards survive collection. Release traversal storage
+     * before catalog mutation allocates its independent edit plan. */
+    free(p->scratch);
+    p->scratch = NULL;
+    return result;
 }
 
 struct rejected_removal
