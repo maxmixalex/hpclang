@@ -824,6 +824,81 @@ static void register_exchanges(void)
     assert(!memcmp(&value, &untouched, sizeof value));
 }
 
+static void seed_origins(struct hpclang_rpl_code_origins *state);
+
+static void literal_origins(const struct hpclang_rpl_code_literal *literal, unsigned p)
+{
+    struct hpclang_rpl_code_origins initial, state, expected;
+    seed_origins(&initial);
+    /* Alias the complete source with the destination: full A/C loads at nonzero
+     * P must rotate the original tokens, not repeatedly copy overwritten ones. */
+    initial.registers[literal->destination][1] = 0;
+    state = expected = initial;
+    unsigned start = literal->destination <= HPCLANG_RPL_CODE_C ? p : 0;
+    for (unsigned digit = 0; digit < 16; ++digit) {
+        unsigned input = (digit + 16 - start) % 16;
+        if (input < literal->nibbles)
+            expected.registers[literal->destination][digit] =
+                initial.registers[literal->destination][input];
+    }
+    assert(!hpclang_rpl_code_origins_literal(
+        &state, literal, p, state.registers[literal->destination], literal->nibbles));
+    assert(!memcmp(&state, &expected, sizeof state));
+}
+
+static void literal_origin_failures(void)
+{
+    struct hpclang_rpl_code_origins initial, state;
+    seed_origins(&initial);
+    const struct hpclang_rpl_code_literal valid = {
+        .destination = HPCLANG_RPL_CODE_D0, .nibbles = 5, .mask = 0xfffff, .value = 0x8076b};
+    for (unsigned mode = 0; mode < 9; ++mode) {
+        struct hpclang_rpl_code_literal literal = valid;
+        unsigned p = 0, count = 5;
+        switch (mode) {
+        case 0:
+            literal.destination = HPCLANG_RPL_CODE_CONSTANT;
+            break;
+        case 1:
+            literal.destination = (enum hpclang_rpl_code_register) - 1;
+            break;
+        case 2:
+            count = 0;
+            break;
+        case 3:
+            count = literal.nibbles = 17;
+            break;
+        case 4:
+            count = literal.nibbles = 3;
+            break;
+        case 5:
+            p = 16;
+            break;
+        case 6:
+            literal.mask ^= 1;
+            break;
+        case 7:
+            literal.value |= UINT64_C(1) << 20;
+            break;
+        case 8:
+            literal.nibbles = 4;
+            break;
+        }
+        state = initial;
+        assert(hpclang_rpl_code_origins_literal(&state, &literal, p, state.registers[0], count) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&state, &initial, sizeof state));
+    }
+    state = initial;
+    assert(hpclang_rpl_code_origins_literal(NULL, &valid, 0, state.registers[0], 5) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_code_origins_literal(&state, NULL, 0, state.registers[0], 5) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_code_origins_literal(&state, &valid, 0, NULL, 5) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!memcmp(&state, &initial, sizeof state));
+}
+
 static void literal_loads(void)
 {
     struct hpclang_rpl_code_literal untouched;
@@ -849,6 +924,7 @@ static void literal_loads(void)
             assert(value.instruction == image.address && value.length == width + 2 &&
                    value.field == image.address + 2 && value.nibbles == width &&
                    value.value == expected && value.mask == ((UINT64_C(1) << (4 * width)) - 1));
+            literal_origins(&value, p);
             for (unsigned i = 0; i < image.size; ++i) {
                 value = untouched;
                 assert(hpclang_rpl_code_literal_inspect(&reader, image.address, i, p, &value) ==
@@ -888,6 +964,7 @@ static void literal_loads(void)
                 assert(value.instruction == image.address && value.length == image.size &&
                        value.field == image.address + prefix && value.nibbles == width &&
                        value.destination == (a ? HPCLANG_RPL_CODE_A : HPCLANG_RPL_CODE_C));
+                literal_origins(&value, p);
                 for (unsigned nibble = 0; nibble < 16; ++nibble) {
                     unsigned source = (nibble + 16 - p) & 15;
                     assert(((value.mask >> (4 * nibble)) & 15) == (source < width ? 15u : 0u));
@@ -1490,6 +1567,7 @@ int main(void)
     native_service_continuation();
     register_assignments();
     literal_loads();
+    literal_origin_failures();
     register_exchanges();
     pc_capture_bounds();
     pc_exchanges();

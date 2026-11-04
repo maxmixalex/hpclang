@@ -210,6 +210,21 @@ struct hpclang_rpl_code_origins
     uint32_t registers[HPCLANG_RPL_CODE_D1 + 1][16];
 };
 
+/* Propagate caller-established instruction-field tokens through LC/LA or a
+ * D0/D1 immediate load. encoded contains count tokens in encoded nibble order,
+ * not destination order; zero means unknown. A/C starts at the proven P and
+ * wraps at sixteen digits, while D0/D1 starts at zero and preserves any high
+ * digits of a partial load. P is required even for a full A/C load: its mask
+ * alone cannot recover the rotation. Keep the instruction mapping and P guarded.
+ * A literal's numeric value does not classify it as an address. This records
+ * where bits came from, not permission to relocate the instruction operand.
+ * Snapshot tokens before writes, allowing encoded to overlap state. Validate
+ * destination, count, P and mask before mutation; errors preserve state.
+ * literal must be disjoint from writable token storage. */
+int hpclang_rpl_code_origins_literal(struct hpclang_rpl_code_origins *state,
+                                     const struct hpclang_rpl_code_literal *literal, unsigned p,
+                                     const uint32_t *encoded, unsigned count);
+
 /* Apply descriptors obtained from the inspectors to abstract facts only.
  * Assignment snapshots its source, exchange snapshots both sides, and memory
  * transfers snapshot the selected source before writing. Overlapping tag arrays

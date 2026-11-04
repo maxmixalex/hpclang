@@ -120,7 +120,7 @@ its requirements from M8.
 
 | Work | Proven locally / accepted | Next acceptance gate |
 | --- | --- | --- |
-| M8.0 native storage, PR #26 | Local 23a49bbc universal build passes complete fresh HP49g+/HP50g execution and independent saved-state replay (176 basic checks, 38 saved executions). | Submit and accept fresh CI. Actual-entry classification still stops at ROM 0x67d2; memory-loaded execution origins, production integration and public library/Port1 operations remain open. |
+| M8.0 native storage, PR #26 | Submitted ca6162f6 (source 23a49bbc): complete fresh HP49g+/HP50g universal execution and independent replay pass locally (176 basic checks, 38 saved executions). | Accept current-head CI. Production collector still stops at ROM 0x67d2. Captured memory-origin chain survives actual catalog movement on both models; duplicate repairs merge and stale/conflicting inputs reject before writes. Production discovery/integration, complete execution coverage and public library/Port1 operations remain open. |
 | M8.0 Port2 | Both supported ID769 recovery/rejection matrices pass locally; explicit recovery-ID support accepted in #25. | Trusted recovery installation, transaction authority lifecycle, safe startup and space reclamation. Mutable-Flash configuration execution remains unqualified; forty resolved data targets retain separate execution obligations. |
 | M8.2/M8.3 UI, PR #28 | Submitted 92e9e897 integrates accepted main; prior 2829502c passes six workflows/196 jobs. Integration passes 33 focused tests and strict docs. | Validate merged-version CI; finish borrowed-stack attribution, reservation bounds and whole-application resource/lifecycle acceptance. |
 | M8.4 compatibility | SD Reset #15, explicit opt-in formatting #17 and async/KOS sound adapters #25 accepted. | Retained historical application/API coverage and remaining migration/branch acceptance. |
@@ -148,13 +148,13 @@ Remote acceptance and broader M8.5 completion remain open.
 
 | Delivery | Current acceptance state |
 | --- | --- |
-| #13 / `5bc78efd` | Current-head CI workflows: 4 success, 5 queued; jobs: 13 success, 69 queued, 1 skipped; no reported failure. Acceptance remains open. |
-| #14 / `d2f1ba36` | Remote head awaiting CI acceptance. Local 3319087c covers keyboard save/reload and ENOSPC retry; cd8b1a11 isolates relaunch checkpoints. Persistence runs and independent source/artifact/pixel/return/resource audits pass HP48gII, HP39g+ and HP39gs (three launches each). Remaining three models running (10531). Local follow-ups not pushed; M8.6 open. |
-| #18 / `0390e023` | Current-head CI workflows: 12 queued; jobs: 20 queued; no reported failure. Acceptance remains open. |
-| #19 / `6a905dfa` | Current-head CI workflows: 6 queued, 6 in_progress; jobs: 14 success, 73 queued, 6 in_progress; no reported failure. Acceptance remains open. |
-| #26 / `73f8e515` | Remote head retains four known code-relocation failures. Local 23a49bbc now passes both complete fresh universal Stock matrices and independent saved-state replay: 88 basic checks and 19 saved executions per model. Source identity, ARM analysis, formatting, Ruff and strict docs pass. Ready for fresh CI; public reference/Port1/Port2 requirements remain open. |
-| #27 / `00eb48fd` | Current-head CI workflows: 9 queued; jobs: 15 queued; no reported failure. Acceptance remains open. |
-| #28 / `92e9e897` | Current-head CI workflows: 3 queued, 7 success, 1 pending; jobs: 297 success, 79 queued, 5 in_progress, 1 skipped, 1 pending; no reported failure. Acceptance remains open. |
+| #13 / `5bc78efd` | Current-head CI workflows: 4 success, 5 queued; jobs: 18 success, 4 in_progress, 175 queued, 1 skipped; no reported failure. Acceptance remains open. |
+| #14 / `3312be9c` | Current-head CI workflows: 10 queued; jobs: 16 queued; no reported failure. Six-model persistence resources and independent 18-launch audit pass locally; export/backup peaks remain open. Acceptance remains open. |
+| #18 / `0390e023` | Current-head CI workflows: 10 queued, 2 in_progress; jobs: 15 success, 138 queued, 5 in_progress; no reported failure. Acceptance remains open. |
+| #19 / `6a905dfa` | Current-head CI workflows: 10 queued, 2 success; jobs: 20 success, 253 queued; no reported failure. Acceptance remains open. |
+| #26 / `ca6162f6` | Current-head CI workflows: 12 queued; jobs: 20 queued; no reported failure. Acceptance remains open. |
+| #27 / `00eb48fd` | Current-head CI workflows: 9 queued; jobs: 50 queued; no reported failure. Acceptance remains open. |
+| #28 / `92e9e897` | Current-head CI workflows: 2 queued, 8 success, 1 pending; jobs: 339 success, 9 in_progress, 33 queued, 2 skipped, 1 pending; no reported failure. Acceptance remains open. |
 | #29 / `fce14d73` | Accepted and merged as `1c0d1e35`: ten workflows pass, 376 successful jobs and two intentional PR publisher skips. Retransmission pacing is fixed; the original initial packet-loss cause remains unproven. |
 | #30 / `97d9eb46` | Accepted and merged as dfb3ee87: four workflows pass, 181 successful jobs and two intentional PR publisher skips. Core manual dispatch and expanded publisher queues are now on main; skipped publishers do not prove live queue behavior. |
 | Historical #18 / `439339b1` | Three unresolved failures retained: HP49g+ Direct system-services PWM IRQ `0x46417b03`, HP40gs UI transfer and HP39g+ Notebook transfer. Valid captured packet checks do not establish the original failure causes. |

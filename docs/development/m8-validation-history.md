@@ -1,5 +1,52 @@
 # M8 validation history
 
+### 2026-11-05 — Literal origins in the shared C tracker
+
+`hpclang_rpl_code_origins_literal` now propagates caller-owned instruction-field
+tokens through LC/LA and partial/full D0/D1 immediate loads. It retains unaffected
+digits, handles P rotation even for full sixteen-digit loads, snapshots aliased
+tokens, and rejects invalid descriptors without changing state. Tokens describe
+bit sources; they do not classify numeric literals as pointers or grant relocation.
+The existing literal decoder matrix checks 608 combinations with overlapping
+source/destination tokens; additional invalid-input cases preserve the entire
+state. The complete rpl_code unit executable passes GCC ASan/UBSan. ARMv4T
+Thumb compilation and static analysis pass. The captured HP49g+/HP50g entry
+traces now use this C operation and retain each immediate D0 field as the load
+address source; report `/work/oct31-entry-snapshot/entry-literal-origins.json`.
+This adds a shared runtime primitive; the stage collector and complete guarded
+repair discovery still need integration.
+
+### 2026-11-05 — Captured memory-source repairs through catalog movement
+
+`research/nov05-entry-move.{c,py}` feeds the identified INTRPPTR and loaded
+source cell into the existing catalog repair batch on both original entry
+snapshots. The real C catalog-growth implementation merges the system-scan
+and explicit INTRPPTR repair, advances it exactly 16 nibbles, and preserves
+the ROM pointer value in the moved source cell. Resuming the original ROM
+interpreter follows the expected shifted instruction sequence to `0x3130`.
+Conflicting INTRPPTR edits and a stale source expected value each reject with
+zero writes, unchanged memory and unchanged supplied execution roots.
+Report: `/work/oct31-entry-snapshot/entry-move.json`. This bounded integration
+uses caller-supplied execution roots and does not establish complete production
+discovery, full Stock return or mutation permission for arbitrary applications.
+The existing merge path suffices; no additional mutation-root table was added.
+
+### 2026-11-05 — Captured entry memory-origin chain
+
+`research/nov05-entry-origins.py` applies the existing C literal, assignment,
+memory-transfer, address-adjustment and nibble-origin routines to the sealed
+original-interpreter entry traces for HP49g+ and HP50g. Every modeled register
+transition matches the retained trace. Both paths load INTRPPTR at `0x8076b`,
+use it to read `0x88d67`, then consume that loaded A value as the indirect
+pointer-field address `0x312b`, whose target is `0x3130`. The D0 source tokens
+retain the INTRPPTR field and A retains the loaded memory field; overwritten
+initial register values are not misidentified as the source. Artifact and code
+hashes are recorded in `/work/oct31-entry-snapshot/entry-origins.json`.
+This is bounded read-only provenance evidence using previously captured ROM
+execution, not a new emulator run, production relocation integration, mapping
+lifetime qualification, interrupt coverage or complete caller coverage. The
+production stage collector still stops at `0x67d2`; repair integration remains.
+
 This retained snapshot separates experiment history from current status. It does
 not remove completion conditions or establish new acceptance. See the
 [current roadmap](roadmap.md) and [original requirements](roadmap-history.md).

@@ -472,6 +472,37 @@ static int origin_field_valid(enum hpclang_rpl_code_register reg, unsigned first
     return count && first < width && count <= width - first;
 }
 
+int hpclang_rpl_code_origins_literal(struct hpclang_rpl_code_origins *state,
+                                     const struct hpclang_rpl_code_literal *literal, unsigned p,
+                                     const uint32_t *encoded, unsigned count)
+{
+    if (!state || !literal || !encoded)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (p > 15 || !count || count > 16 || count != literal->nibbles)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    unsigned first;
+    if (literal->destination == HPCLANG_RPL_CODE_A || literal->destination == HPCLANG_RPL_CODE_C) {
+        first = p;
+    } else if ((literal->destination == HPCLANG_RPL_CODE_D0 ||
+                literal->destination == HPCLANG_RPL_CODE_D1) &&
+               (count == 2 || count == 4 || count == 5)) {
+        first = 0;
+    } else {
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    uint64_t mask = 0;
+    for (unsigned i = 0; i < count; ++i)
+        mask |= UINT64_C(15) << (4 * ((first + i) & 15));
+    if (literal->mask != mask || (literal->value & ~mask))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t source[16];
+    for (unsigned i = 0; i < count; ++i)
+        source[i] = encoded[i];
+    for (unsigned i = 0; i < count; ++i)
+        state->registers[literal->destination][(first + i) & 15] = source[i];
+    return 0;
+}
+
 int hpclang_rpl_code_origins_assign(struct hpclang_rpl_code_origins *state,
                                     const struct hpclang_rpl_code_assignment *assignment,
                                     const uint32_t *next_pc)
