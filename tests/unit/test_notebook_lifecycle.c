@@ -9,16 +9,34 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int observed_update(struct notebook *note, const struct hpclang_ui_event *event);
+
 /* Execute the shipped entry point, including every cleanup path. */
+#define notebook_update observed_update
 #define main notebook_main
 #include "../../examples/notebook/main.c"
 #undef main
+#undef notebook_update
 
 void *__real_malloc(size_t size);
 void *__real_calloc(size_t count, size_t size);
 void __real_free(void *pointer);
 static int remaining = -1;
 static unsigned live, attempts;
+static unsigned editing, changes, idle_attempts;
+
+static int observed_update(struct notebook *note, const struct hpclang_ui_event *event)
+{
+    int result = notebook_update(note, event);
+    if (editing && event->kind == HPCLANG_UI_CHANGE) {
+        ++changes;
+        assert(strlen(note->text) == changes && changes < NOTEBOOK_CAPACITY);
+        for (unsigned i = 0; i < changes; ++i)
+            assert(note->text[i] == '1');
+    }
+    return result;
+}
+
 static int reject(void)
 {
     ++attempts;
@@ -112,6 +130,10 @@ int hpclang_datetime_read(struct hpclang_datetime *out)
 }
 int notebook_load(char text[NOTEBOOK_CAPACITY])
 {
+    if (editing) {
+        text[0] = '\0';
+        return 0;
+    }
     if (capabilities) {
         /* Exercise the largest loaded editor alongside every optional control. */
         memset(text, 'N', NOTEBOOK_CAPACITY - 1);
@@ -190,13 +212,23 @@ void hpclang_keyboard_events_reset(void)
 }
 int hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
 {
-    assert(screen && ++polls <= 3);
+    assert(screen && ++polls <= (editing ? 514u : 3u));
+    if (polls == 1)
+        idle_attempts = attempts;
+    else
+        assert(attempts == idle_attempts);
     if (fault == KEYBOARD) {
         errno = EIO;
         return -1;
     }
     if (polls == 1)
         return 0;
+    if (editing && polls <= 513) {
+        *event = (struct hpclang_keyboard_event){.key = HPCLANG_KEY_1,
+                                                 .type = polls % 2 ? HPCLANG_KEYBOARD_EVENT_UP
+                                                                   : HPCLANG_KEYBOARD_EVENT_DOWN};
+        return 1;
+    }
     *event =
         (struct hpclang_keyboard_event){.key = HPCLANG_KEY_ON, .type = HPCLANG_KEYBOARD_EVENT_DOWN};
     return 1;
@@ -211,12 +243,17 @@ static unsigned run(enum fault selected, int allocations, int expected)
     assert(!live && !screen);
     fault = selected;
     remaining = allocations;
-    attempts = begins = ends = polls = presents = 0;
+    attempts = begins = ends = polls = presents = changes = 0;
     assert(notebook_main() == expected);
     assert(!live && !screen && ends == begins);
     if (!expected) {
-        assert(begins == 1 && polls == 2);
-        assert(presents == (selected == TIMEOUT ? 2u : 1u));
+        assert(begins == 1 && polls == (editing ? 514u : 2u));
+        if (editing) {
+            assert(changes == NOTEBOOK_CAPACITY - 1);
+            assert(presents > 1);
+        } else {
+            assert(presents == (selected == TIMEOUT ? 2u : 1u));
+        }
     }
     return attempts;
 }
@@ -237,6 +274,11 @@ int main(void)
             run(PRESENT, -1, 1);
             run(KEYBOARD, -1, 1);
             run(TIMEOUT, -1, 0);
+            run(NONE, -1, 0);
+            /* Fill the editor, then exceed its bound without allocating in the loop. */
+            editing = 1;
+            run(NONE, -1, 0);
+            editing = 0;
             run(NONE, -1, 0);
         }
     }
