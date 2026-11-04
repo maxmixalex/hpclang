@@ -23,6 +23,8 @@ git -C "$WORK/source" apply "$ROOT/tests/e2e/harness/ckermit-server-command-wait
 git -C "$WORK/source" apply "$ROOT/tests/e2e/harness/ckermit-send-backoff.patch"
 # Fast local links need subsecond samples; retransmitted ACKs are ambiguous.
 git -C "$WORK/source" apply "$ROOT/tests/e2e/harness/ckermit-rtt-sampling.patch"
+# A NAK reply must retain the same peer turnaround pacing as a new packet.
+git -C "$WORK/source" apply "$ROOT/tests/e2e/harness/ckermit-resend-pacing.patch"
 python3 "$ROOT/tests/e2e/harness/test-kermit-timers.py" "$WORK/source/ckcfn2.c"
 make -C "$WORK/source" -j2 linux CC=gcc
 mkdir -p "$DEST"

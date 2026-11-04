@@ -999,3 +999,49 @@ records 11. Evidence: `/work/oct31-stack-banks/independent-audit.json`.
 Before submission, exact remote cca560e0 has one queued workflow/two queued
 jobs with no reported failure or cancellation. No native/exception reservation
 bound or whole-system peak admission is claimed.
+
+## 2026-10-30 — PR26 HP39g+ runtime transfer failure and retry pacing
+
+PR26 head `6a582958`, run 41024016583, job 123960548578 fails before application
+entry: host-gate-failed, no PASS/return, zero payload keyboard frames, PC 0x44c4.
+Directory transfer completed; payload send-window 57 stalled for 90 seconds,
+with three NAKs and repeated identical retransmissions. All 1,668 audited data
+and short ACK/NAK packets have valid length, sequence and CRC at socat. The
+final device Timeout packet has a valid CRC but an invalid sequence field.
+Evidence: `research/oct30-pr26-runtime-packet-audit.json` and downloaded artifacts
+under `research/oct30-pr26-hp39-runtime-failure`. This does not locate the fault
+inside the device/emulator or prove a native runtime regression.
+
+The current mainline omitted `ckermit-resend-pacing.patch`, previously tested
+on the still-unaccepted pacing branch. An isolated follow-up now applies it
+and its PTY regression: retransmissions honor configured SET SEND PAUSE before
+updating the RTT timestamp and sending the unchanged packet. Both the older
+local server and the exact downloaded failing CI server fail the turnaround
+negative test; a freshly compiled patched server passes the entire PTY suite.
+Logs, binary and input hashes: `/work/oct30-kermit-retry`. Ruff and ShellCheck
+pass. Existing x50ng cache keys already include the build script and all Kermit
+patches, so this change invalidates the stale server bundle.
+A replay under `/work/oct30-pr26-runtime-replay` uses exact CI application and
+assets/emulator with only the Kermit executable replaced; it is still running.
+Neither this diagnosis nor local protocol success waives remote CI failures.
+
+The replay completed with exit 0: application PASS, all 52 keyboard frames
+checked by the maintained harness, normal return and four settled-return
+observations. Original CI asset files compare byte-for-byte; the final status,
+input hashes and retained keyboard montage hash are recorded in
+`/work/oct30-pr26-runtime-replay/verified.json`. Individual keyboard frames are
+removed by the maintained harness after its count check and montage creation.
+This local result supports delivery of the pacing correction, not acceptance
+of #26 or proof that it explains every original packet-loss event.
+
+## 2026-11-04 — UI accepted-main integration
+
+Exact submitted 2829502c now passes all six workflows and 196 jobs, including
+the replacement evidence publisher. Integrate accepted main dfb3ee87 to resolve
+mergeability and include accepted Kermit pacing and CI queue/dispatch changes.
+Only roadmap/history required conflict resolution; both historical sections
+are preserved and current status is reconciled from the working roadmap.
+Local integration passes 17 stack observer, nine resource-snapshot verifier and
+seven UI memory tests, plus strict documentation and whitespace checks.
+The merged runtime workflow retains UI capture and adds the accepted publisher
+queue setting. No new emulator matrix is claimed; merged-version CI is required.
