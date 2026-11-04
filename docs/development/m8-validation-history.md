@@ -3040,3 +3040,152 @@ The stack-transfer implementation remains `8ae25d33`. Prior exact remote head
 jobs. Strict documentation and diff checks pass. This delivery does not
 complete execution-reference coverage, public library/Port1 operations, Port2
 installation/authority/startup/reclamation or M8.0 acceptance.
+
+### 2026-10-31 original-entry SRAM snapshots
+
+Local `fce4561d` adds optional pre-instruction SRAM capture to the emulator.
+Set `HPCLANG_X50NG_EXECUTION_SNAPSHOT_PC` to an even instruction address and
+`HPCLANG_X50NG_EXECUTION_SNAPSHOT` to an output prefix; `TARGET` supplies model
+geometry. The first runtime visit writes exclusive `-entry.sram`/`-entry.json`
+files. PC comes from the translated instruction, not stale TB-start r15;
+`time_us` is explicitly zero because this hook has no frontend clock. The hook
+does not change guest state and is disabled without the PC setting.
+
+Seventeen snapshot/resource-verifier tests, Ruff, C formatting and a fresh
+emulator build pass. The unchanged stack-transfer application/launchers pass
+one maintained native call/catalog case on each HP49g+/HP50g with capture at
+`hpclang_call_roots_probe` (0x0122d8c0), before fixture mutations. Snapshot CPU
+cursor/helper values match the later entry witness, and input hashes remain
+unchanged. Evidence: `/work/oct31-entry-snapshot/native-verified.json`.
+
+Classification against these actual entry snapshots finds one original return
+slot per model (slot 5/4 respectively), then follows the existing supported
+return/conditional/direct-call sequence and stops at ROM 0x67d2, byte 0xb1.
+The source stack/register copies remain unchanged. Per-model reports are
+`/work/oct31-entry-snapshot/hp49gplus-classification.json` and
+`hp50g-classification.json`. This is classifier replay, not proof of the stopped
+instruction's native semantics or complete execution coverage. It identifies
+the next real continuation to qualify before production integration.
+
+## 2026-11-04 — CI native-call allocation failure
+
+Exact PR #26 head 73f8e515 audit: ten successful/two failed workflows,
+386 successful/four failed/two skipped jobs. The failures are HP49g+/HP50g
+code-relocation jobs in two runs. Latest logs 124317907209/124317907288 pass
+88 basic cases and fail require_stock_pc on the first native call.
+HP50g artifact from run 41106422928 is retained at
+research/nov04-pr26-ci-hp50g. PC 0x0122e0ae and marker 0x46410ffe identify
+catalog insertion failure. Its HPC SHA-256 matches the earlier local passing
+/work/oct31-stack-transfer/app/e2e.hpc (21a088d3faa3ef1cebaf5ce2c5254f9a5416efd6b1e8afd688080078e368cc88).
+Saved LR 0x012284af identifies the edit-plan malloc return; the restored
+catalog frame at virtual 0x0112f1e0 retains a null plan pointer and capacity
+0x20c, a failed 10,480-byte allocation. This contradicts treating old saved-state
+local success as sufficient for a fresh CI launch.
+
+Local call-roots.c now allocates traversal roots/work in separate scratch and
+releases it after collection, before catalog mutation. All 2048 root/512 work/
+4096 edit/4096 guard capacities remain. ARM build, formatting and whitespace
+checks pass. Session 57322 runs fresh model-specific HP50g then HP49g+ Stock
+validation at /work/nov04-code-relocation-fresh; universal-build CI-equivalent
+validation is still required. No fix acceptance or submission claimed.
+The initial build attempt ended on CRLF shell parsing; the terminal failure
+was corrected by feeding normalized script text, with the old log retained.
+
+Notebook session 35941 passes maintained HP39g+ and HP39gs and continues on
+HP40gs. Documentation run 41840517137 build job 126610564436 remains queued.
+PR #27 has 67 successful/ten running/86 queued jobs; #28 has 18 successful/134
+queued jobs. Audit files: research/nov04-next-delivery-ci-{26,27,28}.json.
+
+Both CI model artifacts now independently identify the same 10,480-byte
+failed allocation (research/nov04-pr26-allocation-diagnosis.json). Saved
+MMU tables map the restored frame; pointer/count are zero, capacity 0x20c,
+and LR matches the malloc return in the byte-identical local ELF.
+The universal fix build passes: payload 73,960/static 16,760 bytes. Session
+37401 runs fresh universal HP50g/HP49g+ Stock at
+/work/nov04-code-relocation-universal. Session 57322 continues the separate
+model-specific run; its HP50g initial Stock launch/return passes but native
+call matrix is still running. Neither profile is accepted yet.
+
+Scratch-lifetime fix is committed locally as c4058b46. ARM Clang analysis
+using the universal build flags passes; result plist is retained under
+/work/nov04-code-relocation-universal/call-roots.plist. Both fresh HP50g
+model-specific and universal native cases now return at PC 0x8428 with one
+library-123 catalog record. Full matrices remain running, so this is focused
+regression evidence, not complete acceptance. Notebook additionally passes
+HP48gII and continues on HP49g+ in session 35941.
+
+## 2026-11-04 — Maintained Notebook entry matrix complete
+
+Session 35941 exits successfully on all six models. Independent audit verifies
+all recorded source/tool and artifact hashes, report hashes, real focused-editor
+pixels and pass/returned/settled flags per model. Evidence:
+/work/nov04-notebook-entry-matrix/independent-audit.json; reproducer
+research/nov04-notebook-matrix-audit.py. This covers the shipped application
+entry with physical GPIO ON injection in original-ROM emulators, not physical
+hardware or complete release acceptance. Local 246a5a66 adds host lifecycle
+coverage and 6abcb849 records independent-launcher packaging tradeoffs without
+retiring the option. Strict documentation build passes.
+
+Universal code-relocation session 37401 ended with failure at native-missing-message
+after native and native-new-message passed. Preserve its saved state at
+/work/nov04-code-relocation-universal/hp50g/verification/hp50g-code-relocation/.
+Model-specific session 57322 continues and has passed the first four native
+cases; this does not qualify the universal failure.
+
+## 2026-11-04 — Rollback snapshot candidate
+
+The universal native-missing-message saved state has marker 0x46410005,
+a preparation allocation error, rather than the prior 0x46410ffe catalog
+commit-path halt. Model-specific c4058b46 session 57322 remains running.
+To keep its recorded source inputs unchanged, candidate work uses a committed
+c4058b46 source archive at /work/nov04-packed-snapshot/src. The catalog
+round-trip snapshot packs two nibbles per byte and still compares every
+original nibble. Read values above 15 are rejected. Universal build passes
+(payload 74,088/static 16,760 bytes). Candidate source is not yet applied to
+the working tree or submitted. Session 85855 runs fresh Stock on HP50g then
+HP49g+ at /work/nov04-packed-snapshot/stock. Earlier source-edit assertion and
+CRLF build failures were terminal; their build log is retained.
+
+
+### 2026-11-04 Fresh relocation matrices and bounded probe storage
+
+Local c4058b46 completed both fresh model-specific Stock matrices. Independent
+saved-state replay rechecks all 88 basic cases and 19 saved executions per
+model, including native markers, catalog/bindings, attachments and messages.
+Proof: /work/nov04-code-relocation-fresh/independent-audit.json; reproducer
+research/nov04-fresh-relocation-audit.py. Recorded input hashes correspond to
+c4058b46, before the following candidate was applied to the worktree.
+
+The universal raw, packed-only, dynamic-only and combined coupled-growth
+candidates failed preparation. Local ab546017 keeps both table ceilings at
+4096, grows only the exhausted edit/guard table, and packs the full rollback
+snapshot without dropping comparisons. Universal ARM build/static analysis
+and the original HP50g missing-message regression pass; all source/HPC/launcher
+hashes are recorded in /work/nov04-packed-snapshot/independent-focused-audit.json.
+Complete fresh universal validation at
+/work/nov04-packed-snapshot/independent-stock (session 20554) stopped at
+native-cache after missing-message/remove/detach/reattach passed. Marker
+0x46410ffd identifies failed round-trip validation: the candidate changed the
+cache comparison to packed reads but left its writer unpacked. The local fix
+packs that writer too, preserves all nibble comparisons and passes ARM build.
+All three focused HP50g cache regressions pass (90455), as does ARM static
+analysis. The correction is committed locally as 23a49bbc. Fresh corrected
+universal two-model validation is active at
+/work/nov04-packed-snapshot/cache-fixed-stock (25166); no full acceptance. No public Port1
+authority, whole M8.0 acceptance or remote acceptance is implied.
+
+Notebook build support 96bf5a2c accepts strong or weak defined startup symbols
+when LTO wraps hpclang_start. Its instrumented HP39g+ build/Stock gate passes;
+the change is local and unpushed. Remaining Notebook model runs continue.
+
+
+### 2026-11-04 — Fresh universal HP50g relocation result
+
+Local `23a49bbc` completes HP50g fresh Stock verification with the shared universal binary: 88 basic reference/control cases and all 14 native/call scenarios. `research/nov04-universal-relocation-audit.py` independently replays 19 retained execution states, checks source/artifact/report hashes and reproduces the maintained result. Evidence: `/work/nov04-packed-snapshot/cache-fixed-stock/independent-audit.json`; `complete` remains false until HP49g+ finishes. Session 25166 is now running HP49g+. No push, public-library acceptance or full M8.0 completion is claimed.
+
+
+### 2026-11-05 — Fresh universal relocation validation complete
+
+Local source `23a49bbc` passes complete fresh Stock matrices on HP50g and HP49g+: 88 basic checks, 14 native/call scenarios and 19 saved executions per model. Independent replay reproduces both maintained results with source, artifact, report and saved-state hashes; `/work/nov04-packed-snapshot/cache-fixed-stock/independent-audit.json` now has `complete: true`. The first full-audit attempt encountered the prior partial-audit directory; the audit now uses a temporary directory and removes it after success. No emulator rerun or weakened check was needed.
+
+All four pending source files match the immutable tested snapshot after checkout-newline normalization (`research/nov05-relocation-delivery-source-identity.json`). ARM build/analysis, formatting, Ruff and strict documentation pass. The exact preceding remote 73f8e515 still has ten successful/two failed workflows, 386 successful/four failed/two skipped jobs; failures are the identified fresh-baseline catalog-plan allocation problem. Evidence: `research/nov04-pr26-pre-delivery-ci-26.json`. Fresh remote acceptance and remaining execution-origin/public Port1/library/Port2 requirements are separate.
