@@ -1,10 +1,11 @@
-
 #include <hpclang/display.h>
 #include <hpclang/time.h>
 #include <stdint.h>
 volatile uint32_t hpclang_e2e_result;
 static unsigned presented, injected;
 int notebook_application_main(void);
+extern volatile uint32_t hpclang_notebook_stack_witness[3];
+uint32_t hpclang_notebook_stack_sample(void);
 int __real_hpclang_display_present(uint32_t timeout);
 static int mailbox(uint32_t request, uint32_t ack)
 {
@@ -40,5 +41,6 @@ int main(void)
             __asm__ volatile("nop");
     for (volatile unsigned n = 12000000; n; --n)
         __asm__ volatile("nop");
+    hpclang_notebook_stack_witness[1] = hpclang_notebook_stack_sample();
     return 0;
 }

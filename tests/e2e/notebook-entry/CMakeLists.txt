@@ -14,6 +14,7 @@ add_executable(hpclang_notebook_entry_e2e
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
     main.c
+    resources.c
     "${HPCLANG_ROOT}/examples/notebook/main.c"
     "${HPCLANG_ROOT}/examples/notebook/app.c"
     "${HPCLANG_ROOT}/examples/notebook/store.c"
@@ -42,4 +43,5 @@ hpclang_target_font(hpclang_notebook_entry_e2e
 
 set_source_files_properties("${HPCLANG_ROOT}/examples/notebook/main.c"
     PROPERTIES COMPILE_DEFINITIONS main=notebook_application_main)
-target_link_options(hpclang_notebook_entry_e2e PRIVATE "LINKER:--wrap=hpclang_display_present")
+target_link_options(hpclang_notebook_entry_e2e PRIVATE "LINKER:--wrap=hpclang_display_present"
+    "LINKER:--wrap=sbrk" "LINKER:--wrap=hpclang_start")

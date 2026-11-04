@@ -7,6 +7,25 @@ from pathlib import Path
 import runpy
 
 
+def verify_resources(build, target):
+    path = build / f"{target}-frame-memory-1.json"
+    report = json.loads(path.read_text())
+    assert set(report) == {"version", "id", "words"}
+    assert type(report["version"]) is int and report["version"] == 1
+    assert type(report["id"]) is int and report["id"] == 1
+    words = report["words"]
+    assert isinstance(words, list) and len(words) == 8
+    assert all(type(value) is int and 0 <= value <= 0xFFFFFFFF for value in words)
+    version, entry, main, final, stack_limit, heap, heap_limit, rw_bytes = words
+    assert version == 1 and stack_limit == 8192
+    assert 0 < entry <= main <= final < stack_limit
+    assert all(value % 4 == 0 for value in (entry, main, final))
+    assert rw_bytes % 4096 == 0 and rw_bytes > stack_limit
+    assert 0 < heap <= heap_limit < rw_bytes - stack_limit
+    print(f"PASS: {target}: touched stack {final}/{stack_limit}, reserved heap {heap}/{heap_limit}")
+    return words
+
+
 def verify(build, target, height, root):
     helpers = runpy.run_path(str(root / "tests/e2e/notebook/verify.py"))
     glyphs = helpers["font_rows"](root / "runtime/fonts/generated/newrpl_6a.S")
@@ -22,6 +41,7 @@ def verify(build, target, height, root):
     report = json.loads((build / f"{target}-stock.json").read_text())
     assert report["status"] == "pass"
     assert all(report[key] is True for key in ("saw_pass", "returned", "return_settled"))
+    verify_resources(build, target)
     print(f"PASS: {target}: real focused editor, ON exit and settled Stock return")
 
 
