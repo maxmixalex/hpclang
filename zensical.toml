@@ -4,7 +4,7 @@ site_url = "https://maxmixalex.github.io/hpclang/"
 repo_url = "https://github.com/maxmixalex/hpclang"
 repo_name = "maxmixalex/hpclang"
 nav = [
-  { "SDK" = ["sdk/getting-started.md", "sdk/declarative-ui.md", "sdk/migration.md"] },
+  { "SDK" = ["sdk/getting-started.md", "sdk/api-conventions.md", "sdk/declarative-ui.md", "sdk/migration.md"] },
   { "Development" = [
     "index.md",
     "development/architecture.md",
