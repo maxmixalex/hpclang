@@ -4455,3 +4455,30 @@ stock.json, unit.log, artifact-audit.json and collected-execution.json.
 Reproducers: research/nov05-execution-collector-{build,stock}.py and
 research/nov05-collected-execution-path.py. Full execution coverage and integration
 of collected uses into complete public mutation plans remain open.
+
+## 2026-11-05 — Continuation boundary and toolchain download failures
+
+Original-ROM ARM traces on both saved HP49g+/HP50g states confirm that the two
+successive dispatches at Saturn 0x3130 are real executions of 81BD, not duplicate
+logging. This instruction changes the low 32-bit halves of B and D, performs
+three dependent five-nibble reads, updates A and D0, and selects a new PC.
+The first observed execution returns to 0x3130; the second reaches 0x28fc.
+All captured register, flag and return-stack bytes match the independently
+calculated transitions in both models. Dispatch capture reconstructs mappings
+from live SRAM. Original sealed 24-dispatch reports remain untouched.
+
+Evidence: /work/nov05-continuation-arm/{hp49gplus,hp50g}.json and
+checked-transitions.json. Reproducers: research/nov05-continuation-{arm,check}.py.
+This qualifies only those observed transitions. It does not add production
+81BD support, general edge-case coverage or mutation permission. The current
+collector still stops at the previously validated 21-instruction boundary;
+the next extension needs multiple dependent read origins and arithmetic effects.
+
+Exact-head CI audit found two failures on #19 afc9e70f: Stock ports / hp50g /
+installation (127262244111) and retirement (127262244168), both in setup-atfe.
+Retained job logs show HTTP 504 on the initial download and all three retries,
+then curl exit 22. Emulator setup and native port execution were skipped.
+These are observed toolchain-download failures, not evidence of port-test
+failure or successful acceptance. The workflow still has pending jobs; no
+blind rerun or merge was performed. Logs: research/nov05-ci-127262244111.log
+and research/nov05-ci-127262244168.log. Other audited deliveries remain pending.
