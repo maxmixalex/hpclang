@@ -198,6 +198,7 @@ static void control_steps(void)
     for (unsigned cursor = 0; cursor < 8; ++cursor) {
         struct hpclang_rpl_code_control state = {.cursor = cursor};
         state.stack[cursor] = 0xabcde;
+        state.stack_generated[cursor] = 99;
         for (unsigned i = 0; i < 5; ++i)
             state.stack_origins[cursor][i] = i + 10;
         encode(&code, 0, 2, 0xf8);
@@ -207,12 +208,25 @@ static void control_steps(void)
         assert(!hpclang_rpl_code_control_step(&reader, 128, &state, &use));
         assert(state.pc == 32 && state.cursor == ((cursor + 1) & 7));
         assert(state.stack[cursor] == 7 && !use.present);
+        assert(state.stack_generated[cursor] == 1);
         for (unsigned i = 0; i < 5; ++i)
             assert(!state.stack_origins[cursor][i]);
         assert(!hpclang_rpl_code_control_step(&reader, 96, &state, &use));
         assert(state.pc == 7 && state.cursor == cursor && use.present && use.target == 7);
+        assert(use.generated == 1 && !state.stack_generated[cursor]);
         for (unsigned i = 0; i < 5; ++i)
             assert(!use.origins[i]);
+        state.pc = 0;
+        encode(&code, 32, 2, 0xf8);
+        encode(&code, 34, 5, 64);
+        encode(&code, 39, 2, 0x10);
+        encode(&code, 64, 2, 0x10);
+        assert(!hpclang_rpl_code_control_step(&reader, 128, &state, &use));
+        assert(!hpclang_rpl_code_control_step(&reader, 96, &state, &use));
+        assert(!hpclang_rpl_code_control_step(&reader, 64, &state, &use));
+        assert(use.generated == 33 && use.target == 39);
+        assert(!hpclang_rpl_code_control_step(&reader, 89, &state, &use));
+        assert(use.generated == 1 && use.target == 7 && state.cursor == cursor);
     }
     struct hpclang_rpl_code_control state = {0}, before = state;
     struct hpclang_rpl_code_return_use use = {0}, old_use = use;
@@ -2170,15 +2184,105 @@ static void computed_origin_transfers(void)
     state.origins = origins;
     state.origins.adjustment[HPCLANG_RPL_CODE_C] = 0xffffb;
     state.values.registers[HPCLANG_RPL_CODE_C] = 0x12345;
+    state.control.stack_generated[0] = 123;
     struct hpclang_rpl_code_step_uses uses;
     assert(!hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL, &uses));
     assert(state.control.stack[0] == 0x12345);
+    assert(!state.control.stack_generated[0]);
     for (unsigned digit = 0; digit < 5; ++digit)
         assert(!state.control.stack_origins[0][digit]); /* RSTK does not yet carry expressions. */
+    state.control.stack_generated[0] = 123;
+    state.control.pc = 0;
+    encode(&code, 0, 2, 0x70);
+    assert(!hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL, &uses));
+    assert(!state.control.stack_generated[0]);
+    for (unsigned digit = 0; digit < 5; ++digit)
+        assert(!state.origins.registers[HPCLANG_RPL_CODE_C][digit]);
+}
+
+static void generated_return_plans(void)
+{
+    struct image code = {.address = 0x100, .size = 128, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    const struct hpclang_rpl_reference_mappings mapping = {1, 1, 1};
+    for (unsigned kind = 0; kind < 3; ++kind) {
+        unsigned prefix = kind ? 2 : 1, width = kind == 0 ? 3 : kind == 1 ? 4 : 5;
+        unsigned length = prefix + width;
+        encode(&code, 16, prefix, kind == 0 ? 7 : kind == 1 ? 0xe8 : 0xf8);
+        encode(&code, 16 + prefix, width, kind == 2 ? 0x160 : 0x160 - 0x110 - length);
+        struct hpclang_rpl_code_address_use use = {.kind = HPCLANG_RPL_CODE_USE_RETURN_TARGET,
+                                                   .value = 0x110 + length,
+                                                   .generated = 0x111};
+        struct hpclang_rpl_code_patch patch = sentinel;
+        int result = hpclang_rpl_code_generated_return_plan(
+            &reader, &use, &mapping, 0x110, 0x110 + length, 16, use.value + 16, &patch);
+        assert(result == (kind == 2 ? 0 : 1));
+        if (result) {
+            assert(patch.field == 0x110 + prefix && patch.width == width);
+            assert(patch.expected == 0x160 - 0x110 - length && patch.value == patch.expected - 16);
+        } else {
+            assert(!memcmp(&patch, &sentinel, sizeof patch));
+        }
+        patch = sentinel;
+        assert(hpclang_rpl_code_generated_return_plan(&reader, &use, &mapping, 0x100, 0x180, 16,
+                                                      use.value + 16, &patch) == (kind == 2));
+        if (kind == 2)
+            assert(patch.value == 0x170);
+        else
+            assert(!memcmp(&patch, &sentinel, sizeof patch));
+        const struct hpclang_rpl_reference_mappings target_only = {2, 1, 1};
+        assert(hpclang_rpl_code_generated_return_plan(&reader, &use, &target_only, 0x150, 0x180, 16,
+                                                      use.value, &patch) == 1);
+        assert(hpclang_rpl_code_generated_return_plan(&reader, &use, &mapping, 0x110,
+                                                      0x110 + length, -16, use.value - 16,
+                                                      &patch) == (kind == 2 ? 0 : 1));
+        for (unsigned digit = 0; digit < length; ++digit) {
+            code.fail = 0x110 + digit;
+            patch = sentinel;
+            assert(hpclang_rpl_code_generated_return_plan(&reader, &use, &mapping, 0x100, 0x180, 16,
+                                                          use.value + 16,
+                                                          &patch) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(!memcmp(&patch, &sentinel, sizeof patch));
+        }
+        code.fail = UINT32_MAX;
+        for (unsigned mode = 0; mode < 7; ++mode) {
+            struct hpclang_rpl_code_address_use bad = use;
+            uint32_t first = 0x110, end = 0x110 + length, replacement = use.value + 16;
+            if (mode == 0)
+                bad.generated = 0;
+            if (mode == 1)
+                bad.adjustment = 1;
+            if (mode == 2)
+                bad.origins[0] = 1;
+            if (mode == 3)
+                ++bad.value;
+            if (mode == 4)
+                ++replacement;
+            if (mode == 5)
+                ++first;
+            if (mode == 6)
+                --end;
+            patch = sentinel;
+            assert(hpclang_rpl_code_generated_return_plan(&reader, &bad, &mapping, first, end, 16,
+                                                          replacement, &patch) < 0);
+            assert(!memcmp(&patch, &sentinel, sizeof patch));
+        }
+    }
+    code.address = 0xffff9;
+    code.size = 7;
+    encode(&code, 0, 2, 0xf8);
+    encode(&code, 2, 5, 32);
+    const struct hpclang_rpl_code_address_use wrap = {
+        .kind = HPCLANG_RPL_CODE_USE_RETURN_TARGET, .value = 0, .generated = 0xffffa};
+    struct hpclang_rpl_code_patch patch = sentinel;
+    assert(!hpclang_rpl_code_generated_return_plan(&reader, &wrap, &mapping, 0xffff9, 0x100000, -16,
+                                                   0xffff0, &patch));
+    assert(!memcmp(&patch, &sentinel, sizeof patch));
 }
 
 int main(void)
 {
+    generated_return_plans();
     computed_origin_transfers();
     native_threaded_exit();
     execution_steps();

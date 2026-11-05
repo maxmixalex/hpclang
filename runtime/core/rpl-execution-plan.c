@@ -24,6 +24,8 @@ int hpclang_rpl_execution_plan_uses(struct hpclang_rpl_reference_edit_builder *b
             return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
     for (uint32_t i = 0; i < uses->count; ++i) {
         const struct hpclang_rpl_code_address_use *use = &uses->addresses[i];
+        if (use->generated)
+            return reject(builder, HPCLANG_RPL_SPAN_UNSUPPORTED);
         if (use->kind < HPCLANG_RPL_CODE_USE_LOAD_ADDRESS ||
             use->kind > HPCLANG_RPL_CODE_USE_RETURN_TARGET)
             return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);

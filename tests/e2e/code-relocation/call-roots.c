@@ -663,6 +663,7 @@ struct execution_probe
     struct hpclang_rpl_stock_view view;
     uint32_t *pc;
     uint32_t observations[4], uses, indirect_targets, derived_uses, derived_source, adjustment;
+    uint32_t generated_uses;
 };
 
 static int execution_observe(void *context, unsigned space, uint32_t at, uint8_t value)
@@ -687,6 +688,13 @@ static int execution_token(void *context, unsigned data, uint32_t at, uint8_t va
     return 0;
 }
 
+static int execution_plan_read(void *context, uint32_t at, uint8_t *value)
+{
+    struct execution_probe *probe = context;
+    return hpclang_rpl_stock_view_saturn(&probe->view, at, value) &&
+           !execution_observe(context, HPCLANG_RPL_EXECUTION_CODE, at, *value);
+}
+
 static int execution_visit(void *context, uint32_t pc,
                            const struct hpclang_rpl_code_execution *state,
                            const struct hpclang_rpl_code_step_uses *uses)
@@ -697,6 +705,16 @@ static int execution_visit(void *context, uint32_t pc,
     probe->uses += uses->count;
     for (unsigned i = 0; i < uses->count; ++i) {
         const struct hpclang_rpl_code_address_use *use = &uses->addresses[i];
+        if (use->generated) {
+            const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
+            const struct hpclang_rpl_reference_mappings mappings = {1, 1, 1};
+            struct hpclang_rpl_code_patch patch;
+            int result = hpclang_rpl_code_generated_return_plan(&instructions, use, &mappings, 0,
+                                                                0x100000, 0, use->value, &patch);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            ++probe->generated_uses;
+        }
         if (!use->adjustment)
             continue;
         uint32_t first = use->origins[0];
@@ -776,7 +794,8 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                           0x45584543,
                           probe->derived_uses,
                           probe->derived_source,
-                          probe->adjustment};
+                          probe->adjustment,
+                          probe->generated_uses};
     for (unsigned i = 0; i < 16; ++i)
         if (probe_write_word(io, entry.object_address + 10 + i * 8, words[i], 8))
             goto done;

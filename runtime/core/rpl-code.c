@@ -176,6 +176,7 @@ static void execution_use(struct hpclang_rpl_code_step_uses *uses, unsigned kind
     use->kind = kind;
     use->value = value;
     use->adjustment = adjustment;
+    use->generated = 0;
     for (unsigned i = 0; i < 5; ++i)
         use->origins[i] = origins[i];
 }
@@ -221,6 +222,7 @@ int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instruction
         unsigned slot = next.control.cursor;
         uint32_t *reg = next.origins.registers[HPCLANG_RPL_CODE_C];
         if (opcode == 0x60) {
+            next.control.stack_generated[slot] = 0;
             next.control.stack[slot] =
                 (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C] & 0xfffffu;
             for (unsigned i = 0; i < 5; ++i)
@@ -237,6 +239,7 @@ int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instruction
                 next.control.stack_origins[slot][i] = 0;
             }
             next.control.stack[slot] = 0;
+            next.control.stack_generated[slot] = 0;
             next.control.cursor = slot;
             next.origins.adjustment[HPCLANG_RPL_CODE_C] = 0;
         }
@@ -359,10 +362,11 @@ int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instruction
     if (result)
         return result;
     next.values.carry = next.control.carry;
-    if (returned.present)
+    if (returned.present) {
         execution_use(&observed, HPCLANG_RPL_CODE_USE_RETURN_TARGET, returned.target,
                       returned.origins, 0);
-    else {
+        observed.addresses[observed.count - 1].generated = returned.generated;
+    } else {
         result = hpclang_rpl_code_branch_inspect(instructions, pc, limit, &observed.branch);
         if (result && result != HPCLANG_RPL_SPAN_UNSUPPORTED)
             return result;
@@ -1130,6 +1134,9 @@ int hpclang_rpl_code_control_step(const struct hpclang_rpl_reader *instructions,
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     if (state->carry > 1 || state->cursor >= 8)
         return HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned slot = 0; slot < 8; ++slot)
+        if (state->stack_generated[slot] > 0x100000u)
+            return HPCLANG_RPL_SPAN_MALFORMED;
     if (state->pc > 0xffffe || limit < 2 || limit > 0x100000u - state->pc)
         return HPCLANG_RPL_SPAN_BOUNDS;
     uint32_t opcode;
@@ -1169,6 +1176,7 @@ int hpclang_rpl_code_control_step(const struct hpclang_rpl_reader *instructions,
             return result;
         if (branch.call) {
             next.stack[next.cursor] = (state->pc + branch.length) & 0xfffffu;
+            next.stack_generated[next.cursor] = state->pc + 1;
             for (unsigned i = 0; i < 5; ++i)
                 next.stack_origins[next.cursor][i] = 0;
             next.cursor = (next.cursor + 1) & 7u;
@@ -1182,11 +1190,15 @@ int hpclang_rpl_code_control_step(const struct hpclang_rpl_reader *instructions,
         next.pc = next.stack[next.cursor];
         consumed.present = 1;
         consumed.target = next.pc;
+        consumed.generated = next.stack_generated[next.cursor];
         for (unsigned i = 0; i < 5; ++i) {
+            if (consumed.generated && next.stack_origins[next.cursor][i])
+                return HPCLANG_RPL_SPAN_MALFORMED;
             consumed.origins[i] = next.stack_origins[next.cursor][i];
             next.stack_origins[next.cursor][i] = 0;
         }
         next.stack[next.cursor] = 0;
+        next.stack_generated[next.cursor] = 0;
     }
     *state = next;
     *use = consumed;
@@ -1557,4 +1569,45 @@ int hpclang_rpl_code_pointer_plan_shift(const struct hpclang_rpl_reader *reader,
                                         struct hpclang_rpl_code_patch *patch)
 {
     return plan_shift(reader, instruction, limit, mappings, first, end, delta, patch, 1);
+}
+
+int hpclang_rpl_code_generated_return_plan(const struct hpclang_rpl_reader *instructions,
+                                           const struct hpclang_rpl_code_address_use *use,
+                                           const struct hpclang_rpl_reference_mappings *mappings,
+                                           uint32_t first, uint32_t end, int32_t delta,
+                                           uint32_t replacement,
+                                           struct hpclang_rpl_code_patch *patch)
+{
+    if (!instructions || !instructions->read_nibble || !use || !mappings || !patch)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!use->generated)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (use->kind != HPCLANG_RPL_CODE_USE_RETURN_TARGET || use->adjustment)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (use->generated > 0x100000u || use->value > 0xfffff || replacement > 0xfffff)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    for (unsigned digit = 0; digit < 5; ++digit)
+        if (use->origins[digit])
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t instruction = use->generated - 1;
+    struct hpclang_rpl_code_branch call;
+    int result =
+        hpclang_rpl_code_branch_inspect(instructions, instruction, 0x100000u - instruction, &call);
+    if (result)
+        return result;
+    if (!call.call || ((instruction + call.length) & 0xfffffu) != use->value)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_code_patch operand;
+    result = hpclang_rpl_code_branch_plan_shift(instructions, instruction, 0x100000u - instruction,
+                                                mappings, first, end, delta, &operand);
+    if (result < 0)
+        return result;
+    int moves = mappings->field == mappings->moving && instruction >= first && instruction < end;
+    uint32_t fallthrough =
+        (uint32_t)((int64_t)instruction + call.length + (moves ? delta : 0)) & 0xfffffu;
+    if (replacement != fallthrough)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result)
+        *patch = operand;
+    return result;
 }

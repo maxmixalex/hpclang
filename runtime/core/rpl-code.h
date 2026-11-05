@@ -225,17 +225,20 @@ struct hpclang_rpl_code_control
 {
     uint32_t pc, carry, cursor, stack[8];
     uint32_t stack_origins[8][5];
+    uint32_t stack_generated[8]; /* Producing call PC + 1; zero means not recorded. */
 };
 
 struct hpclang_rpl_code_return_use
 {
     uint32_t present, target, origins[5];
+    uint32_t generated;
 };
 
 /* Advance a private suspended-state copy through RTN/RTNSC/RTNCC, direct
  * jumps/calls and GOC/GONC (including their zero-displacement returns).
  * Carry is canonical 0/1. Calls overwrite the next circular slot and clear its
- * old origins: a computed return PC is not an original stored field. A taken
+ * old origins and retain the producing call PC+1: a computed return PC is not
+ * an original stored field. A taken
  * return reports the consumed slot's origins before clearing/popping it.
  * Untaken conditions leave the stack unchanged. Direct branch operand repair
  * remains the caller's responsibility via branch_inspect/plan_shift.
@@ -295,6 +298,7 @@ struct hpclang_rpl_code_address_use
 {
     uint32_t kind, value, origins[5];
     uint32_t adjustment; /* value = original source + adjustment modulo 20 bits. */
+    uint32_t generated;  /* For returns: producing call PC+1, not a nibble token. */
 };
 
 struct hpclang_rpl_code_step_uses
@@ -315,7 +319,9 @@ struct hpclang_rpl_code_step_uses
  * describe the same state and must agree. Emit the five source tokens of every
  * consumed load address, register jump target, indirect-memory target or return.
  * Copies alone emit no use. Direct encoded operands are described by branch,
- * not misrepresented as copied address digits. Computed PC origins stay unknown.
+ * not misrepresented as copied address digits. Generated returns retain a call
+ * producer separately; other computed PC origins stay unknown. C/RSTK transfers
+ * conservatively discard generated-call metadata instead of mislabeling it.
  * The caller qualifies entry, memory mappings, tokens and instruction boundaries,
  * guards all reads, limits the walk and rejects unsupported instructions. A zero
  * origin does not authorize an unguarded repair. This is a private simulation,
@@ -327,6 +333,24 @@ int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instruction
                                     struct hpclang_rpl_code_execution *state,
                                     hpclang_rpl_code_token_fn token, void *context,
                                     struct hpclang_rpl_code_step_uses *uses);
+
+/* Validate a collected generated return against its guarded producing call,
+ * and plan that call's branch operand for a caller-qualified move. The return
+ * replacement must equal the relocated call's fallthrough, including at an
+ * exclusive move endpoint or 20-bit wrap. No stored return field is repaired.
+ * mappings.field names the producing instruction/return mapping; mappings.target
+ * names the call destination, independently qualified. Retain original call
+ * bytes as guards and establish that its complete instruction survives the move.
+ * Return 1 with an operand patch, 0 without one, or a negative span error.
+ * Zero is only this generated-return relation, not complete path coverage or
+ * mutation permission. Output changes only on 1; all reads must remain stable.
+ * Non-generated, mixed-token or adjusted records reject; unknown is not generated. */
+int hpclang_rpl_code_generated_return_plan(const struct hpclang_rpl_reader *instructions,
+                                           const struct hpclang_rpl_code_address_use *use,
+                                           const struct hpclang_rpl_reference_mappings *mappings,
+                                           uint32_t first, uint32_t end, int32_t delta,
+                                           uint32_t replacement,
+                                           struct hpclang_rpl_code_patch *patch);
 
 struct hpclang_rpl_code_origin_cell
 {

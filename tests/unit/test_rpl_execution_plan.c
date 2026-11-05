@@ -89,6 +89,12 @@ void test_execution_plans(void)
     assert(hpclang_rpl_execution_plan_uses(&builder, &uses[0], first, resolve_cell, &f) ==
            HPCLANG_RPL_SPAN_MALFORMED);
     assert(f.calls == calls); /* A failed plan cannot resume silently. */
+    struct hpclang_rpl_code_step_uses generated = uses[0];
+    generated.addresses[0].generated = 1;
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 20));
+    assert(hpclang_rpl_execution_plan_uses(&builder, &generated, first, resolve_cell, &f) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!builder.count && f.calls == calls); /* Producer validation is a separate obligation. */
 
     for (unsigned mode = 0; mode < 4; ++mode)
         for (unsigned digit = 0; digit < 10; ++digit) {
