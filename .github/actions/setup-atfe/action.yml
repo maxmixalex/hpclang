@@ -28,7 +28,7 @@ runs:
         if [ ! -x "$DEST/bin/clang" ]; then
           tmp="$(mktemp --suffix=.tar.xz)"
           trap 'rm -f "$tmp"' EXIT
-          curl -fL --retry 3 --retry-delay 2 \
+          curl -fL --retry 3 --retry-delay 2 --retry-all-errors \
             "https://github.com/arm/arm-toolchain/releases/download/release-${VERSION}-ATfE/ATfE-${VERSION}-Linux-x86_64.tar.xz" \
             -o "$tmp"
           rm -rf "$DEST"

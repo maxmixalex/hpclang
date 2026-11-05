@@ -1397,6 +1397,46 @@ def patch_execution_clock(root: Path, args: argparse.Namespace) -> None:
     )
 
 
+def patch_execution_snapshot(root: Path, args: argparse.Namespace) -> None:
+    """Capture SRAM before one caller-selected executed instruction, without guest writes."""
+    arm = root / "src/qemu/target-arm"
+    for name in ("resource-snapshot.h", "execution-snapshot.h"):
+        shutil.copy2(args.headless_header.parent / name, arm)
+    replace_once(
+        arm / "helpers.h",
+        '#include "def-helper.h"',
+        '#include "def-helper.h"\nDEF_HELPER_2(hpclang_execution_snapshot, void, ptr, i32)',
+        "execution snapshot helper declaration",
+    )
+    replace_once(
+        arm / "helper.c",
+        '#include "helpers.h"',
+        '#include "helpers.h"\n#include "execution-snapshot.h"\n'
+        "void HELPER(hpclang_execution_snapshot)(void *opaque, uint32_t pc)\n"
+        "{ execution_snapshot(opaque, pc); }\n",
+        "execution snapshot helper implementation",
+    )
+    replace_once(
+        arm / "translate.c",
+        "        if (env->thumb) {\n            disas_thumb_insn(env, dc);",
+        '        const char *snapshot_pc = getenv("HPCLANG_X50NG_EXECUTION_SNAPSHOT_PC");\n'
+        "        if (snapshot_pc && *snapshot_pc) {\n"
+        "            char *end;\n"
+        "            unsigned long address = strtoul(snapshot_pc, &end, 0);\n"
+        "            if (*end || address > UINT32_MAX || (address & 1u)) {\n"
+        '                fputs("invalid execution snapshot PC\\n", stderr); exit(1);\n'
+        "            }\n"
+        "            if (address == dc->pc) {\n"
+        "                TCGv pc = tcg_const_i32(dc->pc);\n"
+        "                gen_helper_hpclang_execution_snapshot(cpu_env, pc);\n"
+        "                tcg_temp_free_i32(pc);\n"
+        "            }\n"
+        "        }\n"
+        "        if (env->thumb) {\n            disas_thumb_insn(env, dc);",
+        "execution snapshot before instruction",
+    )
+
+
 def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
     """Observe actual SP assignments without writing to guest stack memory."""
     arm = root / "src/qemu/target-arm"
@@ -1461,6 +1501,7 @@ def main() -> None:
     root = args.x50ng
     patch_frontends(root, args)
     patch_execution_clock(root, args)
+    patch_execution_snapshot(root, args)
     patch_stack_pointer_observer(root, args)
     verify_ui_build_inheritance(root)
     patch_universal_flash(root)

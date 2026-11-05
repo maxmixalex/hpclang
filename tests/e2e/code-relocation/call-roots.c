@@ -15,17 +15,36 @@ static int prepare_call(struct hpclang_rpl_mutation_io *, uint32_t **, int *);
 /* Controlled Stock fixture only: the clean test catalog and fixture programs
  * supply the input provenance. Opaque execution coverage stays unresolved;
  * this is not a public registration or recovery implementation. */
+struct probe_scratch
+{
+    uint32_t roots[2048];
+    struct hpclang_rpl_reference_node work[512];
+};
 struct live_probe
 {
     struct hpclang_rpl_mutation_io *io;
-    uint32_t first, end, roots[2048], root_count;
+    uint32_t first, end, root_count;
+    struct probe_scratch *scratch;
     int32_t delta;
     struct hpclang_rpl_reference_edit_builder builder;
-    struct hpclang_rpl_reference_edit edits[4096];
+    struct hpclang_rpl_reference_edit *edits;
     struct hpclang_rpl_reference_guard_builder guard_builder;
-    struct hpclang_rpl_reference_guard guards[4096];
-    struct hpclang_rpl_reference_node work[512];
+    struct hpclang_rpl_reference_guard *guards;
 };
+static void probe_buffers_free(struct live_probe *p)
+{
+    free(p->edits);
+    free(p->guards);
+    p->edits = NULL;
+    p->guards = NULL;
+}
+static void probe_destroy(struct live_probe *p)
+{
+    if (p) {
+        probe_buffers_free(p);
+        free(p);
+    }
+}
 static int probe_read_word(struct hpclang_rpl_mutation_io *io, uint32_t at, unsigned width,
                            uint32_t *out)
 {
@@ -55,7 +74,7 @@ static int probe_root(void *context, enum hpclang_rpl_root_source source, uint32
         return 0; /* catalog_grow owns these. */
     if (!slot || p->root_count == 2048)
         return -1;
-    p->roots[p->root_count++] = slot;
+    p->scratch->roots[p->root_count++] = slot;
     return 0;
 }
 static int probe_edge(void *context, const struct hpclang_rpl_reference *edge)
@@ -70,7 +89,7 @@ static int probe_edge(void *context, const struct hpclang_rpl_reference *edge)
         edge->kind != HPCLANG_RPL_REFERENCE_ATTACHMENT)
         return 0;
     for (uint32_t i = 0; i < p->root_count; ++i)
-        if (p->roots[i] == edge->field)
+        if (p->scratch->roots[i] == edge->field)
             return 0; /* Do not shift a known root twice. */
     uint32_t target = edge->target >= 0x80000 ? 1 : 0;
     if (edge->kind == HPCLANG_RPL_REFERENCE_ACPTR && edge->auxiliary) {
@@ -105,7 +124,7 @@ static int probe_node(struct live_probe *p, struct hpclang_rpl_reader *reader, u
                       uint32_t span)
 {
     struct hpclang_rpl_reference_node node = {at, span, 0};
-    return hpclang_rpl_reference_visit_guarded_nested(reader, &node, p->work, 512, 10000,
+    return hpclang_rpl_reference_visit_guarded_nested(reader, &node, p->scratch->work, 512, 10000,
                                                       probe_edge, probe_dependency, p);
 }
 static int probe_temp(void *context, uint32_t first, uint32_t span)
@@ -122,23 +141,55 @@ static int probe_temp(void *context, uint32_t first, uint32_t span)
     }
     return 0;
 }
+static int probe_collect_once(struct live_probe *p, struct hpclang_rpl_reader *reader,
+                              uint32_t home, unsigned edit_capacity, unsigned guard_capacity)
+{
+    p->root_count = 0;
+    hpclang_rpl_reference_edits_begin(&p->builder, p->edits, edit_capacity);
+    hpclang_rpl_reference_guards_begin(&p->guard_builder, p->guards, guard_capacity);
+    if (hpclang_rpl_mutation_visit_guarded_roots(p->io, probe_root, probe_dependency, p))
+        return 6;
+    if (probe_node(p, reader, home, 0x100000 - home) ||
+        hpclang_rpl_mutation_visit_guarded_temp(p->io, probe_temp, probe_dependency, p))
+        return 7;
+    const struct hpclang_rpl_reference_reader mapped = {probe_mapped_read, p->io};
+    return hpclang_rpl_reference_edits_validate(&mapped, p->edits, p->builder.count) ? 8 : 0;
+}
 static int probe_collect(struct live_probe *p, struct hpclang_rpl_reader *reader, uint32_t home)
 {
-    hpclang_rpl_reference_edits_begin(&p->builder, p->edits, 4096);
-    hpclang_rpl_reference_guards_begin(&p->guard_builder, p->guards, 4096);
-    int result = 6;
-    if (hpclang_rpl_mutation_visit_guarded_roots(p->io, probe_root, probe_dependency, p))
-        return result;
-    result = 7;
-    if (probe_node(p, reader, home, 0x100000 - home))
-        return result;
-    if (hpclang_rpl_mutation_visit_guarded_temp(p->io, probe_temp, probe_dependency, p))
-        return result;
-    const struct hpclang_rpl_reference_reader mapped = {probe_mapped_read, p->io};
-    result = 8;
-    if (hpclang_rpl_reference_edits_validate(&mapped, p->edits, p->builder.count))
-        return result;
-    return 0;
+    p->scratch = malloc(sizeof *p->scratch);
+    if (!p->scratch)
+        return 5;
+    int result = 5;
+    /* Keep the full capacity ceiling without reserving two maximum-size tables
+     * for every case. Discovery is read-only; a capacity retry starts afresh. */
+    unsigned edit_capacity = 512, guard_capacity = 512;
+    for (;;) {
+        probe_buffers_free(p);
+        p->edits = malloc(edit_capacity * sizeof *p->edits);
+        p->guards = malloc(guard_capacity * sizeof *p->guards);
+        if (!p->edits || !p->guards) {
+            result = 5;
+            break;
+        }
+        result = probe_collect_once(p, reader, home, edit_capacity, guard_capacity);
+        if (!result)
+            break;
+        int edits_full = p->builder.error == HPCLANG_RPL_SPAN_BOUNDS;
+        int guards_full = p->guard_builder.error == HPCLANG_RPL_SPAN_BOUNDS;
+        if ((!edits_full && !guards_full) || (edits_full && edit_capacity == 4096) ||
+            (guards_full && guard_capacity == 4096))
+            break;
+        /* Read dependencies can outnumber changed fields substantially. Grow
+         * only the exhausted table; preserve both original capacity ceilings. */
+        if (edits_full)
+            edit_capacity *= 2;
+        if (guards_full)
+            guard_capacity *= 2;
+    }
+    free(p->scratch);
+    p->scratch = NULL;
+    return result;
 }
 
 struct rejected_removal
@@ -275,7 +326,7 @@ static int probe_cache_move(struct hpclang_rpl_mutation_io *io, uint32_t positio
             remove ? hpclang_rpl_mutation_cache_acptr_remove(io, position, target, bank, &repairs)
                    : hpclang_rpl_mutation_cache_acptr_insert(io, position, target, bank, &repairs);
     }
-    free(p);
+    probe_destroy(p);
     return result;
 }
 
@@ -317,13 +368,16 @@ static int probe_cache_roundtrip(struct hpclang_rpl_mutation_io *io, int keep)
             return -1;
     }
     uint32_t size = end - io->library_table;
-    uint8_t *snapshot = malloc(size);
+    uint8_t *snapshot = calloc(((size_t)size + 1u) / 2u, 1u);
     if (!snapshot)
         return -1;
     int result = -1;
-    for (uint32_t i = 0; i < size; ++i)
-        if (!io->read_nibble(io->context, io->library_table + i, snapshot + i))
+    for (uint32_t i = 0; i < size; ++i) {
+        uint8_t value;
+        if (!io->read_nibble(io->context, io->library_table + i, &value) || value > 15u)
             goto done;
+        snapshot[i / 2u] |= (uint8_t)(value << (4u * (i & 1u)));
+    }
     if (hpclang_rpl_mutation_home_detach(io, 275) ||
         probe_cache_move(io, bottom, targets[0], banks[0], 0) ||
         probe_cache_move(io, bottom + 15, targets[1], banks[1], 0) ||
@@ -357,7 +411,8 @@ static int probe_cache_roundtrip(struct hpclang_rpl_mutation_io *io, int keep)
         goto done;
     for (uint32_t i = 0; i < size; ++i) {
         uint8_t value;
-        if (!io->read_nibble(io->context, io->library_table + i, &value) || value != snapshot[i])
+        if (!io->read_nibble(io->context, io->library_table + i, &value) ||
+            value != ((snapshot[i / 2u] >> (4u * (i & 1u))) & 15u))
             goto done;
     }
     for (unsigned i = 0; i < 5; ++i)
@@ -410,20 +465,23 @@ static int probe_register(void)
     if (!p)
         return 5;
     uint32_t snapshot_size = end - io.library_table;
-    uint8_t *snapshot = remove ? malloc(snapshot_size) : NULL;
+    uint8_t *snapshot = remove ? calloc((snapshot_size + 1u) / 2u, 1) : NULL;
     uint32_t native_before[3], avmem_before;
     if (remove) {
         if (!snapshot || probe_read_word(&io, 0x80e9b, 5, &avmem_before)) {
             free(snapshot);
-            free(p);
+            probe_destroy(p);
             return 9;
         }
-        for (uint32_t i = 0; i < snapshot_size; ++i)
-            if (!io.read_nibble(io.context, io.library_table + i, snapshot + i)) {
+        for (uint32_t i = 0; i < snapshot_size; ++i) {
+            uint8_t value;
+            if (!io.read_nibble(io.context, io.library_table + i, &value) || value > 15u) {
                 free(snapshot);
-                free(p);
+                probe_destroy(p);
                 return 9;
             }
+            snapshot[i / 2u] |= (uint8_t)(value << (4u * (i & 1u)));
+        }
         for (unsigned i = 0; i < 3; ++i)
             native_before[i] = *io.native_roots[i];
     }
@@ -445,6 +503,7 @@ static int probe_register(void)
     }
     if (remove) {
         struct hpclang_rpl_catalog_removal removal;
+        probe_buffers_free(p);
         memset(p, 0, sizeof *p);
         p->io = &io;
         p->first = insertion.slot + 16;
@@ -462,7 +521,8 @@ static int probe_register(void)
             goto failed_roundtrip;
         for (uint32_t i = 0; i < snapshot_size; ++i) {
             uint8_t value;
-            if (!io.read_nibble(io.context, io.library_table + i, &value) || value != snapshot[i])
+            if (!io.read_nibble(io.context, io.library_table + i, &value) ||
+                value != ((snapshot[i / 2u] >> (4u * (i & 1u))) & 15u))
                 goto failed_roundtrip;
         }
         for (unsigned i = 0; i < 3; ++i)
@@ -481,7 +541,7 @@ static int probe_register(void)
          * Release them before taking the separate HOME-body snapshot. */
         free(snapshot);
         snapshot = NULL;
-        free(p);
+        probe_destroy(p);
         p = NULL;
         if (probe_detach(&io, remove >= 3))
             goto failed_roundtrip;
@@ -491,7 +551,7 @@ static int probe_register(void)
     result = 0;
 done:
     free(snapshot);
-    free(p);
+    probe_destroy(p);
     return result;
 failed_roundtrip:
     hpclang_e2e_result = 0x46410ffd;
