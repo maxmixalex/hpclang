@@ -89,7 +89,7 @@ class ResourceVerifierTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             VERIFY["allocator_root"](bytes(512), 6)
 
-    def lifecycle(self, directory):
+    def lifecycle(self, directory, baseline="prelaunch"):
         """Synthetic capture for lifecycle checks; ROM identity is tested separately."""
         (directory / "state").mkdir()
         (directory / "state/flash").write_bytes(b"synthetic ROM")
@@ -97,7 +97,7 @@ class ResourceVerifierTests(unittest.TestCase):
             json.dumps(dict(status="pass", saw_pass=True, returned=True, return_settled=True))
         )
         ram = self.memory() + bytes(0x80000 - 256)
-        for time, phase in enumerate(("prelaunch", "application-pass", "settled-return"), 1):
+        for time, phase in enumerate((baseline, "application-pass", "settled-return"), 1):
             stem = directory / f"hp50g-{phase}"
             stem.with_suffix(".sram").write_bytes(ram)
             stem.with_suffix(".json").write_text(
@@ -114,6 +114,56 @@ class ResourceVerifierTests(unittest.TestCase):
                     )
                 )
             )
+
+    def test_ui_return_capacity_rejects_valid_but_depleted_heap(self):
+        verify = VERIFY["verify"]
+        for defect in (None, "missing-baseline", "late-baseline", "depleted", "fragmented"):
+            with (
+                self.subTest(defect=defect),
+                tempfile.TemporaryDirectory() as tmp,
+                patch.dict(
+                    verify.__globals__, allocator_root=lambda rom, model: (BASE, "synthetic")
+                ),
+            ):
+                directory = Path(tmp)
+                self.lifecycle(
+                    directory, "prelaunch" if defect == "missing-baseline" else "armtoolbox"
+                )
+                if defect == "late-baseline":
+                    path = directory / "hp50g-armtoolbox.json"
+                    data = json.loads(path.read_text())
+                    data["time_us"] = 2
+                    path.write_text(json.dumps(data))
+                elif defect in ("depleted", "fragmented"):
+                    path = directory / "hp50g-settled-return.sram"
+                    data = bytearray(path.read_bytes())
+                    struct.pack_into("<I", data, 64, 16)
+                    struct.pack_into("<I", data, 96, 16)
+                    if defect == "fragmented":
+                        # Same total free bytes, but two smaller valid blocks.
+                        struct.pack_into("<I", data, 72, BASE + 128)
+                        struct.pack_into("<4I", data, 128, 16, 0x100, 0, BASE + 64)
+                        struct.pack_into("<I", data, 160, 16)
+                    path.write_bytes(data)
+                if defect:
+                    with self.assertRaises(ValueError):
+                        verify(directory, "hp50g", ui_return=True)
+                else:
+                    report = verify(directory, "hp50g", ui_return=True)
+                    self.assertEqual(report["ui_return_capacity"]["heaps"][0]["usable_delta"], 0)
+
+    def test_ui_return_uses_each_family_pre_entry_phase(self):
+        for model, ident in VERIFY["MODELS"].items():
+            baseline = "fetch-complete" if ident <= 3 else "armtoolbox"
+            phases = {
+                baseline: dict(time_us=1, heaps=VERIFY["free_capacity"](self.memory(), BASE)),
+                "application-pass": dict(time_us=2),
+                "settled-return": dict(
+                    time_us=3, heaps=VERIFY["free_capacity"](self.memory(), BASE)
+                ),
+            }
+            result = VERIFY["ui_return_capacity"](phases, model)
+            self.assertEqual(result["baseline_phase"], baseline)
 
     def test_lifecycle_report_fingerprints_and_order(self):
         verify = VERIFY["verify"]

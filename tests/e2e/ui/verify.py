@@ -7,6 +7,12 @@ import json
 from pathlib import Path
 
 
+# Processing ceilings for the maintained device-manager workload, not a
+# hardware key-to-pixel latency guarantee. Keep common limits across models.
+FRAME_BUDGET_US = 100_000
+INPUT_BUDGET_US = 5_000
+
+
 def read_frame(path: Path, height: int) -> bytes:
     data = path.read_bytes()
     header = f"P5\n132 {height}\n255\n".encode()
@@ -47,8 +53,59 @@ def verify_memory(prefix: Path) -> tuple[int, int, int, int]:
     return final_peak, stack_limit, heap_peak, heap_limit
 
 
+def verify_stack_pointer(prefix: Path) -> dict:
+    """Check the shared User/System SP bank against the application stack arena."""
+    output = Path(f"{prefix}-stack-pointer-budget.json")
+    output.unlink(missing_ok=True)
+    touched, limit, _, _ = verify_memory(prefix)
+    trace_path = Path(f"{prefix}-stack-pointer.jsonl")
+    trace = trace_path.read_bytes()
+    rows = [json.loads(line) for line in trace.splitlines()]
+    assert rows, f"{prefix}: missing SP observations"
+    fields = {"version", "mode", "writes", "minimum", "maximum", "minimum_pc"}
+    modes = {}
+    for row in rows:
+        assert isinstance(row, dict) and set(row) == fields, f"{prefix}: SP report schema"
+        assert all(type(row[key]) is int for key in fields)
+        assert row["version"] == 1 and 0 < row["writes"] <= 0xFFFFFFFFFFFFFFFF
+        mode = row["mode"]
+        assert mode in (16, 17, 18, 19, 23, 27, 31) and mode not in modes
+        assert 0 <= row["minimum"] <= row["maximum"] <= 0xFFFFFFFF
+        assert row["minimum"] % 4 == row["maximum"] % 4 == 0
+        assert 0x01200000 <= row["minimum_pc"] < 0x01300000
+        assert row["minimum_pc"] % 2 == 0
+        modes[mode] = row
+    # Bootstrap preserves the caller mode; Stock may enter in User mode.
+    # User/System share r13, while exception modes have separate banked stacks.
+    application = [modes[mode] for mode in (16, 31) if mode in modes]
+    assert application, f"{prefix}: missing application User/System-mode SP"
+    top = 0x01100000 + 36864
+    assert max(row["maximum"] for row in application) == top, (
+        f"{prefix}: wrong application stack top"
+    )
+    used = top - min(row["minimum"] for row in application)
+    assert touched <= used < limit, f"{prefix}: exhausted or incomplete SP observation"
+    report = dict(
+        version=1,
+        stack_pointer_bytes=used,
+        stack_touched_bytes=touched,
+        stack_limit_bytes=limit,
+        observations=rows,
+        trace_sha256=hashlib.sha256(trace).hexdigest(),
+        memory_sha256=hashlib.sha256(Path(f"{prefix}-memory-1.json").read_bytes()).hexdigest(),
+        scope="Executed application SP writes in the shared User/System bank; excludes native firmware instructions, exception bank switches and unexecuted paths.",
+    )
+    output.write_text(json.dumps(report, indent=2) + "\n")
+    print(f"PASS: {prefix}: observed SP usage {used}/{limit}, touched {touched}")
+    return report
+
+
 def verify_updates(prefix: Path) -> tuple[int, int, int, int]:
-    report = json.loads(Path(f"{prefix}-memory-2.json").read_text())
+    output = Path(f"{prefix}-update-budget.json")
+    output.unlink(missing_ok=True)
+    source = Path(f"{prefix}-memory-2.json")
+    source_bytes = source.read_bytes()
+    report = json.loads(source_bytes)
     assert set(report) == {"version", "id", "words"}, f"{prefix}: update report fields"
     assert type(report["version"]) is int and type(report["id"]) is int
     assert report["version"] == 1 and report["id"] == 2, f"{prefix}: update report schema"
@@ -62,6 +119,25 @@ def verify_updates(prefix: Path) -> tuple[int, int, int, int]:
     # Six timed application/theme updates, one font update and two pressure updates.
     assert frames == 9, f"{prefix}: incomplete frame timing coverage"
     assert inputs == 34, f"{prefix}: incomplete key-edge timing"
+    assert frame_us <= FRAME_BUDGET_US, f"{prefix}: frame processing exceeds {FRAME_BUDGET_US} us"
+    assert input_us <= INPUT_BUDGET_US, f"{prefix}: input processing exceeds {INPUT_BUDGET_US} us"
+    output.write_text(
+        json.dumps(
+            dict(
+                version=1,
+                frame_max_us=frame_us,
+                input_max_us=input_us,
+                frame_limit_us=FRAME_BUDGET_US,
+                input_limit_us=INPUT_BUDGET_US,
+                frames=frames,
+                inputs=inputs,
+                source_sha256=hashlib.sha256(source_bytes).hexdigest(),
+                scope="Fixed UI workload processing in the emulator; excludes polling/queued input latency and hardware performance guarantees.",
+            ),
+            indent=2,
+        )
+        + "\n"
+    )
     return frame_us, input_us, frames, inputs
 
 
@@ -206,6 +282,63 @@ def verify_budget(prefix: Path, model: str, artifact: Path) -> dict:
     return report
 
 
+def verify_stage_stack(prefix: Path, model: str, artifact: Path) -> dict:
+    """Check observed launcher SP assignments against the actual Stock pool."""
+    output = Path(f"{prefix}-stage-stack-budget.json")
+    output.unlink(missing_ok=True)
+    budget = verify_budget(prefix, model, artifact)
+    pool_bytes = Path(f"{prefix}-pool-1.json").read_bytes()
+    pool = json.loads(pool_bytes)
+    top = 0x01300000 + pool["stage_pool_pages"] * 4096
+    source = Path(f"{prefix}-stack-regions.jsonl").read_bytes()
+    rows = [json.loads(line) for line in source.splitlines()]
+    fields = {
+        "version",
+        "mode",
+        "region",
+        "writes",
+        "minimum",
+        "maximum",
+        "minimum_pc",
+        "maximum_pc",
+    }
+    seen = set()
+    for row in rows:
+        assert isinstance(row, dict) and set(row) == fields
+        assert all(type(row[key]) is int for key in fields)
+        assert row["version"] == 1 and 0 < row["writes"] <= 0xFFFFFFFFFFFFFFFF
+        assert row["mode"] in (16, 17, 18, 19, 23, 27, 31)
+        key = (row["mode"], row["region"])
+        assert key not in seen
+        seen.add(key)
+        assert 0 <= row["minimum"] <= row["maximum"] <= 0xFFFFFFFF
+        assert row["minimum"] >> 20 == row["maximum"] >> 20 == row["region"]
+        assert row["minimum"] % 4 == row["maximum"] % 4 == 0
+        assert 0 <= row["minimum_pc"] <= 0xFFFFFFFF and row["minimum_pc"] % 2 == 0
+        assert 0 <= row["maximum_pc"] <= 0xFFFFFFFF and row["maximum_pc"] % 2 == 0
+    stage = [row for row in rows if row["region"] == 19 and row["mode"] in (16, 31)]
+    # The adjacent application-code and post-pool regions contain no shared-bank
+    # stack. Do not silently discard a trace that crossed this reservation.
+    assert not any(row["region"] in (18, 20) and row["mode"] in (16, 31) for row in rows)
+    assert stage and max(row["maximum"] for row in stage) == top - 8
+    minimum = min(row["minimum"] for row in stage)
+    assert top - 4096 < minimum < top, f"{prefix}: exhausted launcher stack"
+    report = dict(
+        version=1,
+        model=model,
+        observed_bytes=top - minimum,
+        reserved_bytes=4096,
+        stack_top=top,
+        trace_sha256=hashlib.sha256(source).hexdigest(),
+        pool_sha256=hashlib.sha256(pool_bytes).hexdigest(),
+        layout_sha256=budget["layout_sha256"],
+        payload_sha256=budget["payload_sha256"],
+        scope="Observed shared-bank launcher SP assignments in this workload, including eight saved-entry bytes; excludes native/exception stacks and unexecuted paths.",
+    )
+    output.write_text(json.dumps(report, indent=2) + "\n")
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -216,19 +349,30 @@ def main() -> None:
     parser.add_argument(
         "--artifact", type=Path, help="reconcile pool/RW with the linked UI artifact"
     )
+    parser.add_argument("--stack-pointer", action="store_true", help="require application SP trace")
+    parser.add_argument(
+        "--stage-stack", action="store_true", help="require launcher stack-region trace"
+    )
     args = parser.parse_args()
     if args.pool and args.mode != "stock":
         parser.error("--pool requires Stock mode")
     if args.artifact and not args.pool:
         parser.error("--artifact requires --pool")
+    if args.stage_stack and not args.artifact:
+        parser.error("--stage-stack requires --artifact and --pool")
     for target in Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines():
         Path(f"build/{target}-frame-budget.json").unlink(missing_ok=True)
+        Path(f"build/{target}-frame-stage-stack-budget.json").unlink(missing_ok=True)
         verify(
             Path(f"build/{target}-frame"),
             80 if args.family == "hp4950" else 64,
             args.mode == "stock",
         )
-        if args.artifact:
+        if args.stack_pointer:
+            verify_stack_pointer(Path(f"build/{target}-frame"))
+        if args.stage_stack:
+            verify_stage_stack(Path(f"build/{target}-frame"), target, args.artifact)
+        elif args.artifact:
             verify_budget(Path(f"build/{target}-frame"), target, args.artifact)
         elif args.pool:
             models = ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g")

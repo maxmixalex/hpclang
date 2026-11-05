@@ -463,6 +463,13 @@ space. Native allocator metadata, stored launcher objects and transfer staging
 remain outside this report. The check does not change Stock allocation policy;
 the 36 KiB application RW bound must not be presented as total memory usage.
 
+The Stock UI lifecycle check also requires each native heap's available bytes
+and largest free block after settled return to be at least its pre-entry value.
+HP39 uses the completed-fetch checkpoint; classic models use the ARMToolbox
+checkpoint. Missing or late baselines fail validation. This detects lost free
+capacity and increased fragmentation in the scripted flow; it does not account
+for every Stock object or establish a whole-system peak bound.
+
 The standalone C and C++ examples also deliberately sleep for 20 milliseconds
 per event-loop iteration. They process one keyboard event per iteration and
 draw an accepted model change on the following iteration. That scheduling and
@@ -480,6 +487,17 @@ and 34 input edges in each launch mode) are:
 Both runs pass independent pixel checks and normal return; HP50g Direct also
 passes with the instrumentation. These observations do not impose a hardware
 performance guarantee or complete the remaining whole-application budget work.
+
+The maintained nine-frame/34-input-edge fixture now enforces common processing
+ceilings of 100,000 µs per frame and 5,000 µs per input edge. These are regression
+limits for this workload, including its theme/font and pressure updates, rather
+than an application-wide or physical-device latency guarantee. The retained
+six-model Direct/Stock matrix measures maxima of 50,416 µs and 1,708 µs; the
+ceilings leave room for emulator scheduling variation while rejecting large
+regressions. A failure requires investigation, not an automatic limit increase.
+The verifier emits `*-update-budget.json` with measured maxima, limits, sample
+counts and the raw timing report's SHA-256; it removes stale passing output
+before checking. Polling delays and queued input are outside this measurement.
 
 For the ARM ABI, the renderer with the example's two styles requests 188 bytes
 for its descriptors and copied styles, plus its two raster buffers:
