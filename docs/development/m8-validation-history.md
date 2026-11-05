@@ -4152,3 +4152,14 @@ plans reject with zero writes. Report:
 /work/oct31-entry-snapshot/entry-origin-plan.json. This is saved-state replay
 through the first indirect jump, not a fresh Stock return or complete automatic
 production source discovery. Candidate remains local and unpushed.
+
+## 2026-11-05 — Maintained origin-repair continuation gate
+
+The maintained threaded_return.py gate now compiles origin-repair.c and the
+shared threaded-return.c fixture. Each model retains 32 baseline/move cases
+and 40 omission controls and adds 16 origin-plan cases. All pass for HP49g+
+and HP50g against the retained original-ROM state and trace. Ten changed-input
+controls reject and remove stale reports; Ruff, C formatting and strict docs
+pass. Evidence: /work/nov05-maintained-origin-repair. This promotes the repair
+experiment to a reproducible repository gate without claiming general source
+discovery, later Stock return, or physical hardware acceptance.

@@ -39,6 +39,7 @@ RAM = 0x08000000
 (OUT / "getptr-move.json").unlink(missing_ok=True)
 base = root / "runtime/core"
 names = [
+    "rpl-code.c",
     "rpl-mutation.c",
     "rpl-object-store.c",
     "rpl-stack-view.c",
@@ -47,7 +48,9 @@ names = [
 ]
 stage = root / "platform/armtoolbox/stage-stack.c"
 stage_hash = hashlib.sha256(stage.read_bytes()).hexdigest()
-shim = Path(__file__).with_name("threaded-return.c")
+shim = Path(__file__).with_name("origin-repair.c")
+shared_shim = Path(__file__).with_name("threaded-return.c")
+shared_shim_hash = hashlib.sha256(shared_shim.read_bytes()).hexdigest()
 source_hashes = {name: hashlib.sha256((base / name).read_bytes()).hexdigest() for name in names}
 shim_hash = hashlib.sha256(shim.read_bytes()).hexdigest()
 driver_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
@@ -81,6 +84,16 @@ lib.bank_catalog_grow.argtypes = [
     c.c_uint,
     c.POINTER(c.c_uint32),
 ]
+lib.bank_catalog_grow_origins.argtypes = [
+    c.POINTER(c.c_uint8),
+    c.POINTER(c.c_uint32),
+    c.POINTER(c.c_uint32),
+    c.c_uint32,
+    c.c_uint,
+    c.POINTER(c.c_uint32),
+    c.POINTER(c.c_uint32),
+    c.POINTER(c.c_uint32),
+]
 
 
 def grow(data, root, entry, position, mode, cursor):
@@ -88,9 +101,21 @@ def grow(data, root, entry, position, mode, cursor):
     native = c.c_uint32(root)
     pc = c.c_uint32(entry)
     writes = c.c_uint32()
-    status = lib.bank_catalog_grow(
-        array, c.byref(native), c.byref(pc), position, mode, cursor, c.byref(writes)
-    )
+    if mode == 3:
+        # The ordered trace below proves INTRPPTR -> thread -> indirect target.
+        # These tokens identify original cells; the runtime planner emits edits.
+        tokens = (c.c_uint32 * 10)(
+            *[0x8076B + i + 1 for i in range(5)],
+            *[thread + i + 1 for i in range(5)],
+        )
+        values = (c.c_uint32 * 2)(thread, mapping(thread))
+        status = lib.bank_catalog_grow_origins(
+            array, c.byref(native), c.byref(pc), position, cursor, c.byref(writes), tokens, values
+        )
+    else:
+        status = lib.bank_catalog_grow(
+            array, c.byref(native), c.byref(pc), position, mode, cursor, c.byref(writes)
+        )
     return status, bytes(array), native.value, pc.value, writes.value
 
 
@@ -165,7 +190,7 @@ if index >= len(events) or events[index][3] != 0x3130:
 for entry_kind in ("getptr-tail", "arm-return"):
     for cursor in range(8):
         baseline = None
-        for mode in ("baseline", "move", "stale-ip", "stale-return") + (
+        for mode in ("baseline", "move", "origin-plan", "stale-ip", "stale-return") + (
             ("stale-pc",) if entry_kind == "arm-return" else ()
         ):
             uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
@@ -210,7 +235,13 @@ for entry_kind in ("getptr-tail", "arm-return"):
                     ret,
                     entry,
                     0x86500,
-                    1 if mode == "stale-return" else 2 if mode == "stale-pc" else 0,
+                    1
+                    if mode == "stale-return"
+                    else 2
+                    if mode == "stale-pc"
+                    else 3
+                    if mode == "origin-plan"
+                    else 0,
                     cursor,
                 )
                 assert status == 0
@@ -293,7 +324,7 @@ for entry_kind in ("getptr-tail", "arm-return"):
                 a=hex(a),
                 error=error,
             )
-            if mode in ("baseline", "move"):
+            if mode in ("baseline", "move", "origin-plan"):
                 assert not saved_accesses, (row, saved_accesses)
                 depth = low = high = 0
                 for delta in stack_steps:
@@ -314,7 +345,7 @@ for entry_kind in ("getptr-tail", "arm-return"):
                     stack_depth_minimum=low,
                     stack_depth_maximum=high,
                 )
-            if mode in ("baseline", "move") and entry_kind == "arm-return":
+            if mode in ("baseline", "move", "origin-plan") and entry_kind == "arm-return":
                 assert (
                     int.from_bytes(uc.mem_read(cpu + 0x914, 4), "little") & 0xFFFFF == expected_b
                 ), row
@@ -367,7 +398,7 @@ for entry_kind in ("getptr-tail", "arm-return"):
                     and d0 == thread + 21
                     and a == 0x1234567801C0312B
                 )
-                if mode == "move":
+                if mode in ("move", "origin-plan"):
                     assert passed, row
                     rows.append(row)
                 else:
@@ -378,6 +409,7 @@ assert source_hashes == {
 }
 assert stage_hash == hashlib.sha256(stage.read_bytes()).hexdigest()
 assert shim_hash == hashlib.sha256(shim.read_bytes()).hexdigest()
+assert shared_shim_hash == hashlib.sha256(shared_shim.read_bytes()).hexdigest()
 assert driver_hash == hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 report = dict(
     cases=rows,
@@ -389,8 +421,17 @@ report = dict(
     },
     stage_sha256=stage_hash,
     shim_sha256=shim_hash,
+    shared_shim_sha256=shared_shim_hash,
     driver_sha256=driver_hash,
     scope="Saved code/data with saved-IP reconstructed from trace and controlled CPU/RSTK; actual C geometry then original GETPTR tail or post-ARMSYS RTNCC, condition, full GETPTR and dispatch. The production stage return-root collector identifies the original caller cell before geometry changes. Both suspended PC and caller return are repaired by C; generated GETPTR returns come from moved code. Seven distinct other slots survive; one existing caller slot is consumed without extra stack capacity. R0..R4 are neither read nor written in accepted runs. This does not prove the earlier ARMJUMP path, arbitrary caller state, later Stock continuation, catalog publication or external-reference closure.",
 )
 (OUT / "getptr-move.json").write_text(json.dumps(report, indent=2) + "\n")
-print(json.dumps(dict(baseline_and_move=len(rows), omission_controls=len(negatives))))
+print(
+    json.dumps(
+        dict(
+            baseline_and_move=sum(row["mode"] != "origin-plan" for row in rows),
+            origin_plan_cases=sum(row["mode"] == "origin-plan" for row in rows),
+            omission_controls=len(negatives),
+        )
+    )
+)
