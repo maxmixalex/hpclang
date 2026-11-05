@@ -44,6 +44,52 @@ static int cleanup(void)
     return result;
 }
 
+/* Exercise the supported optional services with a maximum-length note while
+ * the UI and renderer remain live. Port 1/2 mutation acceptance is separate. */
+static int optional_workload(struct hpclang_ui *ui, const struct hpclang_device_info *device)
+{
+    uint32_t previous_focus = hpclang_ui_focused(ui);
+    struct notebook work = {0};
+    struct hpclang_port_info info = {.size = sizeof(info), .version = HPCLANG_PORT_INFO_VERSION};
+    const unsigned backup = HPCLANG_PORT_READ_BACKUP | HPCLANG_PORT_CREATE_BACKUP |
+                            HPCLANG_PORT_REPLACE_BACKUP | HPCLANG_PORT_REMOVE_BACKUP;
+    if (hpclang_port_query(0, &info))
+        return -1;
+    int has_backup =
+        device->family == HPCLANG_FAMILY_HP48 || device->family == HPCLANG_FAMILY_HP4950;
+    if (has_backup != ((info.available & backup) == backup))
+        return -1;
+    if (has_backup) {
+        strcpy(work.text, "Short backup");
+        if (action(&work, ui, BACKUP) || strcmp(work.status, "Backup saved"))
+            return -1;
+    }
+    memset(work.text, 'N', sizeof(work.text) - 1);
+    if (has_backup) {
+        if (action(&work, ui, BACKUP) || strcmp(work.status, "Backup saved"))
+            return -1;
+        strcpy(work.text, "Unsaved edit");
+        if (action(&work, ui, RESTORE) || strcmp(work.status, "Restored; Save to keep here") ||
+            strlen(work.text) != sizeof(work.text) - 1)
+            return -1;
+        for (unsigned i = 0; i < sizeof(work.text) - 1; ++i)
+            if (work.text[i] != 'N')
+                return -1;
+        if (hpclang_port_backup_remove(0, (const uint8_t *)"HPCNOTE", 7))
+            return -1;
+    }
+    /* The extra button actions scroll to the backup controls. Restore the
+     * original viewport/focus before the unchanged persistence pixel gate. */
+    if (hpclang_ui_focus(ui, 0))
+        return -1;
+    for (size_t i = 0; i < hpclang_ui_node_count(ui); ++i) {
+        const struct hpclang_ui_node *node = hpclang_ui_node_at(ui, i);
+        if (node->kind == HPCLANG_UI_SCROLL && hpclang_ui_scroll_to(ui, node->id, 0))
+            return -1;
+    }
+    return hpclang_ui_focus(ui, previous_focus);
+}
+
 int main(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
@@ -97,6 +143,10 @@ int main(void)
         goto done;
     } else {
         strcpy(note.status, "Persistence verified");
+    }
+    if (!phase && optional_workload(ui, device)) {
+        failure = 9;
+        goto done;
     }
     if (notebook_view(ui, renderer, &note, (int)device->display_width,
                       (int)device->display_height) ||

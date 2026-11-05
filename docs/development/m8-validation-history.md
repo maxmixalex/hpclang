@@ -1,5 +1,44 @@
 # M8 validation history
 
+### 2026-11-05 — Backup stack gate and export resource integration
+
+Corrected maximum-length backup run 40278 terminates at the HP48gII resource
+gate after all three Stock success/return phases and corrected viewport pixels.
+The first report is `[1,48,8192,8192,8192,10396,27136,40960]`: the touched-stack
+watermark exhausts the configured 8192-byte reservation. The next launch uses
+5864 bytes. No budget was relaxed and no six-model acceptance is claimed.
+Saved state and logs remain in `/work/nov05-notebook-backup-resources`.
+Post-LTO disassembly lists 1108 bytes of explicit SP subtraction in write_backup
+and 832 in hpclang_rpl_mutation_userob_shift_before; this is diagnostic evidence,
+not yet a complete dynamic call-chain peak or a proven fix.
+
+The separate notebook-export fixture now retains live UI/renderer/display
+allocations, checks a 191-byte export across two launches, and shares the
+existing runtime-cleanup stack/heap observer. Original UTF-8 export, refusal to
+overwrite, saved-note persistence and raw-card retained-file checks remain.
+The raw-card manifest additionally verifies MAXNOTE.TXT independently. Its new
+verifier is registered in the existing two-model CI matrix. Three target-matrix
+tests and Ruff pass. The first build stopped on a missing fonts.cmake include
+(terminal 8132); that include is corrected and its log/input manifest retained
+as failed-font-config files under `/work/nov05-notebook-export-resources`.
+Corrected run 76765 is active; no export-resource runtime pass or push yet.
+
+### 2026-11-05 — Maximum-length Notebook backup candidate
+
+The local persistence fixture adds Port0 create, size-changing replacement,
+restore and removal of a 191-byte note while UI/renderer allocations remain
+live. HP48gII reaches all three success phases and settled returns, then the
+unchanged pixel verifier rejects the first frame: activating the additional
+backup controls leaves the scroll viewport below the title. Terminal run 88633
+and its copied source, artifacts and logs are retained under
+`/work/nov05-notebook-optional-resources`. The fixture now restores its previous
+focus and top viewport before the existing pixel gate. Corrected six-model
+validation is running under `/work/nov05-notebook-backup-resources` (40278).
+The first candidate also attempted file export without a raw-card contract.
+That path was not reached; export resource checks belong in the existing
+HP49g+/HP50g notebook-export fixture with its SD contract. No export-resource
+pass, full six-model pass or new remote acceptance is claimed.
+
 This retained snapshot separates experiment history from current status. It does
 not remove completion conditions or establish new acceptance. See the
 [current roadmap](roadmap.md) and [original requirements](roadmap-history.md).
@@ -1139,3 +1178,188 @@ Current remote CI and broader M8.6 acceptance remain pending.
 ### 2026-11-04 — Independent checkpoints across Stock relaunches
 
 Notebook persistence resource instrumentation builds on HP48gII. Its initial run saves and returns normally; relaunch phase 1 replaces the note and reaches PASS, then the memory observer fails because stock-lifecycle.py inherited the initial frame prefix. Exclusive report creation correctly rejects overwriting the initial measurement. Local `cd8b1a11` assigns a separate frame prefix to every relaunch. Seven lifecycle tests pass, including exclusive-create checks for all three families; Ruff passes. The complete suite ran against a normalized container copy because Windows checkout CRLF breaks the unchanged sourced shell helper. Failed state, outputs and hashes remain under `/work/nov04-notebook-persistence-resources/failed-hp48gii`, `failed-artifacts.json`, `failed-inputs.json` and `failed-stock.log`. Terminal session 75078 is superseded by corrected run 10531. Six-model persistence-resource acceptance remains pending. Independent audit script `research/nov04-notebook-persistence-audit.py` checks all three launches and explicitly excludes physical hardware and unmeasured export/backup workloads. No new remote push.
+
+
+### 2026-11-05 — Notebook export resources and backup stack diagnosis
+
+The unsubmitted SD export candidate completes HP49g+/HP50g Stock execution,
+two launches per model. Maintained gates verify maximum-length output,
+overwrite refusal, retained raw FAT fixtures, viewport pixels and settled
+return. Independent input/artifact identity and resource-bound checks pass:
+maximum touched stack 6608/8192 bytes and reserved heap 12412 bytes.
+Evidence: `/work/nov05-notebook-export-resources/verified.json` and
+`resource-result-audit.json`. This is local validation, not CI acceptance.
+
+The exact failed HP48gII Port0 backup binary returns successfully with an
+SP-observing emulator, but its translated application stack reaches 9432 bytes,
+1240 bytes beyond the configured budget. The minimum occurs at the push in
+`hpclang_rpl_stock_memory_read` (0x0122ab54); this identifies a deepest observed
+callee, not the responsible caller or full call chain. Input hashes match.
+Evidence: `/work/nov05-backup-stack-diagnostic/diagnostic.json` and original
+`initial-sp.jsonl`. The first diagnostic postprocessor incorrectly expected
+runtime RW size in static launcher metadata; the report was recovered from
+the captured runtime resource words without repeating the execution.
+Budget and acceptance remain unchanged; backup stack diagnosis is open.
+
+
+### 2026-11-05 — Backup branch workspace candidate
+
+The exact failing application reproduces 9432 bytes of translated stack use
+with descending-SP attribution. The observation retains outstanding descending
+assignments, not a symbolic call-stack unwind: equal-SP returns may replace an
+allocation's PC. The save_note prologue independently confirms its large frame
+(1940 bytes excluding saved registers); Port0 write/apply and nested directory
+validation contribute further live frames. Evidence:
+`/work/nov05-stack-chain/run/chain-audit.json` and disassembly of its sealed ELF.
+The temporary observer's pop/reuse/deepest retention assertions pass.
+
+The candidate keeps HOME/aplet mutation workspace in a separate noinline helper,
+so LTO cannot reserve it throughout Port backup. Existing notebook_store tests
+pass GCC ASan/UBSan with warnings as errors. The unchanged six-model resource
+matrix is active at `/work/nov05-backup-frame-resources` (session 75146).
+No runtime improvement or milestone completion is claimed yet. The preceding
+export proof remains tied to its prior source hashes; the store change requires
+fresh export regression before submission.
+
+PR28 exact 92e9e897 CI observation completed after a GitHub 502 retry with
+smaller job-list pages: 9 successful/2 queued workflows; 365 successful,
+2 skipped, 14 queued and 3 running jobs. No reported failure, no merge.
+
+
+### 2026-11-05 — HP48gII workspace separation runtime result
+
+The changed Notebook passes HP48gII maximum-length Port0 backup/restore/removal,
+three-launch persistence, viewport and settled-return/resource gates. First
+launch reports touched stack 7744/8192 and heap 10396/27136 bytes, compared with
+the old saturated watermark and independently observed 9432-byte SP depth.
+Heap consumption is unchanged. Post-LTO save_note local allocation drops from
+1940 to 252 bytes; HOME/aplet workspace now belongs to its separate helper.
+Evidence: `/work/nov05-backup-frame-resources/verified.json` and per-launch
+resource reports. Remaining models and independent audits are not yet complete.
+
+The 448-byte measured stack margin motivates an exact-SP confirmation using
+the same new binary, at `/work/nov05-backup-frame-sp` (71515). Export regression
+for the changed store source is running at `/work/nov05-export-frame-resources`
+(77182). No new CI submission or milestone acceptance is claimed.
+
+
+The follow-up exact-binary HP48gII SP observation confirms 7744 bytes against
+8192 configured, matching the watermark and reducing the prior depth by 1688.
+`/work/nov05-backup-frame-sp/independent-audit.json` checks unchanged inputs,
+identity with the matrix ELF, return success and agreement with resource words.
+This establishes the exercised application path, not arbitrary nesting/hardware.
+HP49g+ also passes all three launches at 7752/5912/3664 stack bytes, with first
+launch heap 14220/241408. Remaining four models continue in the same matrix.
+Changed C formatting, export verifier Ruff checks and strict docs pass; Ruff's
+initial read-only cache setup failure was resolved using --no-cache.
+
+
+### 2026-11-05 — Changed-store export regression complete
+
+Both HP49g+/HP50g export cases pass two Stock launches each after workspace
+separation, including maximum-length output, overwrite refusal, raw-card retained
+files, pixels and settled return. Independent source/artifact hashes and resource
+bounds pass: touched stack 6640 then 3936, heap 12412 bytes on both models.
+Evidence: `/work/nov05-export-frame-resources/independent-audit.json` and
+`verified.json`. This supersedes the preceding-source export result for this
+candidate; runtime/resource acceptance remains local and unsubmitted.
+
+HP50g backup/persistence also passes all three launches, at stack depths
+7752/5912/3664 bytes and heap reservations 14220/13812/13812 bytes. The same
+matrix continues HP39g+/HP39gs/HP40gs capability and persistence regressions.
+PR28 remains unaccepted: 9 successful/2 queued workflows, 376 successful,
+2 skipped, 2 running and 4 queued jobs, with no reported failure.
+
+## 2026-11-05 — Container recovery, Notebook audit and migration submission
+
+Docker API became accessible without a restart. The original Notebook matrix
+PID 42348 remains live and progressed through HP39g+ compilation into emulator
+execution; the earlier client handle completed but did not imply guest exit.
+Independent replay of the completed HP48gII/HP49g+/HP50g cases validates all
+nine launches, source/artifact identity, pixels, settled return and resource
+budgets. Highest touched stack is 7744/7752/7752 of 8192 bytes respectively.
+The report remains partial (`complete: false`):
+`/work/nov05-backup-frame-resources/independent-persistence-audit.json`.
+
+Migration integration `54b5291f` was pushed after auditing the previous exact
+head: nine successful workflows, 372 successful jobs, one skip and one publisher
+cancelled by the higher-priority queue rule before runner assignment. Seven
+migration tests and Ruff pass inside the development container; strict host
+documentation passes. New CI is submitted, not inspected in the push turn.
+M8.5 is not accepted complete.
+
+M8.0 source review confirms that stage execution-root output currently names
+initial stack/A/C cells, while the captured GETPTR/dispatch path needs memory
+source fields and their mapping/dependency guards. The existing origin
+descriptors and captured-path experiment are not yet production integration.
+No unsupported instruction was skipped or new mutation authorization enabled.
+PR #26 latest audit: nine successful workflows/one running, 371 successful jobs,
+one skip/one running; evidence `research/nov05-native-followup-ci-26.json`.
+
+## 2026-11-05 — Native branch accepted, migration transfer failure and interrupted matrix
+
+PR #26 head 4571d52c passes twelve workflows, 390 jobs and two intentional skips,
+then merges as 26140e1d. Evidence: research/nov05-resumed-ci-26.json. The merge
+does not complete production memory-origin discovery, public library/Port1
+operations or Port2 installation/authority/startup/reclamation.
+
+PR #27 head 54b5291f has ten successful workflows and one failed workflow,
+379 successful jobs, one skip and failed job 126971037182. HP40gs hpgcc-format
+fails before application entry: directory fetch completes, payload ACK progress
+stops for 90 seconds at sequence 0 with three NAKs/six resends. All 437 captured
+data/ACK/NAK frame checks pass. A receiver Timeout error frame is retained
+separately; this does not establish delivery or the root cause. Artifacts:
+research/nov05-pr27-hp40-format; packet report:
+research/nov05-pr27-hp40-format-packet-audit.json. No blind retry requested.
+
+Docker reports container exit 255 at 2026-11-05 10:53:49 UTC, OOMKilled=false.
+Only after terminal confirmation was the original container started again.
+No original child process survived. HP39g+ saved reports show all three Stock
+launches and settled returns; the maintained verifier passes after restart,
+including pixels/persistence and touched stacks 2504/2504/2224 of 8192 bytes.
+The source-input hash seal is checked before resume. HP39g+ artifact hashes
+were not persisted before interruption, so recovery explicitly records that
+they are captured after restart rather than claiming pre/post identity.
+research/nov05-backup-resume.py preserves earlier models and resumes only
+HP39gs/HP40gs in the existing output tree, with a one-run marker. Complete
+six-model acceptance still requires the remaining results and independent audit.
+
+## 2026-11-05 — Origin repair draft submitted and five-model Notebook audit
+
+Draft PR #31 submits e3e467b2, incorporating the maintained origin-repair gate
+and accepted main 26140e1d. Prior pushed parent 4571d52c was audited before
+submission: all twelve workflows pass, 390 successful jobs and two intentional
+skips. No new-head CI inspection in the push turn. The maintained private-ROM
+gates pass 32 baseline/move, 16 origin-plan and 40 omission cases per model,
+plus ten altered-input rejections. Strict docs, Ruff and formatting pass.
+Evidence: /work/nov05-maintained-origin-repair; source planning evidence remains
+under /work/nov05-origin-plan. Production discovery and M8.0 stay open.
+
+Notebook resume completes HP39gs. Independent audit now covers HP48gII,
+HP49g+, HP50g, HP39g+ and HP39gs (fifteen launches), retaining HP39g+'s
+post-restart artifact-hash qualification in the output. The report remains
+complete=false while HP40gs runs in the existing resumed matrix. Evidence:
+/work/nov05-backup-frame-resources/independent-persistence-audit.json.
+
+## 2026-11-05 — Notebook six-model resource audit complete; allocation integration running
+
+The resumed Notebook matrix completes HP40gs and exits successfully. Independent
+audit reports complete=true for all six models and eighteen launches, checking
+sealed inputs, retained artifacts, content/pixels, settled return and budgets.
+HP48gII stack usage is 7744/5904/3656 bytes; HP49g+/HP50g each use
+7752/5912/3664; HP39g+/HP39gs/HP40gs each use 2504/2504/2224, all within 8192.
+HP39g+ retains the explicit post-restart artifact-hash qualification; the other
+five models retain pre-execution seals. Evidence:
+/work/nov05-backup-frame-resources/independent-persistence-audit.json.
+Four earlier SD-export launches retain separate independent validation under
+/work/nov05-export-frame-resources. Strict Notebook docs, Ruff and formatting
+pass. These instrumented app/store/UI checks do not complete release or hardware
+acceptance. The current remote USB-transfer failure remains unresolved.
+
+Allocation/UI integration now includes accepted native main 26140e1d, with only
+history/roadmap conflicts resolved in this latest merge. All 37 combined verifier
+tests pass, and a fresh emulator plus universal UI application build succeeds.
+The unchanged candidate is sealed for six Direct/six Stock cases, including
+native allocation/release, application/launcher stacks and resource snapshots.
+The matrix is running at /work/nov05-allocation-ui-combined; no completion claim.
+PR #31 is observed queued/running, with no completed failure yet; not accepted.

@@ -1,11 +1,11 @@
 # hpclang roadmap
 
 Current checkpoint: 2026-11-05. **M8 is incomplete; only M8.1 is accepted complete.**
-Docker/WSL is restored. Earlier ID1701 two-model reservation retests pass guarded
+The development container exited 255 and was restarted after terminal-state confirmation. The resumed Notebook matrix and independent six-model audit now pass; HP39g+ recovery provenance is retained. Earlier ID1701 two-model reservation retests pass guarded
 recovery, repeat restart, absent recovery and 16 rejection cases per model.
 Supported ID769 reservation matrices now pass on both models; full startup
 safety and M8.0 remain incomplete.
-Accepted main: `dfb3ee87` (CI queue/manual dispatch #30, Kermit resend pacing #29, resource snapshots #20, guarded dispatch/origin foundations #25, native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
+Accepted main: `26140e1d` (native execution-origin foundations #26, UI resource observers #28, CI queue/manual dispatch #30, Kermit resend pacing #29, resource snapshots #20, guarded dispatch/origin foundations #25, native catalog/HOME and Port0 fixes #24, physical spans #23, return roots and M0–M7 overview #22, SD Reset #15 and opt-in formatting #17 accepted). Local passing tests, submitted CI, CI acceptance and
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
@@ -99,8 +99,8 @@ M7 acceptance does not imply those capabilities are implemented.
 | --- | --- | --- |
 | M8.0 Native Port 0/1/2 | Implemented in part; active mainline | Complete safe reference handling and movement, public library management and Port 1 edits; Port2 trusted recovery installation, authority lifecycle, safe startup and reclamation |
 | M8.1 Installable SDK | **Accepted complete** | Preserve installed external C/C++ builds, relocatability, packaging and reproducibility |
-| M8.2 Declarative C UI core | Declaration, layout, input and effects implemented; design reviewed; stage open | Smallest-target memory/update-cost and whole-application resource/lifecycle acceptance; pending follow-up CI |
-| M8.3 Components/renderers | Reusable controls and renderer/theme independence implemented; stage open | Complete six-model low-memory, resource-budget and clean-return acceptance; pending follow-up CI |
+| M8.2 Declarative C UI core | Declaration, layout, input and effects implemented; design reviewed; stage open | Smallest-target memory/update-cost and whole-application resource/lifecycle acceptance |
+| M8.3 Components/renderers | Reusable controls and renderer/theme independence implemented; stage open | Complete six-model low-memory, resource-budget and clean-return acceptance |
 | M8.4 HPGCC source adapters | SD Reset #15, opt-in formatting #17 and async/KOS tone gates #25 accepted; stage open | Complete retained historical application/API coverage, documented migrations and pending branch acceptance |
 | M8.5 Modern C++/migration | Implemented in part; stage open | Complete ownership/error/lifetime contracts, migration tooling/guidance and public downstream examples |
 | M8.6 Applications/release | Stage open | Nontrivial integrated apps, clean SDK use, cross-family resource/return checks, documentation and release acceptance |
@@ -120,13 +120,13 @@ its requirements from M8.
 
 | Work | Proven locally / accepted | Next acceptance gate |
 | --- | --- | --- |
-| M8.0 native storage, PR #26 | Submitted ca6162f6 (source 23a49bbc): complete fresh HP49g+/HP50g universal execution and independent replay pass locally (176 basic checks, 38 saved executions). | Accept current-head CI. Actual-entry classification still stops at ROM 0x67d2; memory-loaded execution origins, production integration and public library/Port1 operations remain open. |
+| M8.0 native storage, PR #26 | Accepted in 26140e1d: literal-source tracking and UI integration pass local checks and exact-head CI. Earlier ca6162f6 fresh HP49g+/HP50g universal execution and independent replay pass locally (176 basic checks, 38 saved executions). | Production collector still stops at ROM 0x67d2. Local origin-to-repair planner now generates the captured path repairs; HP49g+/HP50g saved-state catalog movement and original continuation pass, with stale/conflicting repairs rejected before writes. Sanitizer tests, ARM analysis and maintained two-model origin-plan gates pass; submitted in draft #31 for CI. Production discovery/integration, complete execution coverage and public library/Port1 operations remain open. |
 | M8.0 Port2 | Both supported ID769 recovery/rejection matrices pass locally; explicit recovery-ID support accepted in #25. | Trusted recovery installation, transaction authority lifecycle, safe startup and space reclamation. Mutable-Flash configuration execution remains unqualified; forty resolved data targets retain separate execution obligations. |
-| M8.2/M8.3 UI, PR #28 | Submitted 92e9e897 integrates accepted main; prior 2829502c passes six workflows/196 jobs. Integration passes 33 focused tests and strict docs. | Validate merged-version CI; finish borrowed-stack attribution, reservation bounds and whole-application resource/lifecycle acceptance. |
+| M8.2/M8.3 UI, PR #28 | Accepted in cdd6bd86 after all 11 workflows pass. Application/launcher stack observers, return-capacity checks and update-cost gates are merged. | Finish borrowed-stack attribution, reservation bounds and whole-application resource/lifecycle acceptance. |
 | M8.4 compatibility | SD Reset #15, explicit opt-in formatting #17 and async/KOS sound adapters #25 accepted. | Retained historical application/API coverage and remaining migration/branch acceptance. |
 | M8.5 C++ ownership, PRs #13/#14 | Shipped timer example is integrated into system-services E2E. All six Direct and six Stock cases pass the complete independent input/artifact/pixel/settled-return audit. ARM build/analysis, source quality, strict docs and API-conventions installation pass. | Prior timer head 41bfa65d passed seven workflows (337 successful jobs, one skipped). Parent/child branch acceptance and broader ownership/lifetime/application requirements remain open. |
-| M8.5 migration, PR #27 | Installed migration checker, numeric-separator regression and ownership guidance implemented; seven tests and fresh installation/relocation previously pass. | Submitted 00eb48fd integrates accepted main and resolves documentation conflicts; fresh CI and broader migration acceptance remain open. |
-| M8.6 applications/release | Notebook ON fix and maintained entry gate pass all six Stock models; independent audit verifies inputs, artifacts, focused-editor pixels and settled return. Lifecycle sanitizer tests cover six model IDs/three storage configurations. Independent-launcher packaging evaluation is documented in local 6abcb849; option retained. | Notebook follow-ups submitted in d2f1ba36; validate CI; complete release resource/error/return and documentation acceptance. |
+| M8.5 migration, PR #27 | Installed migration checker, numeric-separator regression and ownership guidance implemented; installation/relocation previously pass. UI-main integration passes seven container tests, Ruff and strict host docs. | Submitted `54b5291f` for fresh CI; branch and broader migration acceptance remain open. |
+| M8.6 applications/release | Notebook ON fix and maintained entry gate pass all six Stock models; independent audit verifies inputs, artifacts, focused-editor pixels and settled return. Lifecycle sanitizer tests cover six model IDs/three storage configurations. Independent-launcher packaging evaluation is documented in local 6abcb849; option retained. | Notebook follow-ups submitted in 3312be9c; validate CI; complete release resource/error/return and documentation acceptance. |
 
 Local M8.0 guarded instruction-fetch checks pass sanitizer tests and ARM analysis.
 The maintained ROM gate now retains original return cases and adds controlled
@@ -148,18 +148,19 @@ Remote acceptance and broader M8.5 completion remain open.
 
 | Delivery | Current acceptance state |
 | --- | --- |
-| #13 / `5bc78efd` | Current-head CI workflows: 4 success, 5 queued; jobs: 13 success, 69 queued, 1 skipped; no reported failure. Acceptance remains open. |
-| #14 / `d2f1ba36` | Remote CI acceptance pending. Local keyboard save/reload and ENOSPC retry, separate relaunch checkpoints, and persistence resource checks are ready for delivery. All six Stock models pass three launches each; independent audit verifies sealed inputs/artifacts, pixels, settled returns and memory budgets. Export/backup peaks and broader M8.6 acceptance remain open. |
-| #18 / `0390e023` | Current-head CI workflows: 12 queued; jobs: 20 queued; no reported failure. Acceptance remains open. |
-| #19 / `6a905dfa` | Current-head CI workflows: 10 queued, 2 in_progress; jobs: 18 success, 138 queued, 2 in_progress; no reported failure. Acceptance remains open. |
-| #26 / `ca6162f6` | Current-head CI workflows: 12 queued; jobs: 20 queued. No reported failure. Local validation retained; acceptance remains open. |
-| #27 / `00eb48fd` | Current-head CI workflows: 9 queued; jobs: 15 queued; no reported failure. Acceptance remains open. |
-| #28 / `92e9e897` | Current-head CI workflows: 3 queued, 7 success, 1 pending; jobs: 307 success, 69 queued, 5 in_progress, 1 skipped, 1 pending. No reported failure. Local validation retained; acceptance remains open. |
+| #31 / `e3e467b2` | Origin-derived repair planner and maintained ROM continuation gate submitted as a draft. Two-model offline gates each pass 32 baseline/move, 16 origin-plan and 40 omission cases; 10 altered-input controls reject. Sanitizer tests, ARM compilation/analysis, Ruff, formatting and strict docs pass. CI has started (latest observation: 8 queued workflows, 2 running jobs and 10 queued jobs); acceptance and production discovery remain open. |
+| #13 / `5bc78efd` | Prior remote head passes all 9 workflows (199 jobs, 1 skip). Local integration now includes accepted main 26140e1d; only documentation conflicted in the latest merge. 37 combined verifier tests, fresh emulator and universal UI build pass. Six Direct/six Stock combined allocation, release, stack and lifecycle cases are running. Candidate unpushed; PR not accepted. |
+| #14 / `3312be9c` | Audit before retries: workflows 9 success, 1 failure; jobs 383 success, 2 skipped, 1 failure. HP40gs Stock system-services-immediate failed during USB transfer before application entry (job 126839207493). Saved artifacts show sequence 32 repeatedly NAKed then receiver Timeout; 2326 captured packet checks pass, root cause unresolved. No retry requested. Local Notebook follow-up passes six-model persistence/backup verification and independent audit (18 launches), plus four previously verified SD-export launches. HP39g+ artifact hashes were captured after restart; that qualification is retained. Strict docs, formatting and Ruff pass. Candidate remains unpushed; parent integration and remote acceptance pending. |
+| #18 / `0390e023` | Current-head CI workflows: 10 queued, 2 in_progress; jobs: 15 success, 138 queued, 5 in_progress; no reported failure. Acceptance remains open. |
+| #19 / `6a905dfa` | Current audit: workflows 10 success, 1 queued, 1 cancelled; jobs 388 success, 2 skipped, 1 queued, 1 cancelled. Publisher retry cancelled again by the same higher-priority queue rule; another publisher remains queued. No immediate repeat retry. Main integration conflicts remain. |
+| #26 / `4571d52c` | Accepted and merged as `26140e1d`: all 12 workflows pass, 390 successful jobs and 2 intentional skips. Local integration tests, strict docs and fresh emulator build pass. Production memory-origin discovery/integration and remaining M8.0 goals stay open. |
+| #27 / `54b5291f` | Current-head CI: 10 successful workflows and 1 failure; 379 successful jobs, 1 skip and 1 failure. HP40gs hpgcc-format fails during USB payload transfer before application entry (job 126971037182): no ACK progress for 90 seconds, 3 NAKs and 6 resends at sequence 0. Captured data/ACK/NAK packet checks pass; cause unresolved. No retry requested; PR and M8.5 remain unaccepted. |
+| #28 / `92e9e897` | Accepted and merged as `cdd6bd86`: all 11 workflows pass; 383 successful jobs and 2 intentional skips. Evidence publisher retry succeeds, including download/publish steps. M8.2/M8.3 whole-application and native resource-bound acceptance remain open. |
 | #29 / `fce14d73` | Accepted and merged as `1c0d1e35`: ten workflows pass, 376 successful jobs and two intentional PR publisher skips. Retransmission pacing is fixed; the original initial packet-loss cause remains unproven. |
 | #30 / `97d9eb46` | Accepted and merged as dfb3ee87: four workflows pass, 181 successful jobs and two intentional PR publisher skips. Core manual dispatch and expanded publisher queues are now on main; skipped publishers do not prove live queue behavior. |
 | Historical #18 / `439339b1` | Three unresolved failures retained: HP49g+ Direct system-services PWM IRQ `0x46417b03`, HP40gs UI transfer and HP39g+ Notebook transfer. Valid captured packet checks do not establish the original failure causes. |
 
-Accepted deliveries include #15, #17, #20, #22, #23, #24, #25 and #29; #21 was
+Accepted deliveries include #15, #17, #20, #22, #23, #24, #25, #26, #28 and #29; #21 was
 accepted into #20. Their detailed gates, older heads, failure counts and
 artifact evidence remain in [M8 validation history](m8-validation-history.md).
 The [prior status snapshot](m8-validation-history.md#2026-10-30-current-status-consolidation)
