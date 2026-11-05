@@ -1550,8 +1550,113 @@ static void bank_exit_program(void)
     assert(!memcmp(&output, &sentinel, sizeof output));
 }
 
+struct origin_plan_fixture
+{
+    struct hpclang_rpl_code_origin_cell cells[5];
+    unsigned fail_token;
+    int error;
+};
+
+static int origin_plan_resolve(void *context, uint32_t token,
+                               struct hpclang_rpl_code_origin_cell *cell)
+{
+    struct origin_plan_fixture *fixture = context;
+    if (token == fixture->fail_token)
+        return fixture->error;
+    if (!token || token > 5)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    *cell = fixture->cells[token - 1];
+    return 0;
+}
+
+static void origin_repair_plans(void)
+{
+    struct origin_plan_fixture fixture = {0};
+    uint32_t tokens[] = {1, 2, 3, 4, 5};
+    struct hpclang_rpl_reference_edit edits[5];
+    unsigned count;
+    for (unsigned i = 0; i < 5; ++i)
+        fixture.cells[i] = (struct hpclang_rpl_code_origin_cell){7, 0x80000 + i, i + 1};
+    assert(!hpclang_rpl_code_origins_plan(tokens, 0x54321, 0x54331, origin_plan_resolve, &fixture,
+                                          edits, &count));
+    assert(count == 1 && edits[0].mapping == 7 && edits[0].field == 0x80000 &&
+           edits[0].width == 5 && edits[0].expected == 0x54321 && edits[0].value == 0x54331);
+    /* Every permutation must repair the sources, not the register digit order. */
+    unsigned permutations = 0;
+    for (unsigned a = 1; a <= 5; ++a)
+        for (unsigned b = 1; b <= 5; ++b)
+            for (unsigned c = 1; c <= 5; ++c)
+                for (unsigned d = 1; d <= 5; ++d)
+                    for (unsigned e = 1; e <= 5; ++e) {
+                        uint32_t order[] = {a, b, c, d, e}, seen = 0, current = 0;
+                        for (unsigned i = 0; i < 5; ++i) {
+                            seen |= 1u << order[i];
+                            current |= order[i] << (4 * i);
+                        }
+                        if (seen != 62)
+                            continue;
+                        assert(!hpclang_rpl_code_origins_plan(
+                            order, current, 0xabcde, origin_plan_resolve, &fixture, edits, &count));
+                        assert(count == 1 && edits[0].expected == 0x54321 && edits[0].width == 5);
+                        uint32_t reconstructed = 0;
+                        for (unsigned i = 0; i < 5; ++i)
+                            reconstructed |= ((edits[0].value >> (4 * (order[i] - 1))) & 15u)
+                                             << (4 * i);
+                        assert(reconstructed == 0xabcde);
+                        ++permutations;
+                    }
+    assert(permutations == 120);
+    /* Dispersed mappings must not be combined just because values are related. */
+    for (unsigned i = 0; i < 5; ++i)
+        fixture.cells[i].mapping = i % 2;
+    assert(!hpclang_rpl_code_origins_plan(tokens, 0x54321, 0xabcde, origin_plan_resolve, &fixture,
+                                          edits, &count));
+    assert(count == 5);
+    for (unsigned i = 0; i < 5; ++i)
+        assert(edits[i].width == 1 && edits[i].mapping == (edits[i].field - 0x80000) % 2);
+    for (unsigned i = 0; i < 5; ++i)
+        tokens[i] = 1;
+    assert(!hpclang_rpl_code_origins_plan(tokens, 0x11111, 0x22222, origin_plan_resolve, &fixture,
+                                          edits, &count));
+    assert(count == 1 && edits[0].width == 1 && edits[0].value == 2);
+    struct hpclang_rpl_reference_edit sentinel[5];
+    memset(sentinel, 0x5a, sizeof sentinel);
+    for (unsigned mode = 0; mode < 7; ++mode) {
+        uint32_t replacement = 0x22222;
+        int expected = HPCLANG_RPL_SPAN_MALFORMED;
+        fixture.fail_token = 0;
+        fixture.cells[0].expected = 1;
+        fixture.cells[0].field = 0x80000;
+        tokens[4] = 1;
+        if (mode == 0)
+            replacement = 0x22223; /* One original cell cannot hold both digits. */
+        else if (mode == 1)
+            fixture.cells[0].expected = 16;
+        else if (mode == 2) {
+            tokens[4] = 0;
+            expected = HPCLANG_RPL_SPAN_UNSUPPORTED;
+        } else if (mode == 3) {
+            fixture.cells[0].field = 0x100000;
+            expected = HPCLANG_RPL_SPAN_BOUNDS;
+        } else if (mode == 4 || mode == 5) {
+            fixture.fail_token = 1;
+            fixture.error = mode == 4 ? -79 : 1;
+            expected = mode == 4 ? -79 : HPCLANG_RPL_SPAN_MALFORMED;
+        } else {
+            replacement = 0x100000;
+            expected = HPCLANG_RPL_SPAN_BOUNDS;
+        }
+        memcpy(edits, sentinel, sizeof edits);
+        count = 99;
+        assert(hpclang_rpl_code_origins_plan(tokens, 0x11111, replacement, origin_plan_resolve,
+                                             &fixture, edits, &count) == expected);
+        assert(count == 99 && !memcmp(edits, sentinel, sizeof edits));
+    }
+}
+
 int main(void)
 {
+    origin_repair_plans();
     bank_exit_program();
     bank_entry_program();
     address_origin_invalidation();

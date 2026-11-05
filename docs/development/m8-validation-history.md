@@ -4100,3 +4100,55 @@ both helper symbols: /work/nov05-native-integration/verified.txt.
 Runtime, platform, public headers and code-relocation test sources are unchanged
 from a0a31cb4. This is integration validation, not new runtime coverage or
 completion of the production memory-origin collector. Fresh CI remains required.
+
+## 2026-11-05 — Native branch accepted, migration transfer failure and interrupted matrix
+
+PR #26 head 4571d52c passes twelve workflows, 390 jobs and two intentional skips,
+then merges as 26140e1d. Evidence: research/nov05-resumed-ci-26.json. The merge
+does not complete production memory-origin discovery, public library/Port1
+operations or Port2 installation/authority/startup/reclamation.
+
+PR #27 head 54b5291f has ten successful workflows and one failed workflow,
+379 successful jobs, one skip and failed job 126971037182. HP40gs hpgcc-format
+fails before application entry: directory fetch completes, payload ACK progress
+stops for 90 seconds at sequence 0 with three NAKs/six resends. All 437 captured
+data/ACK/NAK frame checks pass. A receiver Timeout error frame is retained
+separately; this does not establish delivery or the root cause. Artifacts:
+research/nov05-pr27-hp40-format; packet report:
+research/nov05-pr27-hp40-format-packet-audit.json. No blind retry requested.
+
+Docker reports container exit 255 at 2026-11-05 10:53:49 UTC, OOMKilled=false.
+Only after terminal confirmation was the original container started again.
+No original child process survived. HP39g+ saved reports show all three Stock
+launches and settled returns; the maintained verifier passes after restart,
+including pixels/persistence and touched stacks 2504/2504/2224 of 8192 bytes.
+The source-input hash seal is checked before resume. HP39g+ artifact hashes
+were not persisted before interruption, so recovery explicitly records that
+they are captured after restart rather than claiming pre/post identity.
+research/nov05-backup-resume.py preserves earlier models and resumes only
+HP39gs/HP40gs in the existing output tree, with a one-run marker. Complete
+six-model acceptance still requires the remaining results and independent audit.
+
+## 2026-11-05 — Origin-derived repair planning
+
+Local branch m8-origin-repair-plan adds hpclang_rpl_code_origins_plan: resolve
+five proven address-source tokens to guarded original nibble cells, check the
+consumed value, reject inconsistent duplicate sources, and sort/coalesce edits
+by mapping/address. Unchanged digits remain in the plan so an independently
+discovered full pointer field can deduplicate. No memory writes or allocation;
+errors preserve output. Caller still proves address use, mapping identity,
+replacement target, dependencies and complete discovery.
+
+The maintained RPL code tests pass with GCC ASan/UBSan, including all 120 source
+permutations, dispersed mappings, duplicate sources, unknown/stale/invalid cells
+and callback failures. ARMv4T Thumb compilation and Clang static analysis pass;
+clang-format passes. Evidence is under /work/nov05-origin-plan.
+
+research/nov05-entry-origin-plan.py replaces the earlier hand-written repair
+fields with plans generated from captured ROM-path origin tokens. Both HP49g+
+and HP50g saved-state catalog moves continue through the original ROM path;
+independent duplicate system-root discovery merges, and stale/conflicting
+plans reject with zero writes. Report:
+/work/oct31-entry-snapshot/entry-origin-plan.json. This is saved-state replay
+through the first indirect jump, not a fresh Stock return or complete automatic
+production source discovery. Candidate remains local and unpushed.

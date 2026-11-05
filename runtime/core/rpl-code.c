@@ -1,5 +1,61 @@
 #include "rpl-code.h"
 
+int hpclang_rpl_code_origins_plan(const uint32_t *tokens, uint32_t current, uint32_t replacement,
+                                  hpclang_rpl_code_origin_resolve_fn resolve, void *context,
+                                  struct hpclang_rpl_reference_edit *edits, unsigned *count)
+{
+    if (!tokens || !resolve || !edits || !count)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (current >= 0x100000u || replacement >= 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct hpclang_rpl_reference_edit plan[5];
+    unsigned used = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        if (!tokens[i])
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        struct hpclang_rpl_code_origin_cell cell = {0};
+        int result = resolve(context, tokens[i], &cell);
+        if (result)
+            return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        if (cell.field >= 0x100000u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t expected = (current >> (4 * i)) & 15u;
+        uint32_t value = (replacement >> (4 * i)) & 15u;
+        if (cell.expected != expected)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        unsigned at = 0;
+        while (at < used && (plan[at].mapping < cell.mapping ||
+                             (plan[at].mapping == cell.mapping && plan[at].field < cell.field)))
+            ++at;
+        if (at < used && plan[at].mapping == cell.mapping && plan[at].field == cell.field) {
+            if (plan[at].expected != expected || plan[at].value != value)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            continue;
+        }
+        for (unsigned j = used; j > at; --j)
+            plan[j] = plan[j - 1];
+        plan[at] =
+            (struct hpclang_rpl_reference_edit){cell.mapping, cell.field, expected, value, 1};
+        ++used;
+    }
+    unsigned packed = 0;
+    for (unsigned i = 0; i < used; ++i) {
+        if (packed && plan[packed - 1].mapping == plan[i].mapping &&
+            plan[packed - 1].field + plan[packed - 1].width == plan[i].field) {
+            struct hpclang_rpl_reference_edit *previous = &plan[packed - 1];
+            previous->expected |= plan[i].expected << (4 * previous->width);
+            previous->value |= plan[i].value << (4 * previous->width);
+            ++previous->width;
+        } else {
+            plan[packed++] = plan[i];
+        }
+    }
+    for (unsigned i = 0; i < packed; ++i)
+        edits[i] = plan[i];
+    *count = packed;
+    return 0;
+}
+
 struct instruction_cursor
 {
     const struct hpclang_rpl_reader *reader;

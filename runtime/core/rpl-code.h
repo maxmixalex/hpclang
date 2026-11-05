@@ -210,6 +210,34 @@ struct hpclang_rpl_code_origins
     uint32_t registers[HPCLANG_RPL_CODE_D1 + 1][16];
 };
 
+struct hpclang_rpl_code_origin_cell
+{
+    uint32_t mapping, field, expected;
+};
+
+/* Resolve a caller-owned token to its original, guarded nibble cell. Zero is
+ * unknown and is never passed to resolve. Return zero on success, negative on
+ * failure; positive returns are malformed. Normalize physical aliases here. */
+typedef int (*hpclang_rpl_code_origin_resolve_fn)(void *context, uint32_t token,
+                                                  struct hpclang_rpl_code_origin_cell *cell);
+
+/* Project a proven 20-bit address use back to its five original nibble sources.
+ * tokens are in consumed low-to-high digit order; they need not name contiguous
+ * cells or one mapping. Resolve and check all expected digits against current,
+ * then sort/coalesce the repairs by mapping/address. Duplicate source cells must
+ * agree on both old and replacement digits. Keep unchanged digits in the plan,
+ * allowing a full pointer field to deduplicate with independently found roots.
+ * Caller proves address consumption, replacement/target mapping, source identity
+ * and all instruction/data dependencies. This does not infer pointers from
+ * values, discover missing origins, or authorize writes. Mappings and sources
+ * remain guarded until commit. Callbacks are read-only; their observations on
+ * failure must be discarded. No allocation or IO except resolve. On success
+ * write count (1..5) edits; on error leave outputs untouched. Output storage is
+ * five edits plus a disjoint count, also disjoint from callback-owned storage. */
+int hpclang_rpl_code_origins_plan(const uint32_t *tokens, uint32_t current, uint32_t replacement,
+                                  hpclang_rpl_code_origin_resolve_fn resolve, void *context,
+                                  struct hpclang_rpl_reference_edit *edits, unsigned *count);
+
 /* Propagate caller-established instruction-field tokens through LC/LA or a
  * D0/D1 immediate load. encoded contains count tokens in encoded nibble order,
  * not destination order; zero means unknown. A/C starts at the proven P and
