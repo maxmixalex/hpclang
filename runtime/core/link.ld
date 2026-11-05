@@ -16,6 +16,7 @@ SECTIONS
 
     .text :
     {
+        KEEP(*(.hpclang.capabilities))
         KEEP(*(.text.start))
 
         *(.text.unlikely .text.unlikely.*)

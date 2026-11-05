@@ -454,46 +454,20 @@ static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const ui
                 /* Stock save selects its copy. Keep the caller's contexts in
                  *
                    GC-traced native bindings and restore on success or error. */
-                0x9660u,
-                0x3f063u, /* CONTEXT@ dvbind */
-                0x126c6u,
-                0x3f063u, /* PGMCXT@ dvbind */
-                0x126e6u,
-                0x3f063u, /* NOTESCXT@ dvbind */
-                0x12706u,
-                0x3f063u, /* apletPTR@ dvbind */
-                0x565cu,
-                0x2d9du, /* ERRSET :: */
-                source,
-                0x7665u,
-                0x3f66eu,
-                0x775cu, /* RclAplet?Err */
-                saturn_base + HP39P_VARIABLE_OBJECT_NIBBLE,
-                0x7665u,
-                0x3f3cbu,
-                0x775cu,
-                0x312bu,
-                0x56b6u,
-                0x2d9du, /* ; ERRTRAP :: */
-                0xfdaeu,
-                0x126f6u, /* 1GETABND apletPTR! */
-                0xfdaeu,
-                0x126d6u, /* 1GETABND NOTESCXT! */
-                0xfdaeu,
-                0x126b6u, /* 1GETABND PGMCXT! */
-                0xfdaeu,
-                0x960eu, /* 1GETABND CONTEXT! */
-                0x56cfu,
-                0x312bu, /* ERRJMP ; */
-                0xfdaeu,
-                0x126f6u,
-                0xfdaeu,
-                0x126d6u,
-                0xfdaeu,
-                0x126b6u,
-                0xfdaeu,
-                0x960eu,
-                0x4049u,
+                0x9660u, 0x3f063u,                  /* CONTEXT@ dvbind */
+                0x126c6u, 0x3f063u,                 /* PGMCXT@ dvbind */
+                0x126e6u, 0x3f063u,                 /* NOTESCXT@ dvbind */
+                0x12706u, 0x3f063u,                 /* apletPTR@ dvbind */
+                0x565cu, 0x2d9du,                   /* ERRSET :: */
+                source, 0x7665u, 0x3f66eu, 0x775cu, /* RclAplet?Err */
+                saturn_base + HP39P_VARIABLE_OBJECT_NIBBLE, 0x7665u, 0x3f3cbu, 0x775cu, 0x312bu,
+                0x56b6u, 0x2d9du,  /* ; ERRTRAP :: */
+                0xfdaeu, 0x126f6u, /* 1GETABND apletPTR! */
+                0xfdaeu, 0x126d6u, /* 1GETABND NOTESCXT! */
+                0xfdaeu, 0x126b6u, /* 1GETABND PGMCXT! */
+                0xfdaeu, 0x960eu,  /* 1GETABND CONTEXT! */
+                0x56cfu, 0x312bu,  /* ERRJMP ; */
+                0xfdaeu, 0x126f6u, 0xfdaeu, 0x126d6u, 0xfdaeu, 0x126b6u, 0xfdaeu, 0x960eu, 0x4049u,
                 0x312bu, /* StoAplet */
             };
             return hp39_write_operation_helper(words, sizeof(words) / sizeof(words[0]));
@@ -1412,6 +1386,7 @@ static int stage_rpl_memory_bounds(const void *saturn_state, volatile const uint
     bounds->native_roots = NULL;
     bounds->native_root_count = 0u;
     bounds->native_root_masks = NULL;
+    bounds->execution_pc = NULL;
     bounds->port1_limit = 0u;
     if (!hpclang_stage_port1_limit(model, pool_l2, pool_pages, &bounds->port1_limit))
         bounds->magic = HPCLANG_RPL_BOUNDS_MAGIC_V2;
@@ -1664,6 +1639,14 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
                     rpl_bounds.native_root_masks = native_root_masks;
                     break;
                 }
+            if (hpclang_stage_image_capabilities(
+                    hpc1,
+                    (const void *)(uintptr_t)(STAGE_WINDOW_BASE + code_first * HPCLANG_PAGE_SIZE),
+                    code_count * HPCLANG_PAGE_SIZE) &
+                HPCLANG_IMAGE_CAP_RPL_EXECUTION) {
+                rpl_bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V5;
+                rpl_bounds.execution_pc = (uint32_t *)stock_frame;
+            }
         }
         /* Do not publish Saturn's machine return stack as unconditional roots:
          * RSTK=C can also save numbers. Operations that move TEMP code must

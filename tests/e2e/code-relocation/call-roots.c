@@ -9,6 +9,7 @@
 #include "rpl-reference.h"
 #include "rpl-port.h"
 #include "rpl-port-mutation.h"
+#include "launch-services.h"
 extern volatile uint32_t hpclang_e2e_result;
 static int prepare_call(struct hpclang_rpl_mutation_io *, uint32_t **, int *);
 
@@ -658,7 +659,11 @@ static int capture_entry(struct hpclang_rpl_mutation_io *io, uint32_t home)
 {
     if (io->native_root_count != 3 || !io->native_roots[1])
         return -1;
-    uint32_t *cpu = (uint32_t *)(uintptr_t)io->native_roots[1][1];
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    uint32_t *pc = hpclang_launch_execution_pc(boot);
+    if (!pc || pc != io->native_roots[1])
+        return -1;
+    uint32_t *cpu = (uint32_t *)boot->saturn_state;
     if (!cpu || cpu[0x998 / 4] >= 8)
         return -1;
     /* C still names the ROM helper; R3.H retains the launcher source. */
@@ -674,7 +679,7 @@ static int capture_entry(struct hpclang_rpl_mutation_io *io, uint32_t home)
         return -1;
     uint32_t words[32] = {1,
                           (uint32_t)(uintptr_t)cpu,
-                          *io->native_roots[1],
+                          *pc,
                           cpu[0x998 / 4],
                           cpu[0x914 / 4],
                           cpu[0x918 / 4],

@@ -241,6 +241,9 @@ static void test_discovery(void)
     bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V4;
     assert(hpclang_port_query(1, &info) == 0 && (info.available & HPCLANG_PORT_CREATE_BACKUP));
     assert(hpclang_port_query(0, &info) == 0 && info.available == info.implemented);
+    bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V5;
+    assert(hpclang_port_query(1, &info) == 0 && (info.available & HPCLANG_PORT_CREATE_BACKUP));
+    assert(hpclang_port_query(0, &info) == 0 && info.available == info.implemented);
     bounds.port1_limit = HPCLANG_RPL_PORT1_NIBBLES + 1;
     assert(hpclang_port_query(1, &info) == 0 && info.available == reads);
     bounds.port1_limit = 0;
