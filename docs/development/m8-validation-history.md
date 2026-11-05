@@ -4170,3 +4170,45 @@ both helper symbols: /work/nov05-native-integration/verified.txt.
 Runtime, platform, public headers and code-relocation test sources are unchanged
 from a0a31cb4. This is integration validation, not new runtime coverage or
 completion of the production memory-origin collector. Fresh CI remains required.
+
+## 2026-11-05 — Original HPGCC application integration and fresh SDK
+
+PR #19 local candidate 113e1a8f integrates accepted main 26140e1d. Only the
+roadmap/history required manual conflict resolution; union history preserves
+both sides. Functional differences from main remain the four original-application
+compatibility gate sources and documentation. Ruff and strict docs pass.
+
+A fresh temporary installed SDK builds both original HPGCC 2.0 SP2 filesystem
+applications, all six model packages, and the native observation fixture.
+The archive and current implementation inputs are hashed; report and logs live
+under /work/nov05-fsystem-integrated-sdk. Temporary SDK storage is removed by
+the completed build runner. Four new HP49g+/HP50g Direct/Stock executions are
+started under /work/nov05-fsystem-integrated-native using the current sealed
+emulator and firmware. Current-source/artifact, independent console/FAT and
+settled-return checks remain required; no new runtime completion or push claimed.
+
+The independent allocation/UI matrix now has nine saved passing cases, adding
+HP39g+ Stock and HP39gs Direct. The first seven have a separate passing partial
+audit; this does not imply that the latest two have already been re-audited.
+HP39gs Stock is confirmed running, followed by HP40gs Direct/Stock.
+
+## 2026-11-05 — Integrated original filesystem application acceptance
+
+Local PR #19 candidate 113e1a8f passes all four fresh HP49g+/HP50g Direct/Stock
+executions. The final independent audit checks current source/artifact hashes,
+all 22 saved console frames, settled return and raw FAT create/rename/delete/
+retained-file contents. Fresh installed SDK packaging already passed both
+original programs and all six model packages. Evidence:
+/work/nov05-fsystem-integrated-native/independent-audit.json and
+/work/nov05-fsystem-integrated-sdk/inputs.json. Ruff and strict docs pass.
+The pre-push audit of 6a905dfa retains 389 successful jobs, two skips and the
+cancelled Runtime publisher; it does not count cancellation as acceptance.
+These results do not prove physical hardware, all models' filesystem execution
+or completion of M8.4.
+
+The separate PR #27 HP40gs transfer failure now has a diagnostic local replay
+with exact failing-run artifacts (run 41942700281, job 126971037182), matching
+HPC payload/memory report and the original bundled emulator/tools. Only existing
+USB event logging is enabled. The diagnostic is running; no transport fix or
+successful replay is inferred. Inputs and results live at
+/work/nov05-pr27-usb-replay/replay.json.
