@@ -14,6 +14,7 @@ add_executable(hpclang_notebook_e2e
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
     main.c
+    "${HPCLANG_ROOT}/tests/e2e/notebook-entry/resources.c"
     "${HPCLANG_ROOT}/examples/notebook/app.c"
     "${HPCLANG_ROOT}/examples/notebook/store.c"
     "${HPCLANG_ROOT}/examples/notebook/export.c")
@@ -25,6 +26,7 @@ target_compile_options(hpclang_notebook_e2e PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)
 target_link_options(hpclang_notebook_e2e PRIVATE
+    "LINKER:--wrap=sbrk" "LINKER:--wrap=hpclang_start"
     "LINKER:--defsym=vfprintf=__i_vfprintf"
     -nostartfiles -Wl,--gc-sections "-Wl,-T,${HPCLANG_LINKER_SCRIPT}")
 set_target_properties(

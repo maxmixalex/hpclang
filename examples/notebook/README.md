@@ -4,14 +4,17 @@ A C application combining the declarative UI, physical keyboard text input,
 calculator civil clock and owned native string objects. Build with the installed
 SDK as described in its getting-started guide. HP39 models additionally require
 the Aplet envelope. Local host storage tests cover both backend choices. The
-relocated SDK build passes all six launchers and three HP39 Aplet packages;
-device and release acceptance are still pending.
+relocated SDK build covers all six launchers and three HP39 Aplet packages.
+Recorded original-ROM emulator acceptance covers primary persistence on all
+six models, Port 0 backups on HP48gII/HP49g+/HP50g and SD export on HP49g+/HP50g.
+These results do not establish physical-device or complete release acceptance.
 
 The application view and event update functions are shared with tests rather
 than duplicated in a test-only screen. Host UI tests exercise both 64- and
 80-row displays, the maximum note length with all Port controls present,
 controlled edits, Save/Restore and service failures. Storage and clock services
-are simulated in that UI test; native persistence still needs device evidence.
+are simulated in that UI test; separate Stock integration fixtures exercise
+native persistence across repeated launches.
 
 Use the arrow keys to focus controls, Alpha to enter text and Enter to activate
 buttons. Save writes the current note; Reload replaces edits only after a
@@ -50,12 +53,31 @@ and Port 2 writes remain unavailable).
 Host tests cover operation selection and rejected writes for all three port
 indices using simulated service capabilities. The separate `notebook-backup`
 Stock fixture verifies Port 0 create, restore without changing the primary save,
-replacement, and removal across three launches. HP48gII and HP50g ROM-emulator
-runs pass. The UI fixture separately checks primary persistence and pixels,
+replacement, and removal across three launches. Recorded acceptance includes
+HP48gII, HP49g+ and HP50g ROM-emulator runs. The UI fixture separately checks primary persistence and pixels,
 including all three HP39g+ launches with the model-specific build;
 this example does not establish completion of M8.6.
 
 ## Build resources
+
+Copy the installed `share/hpclang/examples/notebook` directory to your own
+application directory. With ATfE on `PATH`, configure one build per calculator:
+
+```sh
+cmake -S notebook -B build/notebook-hp39gs \
+  -DCMAKE_BUILD_TYPE=MinSizeRel \
+  -DCMAKE_TOOLCHAIN_FILE=/path/to/sdk/share/hpclang/cmake/toolchains/hpclang-armv4t.cmake \
+  -DCMAKE_PREFIX_PATH=/path/to/sdk \
+  -DHPCLANG_BUILD_MODEL=hp39gs
+cmake --build build/notebook-hp39gs
+```
+
+Use the corresponding model name for another calculator. The `.hpc` payload
+is not a transfer file. Classic models use the model's wrapped `.hp` launcher
+with its ARMToolbox dependency. HP39 models require the additional Aplet
+envelope described in the SDK getting-started guide; the generated `.hp` file
+alone cannot be installed as an Aplet. Keep the same Aplet when checking a
+saved note across launches, because its custom data owns the HP39 save.
 
 The application selects picolibc's integer-only formatter because it displays
 integer dates, port indices and error codes. Remove that target's

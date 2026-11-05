@@ -11,6 +11,21 @@ import subprocess
 import tempfile
 
 
+def contract_test_analyzer_args(relative):
+    """Keep intentional moved-from contract checks local to their fixtures."""
+    if relative in {
+        "tests/unit/test_timer_cpp.cpp",
+        "tests/e2e/system-services/timer.cpp",
+    }:
+        # cooperative_timer explicitly promises an empty, pollable source after
+        # move. The generic Move heuristic does not know this custom contract.
+        return [
+            "--extra-arg=-Xanalyzer",
+            "--extra-arg=-analyzer-disable-checker=cplusplus.Move",
+        ]
+    return []
+
+
 def compile_key(arguments, directory):
     """Deduplicate only understood invocations; unknown flags retain their cwd."""
     normalized = [arguments[0]]
@@ -155,6 +170,7 @@ def main() -> int:
                 "--extra-arg=-Xanalyzer",
                 "--extra-arg=-analyzer-disable-checker=core.FixedAddressDereference",
             ]
+            command += contract_test_analyzer_args(Path(source).relative_to(root).as_posix())
             tasks.append(command)
 
         def run(command):
@@ -172,7 +188,10 @@ def main() -> int:
                 if output:
                     print(output, end="", flush=True)
                 if completed % 25 == 0 or completed == len(tasks):
-                    print(f"Clang analysis: {completed}/{len(tasks)} sources completed", flush=True)
+                    print(
+                        f"Clang analysis: {completed}/{len(tasks)} sources completed",
+                        flush=True,
+                    )
         return int(failed)
 
 

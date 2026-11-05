@@ -397,6 +397,11 @@ hpclang_unit(notebook_ui test_notebook_ui.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
 target_include_directories(test_notebook_ui PRIVATE "${HPCLANG_ROOT}/include")
 
 if(UNIX)
+    hpclang_unit(notebook_lifecycle test_notebook_lifecycle.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
+        "${HPCLANG_ROOT}/examples/notebook/app.c")
+    target_include_directories(test_notebook_lifecycle PRIVATE "${HPCLANG_ROOT}/include")
+    target_link_options(test_notebook_lifecycle PRIVATE
+        "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
     hpclang_unit(ui_surface_alloc test_ui_surface_alloc.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
     target_include_directories(test_ui_surface_alloc PRIVATE "${HPCLANG_ROOT}/include")
     target_link_options(test_ui_surface_alloc PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
@@ -490,6 +495,14 @@ hpclang_unit(timer test_timer.c
     "${HPCLANG_ROOT}/runtime/core/timer-engine.c"
     "${HPCLANG_ROOT}/runtime/core/timer.c")
 target_include_directories(test_timer PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(timer_cpp test_timer_cpp.cpp
+    "${HPCLANG_ROOT}/runtime/core/timer-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/timer.c")
+target_compile_features(test_timer_cpp PRIVATE cxx_std_17)
+target_compile_options(test_timer_cpp PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+target_include_directories(test_timer_cpp PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(sound_api test_sound_api.c "${HPCLANG_ROOT}/runtime/core/sound.c")
@@ -716,6 +729,7 @@ target_compile_options(test_object_store PRIVATE
 
 hpclang_unit(port
     test_port.c
+    test_port_cpp.cpp
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
     "${HPCLANG_ROOT}/runtime/core/object-construct.c"
@@ -729,6 +743,9 @@ hpclang_unit(port
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_compile_features(test_port PRIVATE cxx_std_17)
+target_compile_options(test_port PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
 target_include_directories(test_port PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 

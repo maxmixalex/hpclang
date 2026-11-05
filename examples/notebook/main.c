@@ -58,7 +58,8 @@ int main(void)
                 declare = 1;
                 quit = notebook_update(&note, &event);
             }
-            if (key.key == HPCLANG_KEY_ON && key.type == HPCLANG_KEYBOARD_EVENT_DOWN && !emitted)
+            /* ON also emits CANCEL when the note's text input has focus. */
+            if (key.key == HPCLANG_KEY_ON && key.type == HPCLANG_KEYBOARD_EVENT_DOWN)
                 quit = 1;
         }
         hpclang_delay_us(20000);

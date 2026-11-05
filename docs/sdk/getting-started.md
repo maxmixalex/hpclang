@@ -109,7 +109,6 @@ Legacy decimal formatting is explicitly selected per application translation
 unit with `HPCLANG_HPGCC_LEGACY_FORMAT=1` before the compatibility include.
 Omitted/zero preserves standard formatting. See the [migration guide](migration.md)
 for the distinct legacy grammar, shared settings and bounded output entry points.
-The formatting addition is locally validated; remote acceptance remains pending.
 
 An application CMake file uses:
 
@@ -224,6 +223,40 @@ failed null result would close the old handle. Local scopes clean up on normal
 return; explicitly reset owners before `exit()` or `_Exit()` if they must close
 before termination.
 Global-object destruction follows the runtime's ordinary exit handling.
+
+## Public API conventions
+
+Use the installed headers as the contract for the SDK revision you build with.
+The C interfaces use `hpclang_` names and opaque handles; C++ helpers live in
+`hpclang` and retain the underlying C service's model and launch requirements.
+Rebuild application sources against the installed SDK. Its source compatibility
+does not make historical HPGCC binaries or private runtime structures compatible.
+UI names remain provisional until UI milestone acceptance.
+
+| Boundary | Application rule |
+| --- | --- |
+| Results | Follow each function's declared convention. Status calls commonly return zero or minus one; iterators can return one for an entry and zero for exhaustion. Pointer factories signal failure with null. Do not treat every nonzero result as failure. |
+| Errors | Read `errno` only after the operation signals failure, and save it before cleanup or another call if needed. Success need not clear an earlier error. Output preservation and rollback are guarantees only where the specific API documents them. |
+| Versioned records | Zero-initialize the record, then set its `size` to `sizeof record` and its `version` to that record's named version constant before calling the API. Follow that header's supported-version rules rather than assuming every record uses the same version. |
+| Ownership | Pair each owned C result with its documented release function, or adopt it into the matching C++ owner once. `get()` borrows; `release()` transfers cleanup responsibility. Borrowed callback data, fonts and surfaces must outlive every user. |
+| C++ execution | Use the SDK's C++17, no-exceptions/no-RTTI profile. Callbacks supplied to `noexcept` helpers must not throw. Normal scope exit runs destructors; `exit()` and `_Exit()` do not unwind automatic owners. Explicitly check operations such as stream close when cleanup success matters. |
+| Availability | Device capability queries and per-port operation masks describe implementation and launch context. They do not reserve memory, guarantee media or promise that the next operation succeeds. Check that operation's result, too. |
+
+For example, a port descriptor starts as:
+
+```c
+struct hpclang_port_info info = {0};
+info.size = sizeof info;
+info.version = HPCLANG_PORT_INFO_VERSION;
+if (hpclang_port_query(0, &info) != 0)
+    return -1;
+```
+
+Include `<hpclang/port.h>` for this example. A successful query can report an
+absent port with zero operation masks. Object and port names remain raw
+calculator bytes unless a particular API explicitly specifies UTF-8; ownership
+does not change their encoding. See the [migration guide](migration.md) for
+numeric, text and legacy-call boundaries.
 
 ## Migrate HPGCC source
 

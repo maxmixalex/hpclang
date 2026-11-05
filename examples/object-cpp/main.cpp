@@ -1,5 +1,6 @@
 #include <hpclang/object.hpp>
 #include <hpclang/object-store.hpp>
+#include <hpclang/port.hpp>
 #include <cstdint>
 
 int main()
@@ -20,6 +21,22 @@ int main()
     std::int64_t result = 0;
     if (hpclang_object_integer_i64(value.get(), &result) != 0 || result != 43)
         return 3;
+
+    // Port 0 metadata is also optional; the owner closes its independent snapshot.
+    hpclang::owned_port_iterator port{hpclang_port_iterator_open(0)};
+    if (!port && errno != ENOSYS)
+        return 7;
+    while (port) {
+        hpclang_port_entry entry{};
+        entry.size = sizeof entry;
+        entry.version = HPCLANG_PORT_ENTRY_VERSION;
+        int next = hpclang_port_iterator_read(port.get(), &entry);
+        if (next < 0)
+            return 8;
+        if (!next)
+            break;
+    }
+    port.reset();
 
     // Native HOME is optional: HP39 and non-Stock contexts report ENOSYS.
     hpclang::owned_object_store home{hpclang_object_store_home()};

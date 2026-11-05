@@ -1,5 +1,43 @@
 # M8 validation history
 
+### 2026-11-05 — Backup stack gate and export resource integration
+
+Corrected maximum-length backup run 40278 terminates at the HP48gII resource
+gate after all three Stock success/return phases and corrected viewport pixels.
+The first report is `[1,48,8192,8192,8192,10396,27136,40960]`: the touched-stack
+watermark exhausts the configured 8192-byte reservation. The next launch uses
+5864 bytes. No budget was relaxed and no six-model acceptance is claimed.
+Saved state and logs remain in `/work/nov05-notebook-backup-resources`.
+Post-LTO disassembly lists 1108 bytes of explicit SP subtraction in write_backup
+and 832 in hpclang_rpl_mutation_userob_shift_before; this is diagnostic evidence,
+not yet a complete dynamic call-chain peak or a proven fix.
+
+The separate notebook-export fixture now retains live UI/renderer/display
+allocations, checks a 191-byte export across two launches, and shares the
+existing runtime-cleanup stack/heap observer. Original UTF-8 export, refusal to
+overwrite, saved-note persistence and raw-card retained-file checks remain.
+The raw-card manifest additionally verifies MAXNOTE.TXT independently. Its new
+verifier is registered in the existing two-model CI matrix. Three target-matrix
+tests and Ruff pass. The first build stopped on a missing fonts.cmake include
+(terminal 8132); that include is corrected and its log/input manifest retained
+as failed-font-config files under `/work/nov05-notebook-export-resources`.
+Corrected run 76765 is active; no export-resource runtime pass or push yet.
+
+### 2026-11-05 — Maximum-length Notebook backup candidate
+
+The local persistence fixture adds Port0 create, size-changing replacement,
+restore and removal of a 191-byte note while UI/renderer allocations remain
+live. HP48gII reaches all three success phases and settled returns, then the
+unchanged pixel verifier rejects the first frame: activating the additional
+backup controls leaves the scroll viewport below the title. Terminal run 88633
+and its copied source, artifacts and logs are retained under
+`/work/nov05-notebook-optional-resources`. The fixture now restores its previous
+focus and top viewport before the existing pixel gate. Corrected six-model
+validation is running under `/work/nov05-notebook-backup-resources` (40278).
+The first candidate also attempted file export without a raw-card contract.
+That path was not reached; export resource checks belong in the existing
+HP49g+/HP50g notebook-export fixture with its SD contract. No export-resource
+pass, full six-model pass or new remote acceptance is claimed.
 ### 2026-11-05 — Literal origins in the shared C tracker
 
 `hpclang_rpl_code_origins_literal` now propagates caller-owned instruction-field
@@ -1241,6 +1279,116 @@ in `/work/oct29-resource-integration-quality` and `/work/oct29-resource-docs-che
 The merged version requires fresh CI; neither parent CI nor this integration
 completes M8.2/M8.3 or proves unsampled peak capacity.
 
+
+## 2026-10-30 — Port C++ integration and second PR26 failure
+
+The local PR14 merge preserves the native-allocation parent PR13 and accepted
+main resource snapshots. Combining `--artifact` with `--native-release` had
+skipped the latter through an `elif`; independent dispatch and a combined-CLI
+regression retain both gates. Eight UI verifier tests and Ruff pass. GCC
+ASan/UBSan tests `port` (including the real C++ owner fixture), `native_allocation`
+and `pool_checkpoint` pass. The first Clang configuration failed because the
+container lacks its host ASan runtime; that environment failure is retained in
+`/work/oct30-port-cpp-integration/clang-environment-failure.log`. GCC reused the
+build directory with a fresh configuration. ARMv4T Object Basics links and strict
+docs pass. Logs: `/work/oct30-port-cpp-integration/{unit,arm}.log` and
+`/work/oct30-port-cpp-docs.log`. No merged emulator or full SDK result is claimed.
+
+PR26 exact head `6a582958` audit now has two failed jobs. Job 123960552830 passed
+Stock execution and original-interpreter verification, then failed in the
+`native-missing-message/message-run` transfer before USB server readiness.
+The saved emulator log reports `key=6 down=1 ready=1 sampled=0 pressed=1` and
+`phase=input-not-sampled`. This is distinct from the HP39g+ packet-57 failure;
+its root cause is not established. Downloaded evidence is retained at
+`research/oct30-pr26-relocation-failure`, with the job log beside it. Neither
+failure is waived. The original 88 native reference/control cases and preceding
+native/new-message checks passed, but do not accept the remaining cases.
+
+
+## 2026-10-30 — Port C++ full SDK gate and additional PR26 failures
+
+Port C++ local integration `3ab04c07` passes the full maintained SDK gate:
+installed/relocated external C/C++ (including the owner example), public ARMv4T
+assembly checks, six model-specific Notebook builds, three HP39 Aplet variants,
+incremental missing-output regeneration and rejected model configurations.
+Two builds produce 517 byte-identical outputs. Log:
+`/work/oct30-port-cpp-sdk-full.log`; runner:
+`research/oct30-port-cpp-sdk-full.py`. Prepared reset assets were byte-checked
+against the generator and a fresh hp2aplet host tool compiled; temporary SDK/tool
+workspaces are removed by the test. This is local SDK validation, not CI or M8.5
+acceptance. New Object Basics application/all launchers also build.
+
+Six-model Direct/Stock owner verification is running under
+`/work/oct30-port-cpp-integration/runner`, with application/emulator/server hashes
+in `runtime-inputs.json`. The first local wrapper incorrectly enabled keyboard
+progression for Object Basics, while runtime-suites.json specifies false. All
+three HP39 payloads passed but that wrapper run failed; its log is retained as
+`runtime-keyboard-config-failure.log`. The corrected wrapper reads the maintained
+suite flag and reruns. Do not count the failed wrapper run as an accepted gate.
+The runner uses the separately tested PR29 retry-pacing server; this dependency
+is explicit in the input hash and is not remote CI acceptance.
+
+PR26 exact-head audit: 341 successful, one skipped, four running, thirty queued
+and four failed jobs. HP50g job 123960552981 in run 41024016583 has the same first
+missing-message ARM-abort snapshot as HP49g+: PC 0x10, CPSR 0x1d7, fault address
+0x53000000. Its artifact is `research/oct30-pr26-hp50-relocation-failure`.
+
+Console job 123962113880 belongs to run 41024024226 (not 41024016583). The latter
+run's passing console artifact was initially downloaded, identified by its
+returned/PASS evidence, and retained separately as `hp39-console-pass-control`.
+The correctly matched failure artifact is `research/oct30-pr26-hp39-console-failure`.
+It stops before payload entry at packet 36: 90 seconds without acknowledged
+progress, three NAKs and four resends. All 1218 checked captured data/ACK/NAK
+frames pass; the terminal Timeout frame also has valid length/sequence/CRC.
+The passing control has 2505 checked frames without failures. These host capture
+results do not establish the source of packet loss or accept a failed gate.
+Audits are `research/oct30-pr26-console-{packet-audit,pass-packet-audit}.json`.
+
+### 2026-10-30 — M8.5 merged UI resource gate execution
+
+The Port C++ integration source remains `3ab04c07`. All six Direct Object
+Basics runs and Stock HP39g+/HP39gs/HP40gs runs pass. The same live process
+continues to HP48gII and then HP49g+/HP50g; no restart or six-Stock acceptance
+is inferred. Inputs and runtime evidence remain in
+`/work/oct30-port-cpp-integration`.
+
+The merged UI application and freshly patched pinned x50ng build pass, using
+`research/oct30-port-cpp-ui-build.py`; source hashes and the build log are in
+`/work/oct30-port-cpp-ui`. The fresh emulator contains both native-allocation
+and resource-snapshot capture support. `oct30-port-cpp-ui-run.py` exercises the
+actual combined CI verifier arguments (`--pool --allocation --native-release
+--artifact`) and separately checks lifecycle snapshots. The first HP48gII run
+is active, not accepted. Verified existing firmware assets and the separately
+tested PR #29 Kermit server are reused; this local dependency does not imply
+remote acceptance of PR #29 or parent PR #13. Application ownership, whole-UI
+acceptance and M8.5 completion remain open.
+
+### 2026-10-30 — Port C++ full runtime matrix and first integrated UI pass
+
+`oct30-port-cpp-runtime-audit.py` passes after the six Direct/six Stock runner
+finishes. `/work/oct30-port-cpp-integration/runtime-verified.json` records twelve
+Stock reports, settled returns, all target completion markers and unchanged
+application/emulator/Kermit hashes. Direct JSON files were replaced by Stock
+reports; Direct acceptance retains the per-target log and successful family
+completion, not independent retained Direct JSON. The actual owner fixture
+exercises move assignment, release/re-adoption, independent snapshot digests
+and errno-preserving destruction on the three classic Stock models. Other
+contexts explicitly require ENOSYS.
+
+Fresh merged UI integration passes on HP48gII, including both artifact-budget
+and native-release checks plus 14 lifecycle snapshots. Native release identifies
+6164 released block bytes, including 20 metadata bytes. The snapshot report confirms observed capacity
+returns to 12540 bytes and largest free block to 11516 bytes. This is sampled
+allocator evidence, not complete physical peak admission. Reports are under
+`/work/oct30-port-cpp-ui/{runner/build,snapshots/hp48gii}`.
+
+Two local-wrapper setup errors remain archived: `capture-disabled-*` lacks
+CI's pool/allocation capture flags; `missing-firmware` is an explicitly stopped
+HP49g+ attempt that lacked the nested firmware directory. The wrapper now sets
+both capture flags and checks the shared verified firmware file before launch.
+It retains the HP48gII pass and resumes HP49g+ with identical application and
+emulator hashes. Remaining UI models and parent #13 integration remain open.
+
 ### 2026-10-30 — Native allocation parent reconciled with accepted main
 
 Local parent #13 merge `19e19700` integrates accepted `3b77453a`, retaining
@@ -1319,6 +1467,58 @@ successful, two skipped and one cancelled publisher job; #14 `492926e1` has
 319 successful, one skipped and fourteen cancelled jobs. No cancelled gate is
 accepted. New-head remote validation remains required, and M8 is incomplete.
 
+## 2026-10-30 — Cooperative C++ timer ownership (local)
+
+Added timer.hpp/cooperative_timer on the M8.5 Port C++ branch. It is move-only,
+allocation-free and no-exceptions/no-RTTI C++17. Moving disarms the source;
+replacement discards the old destination schedule. Chrono arguments reject
+negative durations before sampling time; C clock/overflow failures retain the
+schedule and poll output. Polling/armed/cancel keep the C cooperative semantics.
+No background callback or hardware lease is introduced. The global sound API
+is not wrapped as an owner: it lacks an identity token to prevent stale owners
+from stopping replacement requests.
+
+Two CTest targets (real C timer plus new C++ tests) pass ASan/UBSan under
+/work/oct30-timer-cpp-host. Tests cover move construction/assignment/self-move,
+failed replacement, overflow, missed periodic ticks, inactive no-clock polls,
+one-shot consumption and cleanup errno. Ruff and strict docs pass. The new
+installed examples/timer-cpp is included in relocated SDK builds, all six
+launchers, optional three-model Aplet packaging and output reproduction. That
+full SDK run is active in session 87805, log /work/oct30-timer-cpp-sdk.log; no
+result or device acceptance is claimed. No push was made.
+
+## 2026-10-30 — Timer SDK and Direct validation follow-up (local)
+
+The full installed SDK run completed: 549 byte-identical outputs, six-model
+Notebook and launcher builds, relocated C/C++ builds and three HP39 Aplet
+variants pass. Log and source identities are recorded in
+/work/oct30-timer-cpp-device/sdk-verified.json. The system-services application
+now exercises actual-clock C++ timer move, one-shot expiry, periodic replacement,
+cancel and destructor errno preservation alongside its existing gates. All six
+Direct emulator cases pass; the original Stock matrix remains live in session
+68475. No restart or reduced gate was used. Standalone timer-cpp example runtime
+is not yet covered by this integration result.
+
+The maintained analyzer passes five host/ARM source configurations (seven
+compile entries before deduplication). cplusplus.Move is disabled only for the
+two timer fixtures that deliberately query documented moved-from states;
+production sources and other fixtures retain the checker. Eight analysis-tool
+tests pass, including exception boundaries. The container requires explicit
+GIT_DIR/GIT_WORK_TREE for the Windows worktree; no repository metadata changed.
+M8.0 head 2e7885a4 was checked this turn: all ten listed workflows remain queued.
+No new commit or push; no new milestone acceptance.
+
+Timer independent replay: six Direct cases pass source/artifact SHA-256 checks, ARM call-site inspection, original input-pixel checks and settled-return fields. Evidence: /work/oct30-timer-cpp-device/runtime-audited.json. Stock matrix remains live; HP39g+ runtime/return passes in its log, with the HP39 family gate still pending. PR #29 run 41031458583 still has HP39gs object-composite job 124102178326 queued; no current failed jobs in that run.
+
+Timer example runtime preparation: research/oct30-timer-example-build.py installs an SDK into a temporary directory, copies the unchanged public main.cpp and adds an external observer entry point. It checks stdout progression (including coalesced ticks), at least five seconds elapsed, final progress five and normal return. Build session 24467 is live; no execution claimed. research/oct30-timer-example-run.py prepares the ordinary six-model Direct gates. System-services Stock session 68475 remains live. M8.0 exact-head CI still lists ten queued workflows.
+
+Installed example observer build completed (session 24467 exit 0): 55,576-byte payload, 1,912-byte static RW, six launchers; temporary SDK removed. Execution awaits existing Stock matrix to avoid concurrent emulator timing load. HP39gs now passes runtime and settled return; HP40gs is running. PR #13 Gallery run 41045600435 had only publisher 124108968421 cancelled before any steps; GitHub annotation says a higher priority waiting ci-evidence-publisher exists. Reran only that job; new job 124134000902 is pending. No gate waived or merge performed.
+
+Example execution is now queued in session 57664 behind OS pidfd for confirmed Stock runner PID 85996 (session 68475). It checks command identity, waits for that process to terminate, requires six completed family/mode groups, runs the independent runtime audit, and only then starts six Direct example cases. A failed/incomplete predecessor stops the chain. No concurrent second emulator or restart.
+
+## 2026-10-30 — Current status consolidation
+
+The following is the previous roadmap status, preserved verbatim. Its queue states and active-process statements are historical, not current acceptance.
 ## Shared bank-switch body inventory — local, 2026-10-29
 
 The bounded 0x22fec..0x23077 shared-body inventory decodes 31 instructions on
@@ -2486,6 +2686,11 @@ installation, authority lifecycle, safe startup and reclamation. Sound
 compatibility is independent.
 
 M8.5 Port C++ `3b06b8c0` is submitted in PR #14 on allocation parent
+`97d5ba74` (PR #13). Both await CI acceptance. The latest #14 audit has two successful, two running
+and six queued workflows. #13 had five successful, one running, five queued and
+one cancelled workflow: only its Gallery evidence publisher was cancelled by
+a higher-priority waiting publisher. That job was rerun; attempt 2 is pending.
+Neither branch is accepted.
 `97d5ba74` (PR #13). Both await new-head CI acceptance: #13 has twelve queued workflows and
 #14 has ten. No completed new-head acceptance is claimed.
 All six Direct/six Stock Object Basics runs pass; live Port owners are exercised
@@ -2499,6 +2704,21 @@ host tests, lint and strict docs pass. The publisher queue fix is locally checke
 Previous #13 CI retains one cancelled publisher; #14 retains cancelled gates.
 Remote acceptance, whole-application peak admission and M8.5 completion remain open.
 
+Local M8.5 `cooperative_timer` owns a movable, noncopyable polling schedule
+with chrono durations and no allocation/IRQ. Real C/C++ timer tests pass
+ASan/UBSan. Installed/relocated SDK validation passes, reproducing 549 outputs
+and all six model launchers plus three HP39 Aplet variants. System-services
+integration passes all six Direct emulator cases; independent replay confirms
+source/artifact identities, timer calls, input pixels and settled returns.
+Stock execution remains in progress. Five host/ARM source configurations pass the maintained analyzer;
+eight analyzer-tool tests pass. The Move-checker exception is confined to two
+fixtures deliberately testing the documented empty moved-from state. The
+standalone example runtime fixture now builds with the installed SDK, preserving
+its main and checking output progression and elapsed time. Execution is queued
+behind the live Stock process and requires its complete matrix plus independent
+audit to pass first; HP39g+ and HP39gs runtime/return checks pass so far.
+Changes remain local and M8.5 open.
+
 M8.5 migration tools and API guide `5d5195dc` are submitted in draft PR #27;
 CI has four successful, five queued and one running workflow; 159 jobs pass, 205 are queued and four run. Checker head `b59fb56d` passed the full relocated
 SDK gate, six model-specific Notebook builds, three HP39 Aplet variants and 517
@@ -2507,6 +2727,13 @@ installation/relocation, links, strict ARMv4T C11 example compilation and docs.
 Remaining ownership/application migration acceptance is still required;
 this submission does not complete M8.5.
 
+M8.2/M8.3 UI stack/return-capacity gate `a181a6d2` is submitted in draft
+PR #28; ten workflows are queued/two pending and twenty jobs are queued.
+The pre-push audit of preceding `79a5fe36`
+found twelve queued workflows and twenty queued materialized jobs. The branch
+checks application SP and native free-capacity recovery after settled return,
+and adds optional native/launcher SP diagnostics. Local evidence below does
+not replace CI acceptance or whole-application resource admission.
 M8.2/M8.3 stack, return-capacity and update-cost gates `4bcd3fb6` are submitted
 in draft PR #28. The preceding `a181a6d2` audit found two successful and ten
 queued workflows; 23 jobs passed, two ran and 133 queued. New-head CI was not
@@ -2661,6 +2888,16 @@ and public library/Port1 operations; inspect outstanding CI before delivery and
 accept only proven gates. Continue Port2 installation/startup/reclamation within
 M8, and retain every M8.2–M8.6 requirement above.
 
+
+Timer Stock HP39 family completed: HP39g+/39gs/40gs all pass original runtime, settled-return and physical-input gates. Independent runtime-audited.json verifies nine Direct/Stock cases with unchanged source/artifact hashes and the ARM timer call present. HP48gII is now running. Status consolidation preserves M0–M7 and stage contracts unchanged; all three maintained documentation copies pass strict Zensical build.
+
+Local timer implementation committed as e0f167de (13 files); no push. Exact preceding remote head 3b06b8c0175e8528ed568f0b9abb325ce2e7f21c audit: two successful/three running/five queued workflows; 106 successful/eleven running/254 queued jobs, no failed or cancelled jobs. Complete audit retained in research/oct30-timer-prepush-ci.json. Local code and SDK/test documentation are committed separately from current-status/history edits. Stock and queued example sessions remain active.
+
+Timer system-services matrix completed with exit 0: all six Direct and six Stock cases pass. Independent audit reports complete=true, twelve cases, unchanged source/artifact identities, ARM timer call present, original input-pixel gates and settled returns. Evidence: /work/oct30-timer-cpp-device/runtime-audited.json. Session 57664 then started the installed example Direct matrix; HP39g+ passed and remaining cases are running. This is local emulator evidence, not CI or hardware acceptance.
+
+Installed example session 57664 completed with exit 0. All six Direct cases pass the unchanged example main under an external observer: strictly increasing stdout tick progress ending at five, at least five seconds elapsed, success return and settled emulator return. Independent replay validates every report, original source/ELF/HPC hashes and the real example call in disassembly. Evidence: /work/oct30-timer-example/runtime-audited.json. Standalone Stock and physical hardware coverage are not claimed. Final preceding-head audit: three successful/two running/five queued workflows, 122 successful/ten running/239 queued jobs, no failed/cancelled jobs.
+
+Timer delivery pushed to PR #14 as d3e27922, including implementation e0f167de and consolidated status/evidence. PR title/body and remote head read back. No new-head CI poll or merge in the submission turn. The prior-head audit and all local gates above remain distinct from remote acceptance.
 ## Delivery and evidence policy
 
 Before each push, inspect the preceding push's exact-head CI and investigate
@@ -3901,6 +4138,223 @@ had four queued workflows/eight queued jobs, none failed/cancelled. New-head CI
 was not polled after push. Mainline integration and PR #27 core coverage remain
 open; no existing test, threshold, permissions or publishing policy was removed.
 
+## 2026-10-31 — PR13 HP39gs format transport failure
+
+Job 124103093154 in run 41045608034 fails before payload execution.
+The downloaded Stock report has saw_pass=false and host-gate-failed; the
+transfer gate records no acknowledged progress for 90s at send-window 54.
+Independent wire audit checks 407 data/ACK/NAK frames with valid length and
+CRC3. Retries already include 50ms pacing; build-ckermit.sh and its resend
+patch match accepted main. This is not proof of the initial loss/rejection
+cause or a format-runtime failure. Evidence: research/oct31-pr13-format-evidence
+and research/oct31-pr13-format-packet-audit.json. Acceptance stays open.
+
+## 2026-10-31 — Installed timer example HP39g+ Stock pass
+
+The original HP39g+ Stock run completed successfully; only the driver then
+failed by assuming the Direct-only result field. After terminal exit, retained
+the original report and continued with the Stock saw_pass/returned/return_settled
+checks. Independent audit passes all recorded source/artifact/firmware/runner
+hashes, real example call and settled return. Evidence: /work/oct31-timer-example-stock/partial-audit.json.
+Remaining five models continue in session 7681; no full matrix or hardware claim.
+PR13 failed-job rerun request was rejected with HTTP403 because its workflow
+is still running; original failure evidence remains unresolved.
+
+## 2026-10-31 — Public SDK API usage conventions
+
+Local c19618a8 adds a concise contract summary to the existing getting-started
+page: result conventions, errno, versioned records, ownership, C++ cleanup and
+capability-query boundaries. Existing UI provisional status is retained.
+Strict documentation builds and a real temporary SDK installation pass; the
+installed page is byte-identical and its migration link target is present.
+The temporary install is removed. This is local documentation delivery, not
+remote acceptance or completion of M8.5. Stock timer session 7681 remains live.
+
+## 2026-10-31 — Second Stock timer result and obsolete CI queue cleanup
+
+HP39gs completes the installed timer example and settled Stock return.
+Independent partial audit validates both HP39g+ and HP39gs reports and all
+recorded input hashes; HP40gs continues in the original session 7681.
+Cancelled PR30 old-head bfddd250 runs 41085995365 and 41085995559 only after
+checking every job was queued, runner_id=0, with no steps and a corresponding
+current-head workflow present. Readback confirms cancellation. Other old runs
+with execution evidence or missing current-head replacements were retained.
+Evidence: research/oct31-obsolete-ci-cancelled.json. No acceptance is inferred.
+
+## 2026-10-31 — Shipped timer example joins maintained E2E
+
+Local c8ac990e links examples/timer-cpp/main.cpp with a renamed entry into the
+existing system-services suite. Its observer checks monotonic progress to five,
+at least five seconds elapsed and stdio cleanup; the existing runtime/return
+and pixel gates remain. Workflow filters include example changes. ARM build
+and all six launchers pass; timer-example.cpp and checks.c pass ARM analysis.
+Actionlint passes excluding only its known unsupported queue keyword diagnostic.
+Artifacts: /work/oct31-timer-example-integrated. Integrated runtime execution
+and remote submission remain pending; the original standalone Stock matrix
+continues unchanged in session 7681. Its results do not validate this new image.
+
+## 2026-10-31 — Four Stock example passes and serial integrated validation
+
+HP48gII completes the standalone installed example; independent audit now
+passes HP39g+, HP39gs, HP40gs and HP48gII. HP49g+/HP50g continue in session 7681.
+Session 21119 waits on the confirmed original driver PID 93996 and requires
+its full six-model audit before starting the integrated system-services matrix.
+Source/artifact identities are checked across the wait. No second emulator
+starts during the standalone run. The linked ARM image contains calls to both
+the observer and actual example; /work/oct31-timer-example-integrated/linked-example-audit.json
+records the ELF hash. Integrated runtime and remote acceptance remain pending.
+
+## 2026-10-31 — Complete standalone Stock timer matrix; integrated console isolation
+
+All six standalone installed-example Stock cases and the full independent audit
+pass. Session 7681 terminates successfully. Evidence: /work/oct31-timer-example-stock/independent-audit.json.
+The subsequent integrated run terminates with HP39-family Direct timeouts: the
+example hpconio constructor selects blocking legacy stdin, conflicting with
+the existing unbound getchar/EOF checks. Retain failed evidence in
+/work/oct31-timer-example-integrated. Local c6e801cd defines
+HPCLANG_HPCONIO_NO_AUTOINIT only for the example source inside the explicit-stdio
+observer fixture; shipped source and original EOF gates remain unchanged.
+The v2 image and six launchers build, both changed translation units pass ARM
+analysis, and HP39g+ Direct runtime/settled return passes. Session 65071 continues
+remaining Direct/Stock checks under /work/oct31-timer-example-integrated-v2.
+Full integrated and remote acceptance remain open; no hardware claim is made.
+
+## 2026-10-31 — Integrated timer example six-model Direct acceptance
+
+The corrected c6e801cd image passes all six Direct system-services cases.
+Independent audit checks unchanged source/artifact/runner identities, original
+physical-input pixel gates, settled return and linked calls to the observer
+and actual example. /work/oct31-timer-example-integrated-v2/runtime-audited.json
+records six cases with complete=false; the same session 65071 now runs Stock.
+Full tracked/new-source formatting, Python/shell lint and strict docs pass.
+Temporary quality sources are removed. Stock/remote acceptance remains pending.
+
+## 2026-10-31 — Targeted retry after PR13 Runtime termination
+
+Runtime 41045608034 reached completed/failure. GitHub accepted a single-job
+retry of failed HP39gs hpgcc-format Stock job 124103093154 with HTTP 201;
+readback is queued. Original transfer/packet evidence remains retained.
+This is a diagnostic retry, not a claimed fix or milestone acceptance.
+PR14 full-job audit hit HTTP 502 twice; its prior audit is retained and no
+new acceptance or push follows this incomplete observation.
+
+## 2026-10-31 — Integrated timer HP39-family Stock acceptance
+
+The original v2 session 65071 completes HP39g+/HP39gs/HP40gs Stock.
+Independent runtime-audited.json now records nine cases: all six Direct plus
+three Stock, unchanged source/artifact/runner identities, original physical-input
+pixels and settled return. Full matrix remains incomplete; the same process
+continues HP48gII/HP49g+/HP50g. SDK documentation correction 2bc3ee69 passes
+strict docs and actual installed getting-started byte comparison (9539, exit 0).
+
+## 2026-10-31 — Complete integrated timer example matrix
+
+Session 65071 exits 0 after all six Direct and six Stock cases. The independent
+audit /work/oct31-timer-example-integrated-v2/runtime-audited.json records
+12 cases and complete=true, validates unchanged source/artifact/runner hashes,
+original input pixel gates and settled Stock return, and checks ARM calls to
+the C++ timer fixture, example observer and actual shipped example. Original
+failed console-selection evidence remains preserved. This completes the local
+integrated-example matrix, not remote acceptance or the broader M8.5 stage.
+
+## 2026-10-31 — Notebook public release instructions
+
+Local 26c78e2e corrects the installed README's stale native-persistence status
+and omitted HP49g+ Port 0 coverage, and supplies standalone model-specific
+CMake/launch instructions. app.c, store.c and export.c have no changes between
+recorded accepted 5959159a and current branch. The existing SDK gate covers
+all six model-specific Notebook builds; it was inspected, not rerun for prose.
+Historical run 39928737278 returns HTTP 404 on this audit: historical acceptance
+is retained from repository records, not represented as a fresh remote result.
+Whitespace validation passes. No runtime, hardware or milestone completion is
+claimed. Remaining M8.6 release gates include resource/error/Stock restoration
+and the retained independent-launcher evaluation. No push this turn.
+
+## 2026-11-04 — Notebook real-entry cleanup and ON regression
+
+Local 33a9206a executes the shipped main and actual UI/rendering/input code,
+with mocked device/storage services and link-wrapped allocations. Before the
+fix, ON at the initially focused text field emits CANCEL and main never exits;
+the bounded keyboard fixture fails after repeated ON events. Main now honors
+ON-down even when the UI emits a cancellation event. It performs no save.
+The test exercises all six model IDs/64- and 80-row layouts on the host, every
+allocation-failure position, display-begin/present and keyboard failures,
+timeout retry, normal ON return and immediate restart. All allocations and
+borrowed display ownership are released after each case. These are simulated
+services, not six calculator/emulator executions or complete native restoration.
+GCC 13 ASan/UBSan passes notebook_lifecycle, notebook_ui and notebook_store.
+Formatting/whitespace checks pass. Fresh ATfE 22.1 build of the actual HP39g+
+example and launcher passes: 45,128-byte payload and 1,048 static writable bytes,
+under /work/nov04-notebook-hp39gplus. Host build is /work/nov04-notebook-lifecycle.
+No new Stock/physical execution claimed. No push this turn. Parent Runtime
+41836305043 and object-mutation 41836338211 were confirmed queued at turn start.
+
+## 2026-11-04 — Actual Notebook entry target gate
+
+Local d849a22e adds notebook-entry to the maintained builder and six-model Stock
+matrix. It links shipped main/app/store/export, renaming main and wrapping
+display-present to capture the first frame and schedule GPIO ON scan 56 via
+the existing mailbox. Normal app return is required before PASS, followed by
+ordinary settled-Stock gates. Standard HP39g+ E2E application/launcher build
+passes (50,120-byte payload, 1,560 static writable bytes); eight matrix tests,
+ShellCheck, shell syntax, C format and whitespace checks pass. Maintained build
+/work/nov04-notebook-entry-gate has not yet run in an emulator.
+An earlier byte-checked copy of the actual example with the same observer is
+running Stock HP39g+ in session 92461. Do not restart: retain the watchdog.
+Logs/partial proof: /work/nov04-notebook-entry-stock; application/inputs:
+/work/nov04-notebook-entry. Identity and directory fetch pass, but no app
+PASS/return observed yet. Prior PR14 41bfa65d again passes seven workflows,
+337 successful jobs/one skip (nov04-notebook-prior-ci-14.json). No push.
+
+## 2026-11-04 — Notebook copied-entry Stock pass and maintained matrix
+
+Session 92461 is terminal: emulator/runtime/Stock gates pass with normal and
+settled return. The outer private aggregator then failed with KeyError because
+Stock JSON has no result field. No emulator was restarted. Independent audit
+checks actual status/saw_pass/returned/return_settled, input and artifact hashes,
+source equality, a disassembled call to notebook_application_main, focused blank
+editor pixels before GPIO ON, and retained return frame. Evidence:
+/work/nov04-notebook-entry-stock/independent-audit.json. Failed original aggregate
+is retained. This proves the copied actual entry on HP39g+ original-ROM emulator,
+not the maintained fixture binary or physical hardware.
+Local ca3da6cc adds a reusable verifier to notebook-entry. It validates title,
+input prompt and focused empty editor, tolerates only the known 131/132-column
+capture geometry, and requires settled Stock return. Retained actual pixels pass;
+blank image, missing image and nonreturned report are rejected in temporary
+copies. Originals are unchanged. Eight runtime-plan tests and Ruff pass.
+Maintained six-model Stock matrix is live in session 35941, starting HP39g+.
+Script: research/nov04-notebook-entry-matrix.py. Evidence/logs:
+/work/nov04-notebook-entry-matrix. Builds and runs are serial, inputs/artifacts
+are hashed and checked around each case. Do not restart this process; re-poll
+the same session or inspect its authoritative process state. No push this turn.
+
+## 2026-11-04 — Branch documentation and Notebook entry gates
+
+PR #13 head 92a09d6b: seven queued workflows, one success, one failure.
+Documentation job 126596148899 has no steps; annotations explicitly reject
+branch deployment under Pages protection. Local 5bc78efd splits strict builds
+from main-only deployment and scopes concurrency by ref. Actionlint and clean
+strict Zensical build pass; not pushed. PR #28 head 92e9e897 has two successful
+and nine queued workflows (18 successful/134 queued jobs). Audits:
+research/nov04-followup-ci-{13,28}.json. No acceptance claimed.
+
+Maintained Notebook matrix session 35941 passes HP39g+ pixel/return checks
+and continues on HP39gs. Independent readback confirms report SHA-256 and
+status/pass/returned/settled flags. Evidence:
+/work/nov04-notebook-entry-matrix/verified.json. Other models remain open.
+
+## 2026-11-04 — Notebook optional-service lifecycle coverage
+
+Local 246a5a66 runs the shipped entry point across six model IDs and three
+service configurations: unavailable ports/files, read-only ports, and writable
+ports plus file export. Available-port cases load NOTEBOOK_CAPACITY minus one
+characters. Each configuration injects every allocation failure and checks
+zero live allocations/display ownership, followed by healthy restart; display
+begin/present, keyboard failure, and retryable display timeout remain covered.
+GCC ASan/UBSan notebook_lifecycle, notebook_ui and notebook_store all pass;
+clang-format and whitespace checks pass. This is host lifecycle evidence,
+not hardware or whole-stage resource acceptance. The maintained Stock matrix
+continues unchanged in session 35941. Commit not pushed.
 ## 2026-10-31 — Execution-reference provenance through stack transfers
 
 Local 8ae25d33 extends the launcher collector through RSTK=C and C=RSTK.
@@ -4046,6 +4500,40 @@ after native and native-new-message passed. Preserve its saved state at
 Model-specific session 57322 continues and has passed the first four native
 cases; this does not qualify the universal failure.
 
+
+### 2026-11-04 Notebook sustained-edit lifecycle
+
+Local e18f76a1 extends the shipped-entry lifecycle test with 256 key taps:
+191 accepted bytes followed by capacity rejection, then normal ON exit and
+restart. All six model IDs and three service profiles pass GCC ASan/UBSan.
+The observer forwards to the real update function and checks retained text;
+wrapped malloc/calloc attempts remain unchanged after the first frame.
+This is host input/render/cleanup evidence with mocked device/storage services,
+not ARM heap/stack peak measurement or whole M8.6 acceptance. Format and diff
+checks pass. Existing submitted e7a2cfb0 CI remains queued; follow-up not pushed.
+
+The packed-snapshot universal candidate and dynamic-table focused candidate
+both ended in Stock-return verification failures. They remain experimental.
+Model-specific c4058b46 completed HP50g; HP49g+ session 57322 remains live.
+
+
+### 2026-11-04 Notebook ARM resource observation in progress
+
+The maintained entry fixture now observes allocator-reserved heap high water
+and touched-stack words through runtime cleanup. It preserves the focused
+editor pixel and settled Stock-return gates. The verifier rejects missing
+reports, invalid schema and exceeded bounds; ten synthetic negative cases pass.
+HP39g+ ARM build, packaging and Stock startup/ON return pass. Independent
+audit binds inputs/artifacts/report hashes and heap capacity to the HPC1 static
+size: touched stack 1544/8192, reserved heap peak 9460/43432, RW 57344 bytes.
+Audit: /work/nov04-notebook-resources-matrix/independent-resource-audit.json
+(reproducer research/nov04-notebook-resource-audit.py). Five models remain;
+Stock six-model run 33829 is live, not accepted. Output: /work/nov04-notebook-resources-matrix. This startup/ON workload
+does not cover save/export peaks, untouched stack reservations or total launcher
+RAM. An initial build stopped because LTO emitted the wrapped real startup as
+a valid weak definition; build-e2e.sh now accepts T or W defined startup symbols.
+Follow-up source remains local; Python verifier formatting is still to be
+normalized after the active input-hash-checked run finishes.
 ## 2026-11-04 — Rollback snapshot candidate
 
 The universal native-missing-message saved state has marker 0x46410005,
@@ -4093,6 +4581,161 @@ when LTO wraps hpclang_start. Its instrumented HP39g+ build/Stock gate passes;
 the change is local and unpushed. Remaining Notebook model runs continue.
 
 
+### 2026-11-04 Current filesystem SDK and Direct validation
+
+PR19 6a905dfa passes a fresh source-SDK installation, both pinned original
+HPGCC2 applications and all six launcher packages. The temporary SDK was
+removed after building. Inputs/build report: /work/nov04-fsystem-current-sdk.
+Three application HPC payloads match earlier native evidence; launcher binaries
+differ, so current runtime checks are required. Both HP49g+/HP50g Direct cases
+pass settled return and independent packaged-font console pixels. Current Stock
+cases are running in /work/nov04-fsystem-native (session 8642); no full current
+acceptance. The first private driver selected the wrong Direct font; after its
+terminal verifier failure, the correct newrpl_font6_menus.S was used to replay
+retained pixels without rerunning the completed application.
+
+Notebook resource matrix now independently verifies HP39g+/HP39gs/HP40gs
+(touched stack 1544, reserved heap peak 9460 bytes each) and HP48gII
+(touched stack 1904, reserved heap peak 9924 bytes). Two models remain. This
+is the startup/ON workload only; the existing independent-resource-audit.json
+records artifact identities and each actual RW/heap capacity.
+
+
+### 2026-11-04 Notebook resources and original filesystem matrices complete locally
+
+Notebook startup/ON resource/pixel/settled-return gates pass all six Stock models.
+Independent audit: /work/nov04-notebook-resources-matrix/independent-resource-audit.json.
+Touched-stack/allocator-reserved heap peaks are 1544/9460 bytes on HP39 models,
+1904/9924 on HP48gII, and 1912/13660 on HP49g+/HP50g. Observations include
+test instrumentation; save/export peaks, untouched stack reservations, native
+firmware and launcher RAM remain outside this workload. Verifier formatting
+after the sealed run preserves its Python AST; original verifier and both hashes
+are retained in research/nov04-notebook-{validated-verifier.py,format-equivalence.json}.
+Resource verifier negatives, ARM static analysis and source format/lint pass.
+
+PR19 current installed SDK passes both original source builds and six-model
+packaging. Both HP49g+/HP50g Direct and Stock executions pass, with independent
+22-frame console checks, settled returns and raw Stock FAT inspection. Audit:
+/work/nov04-fsystem-native/independent-audit.json; script
+research/nov04-fsystem-final-audit.py. Current-head CI remains pending; these
+results do not complete M8.4 or establish physical-device behavior.
+
+
+### 2026-11-04 — Notebook main-loop persistence interaction
+
+Local commit `3319087c` extends the shipped-entry lifecycle gate through actual keyboard events: type, save, edit again, reload the saved text, and exit. A separate ENOSPC case preserves the edit and succeeds on retry. All six model IDs and three service profiles pass the existing GCC ASan/UBSan build, with zero owned resources after exit and no added main-loop allocations. Storage calls are mocked: this proves interaction/error handling, not calculator persistence or save/export resource peaks. The commit is local; remote PR #14 remains `d2f1ba36`.
+
+
+### 2026-11-05 — Notebook persistence resource matrix complete locally
+
+All six Stock models pass initial save, replacement and reload/cleanup across
+three launches each. Independent replay verifies sealed source/artifact hashes,
+all 18 content frames and settled returns, and resource reports against the HPC1
+header and launcher memory layout. Evidence:
+`/work/nov04-notebook-persistence-resources/independent-persistence-audit.json`.
+Maximum touched stack / allocator-reserved heap are 2504 / 9476 bytes for HP39
+models, 6456 / 9988 for HP48gII, and 6464 / 12412 for HP49g+/HP50g, within
+the configured 8192-byte stack and each package's heap capacity.
+These measurements include instrumentation and cover the persistence fixture;
+they do not measure the shipped keyboard loop, export/backup peaks, untouched
+stack reservations, firmware/launcher RAM or physical hardware. The separate
+shipped-entry keyboard/ENOSPC sanitizer gate remains complementary evidence.
+Current remote CI and broader M8.6 acceptance remain pending.
+
+### 2026-11-04 — Independent checkpoints across Stock relaunches
+
+Notebook persistence resource instrumentation builds on HP48gII. Its initial run saves and returns normally; relaunch phase 1 replaces the note and reaches PASS, then the memory observer fails because stock-lifecycle.py inherited the initial frame prefix. Exclusive report creation correctly rejects overwriting the initial measurement. Local `cd8b1a11` assigns a separate frame prefix to every relaunch. Seven lifecycle tests pass, including exclusive-create checks for all three families; Ruff passes. The complete suite ran against a normalized container copy because Windows checkout CRLF breaks the unchanged sourced shell helper. Failed state, outputs and hashes remain under `/work/nov04-notebook-persistence-resources/failed-hp48gii`, `failed-artifacts.json`, `failed-inputs.json` and `failed-stock.log`. Terminal session 75078 is superseded by corrected run 10531. Six-model persistence-resource acceptance remains pending. Independent audit script `research/nov04-notebook-persistence-audit.py` checks all three launches and explicitly excludes physical hardware and unmeasured export/backup workloads. No new remote push.
+
+
+### 2026-11-05 — Notebook export resources and backup stack diagnosis
+
+The unsubmitted SD export candidate completes HP49g+/HP50g Stock execution,
+two launches per model. Maintained gates verify maximum-length output,
+overwrite refusal, retained raw FAT fixtures, viewport pixels and settled
+return. Independent input/artifact identity and resource-bound checks pass:
+maximum touched stack 6608/8192 bytes and reserved heap 12412 bytes.
+Evidence: `/work/nov05-notebook-export-resources/verified.json` and
+`resource-result-audit.json`. This is local validation, not CI acceptance.
+
+The exact failed HP48gII Port0 backup binary returns successfully with an
+SP-observing emulator, but its translated application stack reaches 9432 bytes,
+1240 bytes beyond the configured budget. The minimum occurs at the push in
+`hpclang_rpl_stock_memory_read` (0x0122ab54); this identifies a deepest observed
+callee, not the responsible caller or full call chain. Input hashes match.
+Evidence: `/work/nov05-backup-stack-diagnostic/diagnostic.json` and original
+`initial-sp.jsonl`. The first diagnostic postprocessor incorrectly expected
+runtime RW size in static launcher metadata; the report was recovered from
+the captured runtime resource words without repeating the execution.
+Budget and acceptance remain unchanged; backup stack diagnosis is open.
+
+
+### 2026-11-05 — Backup branch workspace candidate
+
+The exact failing application reproduces 9432 bytes of translated stack use
+with descending-SP attribution. The observation retains outstanding descending
+assignments, not a symbolic call-stack unwind: equal-SP returns may replace an
+allocation's PC. The save_note prologue independently confirms its large frame
+(1940 bytes excluding saved registers); Port0 write/apply and nested directory
+validation contribute further live frames. Evidence:
+`/work/nov05-stack-chain/run/chain-audit.json` and disassembly of its sealed ELF.
+The temporary observer's pop/reuse/deepest retention assertions pass.
+
+The candidate keeps HOME/aplet mutation workspace in a separate noinline helper,
+so LTO cannot reserve it throughout Port backup. Existing notebook_store tests
+pass GCC ASan/UBSan with warnings as errors. The unchanged six-model resource
+matrix is active at `/work/nov05-backup-frame-resources` (session 75146).
+No runtime improvement or milestone completion is claimed yet. The preceding
+export proof remains tied to its prior source hashes; the store change requires
+fresh export regression before submission.
+
+PR28 exact 92e9e897 CI observation completed after a GitHub 502 retry with
+smaller job-list pages: 9 successful/2 queued workflows; 365 successful,
+2 skipped, 14 queued and 3 running jobs. No reported failure, no merge.
+
+
+### 2026-11-05 — HP48gII workspace separation runtime result
+
+The changed Notebook passes HP48gII maximum-length Port0 backup/restore/removal,
+three-launch persistence, viewport and settled-return/resource gates. First
+launch reports touched stack 7744/8192 and heap 10396/27136 bytes, compared with
+the old saturated watermark and independently observed 9432-byte SP depth.
+Heap consumption is unchanged. Post-LTO save_note local allocation drops from
+1940 to 252 bytes; HOME/aplet workspace now belongs to its separate helper.
+Evidence: `/work/nov05-backup-frame-resources/verified.json` and per-launch
+resource reports. Remaining models and independent audits are not yet complete.
+
+The 448-byte measured stack margin motivates an exact-SP confirmation using
+the same new binary, at `/work/nov05-backup-frame-sp` (71515). Export regression
+for the changed store source is running at `/work/nov05-export-frame-resources`
+(77182). No new CI submission or milestone acceptance is claimed.
+
+
+The follow-up exact-binary HP48gII SP observation confirms 7744 bytes against
+8192 configured, matching the watermark and reducing the prior depth by 1688.
+`/work/nov05-backup-frame-sp/independent-audit.json` checks unchanged inputs,
+identity with the matrix ELF, return success and agreement with resource words.
+This establishes the exercised application path, not arbitrary nesting/hardware.
+HP49g+ also passes all three launches at 7752/5912/3664 stack bytes, with first
+launch heap 14220/241408. Remaining four models continue in the same matrix.
+Changed C formatting, export verifier Ruff checks and strict docs pass; Ruff's
+initial read-only cache setup failure was resolved using --no-cache.
+
+
+### 2026-11-05 — Changed-store export regression complete
+
+Both HP49g+/HP50g export cases pass two Stock launches each after workspace
+separation, including maximum-length output, overwrite refusal, raw-card retained
+files, pixels and settled return. Independent source/artifact hashes and resource
+bounds pass: touched stack 6640 then 3936, heap 12412 bytes on both models.
+Evidence: `/work/nov05-export-frame-resources/independent-audit.json` and
+`verified.json`. This supersedes the preceding-source export result for this
+candidate; runtime/resource acceptance remains local and unsubmitted.
+
+HP50g backup/persistence also passes all three launches, at stack depths
+7752/5912/3664 bytes and heap reservations 14220/13812/13812 bytes. The same
+matrix continues HP39g+/HP39gs/HP40gs capability and persistence regressions.
+PR28 remains unaccepted: 9 successful/2 queued workflows, 376 successful,
+2 skipped, 2 running and 4 queued jobs, with no reported failure.
 ### 2026-11-04 — Fresh universal HP50g relocation result
 
 Local `23a49bbc` completes HP50g fresh Stock verification with the shared universal binary: 88 basic reference/control cases and all 14 native/call scenarios. `research/nov04-universal-relocation-audit.py` independently replays 19 retained execution states, checks source/artifact/report hashes and reproduces the maintained result. Evidence: `/work/nov04-packed-snapshot/cache-fixed-stock/independent-audit.json`; `complete` remains false until HP49g+ finishes. Session 25166 is now running HP49g+. No push, public-library acceptance or full M8.0 completion is claimed.
@@ -4146,6 +4789,50 @@ No unsupported instruction was skipped or new mutation authorization enabled.
 PR #26 latest audit: nine successful workflows/one running, 371 successful jobs,
 one skip/one running; evidence `research/nov05-native-followup-ci-26.json`.
 
+## 2026-11-05 — Native branch accepted, migration transfer failure and interrupted matrix
+
+PR #26 head 4571d52c passes twelve workflows, 390 jobs and two intentional skips,
+then merges as 26140e1d. Evidence: research/nov05-resumed-ci-26.json. The merge
+does not complete production memory-origin discovery, public library/Port1
+operations or Port2 installation/authority/startup/reclamation.
+
+PR #27 head 54b5291f has ten successful workflows and one failed workflow,
+379 successful jobs, one skip and failed job 126971037182. HP40gs hpgcc-format
+fails before application entry: directory fetch completes, payload ACK progress
+stops for 90 seconds at sequence 0 with three NAKs/six resends. All 437 captured
+data/ACK/NAK frame checks pass. A receiver Timeout error frame is retained
+separately; this does not establish delivery or the root cause. Artifacts:
+research/nov05-pr27-hp40-format; packet report:
+research/nov05-pr27-hp40-format-packet-audit.json. No blind retry requested.
+
+Docker reports container exit 255 at 2026-11-05 10:53:49 UTC, OOMKilled=false.
+Only after terminal confirmation was the original container started again.
+No original child process survived. HP39g+ saved reports show all three Stock
+launches and settled returns; the maintained verifier passes after restart,
+including pixels/persistence and touched stacks 2504/2504/2224 of 8192 bytes.
+The source-input hash seal is checked before resume. HP39g+ artifact hashes
+were not persisted before interruption, so recovery explicitly records that
+they are captured after restart rather than claiming pre/post identity.
+research/nov05-backup-resume.py preserves earlier models and resumes only
+HP39gs/HP40gs in the existing output tree, with a one-run marker. Complete
+six-model acceptance still requires the remaining results and independent audit.
+
+## 2026-11-05 — Origin repair draft submitted and five-model Notebook audit
+
+Draft PR #31 submits e3e467b2, incorporating the maintained origin-repair gate
+and accepted main 26140e1d. Prior pushed parent 4571d52c was audited before
+submission: all twelve workflows pass, 390 successful jobs and two intentional
+skips. No new-head CI inspection in the push turn. The maintained private-ROM
+gates pass 32 baseline/move, 16 origin-plan and 40 omission cases per model,
+plus ten altered-input rejections. Strict docs, Ruff and formatting pass.
+Evidence: /work/nov05-maintained-origin-repair; source planning evidence remains
+under /work/nov05-origin-plan. Production discovery and M8.0 stay open.
+
+Notebook resume completes HP39gs. Independent audit now covers HP48gII,
+HP49g+, HP50g, HP39g+ and HP39gs (fifteen launches), retaining HP39g+'s
+post-restart artifact-hash qualification in the output. The report remains
+complete=false while HP40gs runs in the existing resumed matrix. Evidence:
+/work/nov05-backup-frame-resources/independent-persistence-audit.json.
 ### 2026-11-05 — Interrupted toolchain download regression
 
 The composite action curl arguments were exercised against a local HTTP server
@@ -4279,3 +4966,98 @@ FIFO read, with no observed unread clear/discard. Intermediate byte values are
 not individually logged, and this does not prove successful delivery to the
 firmware Kermit parser. Evidence: /work/nov05-pr27-usb-replay/replay.json,
 run.log and usb-out-accounting.json. No transport fix or CI acceptance claimed.
+
+## 2026-11-05 — Notebook current-parent integration and fresh export acceptance
+
+Local merge 3ce8acb0 integrates parent e8ad129f and current native foundations.
+Only roadmap/history required conflict resolution. Fresh export on HP49g+ and
+HP50g completes both launches per model. Independent audit rechecks sealed
+source/application inputs and artifacts, pixels, resource observations and
+settled return; maintained execution also checks the raw SD card and fixtures.
+Evidence: /work/nov05-notebook-parent-export/independent-audit.json.
+Observed stack use is 6656/8192 bytes on export and 3944/8192 on relaunch;
+reserved heap is 12412 bytes. These measurements cover the instrumented fixture,
+not all firmware/launcher reservations or physical hardware.
+
+25 resource/lifecycle/stack observer tests pass in the container with LF shell
+files; strict host documentation build passes. Initial direct-mount lifecycle
+test failed on Windows CRLF; first isolated copies lacked fixture dependencies.
+The complete fixture copy passes, with no production source change. Evidence:
+/work/nov05-parent-python-checks/result.log. Six-model backup and C/C++ sanitizer
+processes remain live at this checkpoint. Candidate remains unpushed; old
+HP40gs pre-entry USB CI failure and broader M8 acceptance are still open.
+
+## 2026-11-05 — Notebook retained-card and partial persistence recheck
+
+Local merge 3ce8acb0 integrates parent e8ad129f and current native foundations.
+Only roadmap/history required conflict resolution. Fresh export on HP49g+ and
+HP50g completes both launches per model. Independent audit rechecks sealed
+source/application inputs and artifacts, pixels, resource observations and
+settled return; maintained execution also checks the raw SD card and fixtures.
+Evidence: /work/nov05-notebook-parent-export/independent-audit.json.
+Observed stack use is 6656/8192 bytes on export and 3944/8192 on relaunch;
+reserved heap is 12412 bytes. These measurements cover the instrumented fixture,
+not all firmware/launcher reservations or physical hardware.
+
+The partial persistence audit covers HP48gII and HP49g+ only (six launches); its complete flag remains false. Export audit now independently re-reads both retained raw cards against the sealed manifests and records card hashes. Both UTF-8 output, maximum-length output and preserved KEEP.TXT match exactly. No fixture execution was repeated for this read-only audit.
+
+25 resource/lifecycle/stack observer tests pass in the container with LF shell
+files; strict host documentation build passes. Initial direct-mount lifecycle
+test failed on Windows CRLF; first isolated copies lacked fixture dependencies.
+The complete fixture copy passes, with no production source change. Evidence:
+/work/nov05-parent-python-checks/result.log. Six-model backup and C/C++ sanitizer
+processes remain live at this checkpoint. Candidate remains unpushed; old
+HP40gs pre-entry USB CI failure and broader M8 acceptance are still open.
+
+## 2026-11-05 — Data-instruction value/origin evaluation
+
+Local 17b7f6be adds an internal C evaluator for inspected literals, assignments,
+exchanges, memory loads and D0/D1 adjustments. Values and origins advance
+together; failed reads/token resolution preserve all output state. Stores and
+control transfers remain unsupported. Computed next-PC captures have unknown
+origins rather than pretending to name encoded literal cells. Address uses,
+mapping guards and path ownership remain the collector's responsibility.
+
+New tests cover data-source propagation, each failed load/token position,
+whole-register copies and zeroing, wrapped 16-nibble literal loads, next-PC
+capture, address overflow/carry and bounds. The full rpl_code unit executable
+passes GCC ASan/UBSan; ARMv4T compilation and Clang static analysis pass.
+Independent comparison with captured original HP49g+/HP50g interpreter states
+matches 30 supported data steps, including origins and instruction lengths.
+This comparison seeds each instruction from its recorded incoming state; it
+does not yet prove an autonomous whole-path walker or production integration.
+Evidence: /work/nov05-data-step/entry-data-steps.json and analysis.plist;
+reproducer: research/nov05-data-step-trace.py. Follow-up remains unpushed while
+the previous PR #31 CI runs.
+
+Separately, Notebook integration 3ce8acb0 passes all 172 C/C++ ASan/UBSan tests
+in /work/nov05-notebook-parent-unit/run.log. Python tooling is separate (25
+focused tests previously passed). Six-model persistence/backup remains active;
+no all-model completion is inferred from the completed subset.
+
+## 2026-11-05 — Integrated Notebook six-model acceptance
+
+Integration 3ce8acb0 passes all six Stock persistence/backup cases (18 launches)
+and the complete independent input/artifact/pixel/return/resource audit:
+/work/nov05-notebook-parent-backup/independent-persistence-audit.json. Artifacts
+were sealed before each execution, including HP39g+; no restart qualification
+is needed for this new run. Peak touched stack is 7760/8192 on HP48gII,
+7768/8192 on HP49g+/HP50g, and 2520/8192 on HP39 models. Backup at maximum note
+length is included where supported. Instrumented fixture coverage does not
+prove all shipped-loop paths, firmware/launcher reservations or hardware.
+
+Two-model SD export passes four launches and independent retained raw-card
+checks, including exact UTF-8, maximum-length output and preserved KEEP.TXT.
+All 172 C/C++ ASan/UBSan tests, 25 focused Python tests and strict docs pass.
+Before delivery, exact previous head 3312be9c still has one failed HP40gs
+system-services USB transfer before app entry; no transport fix is claimed.
+The changed, freshly tested integration is a new delivery, not a blind retry
+or proof that the historical transport failure is resolved.
+
+M8.0 local 4b325099 adds explicit decimal mode, SETHEX/SETDEC and D.A increment.
+Original-ROM probes on both models confirm mode-dependent arithmetic and the
+mode field at CPU+0x974. Nondecimal digits in decimal arithmetic are unsupported.
+Sanitizer/ARM compile/analysis pass; C-evaluated single-seed paths still match
+21 instructions per model, now also comparing decimal mode. Python organizes
+the loop and token ownership; production integration remains open. Evidence:
+/work/nov05-data-step/arithmetic-mode.json and c-evaluated-path.json.
