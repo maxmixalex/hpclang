@@ -3236,3 +3236,53 @@ Local `23a49bbc` completes HP50g fresh Stock verification with the shared univer
 Local source `23a49bbc` passes complete fresh Stock matrices on HP50g and HP49g+: 88 basic checks, 14 native/call scenarios and 19 saved executions per model. Independent replay reproduces both maintained results with source, artifact, report and saved-state hashes; `/work/nov04-packed-snapshot/cache-fixed-stock/independent-audit.json` now has `complete: true`. The first full-audit attempt encountered the prior partial-audit directory; the audit now uses a temporary directory and removes it after success. No emulator rerun or weakened check was needed.
 
 All four pending source files match the immutable tested snapshot after checkout-newline normalization (`research/nov05-relocation-delivery-source-identity.json`). ARM build/analysis, formatting, Ruff and strict documentation pass. The exact preceding remote 73f8e515 still has ten successful/two failed workflows, 386 successful/four failed/two skipped jobs; failures are the identified fresh-baseline catalog-plan allocation problem. Evidence: `research/nov04-pr26-pre-delivery-ci-26.json`. Fresh remote acceptance and remaining execution-origin/public Port1/library/Port2 requirements are separate.
+
+
+### 2026-11-05 — Toolchain connection-reset retry coverage
+
+CI job 126801298575 terminated on curl 56 during ATfE download before tests.
+The local composite action adds --retry-all-errors to the existing three-retry,
+two-second-delay command; curl still fails after exhaustion and extraction only
+follows successful download. Downloads use a temporary output file and cleanup
+trap. YAML parsing and whitespace checks pass; the existing curl CLI confirms
+the option. This candidate is unpushed and not a claimed network-recovery test.
+The prior-head targeted retry is running creation tests (126957988835).
+
+Publisher retries in #19/#27 were again cancelled without a code failure;
+annotations repeat the higher-priority waiting publisher reason. No repeated
+retry loop was started. Docker observations still fail; no original process
+restart or new local runtime acceptance is claimed.
+
+## 2026-11-05 — Container recovery, Notebook audit and migration submission
+
+Docker API became accessible without a restart. The original Notebook matrix
+PID 42348 remains live and progressed through HP39g+ compilation into emulator
+execution; the earlier client handle completed but did not imply guest exit.
+Independent replay of the completed HP48gII/HP49g+/HP50g cases validates all
+nine launches, source/artifact identity, pixels, settled return and resource
+budgets. Highest touched stack is 7744/7752/7752 of 8192 bytes respectively.
+The report remains partial (`complete: false`):
+`/work/nov05-backup-frame-resources/independent-persistence-audit.json`.
+
+Migration integration `54b5291f` was pushed after auditing the previous exact
+head: nine successful workflows, 372 successful jobs, one skip and one publisher
+cancelled by the higher-priority queue rule before runner assignment. Seven
+migration tests and Ruff pass inside the development container; strict host
+documentation passes. New CI is submitted, not inspected in the push turn.
+M8.5 is not accepted complete.
+
+M8.0 source review confirms that stage execution-root output currently names
+initial stack/A/C cells, while the captured GETPTR/dispatch path needs memory
+source fields and their mapping/dependency guards. The existing origin
+descriptors and captured-path experiment are not yet production integration.
+No unsupported instruction was skipped or new mutation authorization enabled.
+PR #26 latest audit: nine successful workflows/one running, 371 successful jobs,
+one skip/one running; evidence `research/nov05-native-followup-ci-26.json`.
+
+### 2026-11-05 — Interrupted toolchain download regression
+
+The composite action curl arguments were exercised against a local HTTP server
+inside the development container. The control terminates with curl 18 after
+one truncated response; --retry-all-errors performs a second request and
+produces byte-exact content. This tests interrupted-body recovery, not the
+original CI curl 56 network path. Report: /work/nov05-atfe-retry-check.json.
