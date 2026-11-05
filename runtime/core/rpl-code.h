@@ -271,6 +271,51 @@ int hpclang_rpl_code_data_step(const struct hpclang_rpl_reader *instructions,
                                struct hpclang_rpl_code_origins *origins,
                                hpclang_rpl_code_token_fn token, void *context, uint32_t *length);
 
+struct hpclang_rpl_code_execution
+{
+    struct hpclang_rpl_code_values values;
+    struct hpclang_rpl_code_origins origins;
+    struct hpclang_rpl_code_control control;
+};
+
+enum hpclang_rpl_code_use_kind
+{
+    HPCLANG_RPL_CODE_USE_LOAD_ADDRESS = 1,
+    HPCLANG_RPL_CODE_USE_REGISTER_TARGET,
+    HPCLANG_RPL_CODE_USE_MEMORY_TARGET,
+    HPCLANG_RPL_CODE_USE_RETURN_TARGET
+};
+
+struct hpclang_rpl_code_address_use
+{
+    uint32_t kind, value, origins[5];
+};
+
+struct hpclang_rpl_code_step_uses
+{
+    uint32_t count, has_branch;
+    struct hpclang_rpl_code_address_use addresses[2];
+    struct hpclang_rpl_code_branch branch;
+};
+
+/* One C step combining the data/control evaluators with register/indirect PC
+ * transfers, PC exchanges and C/RSTK transfers. values.carry and control.carry
+ * describe the same state and must agree. Emit the five source tokens of every
+ * consumed load address, register jump target, indirect-memory target or return.
+ * Copies alone emit no use. Direct encoded operands are described by branch,
+ * not misrepresented as copied address digits. Computed PC origins stay unknown.
+ * The caller qualifies entry, memory mappings, tokens and instruction boundaries,
+ * guards all reads, limits the walk and rejects unsupported instructions. A zero
+ * origin does not authorize an unguarded repair. This is a private simulation,
+ * not native mutation, complete reference closure or an installation permission.
+ * State and uses are disjoint; callbacks/readers are pure and may not alter them.
+ * Errors leave both outputs unchanged; discard callback observations on failure. */
+int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instructions,
+                                    const struct hpclang_rpl_reader *data, uint32_t limit,
+                                    struct hpclang_rpl_code_execution *state,
+                                    hpclang_rpl_code_token_fn token, void *context,
+                                    struct hpclang_rpl_code_step_uses *uses);
+
 struct hpclang_rpl_code_origin_cell
 {
     uint32_t mapping, field, expected;

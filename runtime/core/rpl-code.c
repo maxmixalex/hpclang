@@ -155,6 +155,139 @@ done:
     return 0;
 }
 
+static void execution_use(struct hpclang_rpl_code_step_uses *uses, unsigned kind, uint32_t value,
+                          const uint32_t *origins)
+{
+    struct hpclang_rpl_code_address_use *use = &uses->addresses[uses->count++];
+    use->kind = kind;
+    use->value = value;
+    for (unsigned i = 0; i < 5; ++i)
+        use->origins[i] = origins[i];
+}
+
+int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instructions,
+                                    const struct hpclang_rpl_reader *data, uint32_t limit,
+                                    struct hpclang_rpl_code_execution *state,
+                                    hpclang_rpl_code_token_fn token, void *context,
+                                    struct hpclang_rpl_code_step_uses *uses)
+{
+    if (!state || !uses || !token)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (state->values.carry != state->control.carry || state->control.cursor >= 8)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_code_execution next = *state;
+    struct hpclang_rpl_code_step_uses observed = {0};
+    uint32_t pc = next.control.pc, length;
+    int result = hpclang_rpl_code_data_step(instructions, data, pc, limit, &next.values,
+                                            &next.origins, token, context, &length);
+    if (!result) {
+        struct hpclang_rpl_code_memory memory;
+        int load = hpclang_rpl_code_memory_inspect(
+            instructions, pc, limit, (unsigned)state->values.registers[HPCLANG_RPL_CODE_P],
+            &memory);
+        if (!load)
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_LOAD_ADDRESS,
+                          (uint32_t)state->values.registers[memory.address],
+                          state->origins.registers[memory.address]);
+        else if (load != HPCLANG_RPL_SPAN_UNSUPPORTED)
+            return load;
+        next.control.pc = (pc + length) & 0xfffffu;
+        next.control.carry = next.values.carry;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    uint32_t opcode;
+    result = read_word(instructions, pc, 2, &opcode);
+    if (result)
+        return result;
+    if (opcode == 0x60 || opcode == 0x70) {
+        unsigned slot = next.control.cursor;
+        uint32_t *reg = next.origins.registers[HPCLANG_RPL_CODE_C];
+        if (opcode == 0x60) {
+            next.control.stack[slot] =
+                (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C] & 0xfffffu;
+            for (unsigned i = 0; i < 5; ++i)
+                next.control.stack_origins[slot][i] = reg[i];
+            next.control.cursor = (slot + 1) & 7u;
+        } else {
+            slot = (slot + 7) & 7u;
+            next.values.registers[HPCLANG_RPL_CODE_C] =
+                (next.values.registers[HPCLANG_RPL_CODE_C] & ~UINT64_C(0xfffff)) |
+                (next.control.stack[slot] & 0xfffffu);
+            for (unsigned i = 0; i < 5; ++i) {
+                reg[i] = next.control.stack_origins[slot][i];
+                next.control.stack_origins[slot][i] = 0;
+            }
+            next.control.stack[slot] = 0;
+            next.control.cursor = slot;
+        }
+        next.control.pc = (pc + 2) & 0xfffffu;
+        goto done;
+    }
+    struct hpclang_rpl_code_pc_exchange exchange;
+    result = HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (opcode == 0x18)
+        result = hpclang_rpl_code_pc_exchange_inspect(
+            instructions, pc, limit, (uint32_t)next.values.registers[HPCLANG_RPL_CODE_A],
+            (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C], &exchange);
+    if (!result) {
+        unsigned reg = exchange.capture.destination;
+        execution_use(&observed, HPCLANG_RPL_CODE_USE_REGISTER_TARGET, exchange.target,
+                      next.origins.registers[reg]);
+        next.values.registers[reg] =
+            (next.values.registers[reg] & ~UINT64_C(0xfffff)) | exchange.capture.constant;
+        for (unsigned i = 0; i < 5; ++i)
+            next.origins.registers[reg][i] = 0;
+        next.control.pc = exchange.target;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    struct hpclang_rpl_code_indirect jump;
+    if (opcode == 0x18 || opcode == 0x08)
+        result = hpclang_rpl_code_indirect_inspect(
+            instructions, data, pc, limit, (uint32_t)next.values.registers[HPCLANG_RPL_CODE_A],
+            (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C], &jump);
+    if (!result) {
+        unsigned reg = jump.register_c ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A;
+        execution_use(&observed, HPCLANG_RPL_CODE_USE_REGISTER_TARGET, jump.register_value,
+                      next.origins.registers[reg]);
+        if (jump.via_memory) {
+            uint32_t origins[5] = {0};
+            for (unsigned i = 0; i < 5; ++i) {
+                result = token(context, 1, jump.register_value + i,
+                               (uint8_t)((jump.target >> (4 * i)) & 15u), &origins[i]);
+                if (result)
+                    return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            }
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, jump.target, origins);
+        }
+        next.control.pc = jump.target;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    struct hpclang_rpl_code_return_use returned;
+    result = hpclang_rpl_code_control_step(instructions, limit, &next.control, &returned);
+    if (result)
+        return result;
+    next.values.carry = next.control.carry;
+    if (returned.present)
+        execution_use(&observed, HPCLANG_RPL_CODE_USE_RETURN_TARGET, returned.target,
+                      returned.origins);
+    else {
+        result = hpclang_rpl_code_branch_inspect(instructions, pc, limit, &observed.branch);
+        if (result && result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+            return result;
+        observed.has_branch = result == 0;
+    }
+done:
+    *state = next;
+    *uses = observed;
+    return 0;
+}
+
 int hpclang_rpl_code_origins_plan(const uint32_t *tokens, uint32_t current, uint32_t replacement,
                                   hpclang_rpl_code_origin_resolve_fn resolve, void *context,
                                   struct hpclang_rpl_reference_edit *edits, unsigned *count)

@@ -265,6 +265,94 @@ static void arithmetic_modes(void)
         }
 }
 
+static void execution_steps(void)
+{
+    struct image code = {.size = 128, .fail = UINT32_MAX};
+    struct image memory = {.address = 0x18000, .size = 128, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+    const struct hpclang_rpl_reader data = {read_nibble, &memory};
+    struct hpclang_rpl_code_execution state = {0};
+    seed_origins(&state.origins);
+    state.values.registers[HPCLANG_RPL_CODE_D1] = memory.address;
+    encode(&code, 0, 3, 0x741); /* C=DAT1.A, then PC=(C). */
+    encode(&code, 3, 4, 0xe808);
+    encode(&memory, 0, 5, 0x18010);
+    encode(&memory, 16, 5, 0x94000);
+    struct hpclang_rpl_code_step_uses uses;
+    assert(!hpclang_rpl_code_execution_step(&instructions, &data, 128, &state, data_token, NULL,
+                                            &uses));
+    assert(state.control.pc == 3 && state.values.registers[HPCLANG_RPL_CODE_C] == 0x18010);
+    assert(uses.count == 1 && !uses.has_branch);
+    assert(uses.addresses[0].kind == HPCLANG_RPL_CODE_USE_LOAD_ADDRESS);
+    assert(uses.addresses[0].value == memory.address);
+    assert(!memcmp(uses.addresses[0].origins, state.origins.registers[HPCLANG_RPL_CODE_D1],
+                   sizeof uses.addresses[0].origins));
+    struct hpclang_rpl_code_execution saved = state;
+    struct hpclang_rpl_code_step_uses old_uses = uses;
+    for (unsigned i = 0; i < 5; ++i) {
+        uint32_t reject = 0x18010 + i;
+        assert(hpclang_rpl_code_execution_step(&instructions, &data, 125, &state, data_token,
+                                               &reject, &uses) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&state, &saved, sizeof state) && !memcmp(&uses, &old_uses, sizeof uses));
+        memory.fail = reject;
+        assert(hpclang_rpl_code_execution_step(&instructions, &data, 125, &state, data_token, NULL,
+                                               &uses) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&state, &saved, sizeof state) && !memcmp(&uses, &old_uses, sizeof uses));
+        memory.fail = UINT32_MAX;
+    }
+    assert(!hpclang_rpl_code_execution_step(&instructions, &data, 125, &state, data_token, NULL,
+                                            &uses));
+    assert(state.control.pc == 0x94000 && uses.count == 2 && !uses.has_branch);
+    assert(uses.addresses[0].kind == HPCLANG_RPL_CODE_USE_REGISTER_TARGET);
+    assert(uses.addresses[0].value == 0x18010);
+    assert(uses.addresses[1].kind == HPCLANG_RPL_CODE_USE_MEMORY_TARGET);
+    assert(uses.addresses[1].value == 0x94000);
+    for (unsigned i = 0; i < 5; ++i) {
+        assert(uses.addresses[0].origins[i] == 0x218000 + i);
+        assert(uses.addresses[1].origins[i] == 0x218010 + i);
+    }
+    for (unsigned cursor = 0; cursor < 8; ++cursor) {
+        state = saved;
+        state.control.pc = 16;
+        state.control.cursor = cursor;
+        encode(&code, 16, 2, 0x60); /* Copy C to stack, then pop to C and jump. */
+        encode(&code, 18, 2, 0x70);
+        encode(&code, 20, 4, 0x3b18);
+        for (unsigned step = 0; step < 3; ++step) {
+            assert(!hpclang_rpl_code_execution_step(&instructions, &data, 128 - state.control.pc,
+                                                    &state, data_token, NULL, &uses));
+            assert(uses.count == (step == 2));
+        }
+        assert(state.control.pc == 0x18010 && state.control.cursor == cursor);
+        assert(!state.control.stack[cursor]);
+        assert(!memcmp(uses.addresses[0].origins, saved.origins.registers[HPCLANG_RPL_CODE_C],
+                       sizeof uses.addresses[0].origins));
+    }
+    state = saved;
+    state.control.pc = 32;
+    encode(&code, 32, 4, 0x7b18); /* CPCEX consumes original C before killing its origins. */
+    assert(!hpclang_rpl_code_execution_step(&instructions, &data, 96, &state, data_token, NULL,
+                                            &uses));
+    assert(state.control.pc == 0x18010 && state.values.registers[HPCLANG_RPL_CODE_C] == 36);
+    assert(uses.count == 1 && uses.addresses[0].value == 0x18010);
+    for (unsigned i = 0; i < 5; ++i)
+        assert(!state.origins.registers[HPCLANG_RPL_CODE_C][i]);
+    state = saved;
+    state.control.pc = 40;
+    encode(&code, 40, 2, 0xf8);
+    encode(&code, 42, 5, 64);
+    encode(&code, 64, 2, 0x10);
+    assert(!hpclang_rpl_code_execution_step(&instructions, &data, 88, &state, data_token, NULL,
+                                            &uses));
+    assert(uses.has_branch && uses.branch.call && uses.branch.target == 64 && !uses.count);
+    assert(
+        !hpclang_rpl_code_execution_step(&instructions, &data, 2, &state, data_token, NULL, &uses));
+    assert(state.control.pc == 47 && uses.count == 1);
+    assert(uses.addresses[0].kind == HPCLANG_RPL_CODE_USE_RETURN_TARGET);
+    for (unsigned i = 0; i < 5; ++i)
+        assert(!uses.addresses[0].origins[i]);
+}
+
 static void exhaustive(void)
 {
     const unsigned opcodes[] = {4, 5, 6, 7, 12, 14};
@@ -1895,6 +1983,7 @@ static void origin_repair_plans(void)
 
 int main(void)
 {
+    execution_steps();
     arithmetic_modes();
     control_steps();
     data_steps();
