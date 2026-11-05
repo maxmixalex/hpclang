@@ -4244,3 +4244,87 @@ checks without claiming a production C control-flow walker, complete execution
 closure, mutation authorization or hardware qualification. Native integration
 remains open. Notebook backup process 14395 and its HP39gs emulator/transport
 children were confirmed live; no timeout-based restart was performed.
+
+## 2026-11-05 — C direct-control evaluation
+
+Local 1d798641 adds control_step for RTN/RTNSC/RTNCC, direct jumps/calls and
+GOC/GONC including conditional returns. Consumed return origins are reported
+before clearing a slot; generated call returns discard the overwritten origins.
+Unsupported mode/predicate state is not skipped. All output state is preserved
+on errors. Direct branch operand repairs remain a separate responsibility.
+
+GCC ASan/UBSan tests cover all eight circular cursors, both carry states,
+taken/untaken conditions, signed displacements, generated calls/returns and
+read failures. ARMv4T compilation and Clang analysis pass. Replacing Python
+return/branch calculations with this C evaluator preserves both original-model
+21-instruction comparisons, including register/carry/stack/cursor state.
+Evidence: /work/nov05-data-step/control-path.json and control-analysis.plist;
+reproducer: research/nov05-control-path.py. D increment and indirect-dispatch
+orchestration remain in Python; production collector/mutation integration and
+complete caller coverage remain open. No push or new CI acceptance is claimed.
+
+Notebook integration's five completed model runs are retained; HP40gs is active.
+The current independent persistence audit still covers two models, not all six.
+
+## 2026-11-05 — Integrated Notebook six-model acceptance
+
+Integration 3ce8acb0 passes all six Stock persistence/backup cases (18 launches)
+and the complete independent input/artifact/pixel/return/resource audit:
+/work/nov05-notebook-parent-backup/independent-persistence-audit.json. Artifacts
+were sealed before each execution, including HP39g+; no restart qualification
+is needed for this new run. Peak touched stack is 7760/8192 on HP48gII,
+7768/8192 on HP49g+/HP50g, and 2520/8192 on HP39 models. Backup at maximum note
+length is included where supported. Instrumented fixture coverage does not
+prove all shipped-loop paths, firmware/launcher reservations or hardware.
+
+Two-model SD export passes four launches and independent retained raw-card
+checks, including exact UTF-8, maximum-length output and preserved KEEP.TXT.
+All 172 C/C++ ASan/UBSan tests, 25 focused Python tests and strict docs pass.
+Before delivery, exact previous head 3312be9c still has one failed HP40gs
+system-services USB transfer before app entry; no transport fix is claimed.
+The changed, freshly tested integration is a new delivery, not a blind retry
+or proof that the historical transport failure is resolved.
+
+M8.0 local 4b325099 adds explicit decimal mode, SETHEX/SETDEC and D.A increment.
+Original-ROM probes on both models confirm mode-dependent arithmetic and the
+mode field at CPU+0x974. Nondecimal digits in decimal arithmetic are unsupported.
+Sanitizer/ARM compile/analysis pass; C-evaluated single-seed paths still match
+21 instructions per model, now also comparing decimal mode. Python organizes
+the loop and token ownership; production integration remains open. Evidence:
+/work/nov05-data-step/arithmetic-mode.json and c-evaluated-path.json.
+
+## 2026-11-05 — Unified C execution-step integration
+
+Local 5b57f7fe combines data, direct-control, PC exchange, indirect dispatch and
+C/RSTK transfers. It emits load-address, register-target, memory-target and
+return-target source tokens; direct branch operands retain their own descriptor.
+Errors preserve the complete simulated state and use report. Sanitizer tests
+cover multi-load dispatch, read/token failures, all circular-stack positions,
+capture invalidation and generated calls/returns. ARM compile/analysis pass.
+
+Both captured original-model paths now pass 21 calls to the same C step API,
+with nine address uses per model. Python provides only mapping/token callbacks,
+looping and output comparison. Evidence: /work/nov05-data-step/unified-execution.json;
+reproducer: research/nov05-unified-execution-path.py. Production collection and
+guarded mutation integration are still open. ARM -Os static local frames are
+1464 bytes for execution_step and 1272 for its data_step callee (not a total
+stack bound); platform integration must account for nested decoders/callers.
+
+## 2026-11-05 — Discovered origins drive actual catalog movement
+
+The unified C path now starts directly from saved CPU memory and the captured
+entry PC; trace states are comparison-only. Its discovered memory-source uses
+feed the existing C origin planner and actual catalog mover. Both 49g+/50g
+saved states resume along the original ROM path to the same indirect target.
+Each valid move performs 10658 nibble writes; conflicting and stale plans both
+reject with zero writes and unchanged state. Native caller origins, generated
+call returns and unchanged ROM-source obligations are checked in this bounded
+fixture. Source locations are selected from reported uses, not manually supplied
+memory-field constants. This remains saved-state evidence, not production
+collection, complete reference closure or a full Stock return.
+
+Evidence: /work/nov05-data-step/discovered-origin-move.json, linked by hashes to
+unified-execution.json and discovered-origins.json. Reproducer:
+research/nov05-discovered-origin-move.py. An initial CI status read hit API 502;
+the read-only exact-head audit was repeated successfully, without rerunning CI.
+Notebook 384ae39d now has 12 queued workflows/20 queued jobs; no CI acceptance.
