@@ -4560,3 +4560,44 @@ The 23-step trace still contains three unknown-origin uses: generated return
 proof rather than omission from a complete plan. Further continuation, public
 library/Port1 integration and M8.0 acceptance remain open. Exact-head CI remains
 pending; #19 retains its two investigated HTTP 504 toolchain failures.
+
+## 2026-11-05 — Computed address source offsets and relocation
+
+Implementation 8e7f1600 retains low-address source tokens plus a canonical
+20-bit modular adjustment. Repeated 81BD B decrements accumulate -5/-10 without
+pretending the computed digits reside in the original source cells. The use
+planner inverts the offset before validating and merging source repairs.
+Full low-address copies/exchanges retain the formula; partial overwrites discard
+it, high-only writes preserve it, and unsupported stores/RSTK expression transfer
+do not mislabel base digits as computed digits. D/D0 arithmetic remains conservative.
+
+The actual B-relative source is system field 0x806f3, loaded during the helper,
+not the initially saved B word. Both saved traces retain its five tokens for
+loads at 0x88da8/0x88da3. Twelve sanitizer targets pass, including repeated
+decrement, copy/exchange/partial overwrite, memory/literal effects, RSTK
+invalidation, modular wrap, inverse-plan aliases and bounds. ARM analysis has
+zero diagnostics; execution_step/data_step own frames are 1632/1336 bytes,
+not total call-chain bounds. The original-ROM 32-case instruction matrix passes.
+
+Both fresh live Stock runs observe two derived uses from 0x806f3, final offset
+0xffff6, 23 steps, 17 total uses and 84 guards; catalog/attachment and settled
+return checks pass. Six-launcher payload audit and strict docs pass. Evidence:
+/work/nov05-affine-final/{unit.log,stock.json,artifact-audit.json,code.plist,plan.plist};
+/work/nov05-affine-execution/{collected-execution.json,rom-matrix.json}.
+
+Separately qualified derived uses enter repair planning and the catalog
+transaction alongside existing roots. Both saved-state moves perform 10658
+nibble writes and replay all 23 original-ROM steps through two 81BD exits to
+0x28fc. Four prior stale/conflict controls plus inconsistent inverse results
+and unknown derived sources reject with zero writes and unchanged state.
+Evidence: /work/nov05-affine-repair/writeback.json; reproducer:
+research/nov05-affine-writeback.{c,py}. This does not establish all-use closure.
+
+The bounded trace now has one unknown-origin use, generated return 0x88996.
+Generated-PC semantics, remaining continuation, mapping/state qualification and
+complete public mutation planning remain open. M8.0 is incomplete.
+
+#19 Core runtime 42023596098 completed with only the two investigated setup-atfe
+HTTP 504 failures. A failed-jobs-only rerun was accepted; no retry result was
+polled this turn. Original failures remain in history and acceptance is pending.
+Request record: research/nov05-toolchain-retry.json.
