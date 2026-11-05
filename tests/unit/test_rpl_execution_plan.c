@@ -138,4 +138,38 @@ void test_execution_plans(void)
     assert(hpclang_rpl_execution_plan_uses(&builder, &windows, replacements, resolve_cell, &f) ==
            HPCLANG_RPL_SPAN_MALFORMED);
     assert(!builder.count);
+    /* Two computed uses of one original value must agree on its replacement,
+     * not merely have superficially compatible computed output digits. */
+    struct hpclang_rpl_code_step_uses computed = {.count = 2};
+    for (unsigned i = 0; i < 2; ++i) {
+        computed.addresses[i] = uses[0].addresses[0];
+        computed.addresses[i].value = 32 - 5 * (i + 1);
+        computed.addresses[i].adjustment = (0x100000u - 5 * (i + 1)) & 0xfffffu;
+        replacements[i] = 48 - 5 * (i + 1);
+    }
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 5));
+    assert(!hpclang_rpl_execution_plan_uses(&builder, &computed, replacements, resolve_cell, &f));
+    assert(builder.count == 5 && edits[1].expected == 2 && edits[1].value == 3);
+    ++replacements[1];
+    assert(hpclang_rpl_execution_plan_uses(&builder, &computed, replacements, resolve_cell, &f) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    put(&f, 96, 0);
+    computed.count = 1;
+    computed.addresses[0].value = 0xffffb;
+    replacements[0] = 0xffffc;
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 5));
+    assert(!hpclang_rpl_execution_plan_uses(&builder, &computed, replacements, resolve_cell, &f));
+    assert(edits[0].expected == 0 && edits[0].value == 1);
+    for (unsigned mode = 0; mode < 3; ++mode) {
+        struct hpclang_rpl_code_step_uses bad = computed;
+        replacements[0] = mode == 0 ? 0x100000 : 0xffffc;
+        if (mode == 1)
+            bad.addresses[0].value = 0x100000;
+        if (mode == 2)
+            bad.addresses[0].adjustment = 0x100000;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 5));
+        assert(hpclang_rpl_execution_plan_uses(&builder, &bad, replacements, resolve_cell, &f) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!builder.count);
+    }
 }

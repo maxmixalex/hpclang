@@ -202,12 +202,17 @@ int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uin
 /* Abstract origins, not register values or pointer classifications. Each token
  * names one caller-owned nibble fact; zero means unknown. Register numbers are
  * the enum above, through D1. CONSTANT's slot and unused high nibbles are unused.
- * Callers establish seeds, memory identity/aliasing, instruction identity and
- * the executed path. Unmodeled writes must invalidate their affected facts;
- * never skip unsupported instructions and continue with stale origins. */
+ * Initialize adjustments to zero for ordinary nibble seeds; each is a canonical
+ * 20-bit modular offset. Callers establish seeds, memory identity/aliasing, instruction identity
+ * and the executed path. Unmodeled writes must invalidate their affected facts; never skip
+ * unsupported instructions and continue with stale origins. */
 struct hpclang_rpl_code_origins
 {
     uint32_t registers[HPCLANG_RPL_CODE_D1 + 1][16];
+    /* Low five digits represent (source + adjustment) modulo 20 bits.
+     * Tokens name the unadjusted source, not the current computed digits.
+     * Zero adjustment is an ordinary nibble copy; missing tokens stay unknown. */
+    uint32_t adjustment[HPCLANG_RPL_CODE_D1 + 1];
 };
 
 struct hpclang_rpl_code_values
@@ -289,6 +294,7 @@ enum hpclang_rpl_code_use_kind
 struct hpclang_rpl_code_address_use
 {
     uint32_t kind, value, origins[5];
+    uint32_t adjustment; /* value = original source + adjustment modulo 20 bits. */
 };
 
 struct hpclang_rpl_code_step_uses
@@ -301,7 +307,9 @@ struct hpclang_rpl_code_step_uses
 /* One C step combining the data/control evaluators with register/indirect PC
  * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81BD.
  * 81BD emits three dependent load addresses followed by the memory PC target;
- * arithmetic on B, D and D0 clears the affected origins. Its B/D updates use
+ * B retains its low-five-digit source plus a modular adjustment; arithmetic
+ * on D and D0 clears affected origins. Full low-address copies/exchanges retain
+ * adjustments; partial overwrites discard the affected expression. Its B/D updates use
  * the low 32-bit ARM words, independent of Saturn decimal mode. A D0 result
  * beyond 20 bits is rejected. values.carry and control.carry
  * describe the same state and must agree. Emit the five source tokens of every

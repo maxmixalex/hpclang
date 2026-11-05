@@ -27,10 +27,13 @@ int hpclang_rpl_execution_plan_uses(struct hpclang_rpl_reference_edit_builder *b
         if (use->kind < HPCLANG_RPL_CODE_USE_LOAD_ADDRESS ||
             use->kind > HPCLANG_RPL_CODE_USE_RETURN_TARGET)
             return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+        if (use->adjustment > 0xfffff || use->value > 0xfffff || replacements[i] > 0xfffff)
+            return reject(builder, HPCLANG_RPL_SPAN_BOUNDS);
         struct hpclang_rpl_reference_edit edits[5];
         unsigned count;
-        int result = hpclang_rpl_code_origins_plan(use->origins, use->value, replacements[i],
-                                                   resolve, context, edits, &count);
+        int result = hpclang_rpl_code_origins_plan(
+            use->origins, (use->value - use->adjustment) & 0xfffffu,
+            (replacements[i] - use->adjustment) & 0xfffffu, resolve, context, edits, &count);
         if (result)
             return reject(builder, result);
         for (unsigned j = 0; j < count; ++j)

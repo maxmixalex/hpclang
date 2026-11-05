@@ -662,7 +662,7 @@ struct execution_probe
     struct hpclang_rpl_reference_guard_builder builder;
     struct hpclang_rpl_stock_view view;
     uint32_t *pc;
-    uint32_t observations[4], uses, indirect_targets;
+    uint32_t observations[4], uses, indirect_targets, derived_uses, derived_source, adjustment;
 };
 
 static int execution_observe(void *context, unsigned space, uint32_t at, uint8_t value)
@@ -695,6 +695,20 @@ static int execution_visit(void *context, uint32_t pc,
     (void)state;
     struct execution_probe *probe = context;
     probe->uses += uses->count;
+    for (unsigned i = 0; i < uses->count; ++i) {
+        const struct hpclang_rpl_code_address_use *use = &uses->addresses[i];
+        if (!use->adjustment)
+            continue;
+        uint32_t first = use->origins[0];
+        if (!first || (probe->derived_uses && probe->derived_source != first - 1))
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        for (unsigned digit = 0; digit < 5; ++digit)
+            if (use->origins[digit] != first + digit)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+        ++probe->derived_uses;
+        probe->derived_source = first - 1;
+        probe->adjustment = use->adjustment;
+    }
     for (unsigned i = 0; i < uses->count; ++i)
         if (uses->addresses[i].kind == HPCLANG_RPL_CODE_USE_MEMORY_TARGET &&
             ++probe->indirect_targets == 3)
@@ -759,7 +773,10 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                           probe->observations[2],
                           probe->observations[3],
                           *probe->pc,
-                          0x45584543};
+                          0x45584543,
+                          probe->derived_uses,
+                          probe->derived_source,
+                          probe->adjustment};
     for (unsigned i = 0; i < 16; ++i)
         if (probe_write_word(io, entry.object_address + 10 + i * 8, words[i], 8))
             goto done;

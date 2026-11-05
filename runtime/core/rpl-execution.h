@@ -66,6 +66,9 @@ int hpclang_rpl_execution_collect(const struct hpclang_boot_info *boot,
  * edit builder. replacements has uses->count caller-qualified addresses;
  * include unchanged values, because their sources may alias other repairs.
  * Resolve every source digit, including unchanged ones; unknown origins reject.
+ * Invert each use's qualified modular adjustment before planning source edits.
+ * The caller guards the arithmetic instructions and proves the source change
+ * preserves all other uses/effects; an invertible expression alone is not that proof.
  * Normalize each source into a one-nibble edit so consistent partial overlaps
  * across uses/steps merge and conflicting requirements invalidate the batch.
  * Use this builder exclusively for normalized one-nibble edits. Resolvers

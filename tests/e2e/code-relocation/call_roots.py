@@ -241,6 +241,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             or execution[8:10] != (256, 8)
             or execution[10] != words[2]
             or execution[11] != 0x45584543
+            or execution[12:15] != (2, 0x806F3, 0xFFFF6)
         ):
             raise ValueError(
                 "Native execution collection/guard observation is incomplete"
@@ -270,6 +271,9 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                         address_uses=execution[4],
                         guards=execution[5],
                         observations=list(execution[6:10]),
+                        derived_uses=execution[12],
+                        derived_source=execution[13],
+                        final_adjustment=execution[14],
                     ),
                 ),
                 indent=2,

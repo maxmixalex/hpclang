@@ -1331,6 +1331,7 @@ static void literal_loads(void)
 
 static void seed_origins(struct hpclang_rpl_code_origins *state)
 {
+    memset(state, 0, sizeof *state);
     for (unsigned reg = 0; reg <= HPCLANG_RPL_CODE_D1; ++reg)
         for (unsigned n = 0; n < 16; ++n)
             state->registers[reg][n] = 0x100u + reg * 16u + n;
@@ -1709,8 +1710,10 @@ static void address_origin_invalidation(void)
                 0x90000, 3, (enum hpclang_rpl_code_register)reg, delta};
             int valid = (reg == HPCLANG_RPL_CODE_D0 || reg == HPCLANG_RPL_CODE_D1) && delta &&
                         delta >= -16 && delta <= 16;
-            if (valid)
+            if (valid) {
                 memset(expected.registers[reg], 0, 5 * sizeof(uint32_t));
+                expected.adjustment[reg] = 0;
+            }
             assert(hpclang_rpl_code_origins_adjust(&state, &adjust) ==
                    (valid ? 0 : HPCLANG_RPL_SPAN_MALFORMED));
             assert(!memcmp(&state, &expected, sizeof state));
@@ -2018,12 +2021,15 @@ static void native_threaded_exit(void)
         assert(uses.addresses[use].value == (use < 3 ? 0x110 + 16 * use : 0x60));
         for (unsigned digit = 0; digit < 5; ++digit)
             assert(uses.addresses[use].origins[digit] ==
-                   (use ? 0x200110 + 16 * (use - 1) + digit : 0));
+                   (use ? 0x200110 + 16 * (use - 1) + digit
+                        : initial.origins.registers[HPCLANG_RPL_CODE_B][digit]));
+        assert(uses.addresses[use].adjustment == (use ? 0 : 0xffffb));
     }
     for (unsigned reg = 0; reg < 13; ++reg)
         for (unsigned digit = 0; digit < 16; ++digit) {
             uint32_t expected = initial.origins.registers[reg][digit];
-            if ((reg == HPCLANG_RPL_CODE_B || reg == HPCLANG_RPL_CODE_D) && digit < 8)
+            if ((reg == HPCLANG_RPL_CODE_B && digit >= 5 && digit < 8) ||
+                (reg == HPCLANG_RPL_CODE_D && digit < 8))
                 expected = 0;
             if (reg == HPCLANG_RPL_CODE_D0 && digit < 5)
                 expected = 0;
@@ -2031,6 +2037,14 @@ static void native_threaded_exit(void)
                 expected = 0x200120 + digit;
             assert(state.origins.registers[reg][digit] == expected);
         }
+    state.control.pc = 0;
+    encode(&memory, 11, 5, 0x120);
+    assert(
+        !hpclang_rpl_code_execution_step(&instructions, &data, 4, &state, data_token, NULL, &uses));
+    assert(uses.addresses[0].value == 0x10b && uses.addresses[0].adjustment == 0xffff6);
+    assert(state.origins.adjustment[HPCLANG_RPL_CODE_B] == 0xffff6);
+    assert(!memcmp(uses.addresses[0].origins, initial.origins.registers[HPCLANG_RPL_CODE_B],
+                   sizeof uses.addresses[0].origins));
     /* Every dependent data digit: unavailable, malformed, and token rejection
      * must preserve both outputs even after earlier loads succeeded. */
     for (unsigned mode = 0; mode < 3; ++mode)
@@ -2081,8 +2095,91 @@ static void native_threaded_exit(void)
     }
 }
 
+static void computed_origin_transfers(void)
+{
+    struct hpclang_rpl_code_origins origins;
+    seed_origins(&origins);
+    origins.adjustment[HPCLANG_RPL_CODE_B] = 0xffffb;
+    struct hpclang_rpl_code_assignment copy = {
+        .source = HPCLANG_RPL_CODE_B, .destination = HPCLANG_RPL_CODE_C, .nibbles = 5};
+    assert(!hpclang_rpl_code_origins_assign(&origins, &copy, NULL));
+    assert(origins.adjustment[HPCLANG_RPL_CODE_C] == 0xffffb);
+    assert(!memcmp(origins.registers[HPCLANG_RPL_CODE_B], origins.registers[HPCLANG_RPL_CODE_C],
+                   5 * sizeof(uint32_t)));
+    copy.source = HPCLANG_RPL_CODE_C;
+    copy.destination = HPCLANG_RPL_CODE_A;
+    copy.source_first = 2;
+    copy.nibbles = 1;
+    assert(!hpclang_rpl_code_origins_assign(&origins, &copy, NULL));
+    assert(!origins.registers[HPCLANG_RPL_CODE_A][0]);
+    copy.source = HPCLANG_RPL_CODE_CONSTANT;
+    copy.source_first = 0;
+    copy.destination = HPCLANG_RPL_CODE_C;
+    copy.destination_first = 6;
+    assert(!hpclang_rpl_code_origins_assign(&origins, &copy, NULL));
+    assert(origins.adjustment[HPCLANG_RPL_CODE_C] ==
+           0xffffb); /* High write preserves low formula. */
+    copy.destination_first = 2;
+    assert(!hpclang_rpl_code_origins_assign(&origins, &copy, NULL));
+    assert(!origins.adjustment[HPCLANG_RPL_CODE_C]);
+    for (unsigned digit = 0; digit < 5; ++digit)
+        assert(!origins.registers[HPCLANG_RPL_CODE_C][digit]);
+    struct hpclang_rpl_code_exchange exchange = {
+        .left = HPCLANG_RPL_CODE_B, .right = HPCLANG_RPL_CODE_A, .nibbles = 5};
+    assert(!hpclang_rpl_code_origins_exchange(&origins, &exchange));
+    assert(origins.adjustment[HPCLANG_RPL_CODE_A] == 0xffffb);
+    assert(!origins.adjustment[HPCLANG_RPL_CODE_B]);
+    exchange.first = 2;
+    exchange.nibbles = 1;
+    assert(!hpclang_rpl_code_origins_exchange(&origins, &exchange));
+    assert(!origins.adjustment[HPCLANG_RPL_CODE_A]);
+    assert(!origins.registers[HPCLANG_RPL_CODE_B][2]);
+    for (unsigned digit = 0; digit < 5; ++digit)
+        if (digit != 2)
+            assert(!origins.registers[HPCLANG_RPL_CODE_A][digit]);
+    origins.adjustment[HPCLANG_RPL_CODE_C] = 0xffffb;
+    for (unsigned digit = 0; digit < 5; ++digit)
+        origins.registers[HPCLANG_RPL_CODE_C][digit] = 100 + digit;
+    struct hpclang_rpl_code_memory memory = {.data = HPCLANG_RPL_CODE_C,
+                                             .address = HPCLANG_RPL_CODE_D1,
+                                             .first = 2,
+                                             .nibbles = 1,
+                                             .load = 0};
+    uint32_t token = 999;
+    assert(!hpclang_rpl_code_origins_memory(&origins, &memory, &token, 1));
+    assert(!token); /* A computed digit cannot be stored as its base digit. */
+    token = 999;
+    memory.load = 1;
+    assert(!hpclang_rpl_code_origins_memory(&origins, &memory, &token, 1));
+    assert(!origins.adjustment[HPCLANG_RPL_CODE_C]);
+    for (unsigned digit = 0; digit < 5; ++digit)
+        assert(origins.registers[HPCLANG_RPL_CODE_C][digit] == (digit == 2 ? 999u : 0u));
+    origins.adjustment[HPCLANG_RPL_CODE_C] = 0xffffb;
+    const struct hpclang_rpl_code_literal literal = {.destination = HPCLANG_RPL_CODE_C,
+                                                     .nibbles = 1,
+                                                     .mask = UINT64_C(15) << 12,
+                                                     .value = UINT64_C(9) << 12};
+    assert(!hpclang_rpl_code_origins_literal(&origins, &literal, 3, &token, 1));
+    assert(!origins.adjustment[HPCLANG_RPL_CODE_C]);
+    for (unsigned digit = 0; digit < 5; ++digit)
+        assert(origins.registers[HPCLANG_RPL_CODE_C][digit] == (digit == 3 ? 999u : 0u));
+    struct image code = {.size = 2, .fail = UINT32_MAX};
+    encode(&code, 0, 2, 0x60);
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    struct hpclang_rpl_code_execution state = {0};
+    state.origins = origins;
+    state.origins.adjustment[HPCLANG_RPL_CODE_C] = 0xffffb;
+    state.values.registers[HPCLANG_RPL_CODE_C] = 0x12345;
+    struct hpclang_rpl_code_step_uses uses;
+    assert(!hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL, &uses));
+    assert(state.control.stack[0] == 0x12345);
+    for (unsigned digit = 0; digit < 5; ++digit)
+        assert(!state.control.stack_origins[0][digit]); /* RSTK does not yet carry expressions. */
+}
+
 int main(void)
 {
+    computed_origin_transfers();
     native_threaded_exit();
     execution_steps();
     arithmetic_modes();
