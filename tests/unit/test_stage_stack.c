@@ -479,8 +479,58 @@ static void test_main_page(void)
     assert(output == 0xfe000u);
 }
 
+static void test_initial_carry(void)
+{
+    const struct hpclang_stage_stack_io io = {NULL, read_word, NULL};
+    for (unsigned cursor = 0; cursor < 8; ++cursor) {
+        for (unsigned condition = 0; condition < 2; ++condition) {
+            for (int carry = -1; carry <= 1; ++carry) {
+                setup();
+                uint32_t stack[8], before[8], *roots[8];
+                for (unsigned i = 0; i < 8; ++i) {
+                    stack[i] = 0x89000 + i * 0x10;
+                    roots[i] = NULL;
+                }
+                memcpy(before, stack, sizeof stack);
+                /* Test conditional returns and both signed branch directions.
+                 * Only the taken branch reaches RTN; fallthrough is unsupported. */
+                for (unsigned path = 0; path < 3; ++path) {
+                    uint32_t displacement = path == 0 ? 0 : path == 1 ? 4 : 252;
+                    put(0x88000, (displacement << 4) | (condition ? 4 : 5), 3);
+                    if (path)
+                        put(path == 1 ? 0x88005 : 0x87ffd, 0x10, 2);
+                    memset(roots, 0, sizeof roots);
+                    unsigned count = hpclang_stage_return_roots_with_carry(&io, 0x88000, stack,
+                                                                           cursor, carry, roots);
+                    unsigned expected = carry >= 0 && carry == (int)condition;
+                    assert(count == expected);
+                    assert(!expected || roots[0] == &stack[(cursor + 7) & 7]);
+                    assert(roots[expected] == NULL && !memcmp(before, stack, sizeof stack));
+                    assert(!writes);
+                    assert(!hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots));
+                    /* A missing opcode/displacement nibble cannot establish a path. */
+                    for (unsigned nibble = 0; nibble < 3; ++nibble) {
+                        fault = 0x88000 + nibble;
+                        memset(roots, 0, sizeof roots);
+                        assert(!hpclang_stage_return_roots_with_carry(&io, 0x88000, stack, cursor,
+                                                                      carry, roots));
+                        assert(roots[0] == NULL && !writes);
+                        assert(!memcmp(before, stack, sizeof stack));
+                    }
+                    fault = UINT32_MAX;
+                }
+            }
+        }
+    }
+    uint32_t stack[8] = {0}, *roots[8] = {NULL};
+    for (int carry = -2; carry <= 2; carry += 4)
+        assert(!hpclang_stage_return_roots_with_carry(&io, 0x88000, stack, 0, carry, roots));
+    assert(roots[0] == NULL && !writes);
+}
+
 int main(void)
 {
+    test_initial_carry();
     test_main_page();
     test_conditional_paths();
     test_call_return_chain();

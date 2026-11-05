@@ -163,7 +163,7 @@ Remote acceptance and broader M8.5 completion remain open.
 Accepted deliveries include #15, #17, #20, #22, #23, #24, #25, #26, #28 and #29; #21 was
 accepted into #20. Their detailed gates, older heads, failure counts and
 artifact evidence remain in [M8 validation history](m8-validation-history.md).
-The [prior status snapshot](https://github.com/maxmixalex/hpclang/blob/m8-port-cpp/docs/development/m8-validation-history.md#2026-10-30-current-status-consolidation)
+The [prior status snapshot](m8-validation-history.md#2026-10-30-current-status-consolidation)
 preserves the detailed text replaced by this current-state summary. All original
 stage contracts remain in the [requirements archive](roadmap-history.md#m8-stages).
 

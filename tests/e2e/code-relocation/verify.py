@@ -18,7 +18,7 @@ def verify(target, build, dist, state_root, output_root):
     # Stock reader. This phase needs the standard suite's installed library 275.
     sys.path.insert(0, str(ROOT / "tests/e2e/port-recovery"))
     from run import transfer
-    from verify import native_words
+    from verify import native_words, require_stock_pc
 
     source = state_root / f"{target}-state"
     output = output_root / f"{target}-code-relocation"
@@ -41,6 +41,7 @@ def verify(target, build, dist, state_root, output_root):
         "BRLIVE",
         remote_commands=["-95 CF HOME CLEAR 'BRLIVE' RCL"],
     )
+    require_stock_pc(output / "run/state")
     flash = (output / "run/state/flash").read_bytes()
     assert flash == (source / "flash").read_bytes(), "Branch probe changed Flash"
     read = native_words((output / "run/state/sram").read_bytes(), flash)
