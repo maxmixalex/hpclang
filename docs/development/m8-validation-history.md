@@ -4397,3 +4397,31 @@ Evidence: /work/nov05-data-step/native-writeback.json, linked to the captured
 execution report and implementation source hashes. Reproducer:
 research/nov05-native-writeback.py. This remains bounded saved-state validation,
 not complete execution coverage, live launcher integration or full Stock return.
+
+## 2026-11-05 — Negotiated suspended execution context
+
+Implementation d1f731c9 introduces an optional HPCX capability prefix inside the
+code payload (the 16-byte HPC1 header is unchanged). New runtime entry is at
+offset eight; existing launchers already use the declared entry offset. After
+unpacking, supporting HP49g+/HP50g launchers publish RPL5 only for requesting
+images, naming the saved post-ARMSYS PC word. Images without that request retain
+the existing context versions. Runtime readers preserve RPL2/RPL3/RPL4 prefixes
+and existing Port0/Port1 services; older contexts never expose an execution PC.
+
+Nine related targets pass ASan/UBSan: port_memory, port1_bounds, port, object,
+object_store, device, rpl_stock_memory, rpl_mutation and stage_image. Exact-size
+old-prefix allocations exercise absent-extension safety. Independent zlib cases
+check requested/non-requested prefixes in raw and compressed images. The
+code-relocation application and all six launchers build; an independent audit
+unpacks each launcher and matches the complete payload, entry and capability
+bytes. The legacy artifact has entry offset zero. Stage-image static analysis,
+Ruff and strict candidate documentation build pass.
+
+Fresh HP49g+/HP50g Stock native-call fixtures validate that the negotiated PC
+field matches the saved return PC and use boot metadata for the CPU state.
+Both complete application execution, catalog/attachment checks and original
+Stock return; sealed source, binary and initial-state hashes remain unchanged.
+Evidence: /work/nov05-entry-context/{unit.log,app.log,artifact-audit.json,stock.json}.
+Reproducers: research/nov05-entry-context-{build,artifacts,stock}.py.
+This supplies the formal entry contract; it does not yet wire the complete
+execution collector into public mutation or prove all execution-reference paths.
