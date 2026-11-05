@@ -256,3 +256,15 @@ return and independent notebook pixels (queue 35554 exits zero). Evidence:
 /work/oct26-notebook-paced/report.json and server-sha256.txt. System-Kermit
 control also passes; this proves local acceptance, not elimination of every
 intermittent CI stall. Remote transport acceptance and broader M8 remain open.
+
+
+### 2026-11-04 PR18 remaining environment-entry delivery
+
+Submitted 0390e023 integrates accepted main into PR18. The remaining functional
+diff is setup-runtime.sh command execution with the portable PATH/library
+environment; runtime, watchdog and Kermit retry-pacing sources match main.
+Four real subprocess tests verify literal arguments/status, CI exports, missing
+bundled tool rejection and invalid syntax. Ruff, normalized-shell ShellCheck,
+strict docs and diff checks pass. The prior-head remote API returns no runs
+(research/nov04-pr18-previous-ci-unavailable.json); historical failed jobs remain
+unresolved evidence. New-head CI was not polled during submission.
