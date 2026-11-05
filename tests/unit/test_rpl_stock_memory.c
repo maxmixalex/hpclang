@@ -88,6 +88,66 @@ static void test_execution_capture(void)
             assert(state.control.stack_origins[slot][digit] ==
                    0x200000 + 2 * (0x978 + slot * 4) + digit);
     }
+    struct hpclang_rpl_stock_execution_source source = {&reader, 0x200000, 7, 0x24000};
+    unsigned accepted = 0;
+    for (unsigned at = 0; at < 0xc60 * 2; ++at) {
+        int seeded = 0;
+        for (unsigned reg = 0; reg <= HPCLANG_RPL_CODE_D1; ++reg)
+            for (unsigned digit = 0; digit < 16; ++digit)
+                seeded |= state.origins.registers[reg][digit] == source.origin_base + at;
+        for (unsigned slot = 0; slot < 8; ++slot)
+            for (unsigned digit = 0; digit < 5; ++digit)
+                seeded |= state.control.stack_origins[slot][digit] == source.origin_base + at;
+        struct hpclang_rpl_code_origin_cell cell = {99, 88, 77}, before = cell;
+        unsigned reads = fixture.reads;
+        int result = hpclang_rpl_stock_execution_origin(&source, source.origin_base + at, &cell);
+        if (seeded) {
+            ++accepted;
+            assert(!result && fixture.reads == reads + 1);
+            assert(cell.mapping == 7 && cell.field == 0x24000 + at);
+            assert(cell.expected == ((fixture.bytes[at / 2] >> (4 * (at & 1))) & 15));
+        } else {
+            assert(result == HPCLANG_RPL_SPAN_UNSUPPORTED && fixture.reads == reads);
+            assert(!memcmp(&cell, &before, sizeof cell));
+        }
+    }
+    assert(accepted == 195);
+    const uint32_t *uses[] = {state.origins.registers[HPCLANG_RPL_CODE_D0],
+                              state.control.stack_origins[7], state.origins.registers[0] + 6};
+    const uint32_t values[] = {0xabcde, 0x90007, 0xf0012};
+    for (unsigned use = 0; use < 3; ++use) {
+        struct hpclang_rpl_reference_edit edits[5];
+        unsigned count = 99;
+        assert(!hpclang_rpl_code_origins_plan(uses[use], values[use], values[use] + 16,
+                                              hpclang_rpl_stock_execution_origin, &source, edits,
+                                              &count));
+        assert(count == 1 && edits[0].mapping == 7 && edits[0].width == 5);
+        assert(edits[0].field == source.field_base + uses[use][0] - source.origin_base);
+        assert(edits[0].expected == values[use] && edits[0].value == values[use] + 16);
+        struct hpclang_rpl_reference_edit before[5];
+        memcpy(before, edits, sizeof edits);
+        assert(hpclang_rpl_code_origins_plan(uses[use], values[use] ^ 1, values[use] + 16,
+                                             hpclang_rpl_stock_execution_origin, &source, edits,
+                                             &count) < 0);
+        assert(count == 1 && !memcmp(before, edits, sizeof edits));
+    }
+    for (unsigned mode = 1; mode <= 2; ++mode) {
+        fixture.mode = mode;
+        fixture.stop = fixture.reads + 1;
+        struct hpclang_rpl_code_origin_cell cell = {1, 2, 3}, before = cell;
+        assert(hpclang_rpl_stock_execution_origin(&source, uses[0][0], &cell) < 0);
+        assert(!memcmp(&cell, &before, sizeof cell));
+    }
+    fixture.mode = fixture.stop = 0;
+    struct hpclang_rpl_code_origin_cell cell = {1, 2, 3}, before = cell;
+    unsigned reads = fixture.reads;
+    assert(hpclang_rpl_stock_execution_origin(&source, 0, &cell) < 0);
+    source.mapping = 0;
+    assert(hpclang_rpl_stock_execution_origin(&source, uses[0][0], &cell) < 0);
+    source.mapping = 7;
+    source.field_base = 0x100000 - 0xc60 * 2 + 1;
+    assert(hpclang_rpl_stock_execution_origin(&source, uses[0][0], &cell) < 0);
+    assert(fixture.reads == reads && !memcmp(&cell, &before, sizeof cell));
     for (unsigned mode = 1; mode <= 4; ++mode)
         for (unsigned stop = 1; stop <= 256; ++stop) {
             fixture.mode = mode;

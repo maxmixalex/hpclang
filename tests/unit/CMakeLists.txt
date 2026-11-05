@@ -868,7 +868,8 @@ hpclang_unit(e2e_phase test_e2e_phase.c "${HPCLANG_ROOT}/tests/e2e/phase.c")
 target_include_directories(test_e2e_phase PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(rpl_stock_memory test_rpl_stock_memory.c
-    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-code.c")
 target_include_directories(test_rpl_stock_memory PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(port_memory test_port_memory.c)

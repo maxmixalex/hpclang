@@ -12,6 +12,25 @@
 
 struct hpclang_rpl_rom_bank;
 struct hpclang_rpl_code_execution;
+struct hpclang_rpl_code_origin_cell;
+
+struct hpclang_rpl_stock_execution_source
+{
+    const struct hpclang_rpl_reader *state;
+    uint32_t origin_base, mapping, field_base;
+};
+
+/* Resolve tokens emitted by execution_capture to caller-normalized cells.
+ * field_base is the native state's nibble offset in mapping (20-bit extent).
+ * The caller establishes mapping identity/alias normalization, retains capture
+ * dependencies and excludes state/mapping changes until use. Only register
+ * digits actually seeded by capture are accepted, not arbitrary CPU fields.
+ * This read-only origin-plan callback does not authorize native writes or
+ * replace full-word guards required by native register repairs. On failure
+ * leave cell untouched. Partial/cross-word source plans remain nibble edits;
+ * they must not be treated as whole-register pointer repairs. */
+int hpclang_rpl_stock_execution_origin(void *context, uint32_t token,
+                                       struct hpclang_rpl_code_origin_cell *cell);
 
 /* Capture the reviewed HP49g+/50g CPU register layout through the existing
  * state-relative nibble reader (e.g. stock_view_native). Observe all 256 read

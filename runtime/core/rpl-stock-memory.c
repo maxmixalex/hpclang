@@ -26,6 +26,34 @@ static int state_word(const struct hpclang_rpl_reader *state, uint32_t at, unsig
     return 0;
 }
 
+int hpclang_rpl_stock_execution_origin(void *context, uint32_t token,
+                                       struct hpclang_rpl_code_origin_cell *cell)
+{
+    const struct hpclang_rpl_stock_execution_source *source = context;
+    if (!source || !cell || !source->state || !source->state->read_nibble)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!source->origin_base || source->origin_base > UINT32_MAX - 0x1337u || !source->mapping ||
+        source->field_base > 0x100000u - 0xc60u * 2u || token < source->origin_base)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t at = token - source->origin_base;
+    int seeded = at >= 0x90cu * 2u && at < 0x954u * 2u;
+    if (at >= 0x954u * 2u && at < 0x95cu * 2u)
+        seeded = at % 8u < 5u;
+    if (at == 0x95cu * 2u)
+        seeded = 1;
+    if (at >= 0x978u * 2u && at < 0x998u * 2u)
+        seeded = at % 8u < 5u;
+    if (!seeded)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint8_t value;
+    if (!source->state->read_nibble(source->state->context, at, &value))
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (value > 15u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    *cell = (struct hpclang_rpl_code_origin_cell){source->mapping, source->field_base + at, value};
+    return 0;
+}
+
 int hpclang_rpl_stock_execution_capture(const struct hpclang_rpl_reader *state, uint32_t pc,
                                         uint32_t origin_base,
                                         struct hpclang_rpl_code_execution *execution,
