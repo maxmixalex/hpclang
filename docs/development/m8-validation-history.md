@@ -4201,3 +4201,46 @@ firmware preparation step. Ran the same bootloaders/official make targets;
 resume preserves completed case hashes, source/artifact seals, failed log
 and state, and adds firmware hashes. Remaining matrix is running under
 /work/nov05-allocation-ui-combined; no full-matrix completion claimed.
+
+## 2026-11-05 — Data-instruction value/origin evaluation
+
+Local 17b7f6be adds an internal C evaluator for inspected literals, assignments,
+exchanges, memory loads and D0/D1 adjustments. Values and origins advance
+together; failed reads/token resolution preserve all output state. Stores and
+control transfers remain unsupported. Computed next-PC captures have unknown
+origins rather than pretending to name encoded literal cells. Address uses,
+mapping guards and path ownership remain the collector's responsibility.
+
+New tests cover data-source propagation, each failed load/token position,
+whole-register copies and zeroing, wrapped 16-nibble literal loads, next-PC
+capture, address overflow/carry and bounds. The full rpl_code unit executable
+passes GCC ASan/UBSan; ARMv4T compilation and Clang static analysis pass.
+Independent comparison with captured original HP49g+/HP50g interpreter states
+matches 30 supported data steps, including origins and instruction lengths.
+This comparison seeds each instruction from its recorded incoming state; it
+does not yet prove an autonomous whole-path walker or production integration.
+Evidence: /work/nov05-data-step/entry-data-steps.json and analysis.plist;
+reproducer: research/nov05-data-step-trace.py. Follow-up remains unpushed while
+the previous PR #31 CI runs.
+
+Separately, Notebook integration 3ce8acb0 passes all 172 C/C++ ASan/UBSan tests
+in /work/nov05-notebook-parent-unit/run.log. Python tooling is separate (25
+focused tests previously passed). Six-model persistence/backup remains active;
+no all-model completion is inferred from the completed subset.
+
+## 2026-11-05 — Single-seed execution-path comparison
+
+The reference walker seeds registers, carry and circular return stack once at
+the captured entry. C data evaluation plus explicit Python return/branch and
+D.A increment semantics calculates 21 instructions on each original 49g+/50g
+image through first indirect dispatch. Intermediate recorded states are read
+only after each computed step for comparison; no step reloads its values from
+the trace. Registers, carry, return-stack cells and cursor all match. Memory
+load sources are discovered from computed addresses and propagated tokens.
+
+Evidence: /work/nov05-data-step/autonomous-path.json; reproducer:
+research/nov05-autonomous-data-path.py. This strengthens the single-instruction
+checks without claiming a production C control-flow walker, complete execution
+closure, mutation authorization or hardware qualification. Native integration
+remains open. Notebook backup process 14395 and its HP39gs emulator/transport
+children were confirmed live; no timeout-based restart was performed.
