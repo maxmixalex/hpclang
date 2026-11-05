@@ -106,7 +106,32 @@ def metadata(data, model, phase, size):
     )
 
 
-def verify(directory, model, rom_path=None):
+def ui_return_capacity(phases, model):
+    """Check the scripted UI's native heaps, not all Stock memory ownership."""
+    baseline = "fetch-complete" if MODELS[model] <= 3 else "armtoolbox"
+    require(baseline in phases, "missing UI pre-entry capacity snapshot")
+    before, after = phases[baseline], phases["settled-return"]
+    require(
+        before["time_us"] < phases["application-pass"]["time_us"],
+        "UI baseline must precede application PASS",
+    )
+    changes = []
+    for old, new in zip(before["heaps"], after["heaps"]):
+        require(old["heap"] == new["heap"], "native heap identity changed")
+        usable = new["usable_bytes"] - old["usable_bytes"]
+        largest = new["largest_usable_bytes"] - old["largest_usable_bytes"]
+        require(usable >= 0, "UI return lost native free capacity")
+        require(largest >= 0, "UI return reduced largest native free block")
+        changes.append(dict(heap=old["heap"], usable_delta=usable, largest_delta=largest))
+    return dict(
+        baseline_phase=baseline,
+        returned_phase="settled-return",
+        heaps=changes,
+        scope="Scripted UI native free capacity and fragmentation regression; not total memory ownership or a peak bound.",
+    )
+
+
+def verify(directory, model, rom_path=None, ui_return=False):
     model_id = MODELS[model]
     status_path = directory / f"{model}-stock.json"
     status = json.loads(status_path.read_text())
@@ -145,7 +170,7 @@ def verify(directory, model, rom_path=None):
         snapshots[0]["time_us"] < passed < returned and snapshots[-1]["phase"] == "settled-return",
         "invalid lifecycle order",
     )
-    return dict(
+    report = dict(
         version=1,
         model=model,
         passed=True,
@@ -156,6 +181,9 @@ def verify(directory, model, rom_path=None):
         free_list_roots=roots,
         snapshots=snapshots,
     )
+    if ui_return:
+        report["ui_return_capacity"] = ui_return_capacity(phases, model)
+    return report
 
 
 def main():
@@ -164,8 +192,9 @@ def main():
     parser.add_argument("--model", choices=MODELS, required=True)
     parser.add_argument("--rom", type=Path)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--ui-return", action="store_true", help="require UI native heap recovery")
     args = parser.parse_args()
-    report = verify(args.directory, args.model, args.rom)
+    report = verify(args.directory, args.model, args.rom, args.ui_return)
     with args.report.open("x", encoding="utf-8") as output:
         json.dump(report, output, indent=2)
         output.write("\n")
