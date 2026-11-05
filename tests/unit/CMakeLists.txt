@@ -588,6 +588,11 @@ target_include_directories(test_rpl_object_store PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(rpl_code test_rpl_code.c "${HPCLANG_ROOT}/runtime/core/rpl-code.c")
+hpclang_unit(rpl_execution test_rpl_execution.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-execution.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-code.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
+target_include_directories(test_rpl_execution PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 target_include_directories(test_rpl_code PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(rpl_reference test_rpl_reference.c

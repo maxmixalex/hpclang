@@ -10,6 +10,8 @@
 #include "rpl-port.h"
 #include "rpl-port-mutation.h"
 #include "launch-services.h"
+#include "rpl-execution.h"
+#include "rpl-stock-view.h"
 extern volatile uint32_t hpclang_e2e_result;
 static int prepare_call(struct hpclang_rpl_mutation_io *, uint32_t **, int *);
 
@@ -653,6 +655,119 @@ static int library_nibble(void *context, uint32_t at, uint8_t *out)
     return 1;
 }
 
+struct execution_probe
+{
+    struct hpclang_rpl_code_execution state;
+    struct hpclang_rpl_reference_guard guards[512];
+    struct hpclang_rpl_reference_guard_builder builder;
+    struct hpclang_rpl_stock_view view;
+    uint32_t *pc;
+    uint32_t observations[4], uses;
+};
+
+static int execution_observe(void *context, unsigned space, uint32_t at, uint8_t value)
+{
+    struct execution_probe *probe = context;
+    if (space > HPCLANG_RPL_EXECUTION_PC)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    ++probe->observations[space];
+    /* Code/data use the same current Saturn mapping; do not invent disjoint
+     * identities for two readers of that same address space. */
+    unsigned mapping = space < 2 ? 1 : space;
+    return hpclang_rpl_reference_guards_observe(&probe->builder, mapping, at, value);
+}
+
+static int execution_token(void *context, unsigned data, uint32_t at, uint8_t value,
+                           uint32_t *token)
+{
+    (void)context;
+    (void)data;
+    (void)value;
+    *token = at + 1;
+    return 0;
+}
+
+static int execution_visit(void *context, uint32_t pc,
+                           const struct hpclang_rpl_code_execution *state,
+                           const struct hpclang_rpl_code_step_uses *uses)
+{
+    (void)pc;
+    (void)state;
+    struct execution_probe *probe = context;
+    probe->uses += uses->count;
+    for (unsigned i = 0; i < uses->count; ++i)
+        if (uses->addresses[i].kind == HPCLANG_RPL_CODE_USE_MEMORY_TARGET)
+            return 1; /* Bounded observation, never a relocation certificate. */
+    return 0;
+}
+
+static int execution_guard_read(void *context, uint32_t mapping, uint32_t at, uint8_t *value)
+{
+    struct execution_probe *probe = context;
+    if (mapping == 1)
+        return hpclang_rpl_stock_view_saturn(&probe->view, at, value);
+    if (mapping == 2)
+        return hpclang_rpl_stock_view_native(&probe->view, at, value);
+    if (mapping == 3 && at < 8) {
+        *value = (*probe->pc >> (4 * at)) & 15;
+        return 1;
+    }
+    return 0;
+}
+
+static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
+{
+    struct execution_probe *probe = calloc(1, sizeof(*probe));
+    if (!probe)
+        return -1;
+    int result = -1;
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    probe->pc = hpclang_launch_execution_pc(boot);
+    if (!probe->pc || hpclang_rpl_stock_view_reader(&probe->view) ||
+        hpclang_rpl_reference_guards_begin(&probe->builder, probe->guards, 512))
+        goto done;
+    const struct hpclang_rpl_execution_io execution = {
+        {hpclang_rpl_stock_view_native, &probe->view},
+        {hpclang_rpl_stock_view_saturn, &probe->view},
+        {hpclang_rpl_stock_view_saturn, &probe->view},
+        execution_observe,
+        execution_token,
+        execution_visit,
+        probe};
+    uint32_t steps;
+    int stop = hpclang_rpl_execution_collect(boot, &execution, 0x200000, 64, &probe->state, &steps);
+    const struct hpclang_rpl_reference_reader guards = {execution_guard_read, probe};
+    if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY ||
+        hpclang_rpl_reference_guards_validate(&guards, probe->guards, probe->builder.count))
+        goto done;
+    struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    struct hpclang_rpl_directory_entry_view entry;
+    uint32_t length;
+    if (hpclang_rpl_directory_find(&reader, home, (const uint8_t *)"EXECOBS", 7, &entry) ||
+        entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
+        length != 133)
+        goto done;
+    uint32_t words[16] = {1,
+                          (uint32_t)stop,
+                          steps,
+                          probe->state.control.pc,
+                          probe->uses,
+                          probe->builder.count,
+                          probe->observations[0],
+                          probe->observations[1],
+                          probe->observations[2],
+                          probe->observations[3],
+                          *probe->pc,
+                          0x45584543};
+    for (unsigned i = 0; i < 16; ++i)
+        if (probe_write_word(io, entry.object_address + 10 + i * 8, words[i], 8))
+            goto done;
+    result = 0;
+done:
+    free(probe);
+    return result;
+}
+
 /* Record entry before library creation and controlled return-path rewrites.
  * ENTRYOBS is a fixed-size test-owned string: no geometry changes are needed. */
 static int capture_entry(struct hpclang_rpl_mutation_io *io, uint32_t home)
@@ -717,7 +832,7 @@ int hpclang_call_roots_probe(void)
         return -1;
     if (found || entry.prologue != 0x2d9d)
         return 60;
-    if (capture_entry(&io, home))
+    if (capture_entry(&io, home) || capture_execution(&io, home))
         return 64;
     struct hpclang_rpl_reader encoded = {library_nibble, NULL};
     struct hpclang_object *source = NULL, *existing = NULL;
