@@ -9,6 +9,43 @@ struct fixture
     uint8_t *nibbles;
     uint32_t writes;
 };
+
+static int reject_write(void *context, uint32_t at, uint8_t value)
+{
+    (void)context;
+    (void)at;
+    (void)value;
+    return 0;
+}
+
+/* Read-only fixture query: validate the entire TEMP chain before qualifying an
+ * exact allocation start. Containment or matching bytes are not sufficient. */
+int bank_temp_allocation(const struct hpclang_rpl_reader *reader, uint32_t address,
+                         uint32_t *extent)
+{
+    if (!reader || !extent)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct hpclang_rpl_mutation_io io = {.read_nibble = reader->read_nibble,
+                                         .write_nibble = reject_write,
+                                         .context = reader->context,
+                                         .temp_limit = 0x100000,
+                                         .user_limit = 0x80000};
+    return hpclang_rpl_mutation_find_temp(&io, address, extent);
+}
+int bank_temp_allocation_guarded(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                 uint32_t *extent, hpclang_rpl_root_dependency_fn dependency,
+                                 void *context)
+{
+    if (!reader)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct hpclang_rpl_mutation_io io = {.read_nibble = reader->read_nibble,
+                                         .write_nibble = reject_write,
+                                         .context = reader->context,
+                                         .temp_limit = 0x100000,
+                                         .user_limit = 0x80000};
+    return hpclang_rpl_mutation_find_guarded_temp(&io, address, extent, dependency, context);
+}
+
 static int read_nibble(void *context, uint32_t at, uint8_t *out)
 {
     struct fixture *f = context;
@@ -64,8 +101,9 @@ int bank_catalog_grow(uint8_t *nibbles, uint32_t *root, uint32_t *entry, uint32_
     if (entry && mode != 2)
         roots[count++] = entry;
     const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
-    struct hpclang_rpl_mutation_io io = {read_nibble, write_nibble, &f,      0x100000, 0x80000, 0,
-                                         roots,       count,        0x8611d, display,  4};
+    struct hpclang_rpl_mutation_io io = {read_nibble, write_nibble, &f,    0x100000, 0x80000,
+                                         0,           roots,        count, 0x8611d,  display,
+                                         4,           NULL};
     int result = hpclang_rpl_mutation_catalog_grow_repaired(&io, position, NULL);
     *root = *caller;
     *writes = f.writes;
@@ -75,23 +113,37 @@ int bank_catalog_grow(uint8_t *nibbles, uint32_t *root, uint32_t *entry, uint32_
 /* Controlled alternate command-4 return: caller proves R0's low address use.
  * This fixture supplies that obligation; it does not discover production roots.
  */
-int bank_catalog_grow_r0(uint8_t *nibbles, uint32_t *entry, uint32_t *r0, unsigned repair_r0,
-                         uint32_t *writes)
+int bank_catalog_grow_r0_guarded(uint8_t *nibbles, uint32_t *entry, uint32_t *r0,
+                                 unsigned repair_r0, uint32_t *writes,
+                                 const struct hpclang_rpl_reference_reader *guard_reader,
+                                 const struct hpclang_rpl_reference_guard *guards,
+                                 uint32_t guard_count, uint32_t expected_r0)
 {
     struct fixture f = {nibbles, 0};
-    uint32_t *roots[] = {entry};
+    uint32_t *roots[] = {entry, r0};
+    const uint32_t masks[] = {UINT32_MAX, 0xfffff};
     const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
     struct hpclang_rpl_mutation_io io = {
-        read_nibble, write_nibble, &f, 0x100000, 0x80000, 0, roots, 1, 0x8611d, display, 4};
-    const struct hpclang_rpl_register_repair reg = {r0, *r0};
+        read_nibble, write_nibble,        &f,      0x100000, 0x80000, 0,
+        roots,       repair_r0 ? 2u : 1u, 0x8611d, display,  4,       masks};
+    const struct hpclang_rpl_register_repair reg = {r0, expected_r0};
     const struct hpclang_rpl_catalog_repairs repairs = {
         .main_mapping = 1,
         .registers = repair_r0 ? &reg : NULL,
         .register_count = repair_r0 ? 1u : 0u,
+        .guard_reader = guard_reader,
+        .guards = guards,
+        .guard_count = guard_count,
     };
     int result = hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x86500, &repairs);
     *writes = f.writes;
     return result;
+}
+
+int bank_catalog_grow_r0(uint8_t *nibbles, uint32_t *entry, uint32_t *r0, unsigned repair_r0,
+                         uint32_t *writes)
+{
+    return bank_catalog_grow_r0_guarded(nibbles, entry, r0, repair_r0, writes, NULL, NULL, 0, *r0);
 }
 
 /* Controlled DUP continuation: A.A and R1.A point inside one TEMP allocation.
@@ -106,7 +158,7 @@ int bank_catalog_grow_dispatch_guarded(uint8_t *nibbles, uint32_t *a, uint32_t *
     struct fixture f = {nibbles, 0};
     const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
     struct hpclang_rpl_mutation_io io = {
-        read_nibble, write_nibble, &f, 0x100000, 0x80000, 0, NULL, 0, 0x8611d, display, 4};
+        read_nibble, write_nibble, &f, 0x100000, 0x80000, 0, NULL, 0, 0x8611d, display, 4, NULL};
     struct hpclang_rpl_register_repair registers[2];
     unsigned count = 0;
     if (mask & 1u)

@@ -154,6 +154,7 @@ jobs:
             build/e2e/*/e2e.stock-*.json
             build/e2e/*/launchers/*.bin
             build/e2e/*/launchers/*.hp
+            build/e2e/code-relocation*/launchers/objects/stage1.elf
             build/e2e/*/launchers/memory.json
           if-no-files-found: error
 
@@ -250,6 +251,7 @@ jobs:
       APPLICATION: ${{ matrix.suite.artifact }}
       HPCLANG_E2E_TARGET: ${{ matrix.model.target }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: ${{ matrix.suite.keyboard && '1' || '0' }}
+      HPCLANG_E2E_CAPTURE_STACK_POINTER: ${{ matrix.suite.mode == 'ui' && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -283,7 +285,12 @@ jobs:
         if: matrix.suite.verifier != ''
         env:
           VERIFIER: ${{ matrix.suite.verifier }}
-        run: python3 "$VERIFIER" direct "$FAMILY"
+        run: |
+          args=(direct "$FAMILY")
+          if [[ "$SUITE" == ui ]]; then
+            args+=(--stack-pointer)
+          fi
+          python3 "$VERIFIER" "${args[@]}"
 
       - name: Generate suite LCD evidence
         if: always()
@@ -315,6 +322,9 @@ jobs:
             build/*-*.pgm.png
             build/*-e2e.json
             build/*-frame-memory-*.json
+            build/*-frame-stack-pointer.jsonl
+            build/*-frame-stack-pointer-budget.json
+            build/*-frame-update-budget.json
             build/*-frame-*.lcd
             build/*-summary.png
             build/direct-${{ matrix.family }}-targets.txt
@@ -325,7 +335,9 @@ jobs:
     name: Stock / ${{ matrix.suite.mode }} / ${{ matrix.model.target }}
     needs: [build, x50ng, stock-assets]
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # Code relocation includes 14 independent native call/catalog launches;
+    # a passing HP50g job took nearly 25 minutes including setup.
+    timeout-minutes: ${{ matrix.suite.mode == 'code-relocation' && 35 || 25 }}
     strategy:
       fail-fast: false
       matrix:
@@ -337,6 +349,7 @@ jobs:
       APPLICATION: ${{ matrix.suite.artifact }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: ${{ matrix.suite.keyboard && '1' || '0' }}
       HPCLANG_E2E_CAPTURE_STAGE_POOL: ${{ matrix.suite.mode == 'ui' && '1' || '0' }}
+      HPCLANG_E2E_CAPTURE_STACK_POINTER: ${{ matrix.suite.mode == 'ui' && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -377,11 +390,47 @@ jobs:
             mkdir -p "$(dirname "$snapshot_dir")"
             mkdir "$snapshot_dir"
             export HPCLANG_X50NG_RESOURCE_SNAPSHOT="$snapshot_dir/$HPCLANG_E2E_TARGET"
+            export HPCLANG_X50NG_STACK_REGIONS="$PWD/build/$HPCLANG_E2E_TARGET-frame-stack-regions.jsonl"
+            export HPCLANG_X50NG_STACK_BANKS="$PWD/build/$HPCLANG_E2E_TARGET-frame-stack-banks.jsonl"
+            rm -f "$HPCLANG_X50NG_STACK_REGIONS" "$HPCLANG_X50NG_STACK_BANKS" "$PWD/build/$HPCLANG_E2E_TARGET-frame-stage-stack-budget.json"
           fi
           if [[ -f "build/e2e/$APPLICATION/e2e.stock-media.json" ]]; then
             bash tools/install-ci-packages.sh dosfstools mtools
           fi
           bash tests/e2e/harness/run-family.sh stock "$FAMILY" "build/e2e/$APPLICATION" "build/assets/$APPLICATION"
+          if [[ "$SUITE" == ui ]]; then
+            test -s "$HPCLANG_X50NG_STACK_BANKS"
+          fi
+
+      - name: Verify execution references against original interpreter
+        if: matrix.suite.mode == 'code-relocation'
+        run: |
+          bash tools/install-ci-packages.sh gcc python3-venv
+          python3 -m venv build/relocation-venv
+          build/relocation-venv/bin/pip install --disable-pip-version-check \
+            -r tests/e2e/code-relocation/requirements.txt
+          build/relocation-venv/bin/python tests/e2e/code-relocation/incoming_carry.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/pc_exchange.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/pc-exchange"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/register_roots.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --stage1-elf "build/e2e/$APPLICATION/launchers/objects/stage1.elf" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/register-roots"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/return_underflow.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --stage1-elf "build/e2e/$APPLICATION/launchers/objects/stage1.elf" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/return-underflow"
+          build/relocation-venv/bin/python tests/e2e/code-relocation/bank_switch_maps.py \
+            --state "build/$HPCLANG_E2E_TARGET-state" \
+            --model "$HPCLANG_E2E_TARGET" \
+            --output "build/$HPCLANG_E2E_TARGET-incoming-carry/bank-switch-maps"
 
       - name: Verify suite-specific evidence
         if: matrix.suite.verifier != ''
@@ -390,7 +439,7 @@ jobs:
         run: |
           args=(stock "$FAMILY")
           if [[ "$SUITE" == ui ]]; then
-            args+=(--pool --artifact "build/e2e/$APPLICATION")
+            args+=(--pool --artifact "build/e2e/$APPLICATION" --stack-pointer --stage-stack)
           fi
           python3 "$VERIFIER" "${args[@]}"
 
@@ -402,7 +451,7 @@ jobs:
           cp "build/$HPCLANG_E2E_TARGET-stock.json" "$snapshot_dir/"
           cp "build/$HPCLANG_E2E_TARGET-state/flash" "$snapshot_dir/state/flash"
           python3 tests/e2e/harness/verify-resource-snapshots.py "$snapshot_dir" \
-            --model "$HPCLANG_E2E_TARGET" --report "$snapshot_dir/verified-lifecycle.json"
+            --model "$HPCLANG_E2E_TARGET" --ui-return --report "$snapshot_dir/verified-lifecycle.json"
 
       - name: Generate suite LCD evidence
         if: always()
@@ -433,6 +482,9 @@ jobs:
             build/*-*.pgm
             build/*-*.pgm.png
             build/*-*.json
+            build/*-frame-stack-pointer.jsonl
+            build/*-frame-stack-regions.jsonl
+            build/*-frame-stack-banks.jsonl
             build/*-frame-*.lcd
             build/*-kermit*
             build/*-socat.log
@@ -442,6 +494,7 @@ jobs:
             build/stock-${{ matrix.model.family }}-targets.txt
             build/*-stock-media.img
             build/*-code-relocation/**
+            build/*-incoming-carry/**
             build/resource-snapshots/**
             build/e2e/${{ matrix.suite.artifact }}/e2e.hpc
             build/e2e/${{ matrix.suite.artifact }}/e2e.stock-*.json

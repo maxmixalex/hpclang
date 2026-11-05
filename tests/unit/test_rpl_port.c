@@ -742,8 +742,220 @@ static void test_rom_bank_layout(void)
     assert(bank.physical == 0x4000 && bank.bytes == 1024);
 }
 
+struct bank_observations
+{
+    const struct image *image;
+    uint8_t seen[160];
+    unsigned count, stop;
+    int positive;
+};
+
+static int observe_bank(void *context, uint32_t address, uint8_t value)
+{
+    struct bank_observations *observations = context;
+    assert(address < sizeof(observations->seen));
+    assert(value == observations->image->data[address]);
+    observations->seen[address] = 1;
+    return ++observations->count == observations->stop ? (observations->positive ? 1 : -79) : 0;
+}
+
+static void test_guarded_configuration(void)
+{
+    struct image image = {.count = 100, .fail_at = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put_word(&image, 5, 161, 3);
+    const unsigned fields[] = {5, 6, 7, 23, 24, 25, 26, 27};
+    for (unsigned present = 0; present < 2; ++present) {
+        put_word(&image, 23, present ? 57 : 0, 5);
+        uint32_t target = 91;
+        struct bank_observations observations = {.image = &image};
+        assert(hpclang_rpl_library_configuration_guarded(
+                   &reader, 0, 100, 5, 161, &target, observe_bank, &observations) == (int)present);
+        assert(target == (present ? 80u : 91u) && observations.count == 8);
+        for (unsigned at = 0; at < 100; ++at)
+            assert(observations.seen[at] == ((at >= 5 && at < 8) || (at >= 23 && at < 28)));
+        for (unsigned i = 0; i < 8; ++i) {
+            for (int positive = 0; positive < 2; ++positive) {
+                target = 91;
+                observations = (struct bank_observations){
+                    .image = &image, .stop = i + 1, .positive = positive};
+                int result = hpclang_rpl_library_configuration_guarded(
+                    &reader, 0, 100, 5, 161, &target, observe_bank, &observations);
+                assert(result == (positive ? HPCLANG_RPL_SPAN_MALFORMED : -79));
+                assert(target == 91 && observations.count == i + 1);
+            }
+            observations = (struct bank_observations){.image = &image};
+            image.fail_at = fields[i];
+            assert(hpclang_rpl_library_configuration_guarded(&reader, 0, 100, 5, 161, &target,
+                                                             observe_bank, &observations) ==
+                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(target == 91 && !observations.seen[fields[i]]);
+            image.fail_at = UINT32_MAX;
+            uint8_t saved = image.data[fields[i]];
+            image.data[fields[i]] = 16;
+            observations = (struct bank_observations){.image = &image};
+            assert(hpclang_rpl_library_configuration_guarded(&reader, 0, 100, 5, 161, &target,
+                                                             observe_bank, &observations) ==
+                   HPCLANG_RPL_SPAN_MALFORMED);
+            assert(target == 91 && !observations.seen[fields[i]]);
+            image.data[fields[i]] = saved;
+        }
+        assert(hpclang_rpl_library_configuration_guarded(&reader, 0, 100, 5, 161, &target, NULL,
+                                                         &observations) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+    }
+}
+
+static void test_guarded_bank_lookup(void)
+{
+    struct image image = {.count = 125, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    for (uint32_t i = 0; i < 16; ++i)
+        put_word(&image, 7 * i, 0x12345 + i * i, 5);
+    put_word(&image, 120, 0x45678, 5);
+    struct bank_observations observations = {.image = &image};
+    struct hpclang_rpl_bank_binding binding = {HPCLANG_RPL_BANK_FLASH, 99};
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x45678, &binding, observe_bank,
+                                           &observations) == 1);
+    assert(binding.kind == HPCLANG_RPL_BANK_ERAM && !binding.index);
+    assert(observations.count == 85);
+    for (unsigned at = 0; at < 125; ++at)
+        assert(observations.seen[at] == (at >= 120 || (at < 112 && at % 7 < 5)));
+    const struct hpclang_rpl_bank_binding sentinel = {HPCLANG_RPL_BANK_FLASH, 99};
+    for (unsigned stop = 1; stop <= 85; ++stop) {
+        binding = sentinel;
+        observations = (struct bank_observations){.image = &image, .stop = stop};
+        assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                               &observations) == -79);
+        assert(observations.count == stop && !memcmp(&binding, &sentinel, sizeof(binding)));
+    }
+    for (unsigned at = 0; at < 125; ++at) {
+        if (!(at >= 120 || (at < 112 && at % 7 < 5)))
+            continue;
+        binding = sentinel;
+        observations = (struct bank_observations){.image = &image};
+        image.fail_at = at;
+        assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                               &observations) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!observations.seen[at] && !memcmp(&binding, &sentinel, sizeof(binding)));
+        image.fail_at = UINT32_MAX;
+        uint8_t old = image.data[at];
+        image.data[at] = 16;
+        observations = (struct bank_observations){.image = &image};
+        assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                               &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!observations.seen[at] && !memcmp(&binding, &sentinel, sizeof(binding)));
+        image.data[at] = old;
+    }
+    observations = (struct bank_observations){.image = &image};
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x99999, &binding, observe_bank,
+                                           &observations) == 0);
+    assert(observations.count == 85 && !memcmp(&binding, &sentinel, sizeof(binding)));
+    observations = (struct bank_observations){.image = &image, .stop = 85, .positive = 1};
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                           &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&binding, &sentinel, sizeof(binding)));
+    put_word(&image, 120, 0x12345, 5);
+    observations = (struct bank_observations){.image = &image};
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, observe_bank,
+                                           &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&binding, &sentinel, sizeof(binding)));
+    assert(hpclang_rpl_bank_lookup_guarded(&reader, 0, 120, 0x12345, &binding, NULL,
+                                           &observations) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
+static void test_bank_alias(void)
+{
+    struct image image = {.count = 160, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    for (uint32_t i = 0; i < 16; ++i)
+        put_word(&image, 7 * i, i == 2 ? 140 : 1000 + i, 5);
+    put_word(&image, 120, 2000, 5);
+    const uint8_t expected[20] = {1, 2, 3, 4};
+    memcpy(image.data + 130, expected, sizeof expected);
+    struct hpclang_rpl_bank_identity_range range = {130, 20, expected};
+    const struct hpclang_rpl_bank_binding sentinel = {HPCLANG_RPL_BANK_ERAM, 99};
+    struct hpclang_rpl_bank_binding output = sentinel;
+    struct bank_observations observations = {.image = &image};
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1, &output,
+                                                 observe_bank, &observations) == 1);
+    assert(output.kind == HPCLANG_RPL_BANK_FLASH && output.index == 2);
+    assert(observations.count == 105);
+    for (unsigned at = 130; at < 150; ++at) {
+        output = sentinel;
+        observations = (struct bank_observations){.image = &image};
+        image.data[at] ^= 1;
+        assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1,
+                                                     &output, observe_bank, &observations) ==
+               HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+        image.data[at] ^= 1;
+        image.fail_at = at;
+        observations = (struct bank_observations){.image = &image};
+        assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1,
+                                                     &output, observe_bank, &observations) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+        image.fail_at = UINT32_MAX;
+    }
+    for (unsigned stop = 1; stop <= 105; ++stop) {
+        observations = (struct bank_observations){.image = &image, .stop = stop};
+        assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1,
+                                                     &output, observe_bank, &observations) == -79);
+        assert(!memcmp(&output, &sentinel, sizeof output));
+    }
+    observations = (struct bank_observations){.image = &image, .stop = 1, .positive = 1};
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1, &output,
+                                                 observe_bank,
+                                                 &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+    observations = (struct bank_observations){.image = &image};
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 131, 130, 140, &range, 1, &output,
+                                                 observe_bank, &observations) == 0);
+    assert(!observations.count);
+    range.length = 10; /* Alias alone cannot qualify the canonical entry. */
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1, &output,
+                                                 observe_bank,
+                                                 &observations) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    range.length = 20;
+    put_word(&image, 120, 140, 5); /* Ambiguous canonical table match. */
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1, &output,
+                                                 observe_bank,
+                                                 &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&output, &sentinel, sizeof output));
+    put_word(&image, 120, 2000, 5);
+    put_word(&image, 14, 3000, 5); /* Canonical entry absent. */
+    observations = (struct bank_observations){.image = &image};
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1, &output,
+                                                 observe_bank, &observations) == 0);
+    range.address = 0xfffff;
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1, &output,
+                                                 observe_bank,
+                                                 &observations) == HPCLANG_RPL_SPAN_BOUNDS);
+    range.address = 130;
+    uint8_t invalid[20] = {16};
+    range.nibbles = invalid;
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1, &output,
+                                                 observe_bank,
+                                                 &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+    range.nibbles = expected;
+    image.data[130] = 16;
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1, &output,
+                                                 observe_bank,
+                                                 &observations) == HPCLANG_RPL_SPAN_MALFORMED);
+    image.data[130] = expected[0];
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 0, &output,
+                                                 observe_bank,
+                                                 &observations) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_bank_alias_lookup_guarded(&reader, 0, 120, 130, 130, 140, &range, 1, &output,
+                                                 NULL,
+                                                 &observations) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!memcmp(&output, &sentinel, sizeof output));
+}
+
 static void test_bank_lookup(void)
 {
+    test_bank_alias();
+    test_guarded_bank_lookup();
     struct image image = {.count = 125, .fail_at = UINT32_MAX};
     struct hpclang_rpl_reader reader = {read_nibble, &image};
     for (uint32_t i = 0; i < 16; ++i)
@@ -781,8 +993,149 @@ static int mapped_nibble(void *context, uint32_t address, uint8_t *value)
     return read_nibble(context, address - 0x40000u, value);
 }
 
+static int observe_mapped_bank(void *context, uint32_t address, uint8_t value)
+{
+    assert(address >= 0x40000u);
+    return observe_bank(context, address - 0x40000u, value);
+}
+
+static void test_guarded_flashptr(void)
+{
+    for (unsigned special = 0; special < 2; ++special) {
+        struct image image = {.count = 15, .fail_at = UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {special ? mapped_nibble : read_nibble, &image};
+        hpclang_rpl_bank_dependency_fn observe = special ? observe_mapped_bank : observe_bank;
+        put_word(&image, 0, special ? 2 : 0x26ac, 5);
+        if (special) {
+            put_word(&image, 10, 0x6f8e, 5);
+        } else {
+            put_word(&image, 5, 0xfff, 3);
+            put_word(&image, 8, 0xffff, 4);
+        }
+        unsigned count = special ? 10 : 12;
+        for (unsigned fault = 0; fault < 5; ++fault) {
+            for (unsigned stop = 1; stop <= (fault ? count : 1); ++stop) {
+                unsigned at = special && stop > 5 ? stop + 4 : stop - 1;
+                uint8_t saved = image.data[at];
+                struct bank_observations observations = {.image = &image};
+                if (fault == 1 || fault == 2) {
+                    observations.stop = stop;
+                    observations.positive = fault == 2;
+                } else if (fault == 3) {
+                    image.fail_at = at;
+                } else if (fault == 4) {
+                    image.data[at] = 16;
+                }
+                uint32_t target = 99;
+                struct hpclang_rpl_flashptr decoded = {99, 99};
+                int result = special ? hpclang_rpl_flashptr_table_lookup_guarded(
+                                           &reader, 0x40000, 0x4000f, 0x40000, 1, &target, observe,
+                                           &observations)
+                                     : hpclang_rpl_flashptr_decode_guarded(&reader, 0, 12, &decoded,
+                                                                           observe, &observations);
+                if (!fault) {
+                    assert(result == 1 && observations.count == count);
+                    assert(special ? target == 0x6f8e
+                                   : decoded.selector == 0xfff && decoded.index == 0xffff);
+                    for (unsigned p = 0; p < 160; ++p)
+                        assert(observations.seen[p] ==
+                               (special ? p < 5 || (p >= 10 && p < 15) : p < 12));
+                } else {
+                    int expected = fault == 1   ? -79
+                                   : fault == 3 ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                                                : HPCLANG_RPL_SPAN_MALFORMED;
+                    assert(result == expected && target == 99 && decoded.selector == 99 &&
+                           decoded.index == 99);
+                    assert(observations.count == stop - (fault >= 3));
+                }
+                image.fail_at = UINT32_MAX;
+                image.data[at] = saved;
+            }
+        }
+    }
+    {
+        struct image image = {.count = 15, .fail_at = UINT32_MAX};
+        const struct hpclang_rpl_reader mapped = {mapped_nibble, &image};
+        const struct hpclang_rpl_reader source = {read_nibble, &image};
+        struct bank_observations observations = {.image = &image};
+        uint32_t target = 99;
+        put_word(&image, 0, 2, 5);
+        assert(!hpclang_rpl_flashptr_table_lookup_guarded(
+            &mapped, 0x40000, 0x4000f, 0x40000, 2, &target, observe_mapped_bank, &observations));
+        assert(target == 99 && observations.count == 5);
+        struct hpclang_rpl_flashptr pointer = {99, 99};
+        observations = (struct bank_observations){.image = &image};
+        assert(hpclang_rpl_flashptr_decode_guarded(&source, 0, 12, &pointer, observe_bank,
+                                                   &observations) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(pointer.selector == 99 && pointer.index == 99 && observations.count == 5);
+        assert(hpclang_rpl_flashptr_decode_guarded(&source, 0, 12, &pointer, NULL, &observations) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(hpclang_rpl_flashptr_table_lookup_guarded(&mapped, 0x40000, 0x4000f, 0x40000, 0,
+                                                         &target, NULL, &observations) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+    }
+    for (unsigned stage = 0; stage < 2; ++stage) {
+        struct image image = {.count = 160, .fail_at = UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {stage ? mapped_nibble : read_nibble, &image};
+        hpclang_rpl_bank_dependency_fn observe = stage ? observe_mapped_bank : observe_bank;
+        if (stage) {
+            put_word(&image, 0, 0x20f, 4);
+            put_word(&image, 29, 2, 5);
+            put_word(&image, 39, 0x6f8e, 5);
+        } else {
+            for (unsigned i = 0; i < 16; ++i)
+                put_word(&image, 80 + 5 * i, 0x70000 + i, 5);
+            put_word(&image, 5, 0x70002, 5);
+        }
+        const unsigned count = stage ? 14 : 85;
+        for (unsigned fault = 0; fault < 5; ++fault) {
+            for (unsigned stop = 1; stop <= count; ++stop) {
+                /* Lookup reads identity, count, selected target; configuration
+                 * resolution reads selector 1 and every physical-bank cell. */
+                unsigned at = stage ? (stop <= 4   ? stop - 1
+                                       : stop <= 9 ? stop + 24
+                                                   : stop + 29)
+                                    : (stop <= 5 ? stop + 4 : stop + 74);
+                uint8_t saved = image.data[at];
+                struct bank_observations observations = {.image = &image};
+                if (fault == 1 || fault == 2) {
+                    observations.stop = stop;
+                    observations.positive = fault == 2;
+                } else if (fault == 3) {
+                    image.fail_at = at;
+                } else if (fault == 4) {
+                    image.data[at] = 16;
+                }
+                uint32_t output = 99;
+                int result = stage ? hpclang_rpl_flashptr_lookup_guarded(
+                                         &reader, 0x40000, 2, 1, &output, observe, &observations)
+                                   : hpclang_rpl_flashptr_bank_guarded(&reader, 0, 80, 1, &output,
+                                                                       observe, &observations);
+                if (!fault) {
+                    assert(result == 1 && output == (stage ? 0x6f8e : 2));
+                    assert(observations.count == count);
+                    for (unsigned p = 0; p < 160; ++p) {
+                        int expected = stage ? (p < 4 || (p >= 29 && p < 34) || (p >= 39 && p < 44))
+                                             : ((p >= 5 && p < 10) || p >= 80);
+                        assert(observations.seen[p] == expected);
+                    }
+                } else {
+                    int expected = fault == 1   ? -79
+                                   : fault == 3 ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                                                : HPCLANG_RPL_SPAN_MALFORMED;
+                    assert(result == expected && output == 99);
+                    assert(observations.count == stop - (fault >= 3));
+                }
+                image.fail_at = UINT32_MAX;
+                image.data[at] = saved;
+            }
+        }
+    }
+}
+
 static void test_flashptr_bank(void)
 {
+    test_guarded_flashptr();
     struct image image = {.count = 160, .fail_at = UINT32_MAX};
     const struct hpclang_rpl_reader reader = {read_nibble, &image};
     for (uint32_t i = 0; i < 16u; ++i)
@@ -945,9 +1298,58 @@ static void test_acptr_resolution(void)
                    (bank < 16 ? HPCLANG_RPL_BANK_FLASH : HPCLANG_RPL_BANK_ERAM));
             assert(target.bank.index == (bank < 16 ? bank : 0));
             assert(target.offset == pointers[i] - 0x40000u);
+            struct bank_observations so = {.image = &source}, ro = {.image = &rom};
+            struct hpclang_rpl_banked_target guarded;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &guarded,
+                                                     observe_bank, &so, observe_bank, &ro) == 1);
+            assert(!memcmp(&guarded, &target, sizeof target));
+            assert(so.count == 15 && ro.count == 85);
+            for (unsigned at = 0; at < 125; ++at) {
+                assert(so.seen[at] == (at < 15));
+                assert(ro.seen[at] == (at >= 120 || (at < 112 && at % 7 < 5)));
+            }
         }
     }
     const struct hpclang_rpl_banked_target before = target;
+    for (unsigned stream = 0; stream < 2; ++stream) {
+        struct image *failing = stream ? &rom : &source;
+        for (unsigned at = 0; at < (stream ? 125u : 15u); ++at) {
+            if (stream && at < 120 && (at >= 112 || at % 7 >= 5))
+                continue;
+            struct bank_observations so = {.image = &source}, ro = {.image = &rom};
+            failing->fail_at = at;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &target,
+                                                     observe_bank, &so, observe_bank,
+                                                     &ro) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(!memcmp(&target, &before, sizeof target));
+            assert(!(stream ? ro.seen[at] : so.seen[at]));
+            failing->fail_at = UINT32_MAX;
+            uint8_t old = failing->data[at];
+            failing->data[at] = 16;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &target,
+                                                     observe_bank, &so, observe_bank,
+                                                     &ro) == HPCLANG_RPL_SPAN_MALFORMED);
+            assert(!memcmp(&target, &before, sizeof target));
+            failing->data[at] = old;
+        }
+    }
+    for (unsigned stream = 0; stream < 2; ++stream) {
+        for (unsigned stop = 1; stop <= (stream ? 85u : 15u); ++stop) {
+            struct bank_observations so = {.image = &source}, ro = {.image = &rom};
+            struct bank_observations *failing = stream ? &ro : &so;
+            failing->stop = stop;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &target,
+                                                     observe_bank, &so, observe_bank, &ro) == -79);
+            assert(!memcmp(&target, &before, sizeof target));
+            assert(failing->count == stop && (stream || !ro.count));
+            failing->positive = 1;
+            so.count = ro.count = 0;
+            assert(hpclang_rpl_acptr_resolve_guarded(&reader, 0, 15, &tables, 0, 120, &target,
+                                                     observe_bank, &so, observe_bank,
+                                                     &ro) == HPCLANG_RPL_SPAN_MALFORMED);
+            assert(!memcmp(&target, &before, sizeof target));
+        }
+    }
     for (unsigned limit = 0; limit < 15; ++limit) {
         assert(hpclang_rpl_acptr_resolve(&reader, 0, limit, &tables, 0, 120, &target) ==
                HPCLANG_RPL_SPAN_BOUNDS);
@@ -1064,8 +1466,92 @@ static void test_catalog_rebind(void)
     }
 }
 
+struct geometry_control
+{
+    unsigned reads, observations, stop, mode;
+};
+struct geometry_image
+{
+    uint8_t data[2048];
+    struct geometry_control *control;
+};
+
+static void geometry_put(struct geometry_image *image, unsigned at, uint32_t value, unsigned width)
+{
+    for (unsigned i = 0; i < width; ++i)
+        image->data[at + i] = (value >> (i * 4u)) & 15u;
+}
+static int geometry_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct geometry_image *image = context;
+    assert(address < sizeof image->data);
+    struct geometry_control *control = image->control;
+    *value = image->data[address];
+    if (++control->reads == control->stop) {
+        if (control->mode == 1)
+            return 0;
+        if (control->mode == 2)
+            *value = 16;
+    }
+    return 1;
+}
+static int geometry_observe(void *context, uint32_t address, uint8_t value)
+{
+    struct geometry_image *image = context;
+    assert(image->data[address] == value);
+    struct geometry_control *control = image->control;
+    if (++control->observations == control->stop && control->mode >= 3)
+        return control->mode == 3 ? -71 : 71;
+    return 0;
+}
+static void test_geometry_capture(void)
+{
+    struct geometry_control control = {0};
+    struct geometry_image rom = {.control = &control}, state = {.control = &control};
+    geometry_put(&rom, 0x20, 0x20, 8);
+    geometry_put(&rom, 0x28, 0x3fe, 8);
+    geometry_put(&rom, 0x40, 2, 2);
+    geometry_put(&rom, 0x7fc, 64, 2);
+    geometry_put(&rom, 0x7fe, 32, 2);
+    geometry_put(&state, 0x80, 0x400, 8);
+    geometry_put(&state, 0x88, 0x10400, 8);
+    struct hpclang_rpl_reader rr = {geometry_read, &rom}, sr = {geometry_read, &state};
+    struct hpclang_rpl_rom_bank banks[16], expected[16] = {{0x400, 0x10000}, {0x10400, 0x8000}};
+    assert(!hpclang_rpl_rom_bank_capture_guarded(&rr, &sr, 0x10, 0x40, 0x18400, banks,
+                                                 geometry_observe, &rom, geometry_observe, &state));
+    assert(!memcmp(banks, expected, sizeof banks) && control.reads == 150 &&
+           control.observations == 150);
+    for (unsigned mode = 1; mode <= 4; ++mode) {
+        for (unsigned stop = 1; stop <= 150; ++stop) {
+            control = (struct geometry_control){.stop = stop, .mode = mode};
+            memset(banks, 0xa5, sizeof banks);
+            struct hpclang_rpl_rom_bank before[16];
+            memcpy(before, banks, sizeof banks);
+            int result = hpclang_rpl_rom_bank_capture_guarded(&rr, &sr, 0x10, 0x40, 0x18400, banks,
+                                                              geometry_observe, &rom,
+                                                              geometry_observe, &state);
+            assert(result == (mode == 1   ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                              : mode == 3 ? -71
+                                          : HPCLANG_RPL_SPAN_MALFORMED));
+            assert(control.reads == stop && !memcmp(banks, before, sizeof banks));
+        }
+    }
+    control = (struct geometry_control){0};
+    geometry_put(&state, 0x90, 1, 8); /* Unpopulated bank must have no base. */
+    assert(hpclang_rpl_rom_bank_capture_guarded(&rr, &sr, 0x10, 0x40, 0x18400, banks,
+                                                geometry_observe, &rom, geometry_observe,
+                                                &state) < 0);
+    assert(hpclang_rpl_rom_bank_capture_guarded(&rr, &sr, 0x7fff9, 0x40, 0x18400, banks,
+                                                geometry_observe, &rom, geometry_observe,
+                                                &state) < 0);
+    assert(hpclang_rpl_rom_bank_capture_guarded(NULL, &sr, 0x10, 0x40, 0x18400, banks,
+                                                geometry_observe, &rom, geometry_observe,
+                                                &state) < 0);
+}
+
 int main(void)
 {
+    test_geometry_capture();
     test_catalog_rebind();
     test_catalog_insertion();
     test_catalog_removal();
@@ -1078,6 +1564,7 @@ int main(void)
     test_library_command_resolution();
     test_library_attachment_targets();
     test_library_configuration();
+    test_guarded_configuration();
     test_rom_bank_layout();
     test_library_catalog_lookup();
     test_catalog_traversal();
