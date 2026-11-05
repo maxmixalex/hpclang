@@ -4328,3 +4328,23 @@ unified-execution.json and discovered-origins.json. Reproducer:
 research/nov05-discovered-origin-move.py. An initial CI status read hit API 502;
 the read-only exact-head audit was repeated successfully, without rerunning CI.
 Notebook 384ae39d now has 12 queued workflows/20 queued jobs; no CI acceptance.
+
+## 2026-11-05 — Native execution capture delivery
+
+Capture implementation `123fe460` reads the reviewed HP49g+/50g CPU layout
+through the state-relative reader, retaining 256 nibble dependencies and native
+source identities. Entry-PC provenance remains a separate caller obligation.
+Both full unit targets pass GCC ASan/UBSan, including capture failure injection
+at all 256 positions for four failure modes. ARM compilation passes; analysis
+with the repository's intentional fixed-address-access exclusion reports zero
+diagnostics (capture-analysis-qualified.plist). The earlier raw report retains
+three fixed-address warnings in existing hardware page-table accesses.
+
+Both captured-execution.json and captured-origin-move.json match current source
+hashes. Each model completes 21 evaluated instructions and nine address uses;
+the actual catalog move performs 10658 nibble writes and original ROM execution
+reaches the first indirect target. Stale/conflicting plans reject with zero
+writes. Evidence is under /work/nov05-data-step; reproducers are
+research/nov05-captured-execution-path.py and nov05-captured-origin-move.py.
+This is bounded saved-state validation, not complete execution coverage,
+production mutation integration, full Stock return or hardware acceptance.
