@@ -4966,3 +4966,98 @@ FIFO read, with no observed unread clear/discard. Intermediate byte values are
 not individually logged, and this does not prove successful delivery to the
 firmware Kermit parser. Evidence: /work/nov05-pr27-usb-replay/replay.json,
 run.log and usb-out-accounting.json. No transport fix or CI acceptance claimed.
+
+## 2026-11-05 — Notebook current-parent integration and fresh export acceptance
+
+Local merge 3ce8acb0 integrates parent e8ad129f and current native foundations.
+Only roadmap/history required conflict resolution. Fresh export on HP49g+ and
+HP50g completes both launches per model. Independent audit rechecks sealed
+source/application inputs and artifacts, pixels, resource observations and
+settled return; maintained execution also checks the raw SD card and fixtures.
+Evidence: /work/nov05-notebook-parent-export/independent-audit.json.
+Observed stack use is 6656/8192 bytes on export and 3944/8192 on relaunch;
+reserved heap is 12412 bytes. These measurements cover the instrumented fixture,
+not all firmware/launcher reservations or physical hardware.
+
+25 resource/lifecycle/stack observer tests pass in the container with LF shell
+files; strict host documentation build passes. Initial direct-mount lifecycle
+test failed on Windows CRLF; first isolated copies lacked fixture dependencies.
+The complete fixture copy passes, with no production source change. Evidence:
+/work/nov05-parent-python-checks/result.log. Six-model backup and C/C++ sanitizer
+processes remain live at this checkpoint. Candidate remains unpushed; old
+HP40gs pre-entry USB CI failure and broader M8 acceptance are still open.
+
+## 2026-11-05 — Notebook retained-card and partial persistence recheck
+
+Local merge 3ce8acb0 integrates parent e8ad129f and current native foundations.
+Only roadmap/history required conflict resolution. Fresh export on HP49g+ and
+HP50g completes both launches per model. Independent audit rechecks sealed
+source/application inputs and artifacts, pixels, resource observations and
+settled return; maintained execution also checks the raw SD card and fixtures.
+Evidence: /work/nov05-notebook-parent-export/independent-audit.json.
+Observed stack use is 6656/8192 bytes on export and 3944/8192 on relaunch;
+reserved heap is 12412 bytes. These measurements cover the instrumented fixture,
+not all firmware/launcher reservations or physical hardware.
+
+The partial persistence audit covers HP48gII and HP49g+ only (six launches); its complete flag remains false. Export audit now independently re-reads both retained raw cards against the sealed manifests and records card hashes. Both UTF-8 output, maximum-length output and preserved KEEP.TXT match exactly. No fixture execution was repeated for this read-only audit.
+
+25 resource/lifecycle/stack observer tests pass in the container with LF shell
+files; strict host documentation build passes. Initial direct-mount lifecycle
+test failed on Windows CRLF; first isolated copies lacked fixture dependencies.
+The complete fixture copy passes, with no production source change. Evidence:
+/work/nov05-parent-python-checks/result.log. Six-model backup and C/C++ sanitizer
+processes remain live at this checkpoint. Candidate remains unpushed; old
+HP40gs pre-entry USB CI failure and broader M8 acceptance are still open.
+
+## 2026-11-05 — Data-instruction value/origin evaluation
+
+Local 17b7f6be adds an internal C evaluator for inspected literals, assignments,
+exchanges, memory loads and D0/D1 adjustments. Values and origins advance
+together; failed reads/token resolution preserve all output state. Stores and
+control transfers remain unsupported. Computed next-PC captures have unknown
+origins rather than pretending to name encoded literal cells. Address uses,
+mapping guards and path ownership remain the collector's responsibility.
+
+New tests cover data-source propagation, each failed load/token position,
+whole-register copies and zeroing, wrapped 16-nibble literal loads, next-PC
+capture, address overflow/carry and bounds. The full rpl_code unit executable
+passes GCC ASan/UBSan; ARMv4T compilation and Clang static analysis pass.
+Independent comparison with captured original HP49g+/HP50g interpreter states
+matches 30 supported data steps, including origins and instruction lengths.
+This comparison seeds each instruction from its recorded incoming state; it
+does not yet prove an autonomous whole-path walker or production integration.
+Evidence: /work/nov05-data-step/entry-data-steps.json and analysis.plist;
+reproducer: research/nov05-data-step-trace.py. Follow-up remains unpushed while
+the previous PR #31 CI runs.
+
+Separately, Notebook integration 3ce8acb0 passes all 172 C/C++ ASan/UBSan tests
+in /work/nov05-notebook-parent-unit/run.log. Python tooling is separate (25
+focused tests previously passed). Six-model persistence/backup remains active;
+no all-model completion is inferred from the completed subset.
+
+## 2026-11-05 — Integrated Notebook six-model acceptance
+
+Integration 3ce8acb0 passes all six Stock persistence/backup cases (18 launches)
+and the complete independent input/artifact/pixel/return/resource audit:
+/work/nov05-notebook-parent-backup/independent-persistence-audit.json. Artifacts
+were sealed before each execution, including HP39g+; no restart qualification
+is needed for this new run. Peak touched stack is 7760/8192 on HP48gII,
+7768/8192 on HP49g+/HP50g, and 2520/8192 on HP39 models. Backup at maximum note
+length is included where supported. Instrumented fixture coverage does not
+prove all shipped-loop paths, firmware/launcher reservations or hardware.
+
+Two-model SD export passes four launches and independent retained raw-card
+checks, including exact UTF-8, maximum-length output and preserved KEEP.TXT.
+All 172 C/C++ ASan/UBSan tests, 25 focused Python tests and strict docs pass.
+Before delivery, exact previous head 3312be9c still has one failed HP40gs
+system-services USB transfer before app entry; no transport fix is claimed.
+The changed, freshly tested integration is a new delivery, not a blind retry
+or proof that the historical transport failure is resolved.
+
+M8.0 local 4b325099 adds explicit decimal mode, SETHEX/SETDEC and D.A increment.
+Original-ROM probes on both models confirm mode-dependent arithmetic and the
+mode field at CPU+0x974. Nondecimal digits in decimal arithmetic are unsupported.
+Sanitizer/ARM compile/analysis pass; C-evaluated single-seed paths still match
+21 instructions per model, now also comparing decimal mode. Python organizes
+the loop and token ownership; production integration remains open. Evidence:
+/work/nov05-data-step/arithmetic-mode.json and c-evaluated-path.json.
