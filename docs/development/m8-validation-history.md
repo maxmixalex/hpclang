@@ -4482,3 +4482,40 @@ These are observed toolchain-download failures, not evidence of port-test
 failure or successful acceptance. The workflow still has pending jobs; no
 blind rerun or merge was performed. Logs: research/nov05-ci-127262244111.log
 and research/nov05-ci-127262244168.log. Other audited deliveries remain pending.
+
+## 2026-11-05 — Guarded native 81BD execution
+
+Implementation 9865ee8b adds qualified HP49g+/HP50g native 81BD semantics to the
+execution evaluator. Each step reports three dependent load addresses and the
+resulting memory target. Loaded A digits retain their memory origins; arithmetic
+on the low 32-bit B/D words and D0 clears affected origins. Decimal mode does
+not change native binary arithmetic. The computed first address remains unknown
+for direct repair; zero origins never authorize an unguarded edit. Out-of-range
+reads and noncanonical D0 results reject, with state and uses unchanged.
+
+Eleven related sanitizer targets pass, including rpl_code/rpl_execution and
+the complete allocation-wrapped mutation target. Unit cases inject unavailable,
+malformed and token failures at all 15 dependent data digits, plus instruction
+read failures, truncated instructions and pointer-boundary rejections. Tests
+check four uses, origin preservation/invalidation and untouched flags/return
+stack. ARM static analysis reports zero diagnostics; execution_step's own frame
+is 1576 bytes, not a total call-chain stack bound.
+
+The C collector matches all 23 saved original-ROM transition states. A separate
+controlled original-ROM matrix passes 16 cases per model, covering B underflow,
+high bits, D overflow, both decimal modes and D0's highest canonical result.
+These tests do not qualify arbitrary mappings, interrupts or other firmware.
+
+Fresh actual Stock runs on both models pass 23 collected instructions, 17 uses,
+84 revalidated guards and final target 0x28fc. Observation counts are 401 code,
+60 data, 256 native and eight PC nibbles. Catalog/attachment checks and settled
+Stock return pass. Inputs and artifacts remain hash-sealed. All six launchers
+build and pass independent payload/decompression audit. Ruff, formatting and
+strict docs pass. Evidence: /work/nov05-threaded-execution/{unit.log,stock.json,
+artifact-audit.json,collected-execution.json,rom-matrix.json,code.plist}.
+Reproducers: research/nov05-threaded-{build,stock,execution-path,rom-matrix}.py.
+
+The maintained fixture deliberately stops after two 81BD steps. Full execution
+coverage, computed-reference proofs and integration with complete public
+mutation planning remain open; this does not finish M8.0. Exact-head CI remains
+pending; #19 retains the two investigated toolchain HTTP 504 failures.
