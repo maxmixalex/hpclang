@@ -3681,6 +3681,41 @@ static void test_call_return_relocation(void)
 
 static void test_catalog_merged_repairs(void)
 {
+    for (unsigned shrink = 0; shrink < 2; ++shrink)
+        for (unsigned offset = 0; offset < 5; ++offset)
+            for (unsigned width = 1; width <= 5 - offset; ++width)
+                for (unsigned fault = 0; fault < 3; ++fault) {
+                    struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+                    put_word(0x8200b, 5, 0x82555);
+                    if (shrink)
+                        assert(!hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, NULL));
+                    uint32_t old = shrink ? 0x82565 : 0x82555;
+                    uint32_t next = shrink ? 0x82555 : 0x82565;
+                    uint32_t mask = (1u << (4 * width)) - 1;
+                    struct hpclang_rpl_reference_edit edit = {7, 0x8200b + offset,
+                                                              (old >> (4 * offset)) & mask,
+                                                              (next >> (4 * offset)) & mask, width};
+                    if (fault == 1)
+                        edit.expected ^= 1;
+                    if (fault == 2)
+                        edit.value ^= 1;
+                    const struct hpclang_rpl_catalog_repairs repairs = {
+                        .main_mapping = 7, .edits = &edit, .edit_count = 1};
+                    static uint8_t before[NIBBLES];
+                    memcpy(before, memory, sizeof memory);
+                    writes = 0;
+                    watched_field = 0x8200b;
+                    watched_writes = 0;
+                    int result =
+                        shrink
+                            ? hpclang_rpl_mutation_catalog_shrink_repaired(&io, 0x82013, &repairs)
+                            : hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs);
+                    if (fault) {
+                        assert(result < 0 && !writes && !memcmp(before, memory, sizeof memory));
+                    } else {
+                        assert(!result && get_word(0x8200b, 5) == next && watched_writes == 1);
+                    }
+                }
     for (unsigned width = 1; width <= 5; ++width) {
         struct hpclang_rpl_mutation_io io = setup_catalog_growth();
         uint32_t first = 0x82555, second = first;

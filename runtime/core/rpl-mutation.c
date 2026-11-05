@@ -902,10 +902,18 @@ static int catalog_add_edit(struct catalog_edits *plan, const struct catalog_edi
                    old->field >= edit->field + edit->width) {
             continue;
         }
-        return old->field == edit->field && old->width == edit->width &&
-                       old->expected == edit->expected && old->value == edit->value
-                   ? 0
-                   : HPCLANG_RPL_MUTATION_MALFORMED;
+        /* A normalized source digit may already be covered by a complete
+         * discovered root (or a boundary published last). Reuse that edit;
+         * never add an early write to a contained geometry field. */
+        if (edit->field >= old->field && edit->field + edit->width <= old->field + old->width) {
+            unsigned shift = 4 * (edit->field - old->field);
+            uint32_t mask = (1u << (4 * edit->width)) - 1;
+            return ((old->expected >> shift) & mask) == edit->expected &&
+                           ((old->value >> shift) & mask) == edit->value
+                       ? 0
+                       : HPCLANG_RPL_MUTATION_MALFORMED;
+        }
+        return HPCLANG_RPL_MUTATION_MALFORMED;
     }
     if (plan->count == plan->capacity)
         return HPCLANG_RPL_MUTATION_NOMEM;

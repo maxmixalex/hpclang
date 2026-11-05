@@ -364,7 +364,8 @@ extern "C"
 
     /* Same geometry/ownership contract as catalog_grow. Merge caller-proven
      * object/code repairs with an immutable snapshot of native root repairs.
-     * Exact duplicates coalesce; conflicting/partial overlaps reject before
+     * Exact duplicates and agreeing edits wholly contained in an earlier field
+     * coalesce; conflicting or other partial overlaps reject before
      * writes, including conflicts with unchanged roots. Fields are ORIGINAL
      * pre-move addresses, wholly in main RAM; normalized mappings must equal
      * main_mapping. Other physical banks require separate transaction work.

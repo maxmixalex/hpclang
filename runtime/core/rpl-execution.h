@@ -62,4 +62,24 @@ int hpclang_rpl_execution_collect(const struct hpclang_boot_info *boot,
                                   uint32_t native_origin_base, uint32_t budget,
                                   struct hpclang_rpl_code_execution *state, uint32_t *steps);
 
+/* Add all consumed address uses from one evaluated step to an initialized
+ * edit builder. replacements has uses->count caller-qualified addresses;
+ * include unchanged values, because their sources may alias other repairs.
+ * Resolve every source digit, including unchanged ones; unknown origins reject.
+ * Normalize each source into a one-nibble edit so consistent partial overlaps
+ * across uses/steps merge and conflicting requirements invalidate the batch.
+ * Use this builder exclusively for normalized one-nibble edits. Resolvers
+ * normalize physical aliases and retain guards/source identity independently.
+ * All errors latch builder->error and clear count; restart with edits_begin.
+ * Inputs/callback state and builder storage must be disjoint and stable.
+ * No allocation or native writes. This plans supplied address uses only:
+ * direct branches, derived/unknown sources, entry PC and completeness remain
+ * separate obligations. Caller proves replacement semantics and excludes source
+ * changes through later conversion/validation/commit. Never infer permission
+ * from a successful empty/partial batch or omit a use that fails planning. */
+int hpclang_rpl_execution_plan_uses(struct hpclang_rpl_reference_edit_builder *builder,
+                                    const struct hpclang_rpl_code_step_uses *uses,
+                                    const uint32_t *replacements,
+                                    hpclang_rpl_code_origin_resolve_fn resolve, void *context);
+
 #endif
