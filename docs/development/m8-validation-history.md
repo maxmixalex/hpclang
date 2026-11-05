@@ -4425,3 +4425,33 @@ Evidence: /work/nov05-entry-context/{unit.log,app.log,artifact-audit.json,stock.
 Reproducers: research/nov05-entry-context-{build,artifacts,stock}.py.
 This supplies the formal entry contract; it does not yet wire the complete
 execution collector into public mutation or prove all execution-reference paths.
+
+## 2026-11-05 — Guarded collection from actual Stock entry
+
+Local implementation bfc3edd2 adds rpl-execution.c/h to the runtime profile.
+It captures the negotiated entry and CPU state, observes instruction/data reads,
+and reports supported steps and address uses. Boundary stop, budget exhaustion
+and unsupported/error termination are distinct; no return means unrestricted
+reference completeness or mutation permission. Source/mapping qualification and
+exclusive state lifetime remain caller obligations. Work state is caller-owned
+scratch; error observations must be discarded.
+
+Ten related CMake targets pass ASan/UBSan, including fault injection at every
+read/observation/token position of the two-instruction unit fixture, visitor
+errors, budget exhaustion, unsupported continuation and legacy-entry rejection.
+ARM compilation/analysis and six-launcher payload audit pass. The collector's
+own ARM frame is 248 bytes, not a bound on total nested stack use.
+
+The maintained native-call Stock fixture now invokes the production collector
+through live mapped readers and retains/revalidates its guards before recording
+EXECOBS. Both HP49g+/HP50g complete 21 instructions, nine address uses and 78
+guards through target 0x3130. Observations: 349 instruction, 30 data, 256 native
+CPU and eight entry-PC nibbles. Both fixtures retain catalog/attachment checks
+and return to Stock. These bounded observations do not authorize new mutations.
+Separately, the C collector matches every register, return-stack, mode and PC
+state in both saved original-ROM traces; a 20-step budget returns BUDGET and
+legacy contexts reject without reads. Evidence under /work/nov05-execution-collector:
+stock.json, unit.log, artifact-audit.json and collected-execution.json.
+Reproducers: research/nov05-execution-collector-{build,stock}.py and
+research/nov05-collected-execution-path.py. Full execution coverage and integration
+of collected uses into complete public mutation plans remain open.
