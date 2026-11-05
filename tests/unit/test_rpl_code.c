@@ -142,6 +142,91 @@ static void data_steps(void)
     assert(!memcmp(&origins, &saved_origins, sizeof origins) && length == old_length);
 }
 
+static void control_steps(void)
+{
+    struct image code = {.size = 128, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    for (unsigned cursor = 0; cursor < 8; ++cursor)
+        for (unsigned carry = 0; carry < 2; ++carry)
+            for (unsigned variant = 0; variant < 7; ++variant) {
+                struct hpclang_rpl_code_control state = {
+                    .pc = 16, .carry = carry, .cursor = cursor};
+                unsigned top = (cursor + 7) & 7;
+                for (unsigned slot = 0; slot < 8; ++slot) {
+                    state.stack[slot] = 0x90000 + slot;
+                    for (unsigned i = 0; i < 5; ++i)
+                        state.stack_origins[slot][i] = 1 + slot * 5 + i;
+                }
+                struct hpclang_rpl_code_control before = state;
+                unsigned opcode = variant < 3 ? 0x10 * (variant + 1) : variant & 1 ? 4 : 5;
+                encode(&code, 16, 3, opcode);
+                if (variant >= 5)
+                    encode(&code, 17, 2, variant == 5 ? 0x80 : 0x7f);
+                struct hpclang_rpl_code_return_use use;
+                memset(&use, 0xa5, sizeof use);
+                assert(!hpclang_rpl_code_control_step(&reader, 112, &state, &use));
+                int taken = variant < 3 || carry == (opcode == 4);
+                int pop = taken && variant < 5;
+                assert(use.present == (unsigned)pop);
+                assert(state.carry == (variant == 1 ? 1u : variant == 2 ? 0u : carry));
+                if (pop) {
+                    assert(state.pc == before.stack[top] && state.cursor == top);
+                    assert(use.target == before.stack[top]);
+                    assert(!memcmp(use.origins, before.stack_origins[top], sizeof use.origins));
+                    assert(!state.stack[top]);
+                    for (unsigned i = 0; i < 5; ++i)
+                        assert(!state.stack_origins[top][i]);
+                } else {
+                    uint32_t target = variant == 5 ? 0xfff91u : 144u;
+                    assert(state.pc == (taken ? target : 19u));
+                    assert(state.cursor == cursor);
+                    assert(!memcmp(state.stack, before.stack, sizeof state.stack));
+                    assert(!memcmp(state.stack_origins, before.stack_origins,
+                                   sizeof state.stack_origins));
+                }
+                for (unsigned i = 0; i < (variant < 3 ? 2u : 3u); ++i) {
+                    code.fail = 16 + i;
+                    state = before;
+                    struct hpclang_rpl_code_return_use old_use = use;
+                    assert(hpclang_rpl_code_control_step(&reader, 112, &state, &use) ==
+                           HPCLANG_RPL_SPAN_UNAVAILABLE);
+                    assert(!memcmp(&state, &before, sizeof state));
+                    assert(!memcmp(&use, &old_use, sizeof use));
+                }
+                code.fail = UINT32_MAX;
+            }
+    for (unsigned cursor = 0; cursor < 8; ++cursor) {
+        struct hpclang_rpl_code_control state = {.cursor = cursor};
+        state.stack[cursor] = 0xabcde;
+        for (unsigned i = 0; i < 5; ++i)
+            state.stack_origins[cursor][i] = i + 10;
+        encode(&code, 0, 2, 0xf8);
+        encode(&code, 2, 5, 32);
+        encode(&code, 32, 2, 0x10);
+        struct hpclang_rpl_code_return_use use;
+        assert(!hpclang_rpl_code_control_step(&reader, 128, &state, &use));
+        assert(state.pc == 32 && state.cursor == ((cursor + 1) & 7));
+        assert(state.stack[cursor] == 7 && !use.present);
+        for (unsigned i = 0; i < 5; ++i)
+            assert(!state.stack_origins[cursor][i]);
+        assert(!hpclang_rpl_code_control_step(&reader, 96, &state, &use));
+        assert(state.pc == 7 && state.cursor == cursor && use.present && use.target == 7);
+        for (unsigned i = 0; i < 5; ++i)
+            assert(!use.origins[i]);
+    }
+    struct hpclang_rpl_code_control state = {0}, before = state;
+    struct hpclang_rpl_code_return_use use = {0}, old_use = use;
+    encode(&code, 0, 2, 0); /* RTNSXM requires mode state we do not model. */
+    assert(hpclang_rpl_code_control_step(&reader, 128, &state, &use) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&state, &before, sizeof state) && !memcmp(&use, &old_use, sizeof use));
+    encode(&code, 0, 2, 0x20);
+    state.stack[7] = 0x100000;
+    before = state;
+    assert(hpclang_rpl_code_control_step(&reader, 128, &state, &use) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&state, &before, sizeof state) && !memcmp(&use, &old_use, sizeof use));
+}
+
 static void exhaustive(void)
 {
     const unsigned opcodes[] = {4, 5, 6, 7, 12, 14};
@@ -1772,6 +1857,7 @@ static void origin_repair_plans(void)
 
 int main(void)
 {
+    control_steps();
     data_steps();
     origin_repair_plans();
     bank_exit_program();

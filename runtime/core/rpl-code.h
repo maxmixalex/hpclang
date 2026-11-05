@@ -216,6 +216,33 @@ struct hpclang_rpl_code_values
     unsigned carry;
 };
 
+struct hpclang_rpl_code_control
+{
+    uint32_t pc, carry, cursor, stack[8];
+    uint32_t stack_origins[8][5];
+};
+
+struct hpclang_rpl_code_return_use
+{
+    uint32_t present, target, origins[5];
+};
+
+/* Advance a private suspended-state copy through RTN/RTNSC/RTNCC, direct
+ * jumps/calls and GOC/GONC (including their zero-displacement returns).
+ * Carry is canonical 0/1. Calls overwrite the next circular slot and clear its
+ * old origins: a computed return PC is not an original stored field. A taken
+ * return reports the consumed slot's origins before clearing/popping it.
+ * Untaken conditions leave the stack unchanged. Direct branch operand repair
+ * remains the caller's responsibility via branch_inspect/plan_shift.
+ * RTNSXM and predicates using other flags are unsupported; do not skip them.
+ * Caller establishes instruction/path/mapping identity and owns all input
+ * storage. No native writes or relocation permission. Errors preserve state
+ * and use; success always replaces use (present=0 except a taken return).
+ * State and use are disjoint from each other and the instruction reader. */
+int hpclang_rpl_code_control_step(const struct hpclang_rpl_reader *instructions, uint32_t limit,
+                                  struct hpclang_rpl_code_control *state,
+                                  struct hpclang_rpl_code_return_use *use);
+
 /* Name an instruction/data nibble already read from a stable mapping. data is
  * zero for encoded literals and one for data loads. Return zero on success;
  * token zero explicitly means unknown. The caller owns token/mapping identity

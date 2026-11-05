@@ -837,6 +837,77 @@ static int read_word(const struct hpclang_rpl_reader *reader, uint32_t at, unsig
     return 0;
 }
 
+int hpclang_rpl_code_control_step(const struct hpclang_rpl_reader *instructions, uint32_t limit,
+                                  struct hpclang_rpl_code_control *state,
+                                  struct hpclang_rpl_code_return_use *use)
+{
+    if (!instructions || !instructions->read_nibble || !state || !use)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (state->carry > 1 || state->cursor >= 8)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (state->pc > 0xffffe || limit < 2 || limit > 0x100000u - state->pc)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(instructions, state->pc, 2, &opcode);
+    if (result)
+        return result;
+    struct hpclang_rpl_code_control next = *state;
+    struct hpclang_rpl_code_return_use consumed = {0};
+    int pop = opcode == 0x10 || opcode == 0x20 || opcode == 0x30;
+    if (pop) {
+        if (opcode != 0x10)
+            next.carry = opcode == 0x20;
+    } else if ((opcode & 15u) == 4 || (opcode & 15u) == 5) {
+        if (limit < 3)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t displacement;
+        result = read_word(instructions, state->pc + 1, 2, &displacement);
+        if (result)
+            return result;
+        if (state->carry != ((opcode & 15u) == 4)) {
+            next.pc = (state->pc + 3) & 0xfffffu;
+        } else if (!displacement) {
+            pop = 1;
+        } else {
+            int32_t delta =
+                displacement < 128 ? (int32_t)displacement : (int32_t)displacement - 256;
+            next.pc = (uint32_t)((int32_t)state->pc + 1 + delta) & 0xfffffu;
+        }
+    } else {
+        /* Other predicates need state not represented by this contract. */
+        if ((opcode & 15u) != 6 && (opcode & 15u) != 7 && opcode != 0xc8 && opcode != 0xd8 &&
+            opcode != 0xe8 && opcode != 0xf8)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        struct hpclang_rpl_code_branch branch;
+        result = hpclang_rpl_code_branch_inspect(instructions, state->pc, limit, &branch);
+        if (result)
+            return result;
+        if (branch.call) {
+            next.stack[next.cursor] = (state->pc + branch.length) & 0xfffffu;
+            for (unsigned i = 0; i < 5; ++i)
+                next.stack_origins[next.cursor][i] = 0;
+            next.cursor = (next.cursor + 1) & 7u;
+        }
+        next.pc = branch.target;
+    }
+    if (pop) {
+        next.cursor = (next.cursor + 7) & 7u;
+        if (next.stack[next.cursor] > 0xfffff)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        next.pc = next.stack[next.cursor];
+        consumed.present = 1;
+        consumed.target = next.pc;
+        for (unsigned i = 0; i < 5; ++i) {
+            consumed.origins[i] = next.stack_origins[next.cursor][i];
+            next.stack_origins[next.cursor][i] = 0;
+        }
+        next.stack[next.cursor] = 0;
+    }
+    *state = next;
+    *use = consumed;
+    return 0;
+}
+
 int hpclang_rpl_code_pc_exchange_inspect(const struct hpclang_rpl_reader *reader,
                                          uint32_t instruction, uint32_t limit, uint32_t a_low,
                                          uint32_t c_low,
