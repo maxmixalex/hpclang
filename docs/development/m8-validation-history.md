@@ -4519,3 +4519,44 @@ The maintained fixture deliberately stops after two 81BD steps. Full execution
 coverage, computed-reference proofs and integration with complete public
 mutation planning remain open; this does not finish M8.0. Exact-head CI remains
 pending; #19 retains the two investigated toolchain HTTP 504 failures.
+
+## 2026-11-05 — Collected-use repair batches and catalog integration
+
+Implementation 78ac05bf adds hpclang_rpl_execution_plan_uses. It resolves every
+consumed source digit, including unchanged values, into normalized one-nibble
+edits. Consistent cross-step/partial aliases deduplicate; stale, unknown,
+conflicting or over-capacity inputs latch an error and invalidate the batch.
+Replacement meaning, physical alias qualification, guards, direct branches and
+complete coverage remain caller obligations. The planner performs no writes.
+
+Integration exposed rejection of a normalized digit already covered by a
+complete catalog root. Catalog transactions now reuse agreeing edits wholly
+contained in an earlier field, preserving single-write behavior and late
+geometry publication. Conflicting or other partial overlaps still reject.
+Ninety growth/contraction cases cover all contained windows and stale/conflict
+variants. A two-instruction evaluator-to-planner unit path checks all generated
+edits, unchanged-source conflicts, resolver failures, unknown origins, capacity
+exhaustion and consistent/inconsistent overlapping five-digit windows.
+
+Twelve sanitizer targets pass, including reference planning and the complete
+allocation-wrapped mutation target. Both changed modules have zero ARM analyzer
+diagnostics; planner's own frame is 200 bytes. Six-launcher build and independent
+payload audit pass. Fresh Stock regressions on both models retain 23 steps,
+17 uses, 84 guards, catalog/attachment checks and settled return. These Stock
+tests exercise collection and catalog regression, not an all-use public plan.
+Evidence: /work/nov05-execution-plan-final/{unit.log,stock.json,artifact-audit.json,
+plan.plist,mutation.plist}; source hashes are retained and rechecked.
+
+A separately qualified subset from the C-collected saved-state report passes
+the new planning bridge, native-word conversion and actual catalog transaction
+on both models. Each valid case performs 10658 nibble writes and continues in
+original ROM through the first indirect target; four memory/native stale or
+conflict cases reject with zero writes and unchanged state. Evidence:
+/work/nov05-execution-plan/native-writeback.json; reproducer:
+research/nov05-collected-writeback.{c,py}. This subset is not all-use closure.
+
+The 23-step trace still contains three unknown-origin uses: generated return
+0x88996 and B-relative loads at 0x88da8/0x88da3. Their semantics require separate
+proof rather than omission from a complete plan. Further continuation, public
+library/Port1 integration and M8.0 acceptance remain open. Exact-head CI remains
+pending; #19 retains its two investigated HTTP 504 toolchain failures.
