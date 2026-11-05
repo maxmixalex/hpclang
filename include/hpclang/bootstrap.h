@@ -87,6 +87,7 @@ extern "C"
  */
 #define HPCLANG_RPL_BOUNDS_MAGIC_V2 UINT32_C(0x324c5052) /* "RPL2" prefix */
 #define HPCLANG_RPL_BOUNDS_MAGIC UINT32_C(0x334c5052)    /* "RPL3" adds ERAM fence */
+#define HPCLANG_RPL_BOUNDS_MAGIC_V4 UINT32_C(0x344c5052) /* "RPL4" adds root masks */
 #define HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG ((uintptr_t)1u)
 
     struct hpclang_rpl_memory_bounds
@@ -98,6 +99,10 @@ extern "C"
         uint32_t **native_roots;        /* private ARM-held Saturn addresses */
         uint32_t native_root_count;
         uint32_t port1_limit; /* exclusive nibble offset before ARM-owned ERAM */
+        /* RPL4 only: parallel caller-proven address fields, UINT32_MAX or
+         * 0xfffff. NULL keeps whole-word semantics. Arrays and cells remain
+         * owned by the launcher for the entire invocation. */
+        const uint32_t *native_root_masks;
     };
 
 /*

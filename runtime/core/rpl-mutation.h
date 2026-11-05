@@ -46,6 +46,12 @@ extern "C"
          * Addresses, not pointer values; optional for synthetic backends. */
         const uint32_t *display_roots;
         uint32_t display_root_count;
+        /* Optional parallel native-root masks: UINT32_MAX (whole word) or
+         * 0xfffff (proven low-20-bit address, preserve remaining bits). NULL
+         * retains whole-word semantics. Duplicate cells must use equal masks.
+         * Caller proves address provenance; masks do not discover pointers.
+         * Root/mask arrays must remain stable and disjoint from writable state. */
+        const uint32_t *native_root_masks;
     };
 
     enum hpclang_rpl_mutation_result
@@ -135,6 +141,15 @@ extern "C"
     int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
                                         hpclang_rpl_temp_visit_fn visit, void *context);
 
+    /* Query an exact TEMP payload start after validating the complete chain.
+     * Interior addresses, markers and footers return NOT_FOUND. The payload
+     * extent is published only on success; errors leave it unchanged. No native
+     * writes. Retain stable IO/mappings and guard read dependencies before a
+     * later mutation. This proves allocation bounds, not object type, execution
+     * provenance or permission to relocate. Output must not alias native state. */
+    int hpclang_rpl_mutation_find_temp(const struct hpclang_rpl_mutation_io *io, uint32_t address,
+                                       uint32_t *nibbles);
+
     /* TEMP traversal with observations for every valid nibble read, including
      * both geometry words, the sentinel and every allocation footer in both
      * validation/enumeration passes. Dependency errors propagate unchanged;
@@ -145,6 +160,15 @@ extern "C"
                                                 hpclang_rpl_temp_visit_fn visit,
                                                 hpclang_rpl_root_dependency_fn dependency,
                                                 void *context);
+
+    /* Exact lookup with every chain-read dependency observed as above. A
+     * dependency callback failure propagates unchanged and preserves nibbles.
+     * Discard partial dependencies on any failure, including NOT_FOUND; this
+     * records inputs for later preflight, it does not itself retain ownership. */
+    int hpclang_rpl_mutation_find_guarded_temp(const struct hpclang_rpl_mutation_io *io,
+                                               uint32_t address, uint32_t *nibbles,
+                                               hpclang_rpl_root_dependency_fn dependency,
+                                               void *context);
 
     /* Bootstrap-only: turn the native page interval into a rooted opaque
      * TEMPOB block. Pin

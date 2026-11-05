@@ -21,8 +21,10 @@ worktree="$(mktemp -d)"
 trap 'git worktree remove --force "$worktree" >/dev/null 2>&1 || true; rm -rf "$worktree"' EXIT
 
 git fetch origin "$branch"
-git worktree add --detach "$worktree" "origin/$branch" >/dev/null
-git -C "$worktree" lfs pull >/dev/null
+# Existing evidence is immutable for this publication. Keep its LFS pointers
+# instead of downloading every historical image; git add preserves untouched
+# pointers and applies the LFS clean filter to newly copied images.
+GIT_LFS_SKIP_SMUDGE=1 git worktree add --detach "$worktree" "origin/$branch" >/dev/null
 
 cp -a "$source_dir"/. "$worktree"/
 
@@ -46,7 +48,7 @@ for _ in 1 2 3; do
         exit 0
     fi
     git -C "$worktree" fetch origin "$branch"
-    git -C "$worktree" rebase "origin/$branch"
+    GIT_LFS_SKIP_SMUDGE=1 git -C "$worktree" rebase "origin/$branch"
 done
 
 exit 1

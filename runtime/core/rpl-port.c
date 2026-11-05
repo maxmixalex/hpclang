@@ -446,6 +446,190 @@ int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t fl
     return found;
 }
 
+struct bank_lookup_observer
+{
+    const struct hpclang_rpl_reader *reader;
+    hpclang_rpl_bank_dependency_fn dependency;
+    void *context;
+    int error;
+};
+
+static int bank_lookup_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct bank_lookup_observer *observer = context;
+    if (observer->error ||
+        !observer->reader->read_nibble(observer->reader->context, address, value))
+        return 0;
+    if (*value <= 15u) {
+        observer->error = observer->dependency(observer->context, address, *value);
+        if (observer->error > 0)
+            observer->error = HPCLANG_RPL_SPAN_MALFORMED;
+        if (observer->error)
+            return 0;
+    }
+    return 1;
+}
+
+int hpclang_rpl_library_configuration_guarded(const struct hpclang_rpl_reader *reader,
+                                              uint32_t first, uint32_t end, uint32_t header,
+                                              uint32_t number, uint32_t *target,
+                                              hpclang_rpl_bank_dependency_fn dependency,
+                                              void *context)
+{
+    if (!reader || !reader->read_nibble || !target || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {reader, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    uint32_t next = 0;
+    int result = hpclang_rpl_library_configuration(&observed, first, end, header, number, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1)
+        *target = next;
+    return result;
+}
+
+static int rom_bank_capture(const struct hpclang_rpl_reader *rom,
+                            const struct hpclang_rpl_reader *state, uint32_t operands,
+                            uint32_t bases_address, uint32_t flash_bytes,
+                            struct hpclang_rpl_rom_bank banks[16])
+{
+    uint32_t metadata_end = flash_bytes < 0x80000u ? flash_bytes : 0x80000u;
+    if (metadata_end < 8 || operands > metadata_end - 8u || bases_address > 0x80000u - 64u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t count_address, directory, count;
+    int result = word(rom, operands * 2u, 8, &count_address);
+    if (result)
+        return result;
+    result = word(rom, (operands + 4u) * 2u, 8, &directory);
+    if (result)
+        return result;
+    if (count_address >= metadata_end)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = word(rom, count_address * 2u, 2, &count);
+    if (result)
+        return result;
+    if (!count || count > 16u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (directory >= metadata_end || count > metadata_end - directory)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint8_t sizes[16];
+    uint32_t bases[16];
+    for (unsigned i = 0; i < count; ++i) {
+        uint32_t size;
+        result = word(rom, (directory + i) * 2u, 2, &size);
+        if (result)
+            return result;
+        sizes[i] = (uint8_t)size;
+    }
+    for (unsigned i = 0; i < 16; ++i) {
+        result = word(state, (bases_address + 4u * i) * 2u, 8, &bases[i]);
+        if (result)
+            return result;
+    }
+    for (unsigned i = 0; i < 16; ++i) {
+        result =
+            hpclang_rpl_rom_bank_layout(sizes, count, directory, flash_bytes, bases, i, &banks[i]);
+        if (result < 0)
+            return result;
+    }
+    return 0;
+}
+
+int hpclang_rpl_rom_bank_capture_guarded(
+    const struct hpclang_rpl_reader *rom, const struct hpclang_rpl_reader *state, uint32_t operands,
+    uint32_t bases_address, uint32_t flash_bytes, struct hpclang_rpl_rom_bank *banks,
+    hpclang_rpl_bank_dependency_fn rom_dependency, void *rom_context,
+    hpclang_rpl_bank_dependency_fn state_dependency, void *state_context)
+{
+    if (!rom || !rom->read_nibble || !state || !state->read_nibble || !banks || !rom_dependency ||
+        !state_dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer ro = {rom, rom_dependency, rom_context, 0};
+    struct bank_lookup_observer so = {state, state_dependency, state_context, 0};
+    const struct hpclang_rpl_reader observed_rom = {bank_lookup_read, &ro};
+    const struct hpclang_rpl_reader observed_state = {bank_lookup_read, &so};
+    struct hpclang_rpl_rom_bank next[16] = {0};
+    int result = rom_bank_capture(&observed_rom, &observed_state, operands, bases_address,
+                                  flash_bytes, next);
+    if (ro.error || so.error)
+        return ro.error ? ro.error : so.error;
+    if (!result)
+        for (unsigned i = 0; i < 16; ++i)
+            banks[i] = next[i];
+    return result;
+}
+
+int hpclang_rpl_bank_lookup_guarded(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
+                                    uint32_t eram_entry, uint32_t bank_switch,
+                                    struct hpclang_rpl_bank_binding *binding,
+                                    hpclang_rpl_bank_dependency_fn dependency, void *context)
+{
+    if (!reader || !reader->read_nibble || !binding || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {reader, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    struct hpclang_rpl_bank_binding next;
+    int result = hpclang_rpl_bank_lookup(&observed, flash_table, eram_entry, bank_switch, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1)
+        *binding = next;
+    return result;
+}
+
+int hpclang_rpl_bank_alias_lookup_guarded(const struct hpclang_rpl_reader *reader,
+                                          uint32_t flash_table, uint32_t eram_entry,
+                                          uint32_t requested_switch, uint32_t alias,
+                                          uint32_t canonical,
+                                          const struct hpclang_rpl_bank_identity_range *ranges,
+                                          uint32_t range_count,
+                                          struct hpclang_rpl_bank_binding *binding,
+                                          hpclang_rpl_bank_dependency_fn dependency, void *context)
+{
+    if (!reader || !reader->read_nibble || !ranges || !range_count || !binding || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (requested_switch >= 0x100000u || alias >= 0x100000u || canonical >= 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (requested_switch != alias)
+        return 0;
+    unsigned covered = 0;
+    for (uint32_t i = 0; i < range_count; ++i) {
+        const struct hpclang_rpl_bank_identity_range *range = &ranges[i];
+        if (!range->nibbles)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (!range->length || range->address >= 0x100000u ||
+            range->length > 0x100000u - range->address)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        if (alias >= range->address && alias - range->address < range->length)
+            covered |= 1;
+        if (canonical >= range->address && canonical - range->address < range->length)
+            covered |= 2;
+        for (uint32_t j = 0; j < range->length; ++j)
+            if (range->nibbles[j] > 15u)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    if (covered != 3)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    for (uint32_t i = 0; i < range_count; ++i) {
+        const struct hpclang_rpl_bank_identity_range *range = &ranges[i];
+        for (uint32_t j = 0; j < range->length; ++j) {
+            uint8_t value;
+            if (!reader->read_nibble(reader->context, range->address + j, &value))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (value > 15u)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            if (value != range->nibbles[j])
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            int result = dependency(context, range->address + j, value);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
+    }
+    return hpclang_rpl_bank_lookup_guarded(reader, flash_table, eram_entry, canonical, binding,
+                                           dependency, context);
+}
+
 int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t address,
                               uint32_t limit, const struct hpclang_rpl_reader *rom,
                               uint32_t flash_table, uint32_t eram_entry,
@@ -476,6 +660,31 @@ int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t 
     next.offset = pointer - 0x40000u;
     *target = next;
     return 1;
+}
+
+int hpclang_rpl_acptr_resolve_guarded(
+    const struct hpclang_rpl_reader *source, uint32_t address, uint32_t limit,
+    const struct hpclang_rpl_reader *rom, uint32_t flash_table, uint32_t eram_entry,
+    struct hpclang_rpl_banked_target *target, hpclang_rpl_bank_dependency_fn source_dependency,
+    void *source_context, hpclang_rpl_bank_dependency_fn rom_dependency, void *rom_context)
+{
+    if (!source || !source->read_nibble || !rom || !rom->read_nibble || !target ||
+        !source_dependency || !rom_dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer source_observer = {source, source_dependency, source_context, 0};
+    struct bank_lookup_observer rom_observer = {rom, rom_dependency, rom_context, 0};
+    const struct hpclang_rpl_reader observed_source = {bank_lookup_read, &source_observer};
+    const struct hpclang_rpl_reader observed_rom = {bank_lookup_read, &rom_observer};
+    struct hpclang_rpl_banked_target next;
+    int result = hpclang_rpl_acptr_resolve(&observed_source, address, limit, &observed_rom,
+                                           flash_table, eram_entry, &next);
+    if (source_observer.error)
+        return source_observer.error;
+    if (rom_observer.error)
+        return rom_observer.error;
+    if (result == 1)
+        *target = next;
+    return result;
 }
 
 int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_t address,
@@ -580,6 +789,84 @@ int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t 
     if (found)
         *bank = selected;
     return found;
+}
+
+int hpclang_rpl_flashptr_decode_guarded(const struct hpclang_rpl_reader *source, uint32_t address,
+                                        uint32_t limit, struct hpclang_rpl_flashptr *pointer,
+                                        hpclang_rpl_bank_dependency_fn dependency, void *context)
+{
+    if (!source || !source->read_nibble || !pointer || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {source, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    struct hpclang_rpl_flashptr next = {UINT32_MAX, UINT32_MAX};
+    int result = hpclang_rpl_flashptr_decode(&observed, address, limit, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1 && (next.selector > 0xfffu || next.index > 0xffffu))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result == 1)
+        *pointer = next;
+    return result;
+}
+
+int hpclang_rpl_flashptr_table_lookup_guarded(const struct hpclang_rpl_reader *mapped,
+                                              uint32_t first, uint32_t end, uint32_t table,
+                                              uint32_t index, uint32_t *target,
+                                              hpclang_rpl_bank_dependency_fn dependency,
+                                              void *context)
+{
+    if (!mapped || !mapped->read_nibble || !target || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {mapped, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    uint32_t next = UINT32_MAX;
+    int result = hpclang_rpl_flashptr_table_lookup(&observed, first, end, table, index, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1 && (!next || next >= 0x80000u))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result == 1)
+        *target = next;
+    return result;
+}
+
+int hpclang_rpl_flashptr_bank_guarded(const struct hpclang_rpl_reader *reader, uint32_t selectors,
+                                      uint32_t banks, uint32_t selector, uint32_t *bank,
+                                      hpclang_rpl_bank_dependency_fn dependency, void *context)
+{
+    if (!reader || !reader->read_nibble || !bank || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {reader, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    uint32_t next = UINT32_MAX;
+    int result = hpclang_rpl_flashptr_bank(&observed, selectors, banks, selector, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1 && next >= 16u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result == 1)
+        *bank = next;
+    return result;
+}
+
+int hpclang_rpl_flashptr_lookup_guarded(const struct hpclang_rpl_reader *mapped, uint32_t header,
+                                        uint32_t bank, uint32_t index, uint32_t *target,
+                                        hpclang_rpl_bank_dependency_fn dependency, void *context)
+{
+    if (!mapped || !mapped->read_nibble || !target || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    struct bank_lookup_observer observer = {mapped, dependency, context, 0};
+    const struct hpclang_rpl_reader observed = {bank_lookup_read, &observer};
+    uint32_t next = UINT32_MAX;
+    int result = hpclang_rpl_flashptr_lookup(&observed, header, bank, index, &next);
+    if (observer.error)
+        return observer.error;
+    if (result == 1 && (!next || next >= 0x80000u))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result == 1)
+        *target = next;
+    return result;
 }
 
 static int library(const struct hpclang_rpl_reader *reader, uint32_t limit,

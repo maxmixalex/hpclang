@@ -3,6 +3,8 @@ import copy
 import json
 import os
 import struct
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -56,6 +58,76 @@ class UiMemoryTests(unittest.TestCase):
                     )
             finally:
                 os.chdir(previous)
+
+    def test_cli_keeps_stack_and_native_release_checks(self):
+        # Keep both stack gates and native release active in the merged CI invocation.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "build").mkdir()
+            (root / "build/stock-hp4950-targets.txt").write_text("hp50g\n")
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
+                with (
+                    patch(
+                        "sys.argv",
+                        [
+                            "verify.py",
+                            "stock",
+                            "hp4950",
+                            "--pool",
+                            "--stack-pointer",
+                            "--stage-stack",
+                            "--allocation",
+                            "--native-release",
+                            "--artifact",
+                            "artifact",
+                        ],
+                    ),
+                    patch.object(VERIFY, "verify") as pixels,
+                    patch.object(VERIFY, "verify_stage_stack") as budget,
+                    patch.object(VERIFY, "verify_stack_pointer") as stack,
+                    patch.object(VERIFY, "verify_native_release") as release,
+                ):
+                    VERIFY.main()
+                    pixels.assert_called_once()
+                    stack.assert_called_once_with(Path("build/hp50g-frame"))
+                    budget.assert_called_once_with(
+                        Path("build/hp50g-frame"), "hp50g", Path("artifact")
+                    )
+                    release.assert_called_once_with(
+                        Path("build/hp50g-frame"),
+                        6,
+                        Path("build/hp50g-state"),
+                        Path("build/hp50g-native-release.json"),
+                    )
+            finally:
+                os.chdir(previous)
+
+    def test_stage_cli_clears_prior_pass_before_earlier_ui_gate_failure(self):
+        root = self.prefix.parent
+        (root / "build").mkdir()
+        (root / "build/stock-hp39-targets.txt").write_text("hp39gs\n")
+        output = root / "build/hp39gs-frame-stage-stack-budget.json"
+        output.write_text('{"observed_bytes":3152}')
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "tests/e2e/ui/verify.py"),
+                "stock",
+                "hp39",
+                "--pool",
+                "--artifact",
+                str(root / "artifact"),
+                "--stage-stack",
+            ],
+            cwd=root,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("hp39gs-frame-memory-1.json", result.stderr)
+        self.assertFalse(output.exists())
 
     def test_pool_budget_is_bound_to_linked_image_and_arena(self):
         artifact = self.prefix.parent / "artifact"
@@ -112,6 +184,7 @@ class UiMemoryTests(unittest.TestCase):
         self.assertEqual(report["pool_required_bytes"], 14 * 4096)
         self.assertEqual(report["pool_excess_bytes"], 16 * 4096)
         self.assertEqual(report["arena_other_bytes"], 0)
+        self.check_stage_stack(artifact)
         for section, key, value in (
             ("application", "image_bytes", 4096),
             ("application", "static_bytes", 0),
@@ -136,6 +209,49 @@ class UiMemoryTests(unittest.TestCase):
         self.path.write_text(json.dumps(bad))
         with self.assertRaises(AssertionError):
             VERIFY.verify_budget(self.prefix, "hp50g", artifact)
+
+    def check_stage_stack(self, artifact):
+        top = 0x01300000 + 30 * 4096
+        row = dict(
+            version=1,
+            mode=16,
+            region=19,
+            writes=100,
+            minimum=top - 3152,
+            maximum=top - 8,
+            minimum_pc=0x01300100,
+            maximum_pc=0x08000100,
+        )
+        trace = Path(f"{self.prefix}-stack-regions.jsonl")
+        output = Path(f"{self.prefix}-stage-stack-budget.json")
+        trace.write_text(json.dumps(row) + "\n")
+        report = VERIFY.verify_stage_stack(self.prefix, "hp50g", artifact)
+        self.assertEqual(report["observed_bytes"], 3152)
+        self.assertEqual(report["stack_top"], top)
+        for rows in (
+            [],
+            [row, row],
+            [dict(row, minimum=top - 4096)],
+            [dict(row, maximum=top)],
+            [dict(row, writes=0)],
+            [dict(row, version=True)],
+            [dict(row, mode=18)],
+            [dict(row, minimum=top - 3151)],
+            [dict(row, region=18)],
+            [row, dict(row, region=18, minimum=0x012FF000, maximum=0x012FFFFC)],
+            [row, dict(row, region=20, minimum=0x01400000, maximum=0x01400004)],
+            [dict(row, maximum_pc=-2)],
+        ):
+            trace.write_text("".join(json.dumps(r) + "\n" for r in rows))
+            output.write_text(json.dumps(report))
+            with self.subTest(rows=rows), self.assertRaises(AssertionError):
+                VERIFY.verify_stage_stack(self.prefix, "hp50g", artifact)
+            self.assertFalse(output.exists())
+        output.write_text(json.dumps(report))
+        trace.unlink()
+        with self.assertRaises(FileNotFoundError):
+            VERIFY.verify_stage_stack(self.prefix, "hp50g", artifact)
+        self.assertFalse(output.exists())
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -376,6 +492,30 @@ class UiMemoryTests(unittest.TestCase):
             path.write_text(json.dumps(invalid))
             with self.subTest(report=invalid), self.assertRaises(AssertionError):
                 VERIFY.verify_updates(self.prefix)
+
+    def test_update_processing_budgets_reject_regression_and_remove_stale_pass(self):
+        path = Path(f"{self.prefix}-memory-2.json")
+        output = Path(f"{self.prefix}-update-budget.json")
+        report = {"version": 1, "id": 2, "words": [1, 100_000, 5_000, 9, 34]}
+        path.write_text(json.dumps(report))
+        self.assertEqual(VERIFY.verify_updates(self.prefix), (100_000, 5_000, 9, 34))
+        accepted = json.loads(output.read_text())
+        self.assertEqual(accepted["frame_limit_us"], 100_000)
+        self.assertEqual(accepted["input_limit_us"], 5_000)
+        for index, value in ((1, 100_001), (2, 5_001)):
+            with self.subTest(index=index):
+                invalid = dict(report, words=report["words"].copy())
+                invalid["words"][index] = value
+                path.write_text(json.dumps(invalid))
+                output.write_text(json.dumps(accepted))
+                with self.assertRaises(AssertionError):
+                    VERIFY.verify_updates(self.prefix)
+                self.assertFalse(output.exists())
+        output.write_text(json.dumps(accepted))
+        path.unlink()
+        with self.assertRaises(FileNotFoundError):
+            VERIFY.verify_updates(self.prefix)
+        self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":
