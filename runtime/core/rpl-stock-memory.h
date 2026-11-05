@@ -11,6 +11,26 @@
 #define HPCLANG_RPL_FLASH_BANK_NIBBLES 0x40000u
 
 struct hpclang_rpl_rom_bank;
+struct hpclang_rpl_code_execution;
+
+/* Capture the reviewed HP49g+/50g CPU register layout through the existing
+ * state-relative nibble reader (e.g. stock_view_native). Observe all 256 read
+ * nibbles as dependencies, including full scalar/stack words. pc is the
+ * separately proven suspended continuation; the caller guards that cell too.
+ * Seed native-cell tokens as origin_base + state-relative nibble offset.
+ * origin_base is a nonzero, caller-owned namespace disjoint from code/data
+ * tokens; resolution must retain this native mapping identity and lifetime.
+ * Canonical P/address/carry/decimal/cursor values are required. RSTK cells can
+ * retain raw non-address values; only later execution establishes their uses.
+ * No writes or allocation. Output changes only on zero; any error invalidates
+ * partial dependency observations. This does not identify the firmware/layout,
+ * prove entry provenance, exclude interrupts or authorize relocation. */
+int hpclang_rpl_stock_execution_capture(const struct hpclang_rpl_reader *state, uint32_t pc,
+                                        uint32_t origin_base,
+                                        struct hpclang_rpl_code_execution *execution,
+                                        hpclang_rpl_reference_dependency_fn dependency,
+                                        void *context);
+
 struct hpclang_rpl_stock_rom_bank
 {
     const volatile uint8_t *bytes;
