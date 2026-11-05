@@ -4348,3 +4348,23 @@ writes. Evidence is under /work/nov05-data-step; reproducers are
 research/nov05-captured-execution-path.py and nov05-captured-origin-move.py.
 This is bounded saved-state validation, not complete execution coverage,
 production mutation integration, full Stock return or hardware acceptance.
+
+## 2026-11-05 — Captured native origins reach repair planning
+
+Local implementation 806f7a21 adds a read-only native-origin resolver for the
+existing origin planner. It accepts exactly the 195 source cells seeded by
+execution capture, preserves output on failure, and retains caller-supplied
+mapping identity and normalized field coordinates. Partial/cross-word sources
+remain nibble edits, not whole-register repairs. Full-word native repair guards,
+mapping lifetime and mutation integration remain caller obligations.
+
+The complete stock-memory unit target passes ASan/UBSan, including exhaustive
+state-offset classification, D0/return-stack/cross-word source planning, stale
+consumed values, reader errors and malformed nibble rejection. The target now
+links rpl-code.c to exercise the actual planner. ARM compilation and qualified
+static analysis pass. Both original saved-state paths project their captured
+native return source through this C resolver and reject stale use values;
+the prior catalog movement/original-ROM continuation checks still pass.
+Evidence: /work/nov05-data-step/native-origin-plan.json and
+captured-origin-move.json. Reproducer: research/nov05-native-origin-plan.py.
+This is local bounded validation; no production native writeback is enabled.
