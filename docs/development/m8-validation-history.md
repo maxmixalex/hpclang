@@ -4368,3 +4368,32 @@ the prior catalog movement/original-ROM continuation checks still pass.
 Evidence: /work/nov05-data-step/native-origin-plan.json and
 captured-origin-move.json. Reproducer: research/nov05-native-origin-plan.py.
 This is local bounded validation; no production native writeback is enabled.
+
+## 2026-11-05 — Native source edits join catalog transactions
+
+Local implementation 40d7d1b7 converts normalized native source fields into at
+most two masked ARM-word edits, retaining full-word expected values and observing
+all source-word nibbles. The catalog transaction merges compatible shared-word
+edits with register/native-root repairs, preserves unselected bits, and rejects
+conflicts or stale complete words before writes. Explicit replacements are not
+shifted again. Source identity, disjoint owned storage, target semantics and
+exclusive mapping/state lifetime remain caller obligations.
+
+Complete stock-memory and allocation-wrapped mutation unit targets pass
+ASan/UBSan. Conversion covers all 70 in-register 1..5-nibble windows and 64
+injected cross-word read/dependency failures. Transaction checks include growth,
+contraction, order-independent/duplicate merges, existing masked roots and
+register aliases, nine malformed/stale/conflicting cases with unchanged native
+words and main RAM, and INCOMPLETE after a commit-stage failure. Both changed
+runtime sources pass ARM compilation and qualified static analysis.
+
+Both saved HP49g+/HP50g states now use C-discovered return-source tokens through
+the resolver, converter and actual catalog transaction. The native caller is
+no longer separately supplied as an automatic root. The entire modified native
+state matches the expected single caller-field change; original ROM continues
+through the first indirect target. Four stale/conflicting native/main-memory
+controls per model reject with zero writes and unchanged native/main memory.
+Evidence: /work/nov05-data-step/native-writeback.json, linked to the captured
+execution report and implementation source hashes. Reproducer:
+research/nov05-native-writeback.py. This remains bounded saved-state validation,
+not complete execution coverage, live launcher integration or full Stock return.
