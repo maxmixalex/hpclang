@@ -227,6 +227,44 @@ static void control_steps(void)
     assert(!memcmp(&state, &before, sizeof state) && !memcmp(&use, &old_use, sizeof use));
 }
 
+static void arithmetic_modes(void)
+{
+    struct image code = {.size = 128, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    const uint32_t inputs[] = {0, 9, 0x99999, 0xfffff};
+    const uint32_t expected[2][4] = {{1, 10, 0x9999a, 0}, {1, 0x10, 0, 0}};
+    for (unsigned decimal = 0; decimal < 2; ++decimal)
+        for (unsigned i = 0; i < 4; ++i) {
+            struct hpclang_rpl_code_values values = {.carry = 1, .decimal = 1 - decimal};
+            struct hpclang_rpl_code_origins origins;
+            seed_origins(&origins);
+            struct hpclang_rpl_code_origins original = origins;
+            encode(&code, 0, 2, decimal ? 0x50 : 0x40);
+            encode(&code, 2, 2, 0x7e);
+            uint32_t length = 123;
+            assert(!hpclang_rpl_code_data_step(&reader, NULL, 0, 128, &values, &origins, data_token,
+                                               NULL, &length));
+            assert(length == 2 && values.decimal == decimal && values.carry == 1);
+            assert(!memcmp(&origins, &original, sizeof origins));
+            values.registers[HPCLANG_RPL_CODE_D] = UINT64_C(0xabcdef0000000000) | inputs[i];
+            struct hpclang_rpl_code_values saved = values;
+            int result = hpclang_rpl_code_data_step(&reader, NULL, 2, 126, &values, &origins,
+                                                    data_token, NULL, &length);
+            if (decimal && i == 3) {
+                assert(result == HPCLANG_RPL_SPAN_UNSUPPORTED);
+                assert(!memcmp(&values, &saved, sizeof values));
+                assert(!memcmp(&origins, &original, sizeof origins));
+            } else {
+                assert(!result && values.registers[HPCLANG_RPL_CODE_D] ==
+                                      (UINT64_C(0xabcdef0000000000) | expected[decimal][i]));
+                assert(values.carry == (decimal ? i == 2 : i == 3));
+                for (unsigned digit = 0; digit < 5; ++digit)
+                    original.registers[HPCLANG_RPL_CODE_D][digit] = 0;
+                assert(!memcmp(&origins, &original, sizeof origins));
+            }
+        }
+}
+
 static void exhaustive(void)
 {
     const unsigned opcodes[] = {4, 5, 6, 7, 12, 14};
@@ -1857,6 +1895,7 @@ static void origin_repair_plans(void)
 
 int main(void)
 {
+    arithmetic_modes();
     control_steps();
     data_steps();
     origin_repair_plans();

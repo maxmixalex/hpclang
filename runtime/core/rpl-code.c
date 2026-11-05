@@ -1,5 +1,8 @@
 #include "rpl-code.h"
 
+static int read_word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned width,
+                     uint32_t *value);
+
 static uint64_t data_mask(unsigned nibbles)
 {
     return nibbles == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * nibbles)) - 1;
@@ -13,7 +16,7 @@ int hpclang_rpl_code_data_step(const struct hpclang_rpl_reader *instructions,
 {
     if (!instructions || !instructions->read_nibble || !values || !origins || !token || !length)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
-    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->carry > 1 ||
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->carry > 1 || values->decimal > 1 ||
         values->registers[HPCLANG_RPL_CODE_D0] > 0xfffff ||
         values->registers[HPCLANG_RPL_CODE_D1] > 0xfffff)
         return HPCLANG_RPL_SPAN_MALFORMED;
@@ -106,6 +109,36 @@ int hpclang_rpl_code_data_step(const struct hpclang_rpl_reader *instructions,
     if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
         return result;
     result = hpclang_rpl_code_address_adjust_inspect(instructions, instruction, limit, &adjust);
+    if (result == HPCLANG_RPL_SPAN_UNSUPPORTED) {
+        uint32_t opcode;
+        result = read_word(instructions, instruction, 2, &opcode);
+        if (result)
+            return result;
+        size = 2;
+        if (opcode == 0x40 || opcode == 0x50) {
+            next.decimal = opcode == 0x50;
+        } else if (opcode == 0x7e) {
+            uint32_t old = (uint32_t)next.registers[HPCLANG_RPL_CODE_D] & 0xfffffu;
+            uint32_t value = 0, carry = 1;
+            for (unsigned i = 0; i < 5; ++i) {
+                unsigned digit = (old >> (4 * i)) & 15u;
+                if (next.decimal && digit > 9)
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+                digit += carry;
+                carry = digit >= (next.decimal ? 10u : 16u);
+                if (carry)
+                    digit = 0;
+                value |= digit << (4 * i);
+                sources.registers[HPCLANG_RPL_CODE_D][i] = 0;
+            }
+            next.registers[HPCLANG_RPL_CODE_D] =
+                (next.registers[HPCLANG_RPL_CODE_D] & ~UINT64_C(0xfffff)) | value;
+            next.carry = carry;
+        } else {
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        }
+        goto done;
+    }
     if (result)
         return result;
     int64_t address = (int64_t)next.registers[adjust.address] + adjust.delta;

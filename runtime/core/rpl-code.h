@@ -213,7 +213,7 @@ struct hpclang_rpl_code_origins
 struct hpclang_rpl_code_values
 {
     uint64_t registers[HPCLANG_RPL_CODE_D1 + 1];
-    unsigned carry;
+    unsigned carry, decimal;
 };
 
 struct hpclang_rpl_code_control
@@ -252,9 +252,12 @@ typedef int (*hpclang_rpl_code_token_fn)(void *context, unsigned data, uint32_t 
 
 /* Evaluate one supported data instruction from caller-proven incoming values,
  * propagating origins alongside values. Supports inspected literals, copies,
- * exchanges, memory LOADS and D0/D1 immediate adjustments. No stores or control
+ * exchanges, memory LOADS, D0/D1 immediate adjustments, SETHEX/SETDEC and D.A+1.
+ * D.A+1 uses the proven decimal flag (0 hexadecimal, 1 decimal); decimal input
+ * digits above nine are unsupported. Arithmetic clears the affected origins.
+ * No stores or control
  * transfers: an unsupported instruction stops the caller's walk. P, D0/D1 and
- * carry must be canonical. NEXT_PC captures deliberately receive unknown
+ * carry/decimal must be canonical. NEXT_PC captures deliberately receive unknown
  * origins: a computed PC is not an encoded literal cell.
  * Readers, mappings and all input state remain stable; data reads must be pure
  * memory, not device registers. The caller separately records load-address and
