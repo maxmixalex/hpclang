@@ -4232,3 +4232,50 @@ The unchanged candidate is sealed for six Direct/six Stock cases, including
 native allocation/release, application/launcher stacks and resource snapshots.
 The matrix is running at /work/nov05-allocation-ui-combined; no completion claim.
 PR #31 is observed queued/running, with no completed failure yet; not accepted.
+
+## 2026-11-05 — CI packet deadline and local ROM fixture diagnosis
+
+PR #31 job 127210261348 fails inside test-kermit-server.py, not native
+storage execution. Its debug timer records a 50 ms select pause lasting
+4.719 s, so the peer's 3 s packet deadline expires before the retransmit.
+The local fix gives packet arrival 10 s of scheduling slack; explicit 30 ms
+turnaround, 15 s backoff, byte/CRC and sequence checks remain unchanged.
+The full bundled-Kermit PTY test passes in /work/nov05-kermit-scheduling;
+a separate 4.719 s delayed-packet check exceeds the previous deadline and
+then passes exact payload/CRC checks. This is not a fix for the unresolved
+HP40gs calculator USB failures. Change remains unpushed.
+
+Allocation/UI combined validation proves HP48gII Direct and Stock, including
+6164 native block bytes returned and fourteen lifecycle snapshots. Its
+terminal HP49g+ Direct failure occurred before application entry: the fresh
+emulator had no firmware, because the local orchestration omitted the CI
+firmware preparation step. Ran the same bootloaders/official make targets;
+resume preserves completed case hashes, source/artifact seals, failed log
+and state, and adds firmware hashes. Remaining matrix is running under
+/work/nov05-allocation-ui-combined; no full-matrix completion claimed.
+
+## 2026-11-05 — Combined UI twelve-case audit complete; HP40gs CI failure reproduced
+
+Allocation/UI candidate 0d43fe6f completes all six Direct and six Stock cases.
+The independent audit rechecks original source/application/emulator/firmware
+seals, saved UI/theme/font/canvas pixels, application and launcher stack budgets,
+native allocation release and lifecycle free-list/return-capacity snapshots.
+It recomputes reports in disposable copies, preserving original evidence, and
+publishes complete=true at
+/work/nov05-allocation-ui-combined/independent-audit.json.
+The earlier local missing-firmware failure and corrected setup remain archived.
+All 37 combined verifier tests, three Aplet identity tests and strict candidate
+documentation pass. The previous exact remote head 5bc78efd is independently
+audited: nine successful workflows, 199 successful jobs, one intentional skip.
+These workload observations do not establish hardware behavior, all native/
+exception stack reservations or complete M8.2/M8.3/M8.5 acceptance.
+
+The exact PR #27 failing-run replay terminates with exit 1, host-gate-failed,
+PC 0x8158 before application entry, and unchanged sealed inputs. Its payload
+stalls at send sequence 14, with three NAKs/four resends and no ACK progress for
+90 seconds; the original CI failure was at sequence 0. Event accounting checks
+1011 host-to-device OUT packets (41293 bytes): every packet reaches its final
+FIFO read, with no observed unread clear/discard. Intermediate byte values are
+not individually logged, and this does not prove successful delivery to the
+firmware Kermit parser. Evidence: /work/nov05-pr27-usb-replay/replay.json,
+run.log and usb-out-accounting.json. No transport fix or CI acceptance claimed.
