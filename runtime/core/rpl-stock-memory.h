@@ -32,6 +32,21 @@ struct hpclang_rpl_stock_execution_source
 int hpclang_rpl_stock_execution_origin(void *context, uint32_t token,
                                        struct hpclang_rpl_code_origin_cell *cell);
 
+/* Convert one normalized native source edit (1..5 nibbles) into at most two
+ * masked ARM-word edits for catalog_repairs.native_edits. state_words names
+ * the same complete 0xc60-byte state as source->state, in owned aligned storage
+ * outside moved memory and all inputs/outputs. The caller proves this identity,
+ * target replacement semantics (including absence from removed extents), and
+ * retains exclusive ownership until commit. Full source words are observed as
+ * dependencies and guarded by expected; every changed digit must have been
+ * seeded by capture. No writes or allocation. On error outputs are unchanged
+ * and partial observations invalid. edits[2] and count are disjoint outputs. */
+int hpclang_rpl_stock_execution_edit(const struct hpclang_rpl_stock_execution_source *source,
+                                     uint32_t *state_words,
+                                     const struct hpclang_rpl_reference_edit *edit,
+                                     struct hpclang_rpl_native_edit *edits, unsigned *count,
+                                     hpclang_rpl_reference_dependency_fn dependency, void *context);
+
 /* Capture the reviewed HP49g+/50g CPU register layout through the existing
  * state-relative nibble reader (e.g. stock_view_native). Observe all 256 read
  * nibbles as dependencies, including full scalar/stack words. pc is the

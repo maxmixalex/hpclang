@@ -334,6 +334,18 @@ extern "C"
         uint32_t expected;
     };
 
+    /* Explicit source-digit repair in an owned, aligned ARM word. expected
+     * guards ALL 32 bits; value is the full replacement word and may differ
+     * only within mask. The caller derives these edits from proven consumed
+     * origins/replacements, not from treating the word itself as a pointer.
+     * Normalize aliases to the same word pointer. Masks sharing a word merge
+     * only with identical expected words and agreeing overlapping values. */
+    struct hpclang_rpl_native_edit
+    {
+        uint32_t *word;
+        uint32_t expected, value, mask;
+    };
+
     struct hpclang_rpl_catalog_repairs
     {
         uint32_t main_mapping;
@@ -346,6 +358,8 @@ extern "C"
         /* Optional reader for read-only guards in proven-disjoint mappings.
          * Main-RAM guards always use io, never this reader. */
         const struct hpclang_rpl_reference_reader *guard_reader;
+        const struct hpclang_rpl_native_edit *native_edits;
+        uint32_t native_edit_count;
     };
 
     /* Same geometry/ownership contract as catalog_grow. Merge caller-proven
@@ -357,7 +371,11 @@ extern "C"
      * Register words must be aligned, owned ARM storage outside moved memory
      * and input arrays. Their low 20 bits use the same main-RAM address mapping;
      * the caller proves that mapping and the continuation's address use. Exact
-     * aliases with native roots coalesce only when full-word repairs agree.
+     * Explicit native source-digit edits obey the same ownership/exclusion
+     * contract. They already contain the caller-proven replacement; they are
+     * not shifted again. They may span several words using separate entries.
+     * Shared-word edits and native roots merge only if expected full words
+     * match and overlapping masks agree. Untouched bits remain unchanged.
      * Guards describe unchanged preconditions, not permissions to relocate.
      * Guards outside main_mapping require guard_reader; distinct identities
      * mean caller-proven physical disjointness, not unequal bank numbers.

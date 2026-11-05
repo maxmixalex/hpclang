@@ -26,6 +26,18 @@ static int state_word(const struct hpclang_rpl_reader *state, uint32_t at, unsig
     return 0;
 }
 
+static int execution_seeded(uint32_t at)
+{
+    int seeded = at >= 0x90cu * 2u && at < 0x954u * 2u;
+    if (at >= 0x954u * 2u && at < 0x95cu * 2u)
+        seeded = at % 8u < 5u;
+    if (at == 0x95cu * 2u)
+        seeded = 1;
+    if (at >= 0x978u * 2u && at < 0x998u * 2u)
+        seeded = at % 8u < 5u;
+    return seeded;
+}
+
 int hpclang_rpl_stock_execution_origin(void *context, uint32_t token,
                                        struct hpclang_rpl_code_origin_cell *cell)
 {
@@ -36,14 +48,7 @@ int hpclang_rpl_stock_execution_origin(void *context, uint32_t token,
         source->field_base > 0x100000u - 0xc60u * 2u || token < source->origin_base)
         return HPCLANG_RPL_SPAN_BOUNDS;
     uint32_t at = token - source->origin_base;
-    int seeded = at >= 0x90cu * 2u && at < 0x954u * 2u;
-    if (at >= 0x954u * 2u && at < 0x95cu * 2u)
-        seeded = at % 8u < 5u;
-    if (at == 0x95cu * 2u)
-        seeded = 1;
-    if (at >= 0x978u * 2u && at < 0x998u * 2u)
-        seeded = at % 8u < 5u;
-    if (!seeded)
+    if (!execution_seeded(at))
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     uint8_t value;
     if (!source->state->read_nibble(source->state->context, at, &value))
@@ -51,6 +56,52 @@ int hpclang_rpl_stock_execution_origin(void *context, uint32_t token,
     if (value > 15u)
         return HPCLANG_RPL_SPAN_MALFORMED;
     *cell = (struct hpclang_rpl_code_origin_cell){source->mapping, source->field_base + at, value};
+    return 0;
+}
+
+int hpclang_rpl_stock_execution_edit(const struct hpclang_rpl_stock_execution_source *source,
+                                     uint32_t *state_words,
+                                     const struct hpclang_rpl_reference_edit *edit,
+                                     struct hpclang_rpl_native_edit *edits, unsigned *count,
+                                     hpclang_rpl_reference_dependency_fn dependency, void *context)
+{
+    if (!source || !source->state || !source->state->read_nibble || !state_words || !edit ||
+        !edits || !count || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if ((uintptr_t)state_words % _Alignof(uint32_t) || !source->mapping ||
+        source->field_base > 0x100000u - 0xc60u * 2u || edit->mapping != source->mapping ||
+        !edit->width || edit->width > 5 || edit->field < source->field_base ||
+        edit->field - source->field_base > 0xc60u * 2u - edit->width ||
+        (edit->expected >> (edit->width * 4)) || (edit->value >> (edit->width * 4)))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t at = edit->field - source->field_base;
+    for (unsigned digit = 0; digit < edit->width; ++digit)
+        if (!execution_seeded(at + digit))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_native_edit next[2];
+    unsigned words = (at % 8 + edit->width + 7) / 8;
+    for (unsigned index = 0; index < words; ++index) {
+        uint32_t base = (at / 8 + index) * 8, expected;
+        int result = state_word(source->state, base, 8, &expected, dependency, context);
+        if (result)
+            return result;
+        next[index] =
+            (struct hpclang_rpl_native_edit){state_words + base / 8, expected, expected, 0};
+        for (unsigned digit = 0; digit < edit->width; ++digit) {
+            if (at + digit < base || at + digit >= base + 8)
+                continue;
+            unsigned shift = (at + digit - base) * 4;
+            if (((expected >> shift) & 15u) != ((edit->expected >> (digit * 4)) & 15u))
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            uint32_t mask = 15u << shift;
+            next[index].mask |= mask;
+            next[index].value =
+                (next[index].value & ~mask) | (((edit->value >> (digit * 4)) & 15u) << shift);
+        }
+    }
+    for (unsigned i = 0; i < words; ++i)
+        edits[i] = next[i];
+    *count = words;
     return 0;
 }
 

@@ -17,7 +17,11 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
 
 struct route_fixture
 {
-    uint8_t bytes[0xc60];
+    union
+    {
+        uint8_t bytes[0xc60];
+        uint32_t words[0xc60 / 4];
+    };
     unsigned reads, observations, stop, mode;
 };
 
@@ -48,6 +52,76 @@ static void execution_word(struct route_fixture *fixture, unsigned at, uint32_t 
 {
     for (unsigned i = 0; i < 4; ++i)
         fixture->bytes[at + i] = (uint8_t)(value >> (8 * i));
+}
+
+static void test_execution_edits(void)
+{
+    struct route_fixture fixture = {0};
+    execution_word(&fixture, 0x90c, 0x12345678);
+    execution_word(&fixture, 0x910, 0xabcdef00);
+    const struct hpclang_rpl_reader reader = {route_read, &fixture};
+    const struct hpclang_rpl_stock_execution_source source = {&reader, 0x200000, 7, 0x24000};
+    const uint64_t original = UINT64_C(0xabcdef0012345678);
+    for (unsigned digit = 0; digit < 16; ++digit)
+        for (unsigned width = 1; width <= 5 && digit + width <= 16; ++width) {
+            uint32_t mask = (1u << (width * 4)) - 1;
+            uint32_t expected = (uint32_t)(original >> (digit * 4)) & mask;
+            struct hpclang_rpl_reference_edit edit = {7, source.field_base + 0x90c * 2 + digit,
+                                                      expected, expected ^ mask, width};
+            struct hpclang_rpl_native_edit edits[2];
+            unsigned count = 99;
+            fixture.reads = fixture.observations = 0;
+            assert(!hpclang_rpl_stock_execution_edit(&source, fixture.words, &edit, edits, &count,
+                                                     route_observe, &fixture));
+            assert(count == (digit % 8 + width + 7) / 8);
+            assert(fixture.reads == count * 8 && fixture.observations == count * 8);
+            uint64_t result = original;
+            for (unsigned i = 0; i < count; ++i) {
+                unsigned word = digit / 8 + i;
+                assert(edits[i].word == fixture.words + 0x90c / 4 + word);
+                assert(edits[i].expected == (uint32_t)(original >> (word * 32)));
+                assert(!((edits[i].expected ^ edits[i].value) & ~edits[i].mask));
+                result = (result & ~(UINT64_C(0xffffffff) << (word * 32))) |
+                         ((uint64_t)edits[i].value << (word * 32));
+            }
+            assert(result == (original ^ ((uint64_t)mask << (digit * 4))));
+            assert(fixture.words[0x90c / 4] == 0x12345678 &&
+                   fixture.words[0x910 / 4] == 0xabcdef00);
+        }
+    struct hpclang_rpl_reference_edit edit = {7, source.field_base + 0x90c * 2 + 6, 0xf0012,
+                                              0xf0022, 5};
+    for (unsigned mode = 1; mode <= 4; ++mode)
+        for (unsigned stop = 1; stop <= 16; ++stop) {
+            fixture.reads = fixture.observations = 0;
+            fixture.mode = mode;
+            fixture.stop = stop;
+            struct hpclang_rpl_native_edit edits[2] = {{0}}, before[2] = {{0}};
+            unsigned count = 99;
+            assert(hpclang_rpl_stock_execution_edit(&source, fixture.words, &edit, edits, &count,
+                                                    route_observe, &fixture) < 0);
+            assert(count == 99 && !memcmp(edits, before, sizeof edits));
+        }
+    fixture.mode = fixture.stop = 0;
+    for (unsigned fault = 0; fault < 6; ++fault) {
+        struct hpclang_rpl_reference_edit invalid = edit;
+        if (fault == 0)
+            invalid.mapping++;
+        if (fault == 1)
+            invalid.width = 0;
+        if (fault == 2)
+            invalid.width = 6;
+        if (fault == 3)
+            invalid.field = source.field_base - 1;
+        if (fault == 4)
+            invalid.field = source.field_base + 0x970 * 2;
+        if (fault == 5)
+            invalid.expected ^= 1;
+        struct hpclang_rpl_native_edit edits[2] = {{0}}, before[2] = {{0}};
+        unsigned count = 99;
+        assert(hpclang_rpl_stock_execution_edit(&source, fixture.words, &invalid, edits, &count,
+                                                route_observe, &fixture) < 0);
+        assert(count == 99 && !memcmp(edits, before, sizeof edits));
+    }
 }
 
 static void test_execution_capture(void)
@@ -677,6 +751,7 @@ static void test_bank_window_select(void)
 int main(void)
 {
     test_execution_capture();
+    test_execution_edits();
     test_bank_route();
     test_bank_route_capture();
     test_bank_window_capture();
