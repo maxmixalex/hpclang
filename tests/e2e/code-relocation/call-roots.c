@@ -662,7 +662,7 @@ struct execution_probe
     struct hpclang_rpl_reference_guard_builder builder;
     struct hpclang_rpl_stock_view view;
     uint32_t *pc;
-    uint32_t observations[4], uses;
+    uint32_t observations[4], uses, indirect_targets;
 };
 
 static int execution_observe(void *context, unsigned space, uint32_t at, uint8_t value)
@@ -696,8 +696,9 @@ static int execution_visit(void *context, uint32_t pc,
     struct execution_probe *probe = context;
     probe->uses += uses->count;
     for (unsigned i = 0; i < uses->count; ++i)
-        if (uses->addresses[i].kind == HPCLANG_RPL_CODE_USE_MEMORY_TARGET)
-            return 1; /* Bounded observation, never a relocation certificate. */
+        if (uses->addresses[i].kind == HPCLANG_RPL_CODE_USE_MEMORY_TARGET &&
+            ++probe->indirect_targets == 3)
+            return 1; /* Includes two 81BD steps; never a relocation certificate. */
     return 0;
 }
 

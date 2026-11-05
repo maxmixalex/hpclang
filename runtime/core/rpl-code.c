@@ -225,6 +225,64 @@ int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instruction
         next.control.pc = (pc + 2) & 0xfffffu;
         goto done;
     }
+    if (opcode == 0x18) {
+        uint32_t extended;
+        if (limit < 4)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(instructions, pc, 4, &extended);
+        if (result)
+            return result;
+        if (extended == 0xdb18) {
+            /* Qualified native-ROM 81BD: three dependent reads, not a
+             * fallthrough. The first address is computed, so it has no
+             * directly repairable source digits. Preserve full B/D words. */
+            if (!data || !data->read_nibble)
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            uint32_t b = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_B] - 5u;
+            uint32_t d = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_D] + 1u;
+            uint32_t address = b & 0xfffffu, sources[5] = {0}, pointer = 0;
+            for (unsigned load = 0; load < 3; ++load) {
+                execution_use(&observed, HPCLANG_RPL_CODE_USE_LOAD_ADDRESS, address, sources);
+                if (address > 0xffffbu)
+                    return HPCLANG_RPL_SPAN_BOUNDS;
+                uint32_t value;
+                result = read_word(data, address, 5, &value);
+                if (result)
+                    return result;
+                for (unsigned digit = 0; digit < 5; ++digit) {
+                    result = token(context, 1, address + digit, (value >> (4 * digit)) & 15,
+                                   &sources[digit]);
+                    if (result)
+                        return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+                }
+                if (load == 0) {
+                    pointer = value;
+                    if (pointer > 0xffffau)
+                        return HPCLANG_RPL_SPAN_BOUNDS;
+                } else if (load == 1) {
+                    next.values.registers[HPCLANG_RPL_CODE_A] =
+                        (next.values.registers[HPCLANG_RPL_CODE_A] & ~UINT64_C(0xfffff)) | value;
+                    for (unsigned digit = 0; digit < 5; ++digit)
+                        next.origins.registers[HPCLANG_RPL_CODE_A][digit] = sources[digit];
+                }
+                address = value;
+            }
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, address, sources);
+            next.values.registers[HPCLANG_RPL_CODE_B] =
+                (next.values.registers[HPCLANG_RPL_CODE_B] & ~UINT64_C(0xffffffff)) | b;
+            next.values.registers[HPCLANG_RPL_CODE_D] =
+                (next.values.registers[HPCLANG_RPL_CODE_D] & ~UINT64_C(0xffffffff)) | d;
+            next.values.registers[HPCLANG_RPL_CODE_D0] = pointer + 5;
+            for (unsigned digit = 0; digit < 8; ++digit) {
+                next.origins.registers[HPCLANG_RPL_CODE_B][digit] = 0;
+                next.origins.registers[HPCLANG_RPL_CODE_D][digit] = 0;
+            }
+            for (unsigned digit = 0; digit < 5; ++digit)
+                next.origins.registers[HPCLANG_RPL_CODE_D0][digit] = 0;
+            next.control.pc = address;
+            goto done;
+        }
+    }
     struct hpclang_rpl_code_pc_exchange exchange;
     result = HPCLANG_RPL_SPAN_UNSUPPORTED;
     if (opcode == 0x18)

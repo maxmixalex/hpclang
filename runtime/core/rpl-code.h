@@ -294,12 +294,16 @@ struct hpclang_rpl_code_address_use
 struct hpclang_rpl_code_step_uses
 {
     uint32_t count, has_branch;
-    struct hpclang_rpl_code_address_use addresses[2];
+    struct hpclang_rpl_code_address_use addresses[4];
     struct hpclang_rpl_code_branch branch;
 };
 
 /* One C step combining the data/control evaluators with register/indirect PC
- * transfers, PC exchanges and C/RSTK transfers. values.carry and control.carry
+ * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81BD.
+ * 81BD emits three dependent load addresses followed by the memory PC target;
+ * arithmetic on B, D and D0 clears the affected origins. Its B/D updates use
+ * the low 32-bit ARM words, independent of Saturn decimal mode. A D0 result
+ * beyond 20 bits is rejected. values.carry and control.carry
  * describe the same state and must agree. Emit the five source tokens of every
  * consumed load address, register jump target, indirect-memory target or return.
  * Copies alone emit no use. Direct encoded operands are described by branch,

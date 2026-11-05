@@ -232,9 +232,9 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         )
         execution = struct.unpack("<16I", home_string(read, b"EXECOBS"))
         if (
-            execution[0:3] != (1, 1, 21)
-            or execution[3] != 0x3130
-            or execution[4] != 9
+            execution[0:3] != (1, 1, 23)
+            or execution[3] != 0x28FC
+            or execution[4] != 17
             or not 0 < execution[5] <= 512
             or not execution[6]
             or not execution[7]
@@ -264,7 +264,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                     saved_registers=list(words[12:22]),
                     stage0_prefix=observation[88:120].hex(),
                     execution_collection=dict(
-                        stop="first_indirect_target",
+                        stop="after_two_81bd_steps",
                         steps=execution[2],
                         pc=execution[3],
                         address_uses=execution[4],
