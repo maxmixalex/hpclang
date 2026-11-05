@@ -251,3 +251,43 @@ Those match old fixture failure paths but do not independently prove the root
 cause; #17 lacks the deadline/diagnostic correction submitted in #13/#14.
 Logs and JSON are retained under research/oct26-format-ci-failures and
 research/oct26-ci-121*.log. Remote acceptance of these branches remains open.
+
+
+### 2026-11-04 Current filesystem SDK and Direct validation
+
+PR19 6a905dfa passes a fresh source-SDK installation, both pinned original
+HPGCC2 applications and all six launcher packages. The temporary SDK was
+removed after building. Inputs/build report: /work/nov04-fsystem-current-sdk.
+Three application HPC payloads match earlier native evidence; launcher binaries
+differ, so current runtime checks are required. Both HP49g+/HP50g Direct cases
+pass settled return and independent packaged-font console pixels. Current Stock
+cases are running in /work/nov04-fsystem-native (session 8642); no full current
+acceptance. The first private driver selected the wrong Direct font; after its
+terminal verifier failure, the correct newrpl_font6_menus.S was used to replay
+retained pixels without rerunning the completed application.
+
+Notebook resource matrix now independently verifies HP39g+/HP39gs/HP40gs
+(touched stack 1544, reserved heap peak 9460 bytes each) and HP48gII
+(touched stack 1904, reserved heap peak 9924 bytes). Two models remain. This
+is the startup/ON workload only; the existing independent-resource-audit.json
+records artifact identities and each actual RW/heap capacity.
+
+
+### 2026-11-04 Notebook resources and original filesystem matrices complete locally
+
+Notebook startup/ON resource/pixel/settled-return gates pass all six Stock models.
+Independent audit: /work/nov04-notebook-resources-matrix/independent-resource-audit.json.
+Touched-stack/allocator-reserved heap peaks are 1544/9460 bytes on HP39 models,
+1904/9924 on HP48gII, and 1912/13660 on HP49g+/HP50g. Observations include
+test instrumentation; save/export peaks, untouched stack reservations, native
+firmware and launcher RAM remain outside this workload. Verifier formatting
+after the sealed run preserves its Python AST; original verifier and both hashes
+are retained in research/nov04-notebook-{validated-verifier.py,format-equivalence.json}.
+Resource verifier negatives, ARM static analysis and source format/lint pass.
+
+PR19 current installed SDK passes both original source builds and six-model
+packaging. Both HP49g+/HP50g Direct and Stock executions pass, with independent
+22-frame console checks, settled returns and raw Stock FAT inspection. Audit:
+/work/nov04-fsystem-native/independent-audit.json; script
+research/nov04-fsystem-final-audit.py. Current-head CI remains pending; these
+results do not complete M8.4 or establish physical-device behavior.
