@@ -210,6 +210,37 @@ struct hpclang_rpl_code_origins
     uint32_t registers[HPCLANG_RPL_CODE_D1 + 1][16];
 };
 
+struct hpclang_rpl_code_values
+{
+    uint64_t registers[HPCLANG_RPL_CODE_D1 + 1];
+    unsigned carry;
+};
+
+/* Name an instruction/data nibble already read from a stable mapping. data is
+ * zero for encoded literals and one for data loads. Return zero on success;
+ * token zero explicitly means unknown. The caller owns token/mapping identity
+ * and guards. This callback must not mutate the readers or suspended state. */
+typedef int (*hpclang_rpl_code_token_fn)(void *context, unsigned data, uint32_t address,
+                                         uint8_t value, uint32_t *token);
+
+/* Evaluate one supported data instruction from caller-proven incoming values,
+ * propagating origins alongside values. Supports inspected literals, copies,
+ * exchanges, memory LOADS and D0/D1 immediate adjustments. No stores or control
+ * transfers: an unsupported instruction stops the caller's walk. P, D0/D1 and
+ * carry must be canonical. NEXT_PC captures deliberately receive unknown
+ * origins: a computed PC is not an encoded literal cell.
+ * Readers, mappings and all input state remain stable; data reads must be pure
+ * memory, not device registers. The caller separately records load-address and
+ * instruction dependencies before advancing. This does not establish a path,
+ * authorize repairs, or prove complete reference coverage. On error values,
+ * origins and length remain unchanged; callback observations must be discarded.
+ * State/output objects are disjoint, and callbacks may not change them. */
+int hpclang_rpl_code_data_step(const struct hpclang_rpl_reader *instructions,
+                               const struct hpclang_rpl_reader *data, uint32_t instruction,
+                               uint32_t limit, struct hpclang_rpl_code_values *values,
+                               struct hpclang_rpl_code_origins *origins,
+                               hpclang_rpl_code_token_fn token, void *context, uint32_t *length);
+
 struct hpclang_rpl_code_origin_cell
 {
     uint32_t mapping, field, expected;

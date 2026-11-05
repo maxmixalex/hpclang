@@ -1,5 +1,127 @@
 #include "rpl-code.h"
 
+static uint64_t data_mask(unsigned nibbles)
+{
+    return nibbles == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * nibbles)) - 1;
+}
+
+int hpclang_rpl_code_data_step(const struct hpclang_rpl_reader *instructions,
+                               const struct hpclang_rpl_reader *data, uint32_t instruction,
+                               uint32_t limit, struct hpclang_rpl_code_values *values,
+                               struct hpclang_rpl_code_origins *origins,
+                               hpclang_rpl_code_token_fn token, void *context, uint32_t *length)
+{
+    if (!instructions || !instructions->read_nibble || !values || !origins || !token || !length)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->carry > 1 ||
+        values->registers[HPCLANG_RPL_CODE_D0] > 0xfffff ||
+        values->registers[HPCLANG_RPL_CODE_D1] > 0xfffff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    struct hpclang_rpl_code_values next = *values;
+    struct hpclang_rpl_code_origins sources = *origins;
+    struct hpclang_rpl_code_literal literal;
+    struct hpclang_rpl_code_assignment assignment;
+    struct hpclang_rpl_code_exchange exchange;
+    struct hpclang_rpl_code_memory memory;
+    struct hpclang_rpl_code_address_adjust adjust;
+    uint32_t tokens[16] = {0}, size;
+    int result = hpclang_rpl_code_literal_inspect(instructions, instruction, limit, p, &literal);
+    if (!result) {
+        for (unsigned i = 0; i < literal.nibbles; ++i) {
+            unsigned digit = literal.destination == HPCLANG_RPL_CODE_D0 ||
+                                     literal.destination == HPCLANG_RPL_CODE_D1
+                                 ? i
+                                 : (p + i) & 15u;
+            result = token(context, 0, literal.field + i,
+                           (uint8_t)((literal.value >> (4 * digit)) & 15), &tokens[i]);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
+        next.registers[literal.destination] =
+            (next.registers[literal.destination] & ~literal.mask) | literal.value;
+        result = hpclang_rpl_code_origins_literal(&sources, &literal, p, tokens, literal.nibbles);
+        size = literal.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    result = hpclang_rpl_code_assignment_inspect(instructions, instruction, limit, p, &assignment);
+    if (!result) {
+        uint64_t value = assignment.source == HPCLANG_RPL_CODE_CONSTANT ||
+                                 assignment.source == HPCLANG_RPL_CODE_NEXT_PC
+                             ? assignment.constant
+                             : next.registers[assignment.source];
+        uint64_t mask = data_mask(assignment.nibbles);
+        value = (value >> (4 * assignment.source_first)) & mask;
+        next.registers[assignment.destination] = (next.registers[assignment.destination] &
+                                                  ~(mask << (4 * assignment.destination_first))) |
+                                                 (value << (4 * assignment.destination_first));
+        result = hpclang_rpl_code_origins_assign(&sources, &assignment, tokens);
+        size = assignment.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    result = hpclang_rpl_code_exchange_inspect(instructions, instruction, limit, p, &exchange);
+    if (!result) {
+        uint64_t mask = data_mask(exchange.nibbles) << (4 * exchange.first);
+        uint64_t left = next.registers[exchange.left], right = next.registers[exchange.right];
+        next.registers[exchange.left] = (left & ~mask) | (right & mask);
+        next.registers[exchange.right] = (right & ~mask) | (left & mask);
+        result = hpclang_rpl_code_origins_exchange(&sources, &exchange);
+        size = exchange.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    result = hpclang_rpl_code_memory_inspect(instructions, instruction, limit, p, &memory);
+    if (!result) {
+        if (!memory.load)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (!data || !data->read_nibble)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        uint32_t address = (uint32_t)next.registers[memory.address];
+        if (address > 0x100000u - memory.nibbles)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint64_t value = 0;
+        for (unsigned i = 0; i < memory.nibbles; ++i) {
+            uint8_t nibble;
+            if (!data->read_nibble(data->context, address + i, &nibble))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (nibble > 15)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            result = token(context, 1, address + i, nibble, &tokens[i]);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            value |= (uint64_t)nibble << (4 * i);
+        }
+        uint64_t mask = data_mask(memory.nibbles) << (4 * memory.first);
+        next.registers[memory.data] =
+            (next.registers[memory.data] & ~mask) | (value << (4 * memory.first));
+        result = hpclang_rpl_code_origins_memory(&sources, &memory, tokens, memory.nibbles);
+        size = memory.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    result = hpclang_rpl_code_address_adjust_inspect(instructions, instruction, limit, &adjust);
+    if (result)
+        return result;
+    int64_t address = (int64_t)next.registers[adjust.address] + adjust.delta;
+    next.registers[adjust.address] = (uint32_t)address & 0xfffffu;
+    next.carry = address < 0 || address > 0xfffff;
+    result = hpclang_rpl_code_origins_adjust(&sources, &adjust);
+    size = adjust.length;
+done:
+    if (result)
+        return result;
+    *values = next;
+    *origins = sources;
+    *length = size;
+    return 0;
+}
+
 int hpclang_rpl_code_origins_plan(const uint32_t *tokens, uint32_t current, uint32_t replacement,
                                   hpclang_rpl_code_origin_resolve_fn resolve, void *context,
                                   struct hpclang_rpl_reference_edit *edits, unsigned *count)

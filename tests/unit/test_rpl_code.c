@@ -26,6 +26,122 @@ static void encode(struct image *image, unsigned prefix, unsigned width, uint32_
 static const struct hpclang_rpl_code_patch sentinel = {123, 456, 789, 1011};
 static void seed_origins(struct hpclang_rpl_code_origins *state);
 
+static int data_token(void *context, unsigned data, uint32_t address, uint8_t value,
+                      uint32_t *token)
+{
+    (void)value;
+    if (context && address == *(uint32_t *)context)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    *token = (data ? 0x200000 : 0x100000) + address;
+    return 0;
+}
+
+static void data_steps(void)
+{
+    struct image code = {.size = 128, .fail = UINT32_MAX};
+    struct image memory = {.address = 0x180e9, .size = 128, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+    const struct hpclang_rpl_reader reader = {read_nibble, &memory};
+    struct hpclang_rpl_code_values values = {0};
+    struct hpclang_rpl_code_origins origins = {0};
+    uint32_t length = 999;
+    encode(&code, 0, 2, 0xf1); /* D1=180e9. */
+    encode(&code, 2, 5, memory.address);
+    encode(&code, 8, 3, 0x741); /* C=DAT1.A. */
+    encode(&memory, 0, 5, 0x54321);
+    values.registers[HPCLANG_RPL_CODE_C] = UINT64_C(0xabcdef0000000000);
+    assert(!hpclang_rpl_code_data_step(&instructions, &reader, 0, 128, &values, &origins,
+                                       data_token, NULL, &length));
+    assert(length == 7 && values.registers[HPCLANG_RPL_CODE_D1] == memory.address);
+    for (unsigned i = 0; i < 5; ++i)
+        assert(origins.registers[HPCLANG_RPL_CODE_D1][i] == 0x100002 + i);
+    const struct hpclang_rpl_code_values before = values;
+    const struct hpclang_rpl_code_origins prior = origins;
+    for (unsigned i = 0; i < 5; ++i) {
+        memory.fail = memory.address + i;
+        assert(hpclang_rpl_code_data_step(&instructions, &reader, 8, 120, &values, &origins,
+                                          data_token, NULL,
+                                          &length) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&values, &before, sizeof values) &&
+               !memcmp(&origins, &prior, sizeof origins));
+        assert(length == 7);
+        memory.fail = UINT32_MAX;
+        uint32_t rejected = memory.address + i;
+        assert(hpclang_rpl_code_data_step(&instructions, &reader, 8, 120, &values, &origins,
+                                          data_token, &rejected,
+                                          &length) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&values, &before, sizeof values) &&
+               !memcmp(&origins, &prior, sizeof origins));
+    }
+    assert(!hpclang_rpl_code_data_step(&instructions, &reader, 8, 120, &values, &origins,
+                                       data_token, NULL, &length));
+    assert(length == 3 && values.registers[HPCLANG_RPL_CODE_C] == UINT64_C(0xabcdef0000054321));
+    for (unsigned i = 0; i < 5; ++i)
+        assert(origins.registers[HPCLANG_RPL_CODE_C][i] == 0x2180e9 + i);
+    encode(&code, 11, 2, 0xad); /* A=C.A. */
+    assert(!hpclang_rpl_code_data_step(&instructions, &reader, 11, 117, &values, &origins,
+                                       data_token, NULL, &length));
+    assert(values.registers[HPCLANG_RPL_CODE_A] == 0x54321);
+    assert(!memcmp(origins.registers[HPCLANG_RPL_CODE_A], origins.registers[HPCLANG_RPL_CODE_C],
+                   5 * sizeof(uint32_t)));
+    encode(&code, 13, 2, 0xed); /* ACEX.A. */
+    values.registers[HPCLANG_RPL_CODE_A] = 0x11111;
+    assert(!hpclang_rpl_code_data_step(&instructions, &reader, 13, 115, &values, &origins,
+                                       data_token, NULL, &length));
+    assert(values.registers[HPCLANG_RPL_CODE_A] == 0x54321);
+    assert(values.registers[HPCLANG_RPL_CODE_C] == UINT64_C(0xabcdef0000011111));
+    encode(&code, 15, 3, 0x071); /* D1=D1+1, including overflow carry. */
+    values.registers[HPCLANG_RPL_CODE_D1] = 0xfffff;
+    assert(!hpclang_rpl_code_data_step(&instructions, &reader, 15, 113, &values, &origins,
+                                       data_token, NULL, &length));
+    assert(!values.registers[HPCLANG_RPL_CODE_D1] && values.carry == 1);
+    for (unsigned i = 0; i < 5; ++i)
+        assert(!origins.registers[HPCLANG_RPL_CODE_D1][i]);
+    encode(&code, 18, 3, 0x541); /* DAT1=C.A is not a load. */
+    struct hpclang_rpl_code_values saved = values;
+    struct hpclang_rpl_code_origins saved_origins = origins;
+    assert(hpclang_rpl_code_data_step(&instructions, &reader, 18, 110, &values, &origins,
+                                      data_token, NULL, &length) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&values, &saved, sizeof values));
+    assert(!memcmp(&origins, &saved_origins, sizeof origins));
+    /* Sixteen-nibble literal wraps at P=15; no shift by 64 or origin rotation loss. */
+    encode(&code, 32, 2, 0xf3);
+    for (unsigned i = 0; i < 16; ++i)
+        code.data[34 + i] = (uint8_t)i;
+    values.registers[HPCLANG_RPL_CODE_P] = 15;
+    assert(!hpclang_rpl_code_data_step(&instructions, &reader, 32, 96, &values, &origins,
+                                       data_token, NULL, &length));
+    assert(length == 18 && values.registers[HPCLANG_RPL_CODE_C] == UINT64_C(0x0fedcba987654321));
+    for (unsigned i = 0; i < 16; ++i)
+        assert(origins.registers[HPCLANG_RPL_CODE_C][(15 + i) & 15] == 0x100022 + i);
+    encode(&code, 50, 3, 0xafa); /* A=C.W. */
+    assert(!hpclang_rpl_code_data_step(&instructions, &reader, 50, 78, &values, &origins,
+                                       data_token, NULL, &length));
+    assert(values.registers[HPCLANG_RPL_CODE_A] == UINT64_C(0x0fedcba987654321));
+    assert(!memcmp(origins.registers[HPCLANG_RPL_CODE_A], origins.registers[HPCLANG_RPL_CODE_C],
+                   sizeof origins.registers[0]));
+    encode(&code, 53, 3, 0x2fa); /* C=0.W kills every source. */
+    assert(!hpclang_rpl_code_data_step(&instructions, &reader, 53, 75, &values, &origins,
+                                       data_token, NULL, &length));
+    assert(!values.registers[HPCLANG_RPL_CODE_C]);
+    for (unsigned i = 0; i < 16; ++i)
+        assert(!origins.registers[HPCLANG_RPL_CODE_C][i]);
+    encode(&code, 56, 4, 0x5b18); /* C=PC does not invent encoded origins. */
+    assert(!hpclang_rpl_code_data_step(&instructions, &reader, 56, 72, &values, &origins,
+                                       data_token, NULL, &length));
+    assert(values.registers[HPCLANG_RPL_CODE_C] == 60);
+    for (unsigned i = 0; i < 5; ++i)
+        assert(!origins.registers[HPCLANG_RPL_CODE_C][i]);
+    values.registers[HPCLANG_RPL_CODE_D1] = 0xffffe;
+    saved = values;
+    saved_origins = origins;
+    uint32_t old_length = length;
+    assert(hpclang_rpl_code_data_step(&instructions, &reader, 8, 120, &values, &origins, data_token,
+                                      NULL, &length) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!memcmp(&values, &saved, sizeof values));
+    assert(!memcmp(&origins, &saved_origins, sizeof origins) && length == old_length);
+}
+
 static void exhaustive(void)
 {
     const unsigned opcodes[] = {4, 5, 6, 7, 12, 14};
@@ -1656,6 +1772,7 @@ static void origin_repair_plans(void)
 
 int main(void)
 {
+    data_steps();
     origin_repair_plans();
     bank_exit_program();
     bank_entry_program();
