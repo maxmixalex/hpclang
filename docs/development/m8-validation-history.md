@@ -4163,3 +4163,41 @@ controls reject and remove stale reports; Ruff, C formatting and strict docs
 pass. Evidence: /work/nov05-maintained-origin-repair. This promotes the repair
 experiment to a reproducible repository gate without claiming general source
 discovery, later Stock return, or physical hardware acceptance.
+
+## 2026-11-05 — Origin repair draft submitted and five-model Notebook audit
+
+Draft PR #31 submits e3e467b2, incorporating the maintained origin-repair gate
+and accepted main 26140e1d. Prior pushed parent 4571d52c was audited before
+submission: all twelve workflows pass, 390 successful jobs and two intentional
+skips. No new-head CI inspection in the push turn. The maintained private-ROM
+gates pass 32 baseline/move, 16 origin-plan and 40 omission cases per model,
+plus ten altered-input rejections. Strict docs, Ruff and formatting pass.
+Evidence: /work/nov05-maintained-origin-repair; source planning evidence remains
+under /work/nov05-origin-plan. Production discovery and M8.0 stay open.
+
+Notebook resume completes HP39gs. Independent audit now covers HP48gII,
+HP49g+, HP50g, HP39g+ and HP39gs (fifteen launches), retaining HP39g+'s
+post-restart artifact-hash qualification in the output. The report remains
+complete=false while HP40gs runs in the existing resumed matrix. Evidence:
+/work/nov05-backup-frame-resources/independent-persistence-audit.json.
+
+## 2026-11-05 — CI packet deadline and local ROM fixture diagnosis
+
+PR #31 job 127210261348 fails inside test-kermit-server.py, not native
+storage execution. Its debug timer records a 50 ms select pause lasting
+4.719 s, so the peer's 3 s packet deadline expires before the retransmit.
+The local fix gives packet arrival 10 s of scheduling slack; explicit 30 ms
+turnaround, 15 s backoff, byte/CRC and sequence checks remain unchanged.
+The full bundled-Kermit PTY test passes in /work/nov05-kermit-scheduling;
+a separate 4.719 s delayed-packet check exceeds the previous deadline and
+then passes exact payload/CRC checks. This is not a fix for the unresolved
+HP40gs calculator USB failures. Change remains unpushed.
+
+Allocation/UI combined validation proves HP48gII Direct and Stock, including
+6164 native block bytes returned and fourteen lifecycle snapshots. Its
+terminal HP49g+ Direct failure occurred before application entry: the fresh
+emulator had no firmware, because the local orchestration omitted the CI
+firmware preparation step. Ran the same bootloaders/official make targets;
+resume preserves completed case hashes, source/artifact seals, failed log
+and state, and adds firmware hashes. Remaining matrix is running under
+/work/nov05-allocation-ui-combined; no full-matrix completion claimed.
