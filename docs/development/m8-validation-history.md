@@ -4891,3 +4891,37 @@ match. ARM analysis has zero diagnostics; data/derived-step own frames are
 1432/1672 bytes, not aggregate stack bounds. Formatting/Ruff/strict docs pass.
 This follow-up remains local to batch delivery while prior CI progresses.
 M8.0 and M8 remain incomplete; no scope or hardware-flashing boundary changed.
+
+## 2026-11-06 — Simulated stores and complete first-store source chain
+
+Local 620f17a3 adds execution_step_effects/collect_effects with a caller-owned
+store recorder; legacy entries still reject stores. Records retain destination
+use, selected source field, entire source value/origins and modular adjustment.
+The caller supplies a physical-alias-aware scratch read/token view and discards
+all speculative effects after failure. No target writes or general mutation
+authority are added. D0/D1 immediate adjustments retain their original source
+plus offset; 81BD now retains its first loaded pointer as D0's source plus five.
+Carry/effect preservation remains a separate repair obligation.
+
+Twelve final sanitizer targets pass. Tests cover selected/custom store fields,
+A/C and D0/D1, P endpoints, readback origins (including unknowns), capacity/bounds,
+callback errors and failed-step/collector publication. Both captured original-ROM
+paths reach 34 steps and stop at unsupported 81B1, 0x2c3f. Initial investigation
+exposed missing D0 lineage; preserving the actual loaded pointer makes the later
++5/-5 cancel and supplies all five original stored-value sources. The final
+physical scratch overlay matches the ROM's actual SRAM store with unchanged
+Read[] mapping and Flash. All twenty consumed addresses enter one 82-cell plan;
+the five stored-value sources already have compatible constraints in that plan.
+Actual catalog moves on both snapshots replay all 34 transitions and verify the
+five stored nibbles; four stale/conflict cases per model remain zero-write.
+
+Evidence: /work/nov06-store-qualified/{unit.log,stock.json,artifact-audit.json,
+analysis.json,path/,plan/,writeback/}. The earlier /work/nov06-store-effects/
+records the pre-D0-lineage run; it is not the final source proof. A JSON string-key
+lookup in the plan audit was corrected before stored-value checks passed.
+Both fresh existing live Stock gates retain their 33-step/no-store boundary and
+pass catalog/attachment/unchanged-Flash/settled-return checks. Live store effects
+are not claimed. All six launcher payloads match; ARM analysis is clean and the
+effects-step own frame is 1808 bytes (not aggregate stack bounds). Strict docs
+and source checks pass. This batch stays local while earlier CI progresses.
+Full M8.0/M8 remain incomplete; production and later native effects remain open.
