@@ -4861,3 +4861,33 @@ entry prefix. ARM analysis has no diagnostics; execution visitor/source-resolver
 own frames are 320/64 bytes, not nested stack bounds. Ruff and strict docs pass.
 No runtime semantics changed, so existing runtime unit results are retained,
 not relabeled as fresh runs. Full M8.0 and M8 acceptance remain open.
+
+## 2026-11-06 — Address-field increment/decrement and first-store boundary
+
+Local e96e4552 evaluates E4..E7 / CC..CF (A..D address-field +/-1), generalizing
+the former D+1 implementation. Hexadecimal/decimal arithmetic ignores incoming
+carry, publishes overflow/borrow and preserves all upper digits. Invalid selected
+BCD digits reject atomically; computed low digits lose original-source tokens
+and offsets. Unit tests cover all eight operations, both modes/carry inputs,
+wrap/borrow chains, invalid BCD, unaffected state and failure non-publication.
+All twelve related sanitizer targets pass. The original ARM ROM independently
+matches all registers/flags/return-stack state in 512 two-model boundary cases.
+
+Both complete C traces and actual catalog-move snapshot replays now pass 33
+transitions, stopping before the store at 0x2c3c. The latter retain 19 uses,
+77 normalized source cells and four zero-write negative cases per model.
+Both fresh maintained Stock plan/return gates pass 33 steps, three branch checks,
+107 guards and two failed-plan controls, with unchanged Flash/catalog invariants.
+The live gate does not apply the proposed move; arbitrary continuation and
+production integration remain unaccepted. Next work must model store effects,
+later reads and address lineage, not silently skip the store.
+
+Evidence: /work/nov06-unit-arithmetic/{unit.log,rom-matrix.json,stock.json,
+artifact-audit.json,analysis.json}, /work/nov06-unit-arithmetic-path/ and
+/work/nov06-unit-arithmetic-writeback/. A comment-only fixture rebuild has the
+same ELF SHA256 de5ad7c0ad98c466d4b11923503e9920099ea3e8896bcf19b620907f1afb9d32
+as the packaged executable; prior inputs are retained. All six launcher payloads
+match. ARM analysis has zero diagnostics; data/derived-step own frames are
+1432/1672 bytes, not aggregate stack bounds. Formatting/Ruff/strict docs pass.
+This follow-up remains local to batch delivery while prior CI progresses.
+M8.0 and M8 remain incomplete; no scope or hardware-flashing boundary changed.
