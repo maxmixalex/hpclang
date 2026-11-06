@@ -202,13 +202,270 @@ int hpclang_rpl_code_memory_inspect(const struct hpclang_rpl_reader *reader, uin
 /* Abstract origins, not register values or pointer classifications. Each token
  * names one caller-owned nibble fact; zero means unknown. Register numbers are
  * the enum above, through D1. CONSTANT's slot and unused high nibbles are unused.
- * Callers establish seeds, memory identity/aliasing, instruction identity and
- * the executed path. Unmodeled writes must invalidate their affected facts;
- * never skip unsupported instructions and continue with stale origins. */
+ * Initialize adjustments to zero for ordinary nibble seeds; each is a canonical
+ * 20-bit modular offset. Callers establish seeds, memory identity/aliasing, instruction identity
+ * and the executed path. Unmodeled writes must invalidate their affected facts; never skip
+ * unsupported instructions and continue with stale origins. */
 struct hpclang_rpl_code_origins
 {
     uint32_t registers[HPCLANG_RPL_CODE_D1 + 1][16];
+    /* Low five digits represent (source + adjustment) modulo 20 bits.
+     * Tokens name the unadjusted source, not the current computed digits.
+     * Zero adjustment is an ordinary nibble copy; missing tokens stay unknown. */
+    uint32_t adjustment[HPCLANG_RPL_CODE_D1 + 1];
 };
+
+struct hpclang_rpl_code_values
+{
+    uint64_t registers[HPCLANG_RPL_CODE_D1 + 1];
+    unsigned carry, decimal;
+};
+
+struct hpclang_rpl_code_control
+{
+    uint32_t pc, carry, cursor, stack[8];
+    uint32_t stack_origins[8][5];
+    uint32_t stack_generated[8]; /* Producing call PC + 1; zero means not recorded. */
+};
+
+struct hpclang_rpl_code_return_use
+{
+    uint32_t present, target, origins[5];
+    uint32_t generated;
+};
+
+/* Advance a private suspended-state copy through RTN/RTNSC/RTNCC, direct
+ * jumps/calls and GOC/GONC (including their zero-displacement returns).
+ * Carry is canonical 0/1. Calls overwrite the next circular slot and clear its
+ * old origins and retain the producing call PC+1: a computed return PC is not
+ * an original stored field. A taken
+ * return reports the consumed slot's origins before clearing/popping it.
+ * Untaken conditions leave the stack unchanged. Direct branch operand repair
+ * remains the caller's responsibility via branch_inspect/plan_shift.
+ * RTNSXM and predicates using other flags are unsupported; do not skip them.
+ * Caller establishes instruction/path/mapping identity and owns all input
+ * storage. No native writes or relocation permission. Errors preserve state
+ * and use; success always replaces use (present=0 except a taken return).
+ * State and use are disjoint from each other and the instruction reader. */
+int hpclang_rpl_code_control_step(const struct hpclang_rpl_reader *instructions, uint32_t limit,
+                                  struct hpclang_rpl_code_control *state,
+                                  struct hpclang_rpl_code_return_use *use);
+
+/* Name an instruction/data nibble already read from a stable mapping. data is
+ * zero for encoded literals and one for data loads. Return zero on success;
+ * token zero explicitly means unknown. The caller owns token/mapping identity
+ * and guards. This callback must not mutate the readers or suspended state. */
+typedef int (*hpclang_rpl_code_token_fn)(void *context, unsigned data, uint32_t address,
+                                         uint8_t value, uint32_t *token);
+
+struct hpclang_rpl_execution_value
+{
+    uint32_t value, origins[5], adjustment;
+};
+
+struct hpclang_rpl_execution_subtraction
+{
+    struct hpclang_rpl_execution_value left, right;
+    uint32_t first, nibbles, decimal, value, carry;
+};
+
+/* Optional subtraction recorder. Save the immutable relation and return five
+ * nonzero tokens naming its RESULT digits, in a namespace disjoint from all
+ * original/native sources. These tokens are expression facts, never writable
+ * physical cells. Their resolver must reject them until the expression is
+ * expanded/qualified; do not pass them through a physical-address resolver.
+ * Copies/exchanges propagate these ordinary nibble facts. Partial overwrites
+ * replace affected digits. Nested operands can name older records; this does
+ * not implement recursive planning. Caller owns bounded storage and guards
+ * instruction/P/mode. Return zero or a negative error; positive is malformed.
+ * On any step/collection failure discard speculative records and observations.
+ * Emitted for EA and BfA fields wholly within the low five digits only. */
+typedef int (*hpclang_rpl_code_derive_fn)(
+    void *context, uint32_t instruction, const struct hpclang_rpl_execution_subtraction *expression,
+    uint32_t tokens[5]);
+
+/* Evaluate one supported data instruction from caller-proven incoming values,
+ * propagating origins alongside values. Supports inspected literals, copies,
+ * exchanges, memory LOADS, D0/D1 immediate adjustments, SETHEX/SETDEC, A..D.A +/- 1
+ * and EA/BfA (A=A-C, address field / fields 0..7). These arithmetic instructions use the proven
+ * decimal flag (0 hexadecimal, 1 decimal); selected decimal input digits above
+ * nine are unsupported. Hex increment/decrement retain the original or expression
+ * source plus a 20-bit modular offset; BCD increment/decrement clear the affected
+ * origins because their result is not a fixed binary offset. Missing sources stay
+ * unknown. Retained offsets alone do not prove carry or later-effect invariance
+ * under a proposed repair. Subtraction clears origins unless recorded. Increment,
+ * decrement and EA/BfA ignore incoming carry, set carry to overflow/borrow and
+ * preserve unselected digits. This entry does not retain derived expressions;
+ * execution_step_derived can retain supported subtraction expressions through a callback.
+ * No stores or control
+ * transfers: an unsupported instruction stops the caller's walk. P, D0/D1 and
+ * carry/decimal must be canonical. NEXT_PC captures deliberately receive unknown
+ * origins: a computed PC is not an encoded literal cell.
+ * Readers, mappings and all input state remain stable; data reads must be pure
+ * memory, not device registers. The caller separately records load-address and
+ * instruction dependencies before advancing. This does not establish a path,
+ * authorize repairs, or prove complete reference coverage. On error values,
+ * origins and length remain unchanged; callback observations must be discarded.
+ * State/output objects are disjoint, and callbacks may not change them. */
+int hpclang_rpl_code_data_step(const struct hpclang_rpl_reader *instructions,
+                               const struct hpclang_rpl_reader *data, uint32_t instruction,
+                               uint32_t limit, struct hpclang_rpl_code_values *values,
+                               struct hpclang_rpl_code_origins *origins,
+                               hpclang_rpl_code_token_fn token, void *context, uint32_t *length);
+
+struct hpclang_rpl_code_execution
+{
+    struct hpclang_rpl_code_values values;
+    struct hpclang_rpl_code_origins origins;
+    struct hpclang_rpl_code_control control;
+};
+
+enum hpclang_rpl_code_use_kind
+{
+    HPCLANG_RPL_CODE_USE_LOAD_ADDRESS = 1,
+    HPCLANG_RPL_CODE_USE_REGISTER_TARGET,
+    HPCLANG_RPL_CODE_USE_MEMORY_TARGET,
+    HPCLANG_RPL_CODE_USE_RETURN_TARGET,
+    HPCLANG_RPL_CODE_USE_STORE_ADDRESS
+};
+
+struct hpclang_rpl_code_address_use
+{
+    uint32_t kind, value, origins[5];
+    uint32_t adjustment; /* value = original source + adjustment modulo 20 bits. */
+    uint32_t generated;  /* For returns: producing call PC+1, not a nibble token. */
+};
+
+struct hpclang_rpl_code_step_uses
+{
+    uint32_t count, has_branch;
+    struct hpclang_rpl_code_address_use addresses[4];
+    struct hpclang_rpl_code_branch branch;
+};
+
+struct hpclang_rpl_code_store
+{
+    uint32_t instruction, first, nibbles;
+    struct hpclang_rpl_code_address_use address;
+    uint64_t value;                   /* Entire source register; selected digits start at first. */
+    uint32_t origins[16], adjustment; /* Preserve computed low-five-digit relation. */
+};
+
+/* Record a simulated store in caller-owned scratch only; never write the target.
+ * Qualify destination mapping/aliases, retain overwritten dependencies and supply
+ * subsequent code/data reads and tokens from the updated scratch view. Computed
+ * values need relation tokens: adjustment must not be flattened into old cell
+ * tokens. Unknown sources remain unknown. Return zero or a negative error;
+ * positive becomes MALFORMED. Discard all speculative effects on any later
+ * step/visitor/collection failure. This callback grants no mutation permission. */
+typedef int (*hpclang_rpl_code_store_fn)(void *context, const struct hpclang_rpl_code_store *store);
+
+/* One C step combining the data/control evaluators with register/indirect PC
+ * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81B1/81BD/81BE.
+ * 81BE with carry clear stores D0.A at B.A, increments B.low32 by five,
+ * sets D0=(A.A+5) modulo 20 bits, then executes the 81B1 load sequence.
+ * Its store callback must supply subsequent reads/tokens from scratch; a later
+ * read failure requires discarding that speculative store. With carry set it
+ * jumps to native-ROM target 0x2e15 without a store. That target is emitted
+ * with unknown origins: planning requires separate ROM-profile qualification,
+ * never a fabricated Saturn operand. Native ROM profile qualification remains
+ * the caller's responsibility for all three instructions.
+ * 81B1 emits D0 and its loaded pointer as load addresses, then the loaded PC
+ * target. It replaces A's low five digits and sources, retaining its upper bits;
+ * D0 retains its original sources with an additional offset of five. Both
+ * instructions leave carry/decimal mode unchanged and require canonical D0.
+ * 81BD emits three dependent load addresses followed by the memory PC target;
+ * B retains its low-five-digit source plus a modular adjustment; D0 retains
+ * the first loaded pointer's source plus five. Arithmetic on D clears affected
+ * origins. Full low-address copies/exchanges retain
+ * adjustments; partial overwrites discard the affected expression. Its B/D updates use
+ * the low 32-bit ARM words, independent of Saturn decimal mode. A D0 result
+ * beyond 20 bits is rejected. values.carry and control.carry
+ * describe the same state and must agree. Emit the five source tokens of every
+ * consumed load address, register jump target, indirect-memory target or return.
+ * Copies alone emit no use. Direct encoded operands are described by branch,
+ * not misrepresented as copied address digits. Generated returns retain a call
+ * producer separately; other computed PC origins stay unknown. C/RSTK transfers
+ * conservatively discard generated-call metadata instead of mislabeling it.
+ * The caller qualifies entry, memory mappings, tokens and instruction boundaries,
+ * guards all reads, limits the walk and rejects unsupported instructions. A zero
+ * origin does not authorize an unguarded repair. This is a private simulation,
+ * not native mutation, complete reference closure or an installation permission.
+ * State and uses are disjoint; callbacks/readers are pure and may not alter them.
+ * Errors leave both outputs unchanged; discard callback observations on failure. */
+int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instructions,
+                                    const struct hpclang_rpl_reader *data, uint32_t limit,
+                                    struct hpclang_rpl_code_execution *state,
+                                    hpclang_rpl_code_token_fn token, void *context,
+                                    struct hpclang_rpl_code_step_uses *uses);
+
+/* Same evaluator, with optional caller-owned arithmetic result records. */
+int hpclang_rpl_code_execution_step_derived(const struct hpclang_rpl_reader *instructions,
+                                            const struct hpclang_rpl_reader *data, uint32_t limit,
+                                            struct hpclang_rpl_code_execution *state,
+                                            hpclang_rpl_code_token_fn token,
+                                            hpclang_rpl_code_derive_fn derive, void *context,
+                                            struct hpclang_rpl_code_step_uses *uses);
+
+/* As execution_step_derived, with optional simulated memory-store effects.
+ * Without store, stores still reject. A store's entire span must fit the
+ * 20-bit address space; callback rejection preserves state and uses. Readers
+ * must expose the caller's current simulated view, including physical aliases
+ * and instruction fetches affected by earlier stores. Other native/mapping/MMIO
+ * effects remain unsupported and must never be treated as ordinary RAM writes. */
+int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *instructions,
+                                            const struct hpclang_rpl_reader *data, uint32_t limit,
+                                            struct hpclang_rpl_code_execution *state,
+                                            hpclang_rpl_code_token_fn token,
+                                            hpclang_rpl_code_derive_fn derive,
+                                            hpclang_rpl_code_store_fn store, void *context,
+                                            struct hpclang_rpl_code_step_uses *uses);
+
+/* Validate a collected generated return against its guarded producing call,
+ * and plan that call's branch operand for a caller-qualified move. The return
+ * replacement must equal the relocated call's fallthrough, including at an
+ * exclusive move endpoint or 20-bit wrap. No stored return field is repaired.
+ * mappings.field names the producing instruction/return mapping; mappings.target
+ * names the call destination, independently qualified. Retain original call
+ * bytes as guards and establish that its complete instruction survives the move.
+ * Return 1 with an operand patch, 0 without one, or a negative span error.
+ * Zero is only this generated-return relation, not complete path coverage or
+ * mutation permission. Output changes only on 1; all reads must remain stable.
+ * Non-generated, mixed-token or adjusted records reject; unknown is not generated. */
+int hpclang_rpl_code_generated_return_plan(const struct hpclang_rpl_reader *instructions,
+                                           const struct hpclang_rpl_code_address_use *use,
+                                           const struct hpclang_rpl_reference_mappings *mappings,
+                                           uint32_t first, uint32_t end, int32_t delta,
+                                           uint32_t replacement,
+                                           struct hpclang_rpl_code_patch *patch);
+
+struct hpclang_rpl_code_origin_cell
+{
+    uint32_t mapping, field, expected;
+};
+
+/* Resolve a caller-owned token to its original, guarded nibble cell. Zero is
+ * unknown and is never passed to resolve. Return zero on success, negative on
+ * failure; positive returns are malformed. Normalize physical aliases here. */
+typedef int (*hpclang_rpl_code_origin_resolve_fn)(void *context, uint32_t token,
+                                                  struct hpclang_rpl_code_origin_cell *cell);
+
+/* Project a proven 20-bit address use back to its five original nibble sources.
+ * tokens are in consumed low-to-high digit order; they need not name contiguous
+ * cells or one mapping. Resolve and check all expected digits against current,
+ * then sort/coalesce the repairs by mapping/address. Duplicate source cells must
+ * agree on both old and replacement digits. Keep unchanged digits in the plan,
+ * allowing a full pointer field to deduplicate with independently found roots.
+ * Caller proves address consumption, replacement/target mapping, source identity
+ * and all instruction/data dependencies. This does not infer pointers from
+ * values, discover missing origins, or authorize writes. Mappings and sources
+ * remain guarded until commit. Callbacks are read-only; their observations on
+ * failure must be discarded. No allocation or IO except resolve. On success
+ * write count (1..5) edits; on error leave outputs untouched. Output storage is
+ * five edits plus a disjoint count, also disjoint from callback-owned storage. */
+int hpclang_rpl_code_origins_plan(const uint32_t *tokens, uint32_t current, uint32_t replacement,
+                                  hpclang_rpl_code_origin_resolve_fn resolve, void *context,
+                                  struct hpclang_rpl_reference_edit *edits, unsigned *count);
 
 /* Propagate caller-established instruction-field tokens through LC/LA or a
  * D0/D1 immediate load. encoded contains count tokens in encoded nibble order,
@@ -245,11 +502,12 @@ int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
                                     const struct hpclang_rpl_code_memory *transfer,
                                     uint32_t *memory, unsigned count);
 
-/* Address arithmetic destroys all five copied nibble origins of D0/D1,
- * including when some resulting digits happen to be unchanged. Other slots
- * are preserved. Validate a nonzero signed immediate in [-16,16] before any
- * change. Carry is not represented here; callers must separately replace or
- * invalidate their carry fact. This does not qualify the resulting address. */
+/* D0/D1 immediate arithmetic retains the original low-five source tokens and
+ * accumulates a modulo-20-bit adjustment. Other slots are preserved. Validate
+ * a nonzero immediate in [-16,16] and canonical incoming adjustment before
+ * any change. Carry is not represented here: callers separately qualify all
+ * carry-dependent effects of a proposed source repair. This relation alone
+ * does not qualify the resulting address or authorize source mutation. */
 int hpclang_rpl_code_origins_adjust(struct hpclang_rpl_code_origins *state,
                                     const struct hpclang_rpl_code_address_adjust *adjust);
 

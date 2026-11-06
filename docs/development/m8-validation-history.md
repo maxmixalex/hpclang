@@ -4218,6 +4218,1123 @@ Runtime, platform, public headers and code-relocation test sources are unchanged
 from a0a31cb4. This is integration validation, not new runtime coverage or
 completion of the production memory-origin collector. Fresh CI remains required.
 
+## 2026-11-05 — Native branch accepted, migration transfer failure and interrupted matrix
+
+PR #26 head 4571d52c passes twelve workflows, 390 jobs and two intentional skips,
+then merges as 26140e1d. Evidence: research/nov05-resumed-ci-26.json. The merge
+does not complete production memory-origin discovery, public library/Port1
+operations or Port2 installation/authority/startup/reclamation.
+
+PR #27 head 54b5291f has ten successful workflows and one failed workflow,
+379 successful jobs, one skip and failed job 126971037182. HP40gs hpgcc-format
+fails before application entry: directory fetch completes, payload ACK progress
+stops for 90 seconds at sequence 0 with three NAKs/six resends. All 437 captured
+data/ACK/NAK frame checks pass. A receiver Timeout error frame is retained
+separately; this does not establish delivery or the root cause. Artifacts:
+research/nov05-pr27-hp40-format; packet report:
+research/nov05-pr27-hp40-format-packet-audit.json. No blind retry requested.
+
+Docker reports container exit 255 at 2026-11-05 10:53:49 UTC, OOMKilled=false.
+Only after terminal confirmation was the original container started again.
+No original child process survived. HP39g+ saved reports show all three Stock
+launches and settled returns; the maintained verifier passes after restart,
+including pixels/persistence and touched stacks 2504/2504/2224 of 8192 bytes.
+The source-input hash seal is checked before resume. HP39g+ artifact hashes
+were not persisted before interruption, so recovery explicitly records that
+they are captured after restart rather than claiming pre/post identity.
+research/nov05-backup-resume.py preserves earlier models and resumes only
+HP39gs/HP40gs in the existing output tree, with a one-run marker. Complete
+six-model acceptance still requires the remaining results and independent audit.
+
+## 2026-11-05 — Origin-derived repair planning
+
+Local branch m8-origin-repair-plan adds hpclang_rpl_code_origins_plan: resolve
+five proven address-source tokens to guarded original nibble cells, check the
+consumed value, reject inconsistent duplicate sources, and sort/coalesce edits
+by mapping/address. Unchanged digits remain in the plan so an independently
+discovered full pointer field can deduplicate. No memory writes or allocation;
+errors preserve output. Caller still proves address use, mapping identity,
+replacement target, dependencies and complete discovery.
+
+The maintained RPL code tests pass with GCC ASan/UBSan, including all 120 source
+permutations, dispersed mappings, duplicate sources, unknown/stale/invalid cells
+and callback failures. ARMv4T Thumb compilation and Clang static analysis pass;
+clang-format passes. Evidence is under /work/nov05-origin-plan.
+
+research/nov05-entry-origin-plan.py replaces the earlier hand-written repair
+fields with plans generated from captured ROM-path origin tokens. Both HP49g+
+and HP50g saved-state catalog moves continue through the original ROM path;
+independent duplicate system-root discovery merges, and stale/conflicting
+plans reject with zero writes. Report:
+/work/oct31-entry-snapshot/entry-origin-plan.json. This is saved-state replay
+through the first indirect jump, not a fresh Stock return or complete automatic
+production source discovery. Candidate remains local and unpushed.
+
+## 2026-11-05 — Maintained origin-repair continuation gate
+
+The maintained threaded_return.py gate now compiles origin-repair.c and the
+shared threaded-return.c fixture. Each model retains 32 baseline/move cases
+and 40 omission controls and adds 16 origin-plan cases. All pass for HP49g+
+and HP50g against the retained original-ROM state and trace. Ten changed-input
+controls reject and remove stale reports; Ruff, C formatting and strict docs
+pass. Evidence: /work/nov05-maintained-origin-repair. This promotes the repair
+experiment to a reproducible repository gate without claiming general source
+discovery, later Stock return, or physical hardware acceptance.
+
+## 2026-11-05 — Origin repair draft submitted and five-model Notebook audit
+
+Draft PR #31 submits e3e467b2, incorporating the maintained origin-repair gate
+and accepted main 26140e1d. Prior pushed parent 4571d52c was audited before
+submission: all twelve workflows pass, 390 successful jobs and two intentional
+skips. No new-head CI inspection in the push turn. The maintained private-ROM
+gates pass 32 baseline/move, 16 origin-plan and 40 omission cases per model,
+plus ten altered-input rejections. Strict docs, Ruff and formatting pass.
+Evidence: /work/nov05-maintained-origin-repair; source planning evidence remains
+under /work/nov05-origin-plan. Production discovery and M8.0 stay open.
+
+Notebook resume completes HP39gs. Independent audit now covers HP48gII,
+HP49g+, HP50g, HP39g+ and HP39gs (fifteen launches), retaining HP39g+'s
+post-restart artifact-hash qualification in the output. The report remains
+complete=false while HP40gs runs in the existing resumed matrix. Evidence:
+/work/nov05-backup-frame-resources/independent-persistence-audit.json.
+
+## 2026-11-05 — CI packet deadline and local ROM fixture diagnosis
+
+PR #31 job 127210261348 fails inside test-kermit-server.py, not native
+storage execution. Its debug timer records a 50 ms select pause lasting
+4.719 s, so the peer's 3 s packet deadline expires before the retransmit.
+The local fix gives packet arrival 10 s of scheduling slack; explicit 30 ms
+turnaround, 15 s backoff, byte/CRC and sequence checks remain unchanged.
+The full bundled-Kermit PTY test passes in /work/nov05-kermit-scheduling;
+a separate 4.719 s delayed-packet check exceeds the previous deadline and
+then passes exact payload/CRC checks. This is not a fix for the unresolved
+HP40gs calculator USB failures. Change remains unpushed.
+
+Allocation/UI combined validation proves HP48gII Direct and Stock, including
+6164 native block bytes returned and fourteen lifecycle snapshots. Its
+terminal HP49g+ Direct failure occurred before application entry: the fresh
+emulator had no firmware, because the local orchestration omitted the CI
+firmware preparation step. Ran the same bootloaders/official make targets;
+resume preserves completed case hashes, source/artifact seals, failed log
+and state, and adds firmware hashes. Remaining matrix is running under
+/work/nov05-allocation-ui-combined; no full-matrix completion claimed.
+
+## 2026-11-05 — Data-instruction value/origin evaluation
+
+Local 17b7f6be adds an internal C evaluator for inspected literals, assignments,
+exchanges, memory loads and D0/D1 adjustments. Values and origins advance
+together; failed reads/token resolution preserve all output state. Stores and
+control transfers remain unsupported. Computed next-PC captures have unknown
+origins rather than pretending to name encoded literal cells. Address uses,
+mapping guards and path ownership remain the collector's responsibility.
+
+New tests cover data-source propagation, each failed load/token position,
+whole-register copies and zeroing, wrapped 16-nibble literal loads, next-PC
+capture, address overflow/carry and bounds. The full rpl_code unit executable
+passes GCC ASan/UBSan; ARMv4T compilation and Clang static analysis pass.
+Independent comparison with captured original HP49g+/HP50g interpreter states
+matches 30 supported data steps, including origins and instruction lengths.
+This comparison seeds each instruction from its recorded incoming state; it
+does not yet prove an autonomous whole-path walker or production integration.
+Evidence: /work/nov05-data-step/entry-data-steps.json and analysis.plist;
+reproducer: research/nov05-data-step-trace.py. Follow-up remains unpushed while
+the previous PR #31 CI runs.
+
+Separately, Notebook integration 3ce8acb0 passes all 172 C/C++ ASan/UBSan tests
+in /work/nov05-notebook-parent-unit/run.log. Python tooling is separate (25
+focused tests previously passed). Six-model persistence/backup remains active;
+no all-model completion is inferred from the completed subset.
+
+## 2026-11-05 — Single-seed execution-path comparison
+
+The reference walker seeds registers, carry and circular return stack once at
+the captured entry. C data evaluation plus explicit Python return/branch and
+D.A increment semantics calculates 21 instructions on each original 49g+/50g
+image through first indirect dispatch. Intermediate recorded states are read
+only after each computed step for comparison; no step reloads its values from
+the trace. Registers, carry, return-stack cells and cursor all match. Memory
+load sources are discovered from computed addresses and propagated tokens.
+
+Evidence: /work/nov05-data-step/autonomous-path.json; reproducer:
+research/nov05-autonomous-data-path.py. This strengthens the single-instruction
+checks without claiming a production C control-flow walker, complete execution
+closure, mutation authorization or hardware qualification. Native integration
+remains open. Notebook backup process 14395 and its HP39gs emulator/transport
+children were confirmed live; no timeout-based restart was performed.
+
+## 2026-11-05 — C direct-control evaluation
+
+Local 1d798641 adds control_step for RTN/RTNSC/RTNCC, direct jumps/calls and
+GOC/GONC including conditional returns. Consumed return origins are reported
+before clearing a slot; generated call returns discard the overwritten origins.
+Unsupported mode/predicate state is not skipped. All output state is preserved
+on errors. Direct branch operand repairs remain a separate responsibility.
+
+GCC ASan/UBSan tests cover all eight circular cursors, both carry states,
+taken/untaken conditions, signed displacements, generated calls/returns and
+read failures. ARMv4T compilation and Clang analysis pass. Replacing Python
+return/branch calculations with this C evaluator preserves both original-model
+21-instruction comparisons, including register/carry/stack/cursor state.
+Evidence: /work/nov05-data-step/control-path.json and control-analysis.plist;
+reproducer: research/nov05-control-path.py. D increment and indirect-dispatch
+orchestration remain in Python; production collector/mutation integration and
+complete caller coverage remain open. No push or new CI acceptance is claimed.
+
+Notebook integration's five completed model runs are retained; HP40gs is active.
+The current independent persistence audit still covers two models, not all six.
+
+## 2026-11-05 — Integrated Notebook six-model acceptance
+
+Integration 3ce8acb0 passes all six Stock persistence/backup cases (18 launches)
+and the complete independent input/artifact/pixel/return/resource audit:
+/work/nov05-notebook-parent-backup/independent-persistence-audit.json. Artifacts
+were sealed before each execution, including HP39g+; no restart qualification
+is needed for this new run. Peak touched stack is 7760/8192 on HP48gII,
+7768/8192 on HP49g+/HP50g, and 2520/8192 on HP39 models. Backup at maximum note
+length is included where supported. Instrumented fixture coverage does not
+prove all shipped-loop paths, firmware/launcher reservations or hardware.
+
+Two-model SD export passes four launches and independent retained raw-card
+checks, including exact UTF-8, maximum-length output and preserved KEEP.TXT.
+All 172 C/C++ ASan/UBSan tests, 25 focused Python tests and strict docs pass.
+Before delivery, exact previous head 3312be9c still has one failed HP40gs
+system-services USB transfer before app entry; no transport fix is claimed.
+The changed, freshly tested integration is a new delivery, not a blind retry
+or proof that the historical transport failure is resolved.
+
+M8.0 local 4b325099 adds explicit decimal mode, SETHEX/SETDEC and D.A increment.
+Original-ROM probes on both models confirm mode-dependent arithmetic and the
+mode field at CPU+0x974. Nondecimal digits in decimal arithmetic are unsupported.
+Sanitizer/ARM compile/analysis pass; C-evaluated single-seed paths still match
+21 instructions per model, now also comparing decimal mode. Python organizes
+the loop and token ownership; production integration remains open. Evidence:
+/work/nov05-data-step/arithmetic-mode.json and c-evaluated-path.json.
+
+## 2026-11-05 — Unified C execution-step integration
+
+Local 5b57f7fe combines data, direct-control, PC exchange, indirect dispatch and
+C/RSTK transfers. It emits load-address, register-target, memory-target and
+return-target source tokens; direct branch operands retain their own descriptor.
+Errors preserve the complete simulated state and use report. Sanitizer tests
+cover multi-load dispatch, read/token failures, all circular-stack positions,
+capture invalidation and generated calls/returns. ARM compile/analysis pass.
+
+Both captured original-model paths now pass 21 calls to the same C step API,
+with nine address uses per model. Python provides only mapping/token callbacks,
+looping and output comparison. Evidence: /work/nov05-data-step/unified-execution.json;
+reproducer: research/nov05-unified-execution-path.py. Production collection and
+guarded mutation integration are still open. ARM -Os static local frames are
+1464 bytes for execution_step and 1272 for its data_step callee (not a total
+stack bound); platform integration must account for nested decoders/callers.
+
+## 2026-11-05 — Discovered origins drive actual catalog movement
+
+The unified C path now starts directly from saved CPU memory and the captured
+entry PC; trace states are comparison-only. Its discovered memory-source uses
+feed the existing C origin planner and actual catalog mover. Both 49g+/50g
+saved states resume along the original ROM path to the same indirect target.
+Each valid move performs 10658 nibble writes; conflicting and stale plans both
+reject with zero writes and unchanged state. Native caller origins, generated
+call returns and unchanged ROM-source obligations are checked in this bounded
+fixture. Source locations are selected from reported uses, not manually supplied
+memory-field constants. This remains saved-state evidence, not production
+collection, complete reference closure or a full Stock return.
+
+Evidence: /work/nov05-data-step/discovered-origin-move.json, linked by hashes to
+unified-execution.json and discovered-origins.json. Reproducer:
+research/nov05-discovered-origin-move.py. An initial CI status read hit API 502;
+the read-only exact-head audit was repeated successfully, without rerunning CI.
+Notebook 384ae39d now has 12 queued workflows/20 queued jobs; no CI acceptance.
+
+## 2026-11-05 — Native execution capture delivery
+
+Capture implementation `123fe460` reads the reviewed HP49g+/50g CPU layout
+through the state-relative reader, retaining 256 nibble dependencies and native
+source identities. Entry-PC provenance remains a separate caller obligation.
+Both full unit targets pass GCC ASan/UBSan, including capture failure injection
+at all 256 positions for four failure modes. ARM compilation passes; analysis
+with the repository's intentional fixed-address-access exclusion reports zero
+diagnostics (capture-analysis-qualified.plist). The earlier raw report retains
+three fixed-address warnings in existing hardware page-table accesses.
+
+Both captured-execution.json and captured-origin-move.json match current source
+hashes. Each model completes 21 evaluated instructions and nine address uses;
+the actual catalog move performs 10658 nibble writes and original ROM execution
+reaches the first indirect target. Stale/conflicting plans reject with zero
+writes. Evidence is under /work/nov05-data-step; reproducers are
+research/nov05-captured-execution-path.py and nov05-captured-origin-move.py.
+This is bounded saved-state validation, not complete execution coverage,
+production mutation integration, full Stock return or hardware acceptance.
+
+## 2026-11-05 — Captured native origins reach repair planning
+
+Local implementation 806f7a21 adds a read-only native-origin resolver for the
+existing origin planner. It accepts exactly the 195 source cells seeded by
+execution capture, preserves output on failure, and retains caller-supplied
+mapping identity and normalized field coordinates. Partial/cross-word sources
+remain nibble edits, not whole-register repairs. Full-word native repair guards,
+mapping lifetime and mutation integration remain caller obligations.
+
+The complete stock-memory unit target passes ASan/UBSan, including exhaustive
+state-offset classification, D0/return-stack/cross-word source planning, stale
+consumed values, reader errors and malformed nibble rejection. The target now
+links rpl-code.c to exercise the actual planner. ARM compilation and qualified
+static analysis pass. Both original saved-state paths project their captured
+native return source through this C resolver and reject stale use values;
+the prior catalog movement/original-ROM continuation checks still pass.
+Evidence: /work/nov05-data-step/native-origin-plan.json and
+captured-origin-move.json. Reproducer: research/nov05-native-origin-plan.py.
+This is local bounded validation; no production native writeback is enabled.
+
+## 2026-11-05 — Native source edits join catalog transactions
+
+Local implementation 40d7d1b7 converts normalized native source fields into at
+most two masked ARM-word edits, retaining full-word expected values and observing
+all source-word nibbles. The catalog transaction merges compatible shared-word
+edits with register/native-root repairs, preserves unselected bits, and rejects
+conflicts or stale complete words before writes. Explicit replacements are not
+shifted again. Source identity, disjoint owned storage, target semantics and
+exclusive mapping/state lifetime remain caller obligations.
+
+Complete stock-memory and allocation-wrapped mutation unit targets pass
+ASan/UBSan. Conversion covers all 70 in-register 1..5-nibble windows and 64
+injected cross-word read/dependency failures. Transaction checks include growth,
+contraction, order-independent/duplicate merges, existing masked roots and
+register aliases, nine malformed/stale/conflicting cases with unchanged native
+words and main RAM, and INCOMPLETE after a commit-stage failure. Both changed
+runtime sources pass ARM compilation and qualified static analysis.
+
+Both saved HP49g+/HP50g states now use C-discovered return-source tokens through
+the resolver, converter and actual catalog transaction. The native caller is
+no longer separately supplied as an automatic root. The entire modified native
+state matches the expected single caller-field change; original ROM continues
+through the first indirect target. Four stale/conflicting native/main-memory
+controls per model reject with zero writes and unchanged native/main memory.
+Evidence: /work/nov05-data-step/native-writeback.json, linked to the captured
+execution report and implementation source hashes. Reproducer:
+research/nov05-native-writeback.py. This remains bounded saved-state validation,
+not complete execution coverage, live launcher integration or full Stock return.
+
+## 2026-11-05 — Negotiated suspended execution context
+
+Implementation d1f731c9 introduces an optional HPCX capability prefix inside the
+code payload (the 16-byte HPC1 header is unchanged). New runtime entry is at
+offset eight; existing launchers already use the declared entry offset. After
+unpacking, supporting HP49g+/HP50g launchers publish RPL5 only for requesting
+images, naming the saved post-ARMSYS PC word. Images without that request retain
+the existing context versions. Runtime readers preserve RPL2/RPL3/RPL4 prefixes
+and existing Port0/Port1 services; older contexts never expose an execution PC.
+
+Nine related targets pass ASan/UBSan: port_memory, port1_bounds, port, object,
+object_store, device, rpl_stock_memory, rpl_mutation and stage_image. Exact-size
+old-prefix allocations exercise absent-extension safety. Independent zlib cases
+check requested/non-requested prefixes in raw and compressed images. The
+code-relocation application and all six launchers build; an independent audit
+unpacks each launcher and matches the complete payload, entry and capability
+bytes. The legacy artifact has entry offset zero. Stage-image static analysis,
+Ruff and strict candidate documentation build pass.
+
+Fresh HP49g+/HP50g Stock native-call fixtures validate that the negotiated PC
+field matches the saved return PC and use boot metadata for the CPU state.
+Both complete application execution, catalog/attachment checks and original
+Stock return; sealed source, binary and initial-state hashes remain unchanged.
+Evidence: /work/nov05-entry-context/{unit.log,app.log,artifact-audit.json,stock.json}.
+Reproducers: research/nov05-entry-context-{build,artifacts,stock}.py.
+This supplies the formal entry contract; it does not yet wire the complete
+execution collector into public mutation or prove all execution-reference paths.
+
+## 2026-11-05 — Guarded collection from actual Stock entry
+
+Local implementation bfc3edd2 adds rpl-execution.c/h to the runtime profile.
+It captures the negotiated entry and CPU state, observes instruction/data reads,
+and reports supported steps and address uses. Boundary stop, budget exhaustion
+and unsupported/error termination are distinct; no return means unrestricted
+reference completeness or mutation permission. Source/mapping qualification and
+exclusive state lifetime remain caller obligations. Work state is caller-owned
+scratch; error observations must be discarded.
+
+Ten related CMake targets pass ASan/UBSan, including fault injection at every
+read/observation/token position of the two-instruction unit fixture, visitor
+errors, budget exhaustion, unsupported continuation and legacy-entry rejection.
+ARM compilation/analysis and six-launcher payload audit pass. The collector's
+own ARM frame is 248 bytes, not a bound on total nested stack use.
+
+The maintained native-call Stock fixture now invokes the production collector
+through live mapped readers and retains/revalidates its guards before recording
+EXECOBS. Both HP49g+/HP50g complete 21 instructions, nine address uses and 78
+guards through target 0x3130. Observations: 349 instruction, 30 data, 256 native
+CPU and eight entry-PC nibbles. Both fixtures retain catalog/attachment checks
+and return to Stock. These bounded observations do not authorize new mutations.
+Separately, the C collector matches every register, return-stack, mode and PC
+state in both saved original-ROM traces; a 20-step budget returns BUDGET and
+legacy contexts reject without reads. Evidence under /work/nov05-execution-collector:
+stock.json, unit.log, artifact-audit.json and collected-execution.json.
+Reproducers: research/nov05-execution-collector-{build,stock}.py and
+research/nov05-collected-execution-path.py. Full execution coverage and integration
+of collected uses into complete public mutation plans remain open.
+
+## 2026-11-05 — Continuation boundary and toolchain download failures
+
+Original-ROM ARM traces on both saved HP49g+/HP50g states confirm that the two
+successive dispatches at Saturn 0x3130 are real executions of 81BD, not duplicate
+logging. This instruction changes the low 32-bit halves of B and D, performs
+three dependent five-nibble reads, updates A and D0, and selects a new PC.
+The first observed execution returns to 0x3130; the second reaches 0x28fc.
+All captured register, flag and return-stack bytes match the independently
+calculated transitions in both models. Dispatch capture reconstructs mappings
+from live SRAM. Original sealed 24-dispatch reports remain untouched.
+
+Evidence: /work/nov05-continuation-arm/{hp49gplus,hp50g}.json and
+checked-transitions.json. Reproducers: research/nov05-continuation-{arm,check}.py.
+This qualifies only those observed transitions. It does not add production
+81BD support, general edge-case coverage or mutation permission. The current
+collector still stops at the previously validated 21-instruction boundary;
+the next extension needs multiple dependent read origins and arithmetic effects.
+
+Exact-head CI audit found two failures on #19 afc9e70f: Stock ports / hp50g /
+installation (127262244111) and retirement (127262244168), both in setup-atfe.
+Retained job logs show HTTP 504 on the initial download and all three retries,
+then curl exit 22. Emulator setup and native port execution were skipped.
+These are observed toolchain-download failures, not evidence of port-test
+failure or successful acceptance. The workflow still has pending jobs; no
+blind rerun or merge was performed. Logs: research/nov05-ci-127262244111.log
+and research/nov05-ci-127262244168.log. Other audited deliveries remain pending.
+
+## 2026-11-05 — Guarded native 81BD execution
+
+Implementation 9865ee8b adds qualified HP49g+/HP50g native 81BD semantics to the
+execution evaluator. Each step reports three dependent load addresses and the
+resulting memory target. Loaded A digits retain their memory origins; arithmetic
+on the low 32-bit B/D words and D0 clears affected origins. Decimal mode does
+not change native binary arithmetic. The computed first address remains unknown
+for direct repair; zero origins never authorize an unguarded edit. Out-of-range
+reads and noncanonical D0 results reject, with state and uses unchanged.
+
+Eleven related sanitizer targets pass, including rpl_code/rpl_execution and
+the complete allocation-wrapped mutation target. Unit cases inject unavailable,
+malformed and token failures at all 15 dependent data digits, plus instruction
+read failures, truncated instructions and pointer-boundary rejections. Tests
+check four uses, origin preservation/invalidation and untouched flags/return
+stack. ARM static analysis reports zero diagnostics; execution_step's own frame
+is 1576 bytes, not a total call-chain stack bound.
+
+The C collector matches all 23 saved original-ROM transition states. A separate
+controlled original-ROM matrix passes 16 cases per model, covering B underflow,
+high bits, D overflow, both decimal modes and D0's highest canonical result.
+These tests do not qualify arbitrary mappings, interrupts or other firmware.
+
+Fresh actual Stock runs on both models pass 23 collected instructions, 17 uses,
+84 revalidated guards and final target 0x28fc. Observation counts are 401 code,
+60 data, 256 native and eight PC nibbles. Catalog/attachment checks and settled
+Stock return pass. Inputs and artifacts remain hash-sealed. All six launchers
+build and pass independent payload/decompression audit. Ruff, formatting and
+strict docs pass. Evidence: /work/nov05-threaded-execution/{unit.log,stock.json,
+artifact-audit.json,collected-execution.json,rom-matrix.json,code.plist}.
+Reproducers: research/nov05-threaded-{build,stock,execution-path,rom-matrix}.py.
+
+The maintained fixture deliberately stops after two 81BD steps. Full execution
+coverage, computed-reference proofs and integration with complete public
+mutation planning remain open; this does not finish M8.0. Exact-head CI remains
+pending; #19 retains the two investigated toolchain HTTP 504 failures.
+
+## 2026-11-05 — Collected-use repair batches and catalog integration
+
+Implementation 78ac05bf adds hpclang_rpl_execution_plan_uses. It resolves every
+consumed source digit, including unchanged values, into normalized one-nibble
+edits. Consistent cross-step/partial aliases deduplicate; stale, unknown,
+conflicting or over-capacity inputs latch an error and invalidate the batch.
+Replacement meaning, physical alias qualification, guards, direct branches and
+complete coverage remain caller obligations. The planner performs no writes.
+
+Integration exposed rejection of a normalized digit already covered by a
+complete catalog root. Catalog transactions now reuse agreeing edits wholly
+contained in an earlier field, preserving single-write behavior and late
+geometry publication. Conflicting or other partial overlaps still reject.
+Ninety growth/contraction cases cover all contained windows and stale/conflict
+variants. A two-instruction evaluator-to-planner unit path checks all generated
+edits, unchanged-source conflicts, resolver failures, unknown origins, capacity
+exhaustion and consistent/inconsistent overlapping five-digit windows.
+
+Twelve sanitizer targets pass, including reference planning and the complete
+allocation-wrapped mutation target. Both changed modules have zero ARM analyzer
+diagnostics; planner's own frame is 200 bytes. Six-launcher build and independent
+payload audit pass. Fresh Stock regressions on both models retain 23 steps,
+17 uses, 84 guards, catalog/attachment checks and settled return. These Stock
+tests exercise collection and catalog regression, not an all-use public plan.
+Evidence: /work/nov05-execution-plan-final/{unit.log,stock.json,artifact-audit.json,
+plan.plist,mutation.plist}; source hashes are retained and rechecked.
+
+A separately qualified subset from the C-collected saved-state report passes
+the new planning bridge, native-word conversion and actual catalog transaction
+on both models. Each valid case performs 10658 nibble writes and continues in
+original ROM through the first indirect target; four memory/native stale or
+conflict cases reject with zero writes and unchanged state. Evidence:
+/work/nov05-execution-plan/native-writeback.json; reproducer:
+research/nov05-collected-writeback.{c,py}. This subset is not all-use closure.
+
+The 23-step trace still contains three unknown-origin uses: generated return
+0x88996 and B-relative loads at 0x88da8/0x88da3. Their semantics require separate
+proof rather than omission from a complete plan. Further continuation, public
+library/Port1 integration and M8.0 acceptance remain open. Exact-head CI remains
+pending; #19 retains its two investigated HTTP 504 toolchain failures.
+
+## 2026-11-05 — Computed address source offsets and relocation
+
+Implementation 8e7f1600 retains low-address source tokens plus a canonical
+20-bit modular adjustment. Repeated 81BD B decrements accumulate -5/-10 without
+pretending the computed digits reside in the original source cells. The use
+planner inverts the offset before validating and merging source repairs.
+Full low-address copies/exchanges retain the formula; partial overwrites discard
+it, high-only writes preserve it, and unsupported stores/RSTK expression transfer
+do not mislabel base digits as computed digits. D/D0 arithmetic remains conservative.
+
+The actual B-relative source is system field 0x806f3, loaded during the helper,
+not the initially saved B word. Both saved traces retain its five tokens for
+loads at 0x88da8/0x88da3. Twelve sanitizer targets pass, including repeated
+decrement, copy/exchange/partial overwrite, memory/literal effects, RSTK
+invalidation, modular wrap, inverse-plan aliases and bounds. ARM analysis has
+zero diagnostics; execution_step/data_step own frames are 1632/1336 bytes,
+not total call-chain bounds. The original-ROM 32-case instruction matrix passes.
+
+Both fresh live Stock runs observe two derived uses from 0x806f3, final offset
+0xffff6, 23 steps, 17 total uses and 84 guards; catalog/attachment and settled
+return checks pass. Six-launcher payload audit and strict docs pass. Evidence:
+/work/nov05-affine-final/{unit.log,stock.json,artifact-audit.json,code.plist,plan.plist};
+/work/nov05-affine-execution/{collected-execution.json,rom-matrix.json}.
+
+Separately qualified derived uses enter repair planning and the catalog
+transaction alongside existing roots. Both saved-state moves perform 10658
+nibble writes and replay all 23 original-ROM steps through two 81BD exits to
+0x28fc. Four prior stale/conflict controls plus inconsistent inverse results
+and unknown derived sources reject with zero writes and unchanged state.
+Evidence: /work/nov05-affine-repair/writeback.json; reproducer:
+research/nov05-affine-writeback.{c,py}. This does not establish all-use closure.
+
+The bounded trace now has one unknown-origin use, generated return 0x88996.
+Generated-PC semantics, remaining continuation, mapping/state qualification and
+complete public mutation planning remain open. M8.0 is incomplete.
+
+#19 Core runtime 42023596098 completed with only the two investigated setup-atfe
+HTTP 504 failures. A failed-jobs-only rerun was accepted; no retry result was
+polled this turn. Original failures remain in history and acceptance is pending.
+Request record: research/nov05-toolchain-retry.json.
+
+## 2026-11-05 — Generated return producer validation
+
+Implementation 6816ae8d records call PC+1 separately from nibble origins in
+simulated return-stack slots. Calls overwrite stale provenance, nested calls
+retain their own producers, and returns consume/clear the corresponding tag.
+C/RSTK transfers conservatively discard tags instead of pretending a generated
+value is an original stored field. Ordinary source planning rejects tagged uses.
+
+hpclang_rpl_code_generated_return_plan re-inspects the guarded producing call,
+checks the observed old fallthrough and requires the proposed return to equal
+the relocated call's fallthrough. It returns any branch-operand patch through
+the existing qualified branch planner; it never invents a return-field write.
+Caller still proves mapping identity, complete instruction lifetime, guards and
+replacement semantics. Zero proves this relation only, not a complete plan.
+
+Twelve sanitizer targets pass. New tests cover nested calls at all stack
+cursors, overwrite/pop behavior, relative and absolute calls, source-only,
+target-only and combined movement, contraction, exclusive move endpoints,
+20-bit wrap, split instructions, read failures and malformed source records.
+ARM analysis has zero diagnostics; execution_step/control_step/generated-plan
+own frames are 1680/336/128 bytes, not total call-chain bounds. All six launcher
+payloads pass independent audit; strict docs and source quality checks pass.
+
+Both fresh live Stock cases validate one generated return against its original
+call and guard the additional reads. They retain 23 steps, 17 uses, two B-derived
+uses, catalog/attachment checks and settled return. The saved-state C trace
+identifies return 0x88996 as produced by call 0x8898f; no consumed use in this
+bounded trace lacks either original source tokens or a generating call.
+Evidence: /work/nov05-generated-execution/{unit.log,stock.json,artifact-audit.json,
+collected-execution.json,rom-matrix.json,code.plist}.
+
+Generated-return validation joins the separately qualified source/derived
+repair fixture. Both catalog moves perform 10658 nibble writes and continue
+through all 23 original-ROM steps to 0x28fc. Nine stale/conflict/unknown or
+incorrect-producer controls per model reject with zero writes and unchanged
+state. Evidence: /work/nov05-generated-repair/writeback.json; reproducer:
+research/nov05-generated-writeback.{c,py}. Remaining continuation, complete
+all-use mutation integration and public library/Port1 acceptance stay open.
+
+#18 has eleven successful workflows and one pending ci-evidence publisher
+(job 127325531362); no acceptance/merge yet. #19's investigated HTTP 504 retry
+is queued, not passed. Historical failures remain retained.
+
+## 2026-11-06 — Continuation boundary and remote delivery audit
+
+Previous turn made progress: generated return producer validation was pushed
+in 98094351. Fresh original-ROM observation now records 81 dispatch states per
+model without emulator errors. The C collector matches the first 24 transitions
+(all registers, flags, PC and return stack), then returns UNSUPPORTED at 0x2900
+on B6A. This identifies the next implementation gap; the remaining original-ROM
+trace is observational evidence, not supported execution or complete coverage.
+Evidence: /work/nov06-continuation-arm/{hp49gplus,hp50g}.json and
+/work/nov06-continuation-check/collected-execution.json. Snapshot/ROM hashes are
+checked against the original entry; prior sealed reports are preserved.
+
+#19 afc9e70f passes all seven workflows and 197 jobs, including both previously
+failed toolchain-download jobs, and is merged as 89fe4a44. Installed-SDK and
+independent four-case console/FAT/return evidence were rechecked before merge.
+#13 e8ad129f and #18 1b24a09f each pass all twelve workflows, 390 jobs and two
+intentional skips; neither is merged yet following the main update.
+#14 384ae39d has 400 passing jobs, two skips and two failed Stock jobs:
+127337979669 (hp39gs system-services) and 127337980238 (hp39gplus display).
+Both logs show USB host-gate failure before application entry. Root causes
+remain unresolved; no rerun requested. #31 98094351 has two failed Quality jobs
+127654849622/127654830338, both reporting only stage1.c clang-format violations.
+The C correction changes whitespace only. Full checking also found Python line wrapping in call_roots.py; its correction preserves the AST. All 621 native files and 146 LF-normalized Python files pass formatting. Remaining CI jobs are ongoing.
+Logs: research/nov06-ci-<job>.log. No milestone is newly declared complete.
+
+## 2026-11-06 — Selected-field subtraction and the next provenance gap
+
+Implementation c9a5139f evaluates BfA (A=A-C, fields 0..7), including P/WP
+fields, independent borrow and decimal/hexadecimal modes. Unselected register
+digits survive. Selected invalid BCD digits reject atomically. Written source
+tokens are cleared; overlapping modular-offset expressions are invalidated.
+The two-operand expression is not yet represented for relocation planning.
+
+Twelve sanitizer targets pass, including full mutation allocation checks.
+Field/P/mode tests cover output and origin preservation/invalidation and each
+instruction read failure. 160 controlled original-ROM cases pass across both
+models. The ROM fixture executes a real P-setting instruction from a distinct
+old P value so interpreter caches are updated; directly overwriting P alone
+initially produced an inconsistent decimal fixture, corrected before acceptance.
+No ROM behavior was weakened to match the implementation.
+
+Both saved-entry C traces now match all registers, flags, PC and return stack
+for 30 transitions, stopping unsupported at 0x2c34. The indirect use at 0x2903
+has value 0x2907 and two unknown low source digits following A-C; retaining
+numerical execution does not establish repair authority. This is a concrete
+remaining source-expression gap, not full reference coverage.
+
+ARM static analysis has zero diagnostics. At -O2 the data-step and execution-step
+own frames are 1336/1712 bytes, not total call-chain bounds. All six launchers
+pass independent payload/decompression/prefix checks. Fresh maintained Stock
+regression passes on HP49g+/HP50g with source/artifact/state hashes checked
+before and after, retaining its 23-step bounded probe and settled return. It
+does not claim the new 30-step trace is integrated into live mutation planning.
+Evidence: /work/nov06-subtract/{unit.log,rom-matrix.json,code.plist,code.su,
+artifact-audit.json,stock.json} and
+/work/nov06-subtract-continuation/collected-execution.json.
+
+Exact-head audit: #31 1edc4599 has two pending/four queued workflows and seven
+queued jobs; no failure reported yet. #13 remains all-green at its head but conflicts with accepted main. During
+the mainline Stock wait, #18 integration 8956de50 resolves documentation-only
+conflicts with 89fe4a44, preserving both histories. Four actual unittest cases,
+Ruff, ShellCheck and strict docs pass; runtime entry and regression source blobs
+are identical to green 1b24a09f. Integration still needs submission/new CI;
+neither branch was merged.
+#14 retains two diagnosed pre-entry host-gate transfer failures, unresolved.
+M8.0 and M8 overall remain incomplete.
+
+## 2026-11-06 — Two-operand source repair constraints
+
+Implementation 4a78bb52 adds hpclang_rpl_execution_plan_subtraction. It verifies
+the original result/borrow from recorded operands and the proposed result from
+both replacements. A borrow change rejects, preserving carry-dependent flow.
+All five left digits and only participating right digits enter the same
+normalized edit builder as other consumed values. Unchanged dependencies remain
+constraints; aliases merge only when expectations/replacements agree. Left
+modular offsets are inverted; adjusted right operands remain unsupported.
+The caller still captures the original operands, guards instruction/P/mode and
+proves the relation supplies the consumed value. No automatic expression
+retention/propagation or complete mutation permission is claimed.
+
+Twelve final sanitizer targets pass (/work/nov06-expression-final/retest.log,
+retest-inputs.json). Tests execute original and repaired operands through the
+C evaluator, cover decimal/hex borrow, source offsets, stale/unknown operands,
+capacity, aliases and unchanged dependencies. An intermediate assertion wrongly
+required a conflict on unused right high digits after dependency narrowing;
+the corrected case conflicts on a participating digit and separately proves
+unused high-digit alias changes are harmless. The original failed log is kept
+in unit.log; final retest passes all twelve targets.
+
+Both captured C paths retain pre-subtraction operands from the verified ROM
+trace. The actual result 0x2907 depends on five A-source digits at Saturn
+0xffec4..0xffec8 (SRAM) and two C-literal digits at 0x28fe..0x28ff (Flash).
+The proof resolves physical aliases and requires exactly these seven sources.
+Every stale-source control rejects. An earlier consumed value shares A's source;
+a locally valid change to 0x3907 is rejected when that earlier use stays fixed.
+No native/Flash writes occur. Proof: /work/nov06-expression-plan/source-proof.json;
+captured operands and 30-step comparisons: /work/nov06-expression-operands/.
+This closes a relation-planning gap, not collection/full-mutation integration.
+
+ARM analysis has zero diagnostics. Own frames for ordinary-use planning,
+subtraction planning and its arithmetic helper are 208/272/40 bytes, not total
+call-chain bounds. Formatting and diff checks pass. Existing execution paths
+and the prior maintained Stock gate are unchanged; no fresh Stock claim is
+made for this new caller-driven planning API.
+
+During the concrete mainline sanitizer wait, #13 integrates accepted main as
+46a4cc74. Only roadmap/history conflict; both histories are preserved. Runtime,
+headers, platform, E2E, tools, CMake and workflow trees equal green e8ad129f.
+37 verifier tests, three Aplet identity tests and strict docs pass. Earlier
+all-six Direct/Stock resource evidence is retained, not rerun or newly claimed.
+Its new integration still requires CI; #18 is also queued/running. #14's two
+pre-entry USB failures remain unresolved. M8 is incomplete.
+
+## 2026-11-06 — Automatic arithmetic expression recording in collection
+
+Implementation c1c7bf87 adds an optional caller-owned derivation callback to
+the execution collector. The derived evaluator records BfA fields wholly within
+the low five digits, using original operands and observed result/borrow. The
+callback returns five nonzero result-fact tokens in a separate namespace.
+Ordinary copies/exchanges propagate these tokens; partial overwrites replace
+only affected facts. Later records can refer to earlier facts, but recursive
+planning/partial-expression expansion remain separate work. Physical resolvers
+must reject expression tokens; they are not writable memory addresses.
+Legacy evaluator entry points retain their prior behavior with no callback.
+Failure leaves step outputs unchanged; all speculative callback records must
+be discarded if a step or collection fails. Caller supplies bounded storage.
+
+Twelve sanitizer targets pass, including callback errors/invalid tokens,
+copy-to-PC propagation, partial literal overwrite and nested record references.
+Both captured original-ROM paths reach a deliberate 30-step boundary at 0x2c34,
+with all 19 consumed uses carrying original/result facts or a generating call.
+One expression is recorded automatically at 0x2900 and consumed at 0x2903.
+Injected recorder failure stops at 24 completed steps with no arithmetic-state
+publication. The first Python-driver run failed on ctypes pointer slice
+assignment; corrected per-element assignment passes. Failed output directory
+is preserved separately from /work/nov06-derived-path-final/.
+
+The maintained Stock gate now records EXECOBS version 2 (80 bytes): 30 steps,
+19 uses, one recorded/consumed subtraction, and seven source constraints.
+Both HP49g+/HP50g fresh runs pass guard revalidation, catalog/attachment checks,
+unchanged Flash and settled return; source/artifact/state hashes are sealed and
+rechecked. HP49g+ observes 91 guards and code/data/native/PC reads 530/75/256/8.
+The current gate validates unchanged expression sources; it does not perform a
+new expression-based native relocation. The separate physically normalized
+source proof retains seven stale controls and prior-use conflict rejection on
+both models. Evidence: /work/nov06-derived-collection/{retest.log,stock.json,
+artifact-audit.json,source-proof.json,code.plist,code.su} and
+/work/nov06-derived-path-final/{collected-execution.json,operands.json}.
+
+All six launchers pass independent payload/decompression/prefix audit. ARM
+analysis has zero diagnostics; own frames are data evaluator 1416, derived
+execution step 1720 and legacy wrappers 32/24 bytes, not total call-chain bounds.
+Formatting, Ruff and strict documentation checks pass. Current CI for #31,
+#13 and #18 is queued/running; no acceptance or merge is inferred. #14's known
+pre-entry USB failures remain unresolved. Full M8.0/M8 completion remains open.
+
+## 2026-11-06 — All consumed sources in one catalog movement
+
+A local integration probe combines all 19 consumed uses in the sealed 30-step
+collector path: ordinary values, native return source, two adjusted B uses,
+generated return and the automatically recorded subtraction. Physical SRAM
+coordinates unify native and logical aliases; Flash coordinates remain distinct.
+Both branch operands and the generating call need no encoded patch for this
+specific insertion. The normalized builder retains 77 source cells, including
+unchanged constraints; four nibble values change. ROM dependencies become guards,
+not attempted RAM edits. Recorded code/data/native observations also guard the
+actual mutation preflight.
+
+Both HP49g+/HP50g snapshot cases perform the real catalog-grow operation, then
+execute the original ARM ROM interpreter for all 30 transitions to 0x2c34.
+The complete PC sequence agrees with the relocated captured sequence and Flash
+remains unchanged. Stale RAM, Flash and native-state guards, plus a conflicting
+RAM edit, each reject with zero RAM/native/PC publication. This is bounded
+snapshot replay, not fresh live Stock return, arbitrary continuation or production
+root discovery. Maintaining this integration at the execution entry remains open.
+
+Evidence: /work/nov06-all-use-plan-v3/plan.json and
+/work/nov06-all-use-writeback/writeback.json. Drivers are
+research/nov06-all-use-{plan.py,writeback.c,writeback.py}. C compilation uses
+-Wall -Wextra -Werror; source/input hashes are checked again after both cases.
+The initial probe passed absolute physical coordinates to a 20-bit per-mapping
+field API; the second supplied an absolute end instead of an instruction extent.
+Both correctly rejected with BOUNDS. Corrected drivers use region-relative
+physical coordinates and remaining instruction extent; original failed output
+directories are retained. No runtime implementation change was needed for this
+bounded integration. CI #31 is queued; #13/#18 remain unaccepted and #14 retains
+its two unresolved pre-entry USB failures. M8.0 and M8 remain incomplete.
+
+## 2026-11-06 — Maintained Stock unified source-plan gate
+
+Implementation b5f6aa09 extends the maintained call-root entry test with one
+shared source-edit builder for a proposed 16-nibble catalog insertion. Ordinary,
+native and derived uses enter the same physically normalized SRAM coordinate
+space; immutable ROM uses separate bounded coordinates. Native tokens resolve
+only seeded register cells. Read-map words are guarded along with source values.
+Both branch operands and the generating call are checked against the same move;
+an unexpected operand patch rejects instead of being omitted. A proposed Flash
+write also rejects. The selected boundary still grants no mutation permission.
+
+Both fresh HP49g+/HP50g Stock runs pass all 30 steps/19 consumed uses, 77 merged
+source cells, two branch checks, one generated return and one seven-source
+subtraction. Two negative controls reject conflicting replacements and stale
+native-source values with failed, empty plans. Original guard, catalog, attachment,
+unchanged-Flash and settled-return checks remain. EXECOBS version 3 records the
+new counters; HP49g+ has 106 guards, four changed plan cells and code/data/native/PC
+reads 543/173/1062/8. The live test builds a proposed plan without applying it;
+actual catalog movement remains separately covered by the previous snapshot
+integration probe, not newly claimed as a live Stock mutation.
+
+Evidence: /work/nov06-unified-collection/{app.log,app-inputs.json,stock.json,
+artifact-audit.json,analysis.json}. Input hashes are checked before/after both
+Stock runs. All six launchers independently match the payload and negotiated
+entry prefix. ARM analysis has no diagnostics; execution visitor/source-resolver
+own frames are 320/64 bytes, not nested stack bounds. Ruff and strict docs pass.
+No runtime semantics changed, so existing runtime unit results are retained,
+not relabeled as fresh runs. Full M8.0 and M8 acceptance remain open.
+
+## 2026-11-06 — Address-field increment/decrement and first-store boundary
+
+Local e96e4552 evaluates E4..E7 / CC..CF (A..D address-field +/-1), generalizing
+the former D+1 implementation. Hexadecimal/decimal arithmetic ignores incoming
+carry, publishes overflow/borrow and preserves all upper digits. Invalid selected
+BCD digits reject atomically; computed low digits lose original-source tokens
+and offsets. Unit tests cover all eight operations, both modes/carry inputs,
+wrap/borrow chains, invalid BCD, unaffected state and failure non-publication.
+All twelve related sanitizer targets pass. The original ARM ROM independently
+matches all registers/flags/return-stack state in 512 two-model boundary cases.
+
+Both complete C traces and actual catalog-move snapshot replays now pass 33
+transitions, stopping before the store at 0x2c3c. The latter retain 19 uses,
+77 normalized source cells and four zero-write negative cases per model.
+Both fresh maintained Stock plan/return gates pass 33 steps, three branch checks,
+107 guards and two failed-plan controls, with unchanged Flash/catalog invariants.
+The live gate does not apply the proposed move; arbitrary continuation and
+production integration remain unaccepted. Next work must model store effects,
+later reads and address lineage, not silently skip the store.
+
+Evidence: /work/nov06-unit-arithmetic/{unit.log,rom-matrix.json,stock.json,
+artifact-audit.json,analysis.json}, /work/nov06-unit-arithmetic-path/ and
+/work/nov06-unit-arithmetic-writeback/. A comment-only fixture rebuild has the
+same ELF SHA256 de5ad7c0ad98c466d4b11923503e9920099ea3e8896bcf19b620907f1afb9d32
+as the packaged executable; prior inputs are retained. All six launcher payloads
+match. ARM analysis has zero diagnostics; data/derived-step own frames are
+1432/1672 bytes, not aggregate stack bounds. Formatting/Ruff/strict docs pass.
+This follow-up remains local to batch delivery while prior CI progresses.
+M8.0 and M8 remain incomplete; no scope or hardware-flashing boundary changed.
+
+## 2026-11-06 — Simulated stores and complete first-store source chain
+
+Local 620f17a3 adds execution_step_effects/collect_effects with a caller-owned
+store recorder; legacy entries still reject stores. Records retain destination
+use, selected source field, entire source value/origins and modular adjustment.
+The caller supplies a physical-alias-aware scratch read/token view and discards
+all speculative effects after failure. No target writes or general mutation
+authority are added. D0/D1 immediate adjustments retain their original source
+plus offset; 81BD now retains its first loaded pointer as D0's source plus five.
+Carry/effect preservation remains a separate repair obligation.
+
+Twelve final sanitizer targets pass. Tests cover selected/custom store fields,
+A/C and D0/D1, P endpoints, readback origins (including unknowns), capacity/bounds,
+callback errors and failed-step/collector publication. Both captured original-ROM
+paths reach 34 steps and stop at unsupported 81B1, 0x2c3f. Initial investigation
+exposed missing D0 lineage; preserving the actual loaded pointer makes the later
++5/-5 cancel and supplies all five original stored-value sources. The final
+physical scratch overlay matches the ROM's actual SRAM store with unchanged
+Read[] mapping and Flash. All twenty consumed addresses enter one 82-cell plan;
+the five stored-value sources already have compatible constraints in that plan.
+Actual catalog moves on both snapshots replay all 34 transitions and verify the
+five stored nibbles; four stale/conflict cases per model remain zero-write.
+
+Evidence: /work/nov06-store-qualified/{unit.log,stock.json,artifact-audit.json,
+analysis.json,path/,plan/,writeback/}. The earlier /work/nov06-store-effects/
+records the pre-D0-lineage run; it is not the final source proof. A JSON string-key
+lookup in the plan audit was corrected before stored-value checks passed.
+Both fresh existing live Stock gates retain their 33-step/no-store boundary and
+pass catalog/attachment/unchanged-Flash/settled-return checks. Live store effects
+are not claimed. All six launcher payloads match; ARM analysis is clean and the
+effects-step own frame is 1808 bytes (not aggregate stack bounds). Strict docs
+and source checks pass. This batch stays local while earlier CI progresses.
+Full M8.0/M8 remain incomplete; production and later native effects remain open.
+
+## 2026-11-06 — Maintained first-store boundary
+
+Local 58fcece4 moves the maintained call-root gate from 33 steps before the
+store to 34 steps after it. The opt-in callback retains the record, guards five
+destination cells and their mapping, excludes ROM/native CPU state, and requires all
+five payload sources to be covered by existing constraints in the shared 82-cell
+plan. Two initial live attempts rejected the gate: the origin resolver coalesces
+adjacent cells into a five-nibble edit, whereas the shared plan stores normalized
+single-nibble edits. Adding the overlapping field, then matching it as one cell,
+both failed. Saved heap evidence shows all five source digits agree with the
+existing unchanged constraints; the initial changing-value diagnosis was wrong.
+The corrected coverage check expands each resolved field into individual digits.
+Failed runs remain in /work/nov06-maintained-store/ and its -final directory.
+The gate stops immediately: code/data execution readers reject all later reads rather
+than misrepresent original memory as a post-store overlay. Both rejection probes
+preserve their output sentinel. Planning/guard readers retain original values.
+EXECOBS version 4 contains 28 words, including one store, five stored sources and
+two rejected later reads. No production mutation authority is enabled.
+
+Fresh HP49g+ and HP50g native Stock cases pass entry/34-step collection, catalog,
+attachment, unchanged Flash and settled return. Source/artifact inputs are sealed
+and rechecked. A subsequent report-label-only correction changes
+before_first_memory_store to after_first_simulated_store; its exact one-string
+diff and unchanged other inputs are audited in report-label-audit.json. The raw
+Stock evidence retains its original label, with numeric PC/store fields proving
+the actual boundary. All six launchers pass independent payload/decompression checks;
+ARM analysis reports zero diagnostics; Python lint/format and strict docs pass.
+Evidence: /work/nov06-maintained-store-cells/{stock.json,artifact-audit.json,analysis.json}.
+The earlier twelve sanitizer targets and actual-move snapshot replay belong to
+620f17a3; they were not rerun or relabeled as fresh live mutation proof here.
+
+Inspection of original-ROM ARM dispatch identifies 81B1's two dependent reads,
+A low-field update, jump and D0 increment. Both captured transitions match all
+retained CPU bytes and the target after independently reading the two pointers;
+the preceding store does not alias either read. Evidence is native81b1-observation.json.
+The trace labels change when R7 is
+written, before the handler completes, so matching only saturn_pc would omit its
+last D0 update. This is investigation, not completed continuation qualification.
+The batch stays local while previous exact-head CI runs; #14's two pre-entry USB
+failures remain unresolved. M8.0 and M8 remain incomplete.
+
+## 2026-11-06 - Native 81B1 continuation
+
+Local aceeea10 implements A.A=read5(D0), PC=read5(A.A), D0+=5 with
+three consumed-address records. A retains upper bits and receives loaded origins;
+D0 retains its original origins plus a modular five-digit offset. Native D0
+increments beyond the canonical 20-bit range are rejected, not wrapped. Errors
+publish neither state nor uses. Tests cover all dependent digits, unavailable or
+malformed reads, negative/positive token errors, instruction truncation, missing
+memory, bounds, unknown D0 origin and offset wrap, with full-state preservation.
+
+All twelve sanitizer targets pass. Original ROM executes 144 independent cases
+across two models, page/address edges, target extremes and carry/decimal flags;
+all captured register/stack/PC fields match, with source memory unchanged. Full
+captured C paths reach 38 steps and stop at unsupported EA4 at 0x2a19d. All 27
+address uses enter one 102-cell plan (four changed digits, four branches).
+Actual catalog moves replay 38 original-ROM transitions and verify the five
+stored nibbles; four stale/conflict cases per model remain zero-write.
+
+Fresh maintained HP49g+/HP50g Stock entry, first-store boundary, catalog,
+attachment, unchanged-Flash and settled-return gates pass at 34 steps. Those
+gates still reject post-store execution reads; the 38-step result uses the
+research physical-alias overlay and is not live production closure. All six
+launcher artifacts match, ARM analysis is clean, effects-step own frame remains
+1808 bytes, and strict docs/source checks pass. Evidence: /work/nov06-native-next/
+(unit.log, rom-matrix.json, path/, plan/, writeback/, stock.json,
+artifact-audit.json, analysis.json). The source-bounded path report's old scope
+label was corrected to 38 steps after checking both numeric result records.
+No push while previous CI is pending; M8.0 and M8 remain incomplete.
+
+## 2026-11-06 - Maintained simulated-memory continuation
+
+Local 97b7fd12 replaces the first-store stop-only reader with a physical
+SRAM-cell overlay. Code/data/token readers normalize through the guarded original
+map and return stored values and source tokens across aliases. Dependency and
+source-plan readers retain original memory values; simulated read observations
+never become original-memory guards. The one-store fixture still requires all
+five source cells to be covered by its prior plan and excludes native CPU state,
+ROM and unsupported computed payloads. Failed stores publish no overlay.
+
+The maintained gate now reaches 38 steps/27 uses/102 source cells on HP49g+ and
+HP50g. It checks all five stored digits through code/data/token readback, a
+separate D0-derived use, three B-derived uses and four branches. EXECOBS version 5
+has 29 words. Catalog/attachment/unchanged-Flash/settled-return checks pass.
+Source/artifact manifests are sealed and rechecked. The first attempt failed
+before entry while creating EXECOBS with a 95-byte remote command. A shorter
+command creates the same 116-byte string; fixture-command-audit.json proves
+that this line alone changed and compiled app/host-test inputs are identical.
+The failed transfer is retained in /work/nov06-maintained-shadow/. The 38-step trace itself does
+not naturally read the stored destination again; explicit maintained readback
+checks and host alias tests cover that behavior instead of claiming it occurred.
+
+All thirteen sanitizer targets pass. The new Linux host target exercises the
+actual maintained callbacks with owned SRAM, distinct logical aliases, original
+value guards, token mismatch, stale maps, duplicate stores and rejection of
+unknown/adjusted sources, out-of-range destinations, native state and ROM. No
+target memory writes occur. Six launcher payloads match; ARM analysis has zero
+diagnostics and strict docs/Python/source checks pass. Evidence:
+/work/nov06-maintained-shadow-fixed/{unit.log,stock.json,artifact-audit.json,analysis.json}.
+Prior aceeea10 ROM and actual-move snapshot checks remain separate evidence.
+EA4 at 0x2a19d, production Stage1 integration and broader M8 remain open. The
+batch stays local while previous exact-head CI is still pending.
+
+## 2026-11-06 - EA subtraction and four-store captured continuation
+
+Local c8eb3166 adds the two-nibble EA encoding of A=A-C.A. Earlier
+roadmap references to EA4 included the first nibble of the following instruction;
+EA alone is the subtraction. It reuses the existing subtraction relation and
+numeric evaluator, preserves upper digits, ignores incoming carry and records
+borrow. Tests cover all P settings, both radices, origin clearing/derived facts,
+unknown operand origins, callback rejection, bounds and invalid BCD inputs.
+All thirteen sanitizer targets and 64 independent original-ROM cases pass.
+
+Both captured paths advance to 59 steps with four scratch stores and stop at
+unsupported 820 at 0x2d9f. Every modeled register/carry/mode/return-stack transition
+matches the retained original-ROM trace. An old one-store assertion correctly
+stopped the first exploratory driver; the expanded run retains all four records.
+The second subtraction's unchanged operands and eighteen known payload digits
+join all thirty consumed addresses in a 125-cell normalized plan. Four source
+cells change; seven branch encodings remain unchanged. Four scalar digits stored
+at 0x2a1c1 have unknown origins after increment: this gap is explicitly retained,
+not silently treated as original source memory or claimed as full provenance.
+
+Actual catalog moves replay all 59 original-ROM transitions and verify all 22
+stored physical nibbles on both snapshots. Four stale/conflict controls per model
+remain zero-write. These finite replays do not discharge the missing scalar
+relation or general continuation obligations. Collection/report hashes remain
+consistent with the plan and replay input seals. Evidence:
+/work/nov06-address-subtract/{unit.log,rom-matrix.json,path-qualified/,plan/,writeback/}.
+
+Fresh maintained HP49g+/HP50g Stock gates still stop at 38 steps, retaining their
+single-expression/single-store fixture, source readback, catalog/attachment,
+unchanged Flash and settled return. Six launcher payloads match; ARM analysis is
+clean (effects-step own frame 1808 bytes); strict docs/source checks pass. Those
+checks are in stock.json, artifact-audit.json and analysis.json beside the above.
+The batch remains local while previous CI is pending; M8.0/M8 remain incomplete.
+
+## 2026-11-06 - Hex unit arithmetic source offsets
+
+Local 39d87747 preserves low-five-digit hexadecimal increment/decrement
+origins with a modular offset, including existing expression facts. Missing
+sources stay unknown. BCD numeric execution remains supported but clears origins;
+a binary offset does not establish BCD provenance. Carry/effect invariance under
+changed operands still requires separate qualification.
+
+Thirteen sanitizer targets and 512 original-ROM numeric boundary cases pass.
+Both 59-step captured paths retain two subtraction facts and four stores.
+Eighteen stored digits have physical sources; four computed digits are bound to
+the second subtraction plus one. Both subtraction operands are constrained
+unchanged by the same 125-cell repair plan, qualifying that bounded result and
+carry. Computed facts are never passed off as physical source cells. Actual
+catalog moves replay all 59 original-ROM transitions and verify all 22 stored
+digits; four stale/conflict controls per model remain zero-write.
+
+Fresh two-model maintained Stock entry/catalog/attachment/unchanged-Flash/settled
+return checks pass at the existing 38-step bound. Six launcher payload audits and
+ARM analysis pass. Evidence: /work/nov06-unit-source/ (unit.log, rom-matrix.json,
+path/, plan/, writeback/, stock.json, artifact-audit.json, analysis.json).
+Multiple-expression/store integration, 0x2d9f, generic recursive and BCD source
+relations remain open. Production Stage1 still stops at 0x67d2. This closes a
+bounded payload gap, not M8.0 or M8. The batch remains local pending prior CI.
+
+## 2026-11-06 - Maintained four-store continuation
+
+Local 2fd7a761 extends the maintained Stock entry collector from 38 to
+59 steps at 0x2d9f. It retains two subtraction facts, qualifies the second fact's
+incremented payload with fixed operands, and simulates four non-overlapping SRAM
+stores. Eighteen payload digits retain physical origins; four computed digits
+use a separate result-fact namespace. Physical source resolution rejects those
+fact IDs. First-store address repairs remain in the shared plan; later literal
+payloads and subtraction operands add unchanged constraints. Unknown origins,
+invalid computation, aliases overlapping earlier stores, ROM/CPU destinations,
+capacity and malformed effects reject before publishing overlay cells.
+
+Both fresh HP49g+/HP50g Stock gates verify all 22 cells through code/data/token
+readers, original-memory guards, 30 planned addresses, 125 source cells, seven
+branches and both plan rejection controls. Entry/catalog/attachment, unchanged
+Flash and settled return checks pass. The 116-byte EXECOBS report is now v6.
+Thirteen sanitizer targets pass, including actual gate callbacks with four stores,
+computed-source rejection, stale mapping, alias overlap and no partial overlay
+publication. Six launcher payload checks, Ruff and ARM analyzer checks pass;
+individual visit/store/source frames are 336/176/64 bytes, not total stack bounds.
+
+Runtime/include/platform sources remain identical to 39d87747; its 512 original
+ROM arithmetic cases and actual-move 59-step replay evidence are retained, not
+rerun or claimed to cover more paths. Identity: research/nov06-multistore-runtime-identity.json.
+Fresh evidence: /work/nov06-multistore/{unit.log,stock.json,artifact-audit.json,analysis.json}.
+The finite fixture rejects overlapping stores and stops before unsupported 820;
+full recursive/BCD provenance and production integration remain open. Stage1
+still stops at 0x67d2. This is expanded maintained validation, not M8.0 completion.
+
+## 2026-11-06 - Native write mapping and 81BE qualification
+
+Local 0c08b03a guards the native Write[] page (CPU+0x404+4*page) and
+both I/O dispatch selectors (CPU+0xba0 and CPU+0xbb0) before publishing simulated
+stores. Readable SRAM alone is insufficient: a write-disabled/differently mapped
+page or an I/O window may behave differently. Each destination must resolve to
+the same ordinary physical SRAM cell through guarded read and write mappings.
+The actual maintained callback tests now reject all four of those conditions.
+Thirteen sanitizer targets, six launcher audits and ARM analysis pass. Own
+visit/store/source frames are 336/200/64 bytes, not aggregate stack bounds.
+Fresh HP49g+/HP50g Stock entry/catalog/attachment/unchanged-Flash/settled-return
+gates retain 59 steps, four stores and all 22 code/data/token readbacks.
+Evidence: /work/nov06-write-mapping/.
+
+Independent original-ROM 81BE tests pass 256 cases across both models, radices,
+carry branches, pointer boundaries and overlapping store/load addresses. Carry
+set jumps to ROM-qualified constant 0x2e15 without the store. Carry clear stores
+D0.A at B.A, increments B's low native word by five, sets D0=(A.A+5) modulo 20
+bits, then loads A.A and PC through that new D0 before incrementing D0 by five.
+The store precedes dependent reads: overlap must use the new payload.
+The evaluator does not yet implement 81BE; these tests establish semantics only,
+not origins or production mutation authority. 820 clears a zero HST mask in this
+path; full HST state handling is not claimed.
+
+Initial synthetic-ROM harness attempts used the wrong Write[] start (+0x400)
+and then retained active I/O windows; the overlapping ordinary-RAM expectation
+failed. Correcting the map and isolating I/O windows produced the final matrix,
+and exposed the missing maintained-gate checks fixed above. Aligned word reads
+also require padded synthetic memory at the final page. Driver, snapshots, ROMs
+and harness corrections are sealed in /work/nov06-native-store-next/qualification-audit.json;
+all cases are in rom-semantics.json. Prior tests did not qualify these new mapping
+conditions. Production Stage1 still stops at 0x67d2; full M8.0 remains open.
+
+## 2026-11-06 - Native 81BE evaluator and detach CI diagnosis
+
+Local e31343b8 implements the previously qualified 81BE semantics.
+Carry clear records a D0.A store at B.A before either dependent load, increments
+B.low32 by five, derives D0 from A.A+5, then reuses the 81B1 reads and final D0
+increment. Low-five-digit origins/offsets are retained; overwritten B high-word
+digits become unknown. The store callback supplies subsequent data and tokens
+from scratch, including overlaps. Failures leave execution state and uses intact;
+callers must discard speculative store effects after a later read/token failure.
+Carry set jumps to qualified native-ROM constant 0x2e15 without store effects.
+Its target origins remain unknown rather than fabricated Saturn source cells;
+full planning still requires separate native-ROM constant qualification.
+
+All 256 C-versus-original-ROM cases match registers, flags, return stack/cursor,
+PC and all simulated memory on both models. Tests include both radices and carry
+branches, wrap/boundary values and overlapping store/load addresses. Thirteen
+sanitizer targets pass; callback tests cover origin propagation, all downstream
+read/token failure positions, callback errors, bounds and missing callbacks.
+Six launcher payload audits and ARM analysis pass (execution-effects own frame
+1816 bytes, not total stack). Fresh maintained two-model Stock gates pass at the
+unchanged 59-step/four-store bound; no later maintained continuation is claimed.
+Evidence: /work/nov06-native-store-next-impl/.
+
+PR #31 exact head f97b100e has two failed Stock jobs (127698157693 and
+127698157726, run 42153189322). Both pass native/new-message/missing-message/remove
+then fail native-detach. Saved PC=0x012317b0 and R0=0x46410ffd identify the explicit
+application round-trip failure loop, not a pre-entry USB failure. The specific
+condition inside that round trip remains unresolved. Artifact/log/state audit:
+research/nov06-pr31-detach-audit.json and research/nov06-pr31-failed-stock/.
+A focused current-build detach replay reuses the just-built payload under
+/work/nov06-current-detach/ and passes both local baselines. CI saved HOME spans
+about 166 KB versus about 115 KB locally; library 275 remains attached in CI
+but is removed in the successful local case. The full HOME snapshot allocation
+is a candidate cause, not yet proven. A matching large-HOME replay is needed.
+Comparison: /work/nov06-current-detach/state-comparison.json.
+No blind CI retry or acceptance. Production Stage1 remains at 0x67d2; M8.0/M8
+remain incomplete.
+
+## 2026-11-06 - Large HOME detach fixture memory fix
+
+Local 9f11ffa0 fixes the two f97b100e native-detach CI failures. Decoding the
+saved MMU tables and boot info on both models proves rw_bytes=163840, while the
+fixture requests 166034 bytes for the HOME body alone. This cannot fit even
+before static data, stack and allocator overhead. The old packed-copy fixture
+also fails both local baselines with 60000 bytes of retained padding (snapshot
+request 174495 bytes), preserving the same round-trip failure result 0x46410ffd.
+
+The synchronous fixture now forwards reads/writes through a protected-body
+observer, rejects any write that would change a HOME-body nibble, and allows
+identical writes. It validates every original nibble and retains header, count,
+attachment, root/catalog and return checks; no full-body allocation or digest
+substitutes for preservation. The mutation backend's stable mapping/write-through
+contract applies. Host tests inject a change at each protected nibble, verify
+no delegate write, test both boundaries, identical writes and unreadable cells.
+
+Thirteen sanitizer targets, six launcher audits and ARM analysis pass. The fixed
+build passes native-detach and native-reattach on both HP49g+/HP50g with 60000
+retained padding bytes checked independently after each run. All four runs also
+validate the 59-step/four-store entry, unchanged Flash and settled return. The
+runtime is unchanged from e31343b8; earlier original-ROM evidence remains retained.
+The change fixes test workspace consumption, not a newly proven general mutation
+capability or complete M8.0. Fresh remote CI acceptance remains required.
+
+Evidence: /work/nov06-detach-guard/{ci-capacity.json,stock.json,unit.log,analysis.json,
+artifact-audit.json} and /work/nov06-detach-before/before.json. The old executable
+is reused with sealed inputs and archived source bytes; no redundant old build
+was created. CI artifacts/logs remain in research/nov06-pr31-failed-stock/.
+
 ## 2026-11-05 — Local runtime environment branch integration
 
 PR #18 previous exact head 0390e023 has 389 successful jobs, two skips and
@@ -4288,3 +5405,12 @@ regression test blobs are byte-identical to previously green 1b24a09f. All
 four unittest cases, Ruff, normalized-shell ShellCheck, strict docs and diff
 checks pass. Previous exact-head CI passed twelve workflows, 390 jobs and
 two intentional skips. The new integration must pass fresh CI before merge.
+
+
+Before delivery, main d47dcf50 was integrated into the origin branch. Documentation
+conflicts preserve both histories. The six added/changed compatibility and harness
+files equal accepted main; runtime, headers, platforms and compiled application
+inputs are unchanged. Four fresh setup-runtime tests and strict docs pass. Identity
+audit: research/nov06-pr31-main-identity.json. Prior exact-head CI was rechecked:
+f97b100e retains 157 successful/two failed/one queued jobs; the two known detach
+failures are covered by the above before/after fix. New remote acceptance is pending.

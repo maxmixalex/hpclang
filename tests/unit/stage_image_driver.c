@@ -4,7 +4,7 @@
 
 int main(int argc, char **argv)
 {
-    if (argc != 3)
+    if (argc != 3 && argc != 4)
         return 2;
     int result = 2;
     unsigned char *packed = NULL;
@@ -22,6 +22,10 @@ int main(int argc, char **argv)
         goto done;
     result =
         hpclang_stage_image_unpack((const void *)packed, (size_t)length, output, capacity) ? 1 : 0;
+    if (!result && argc == 4 &&
+        hpclang_stage_image_capabilities((const void *)packed, output, capacity) !=
+            (uint32_t)strtoul(argv[3], NULL, 10))
+        result = 3;
     if (!result && fwrite(output, 1, capacity, stdout) != capacity)
         result = 2;
 done:

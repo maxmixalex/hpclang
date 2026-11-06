@@ -588,16 +588,23 @@ target_include_directories(test_rpl_object_store PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(rpl_code test_rpl_code.c "${HPCLANG_ROOT}/runtime/core/rpl-code.c")
+hpclang_unit(rpl_execution test_rpl_execution.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-execution.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-code.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
+target_include_directories(test_rpl_execution PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 target_include_directories(test_rpl_code PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(rpl_reference test_rpl_reference.c
+    test_rpl_execution_plan.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-execution-plan.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-code.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
-target_include_directories(test_rpl_reference PRIVATE "${HPCLANG_ROOT}/runtime/core")
+target_include_directories(test_rpl_reference PRIVATE "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/include")
 
 hpclang_unit(hp39_transfer_directory
     test_hp39_transfer_directory.c
@@ -868,7 +875,8 @@ hpclang_unit(e2e_phase test_e2e_phase.c "${HPCLANG_ROOT}/tests/e2e/phase.c")
 target_include_directories(test_e2e_phase PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(rpl_stock_memory test_rpl_stock_memory.c
-    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-code.c")
 target_include_directories(test_rpl_stock_memory PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(port_memory test_port_memory.c)
@@ -987,6 +995,20 @@ hpclang_unit(rpl_stock_view test_rpl_stock_view.c
     "${HPCLANG_ROOT}/runtime/core/rpl-stock-view.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c")
 target_include_directories(test_rpl_stock_view PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    hpclang_unit(call_roots_shadow test_call_roots_shadow.c
+        "${HPCLANG_ROOT}/runtime/core/rpl-code.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-execution-plan.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-stock-view.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c")
+    target_include_directories(test_call_roots_shadow PRIVATE "${HPCLANG_ROOT}/include"
+        "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/platform/armtoolbox")
+    target_compile_options(test_call_roots_shadow PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(test_call_roots_shadow PRIVATE -Wl,--gc-sections)
+endif()
 
 hpclang_unit(rpl_bank_target test_rpl_bank_target.c
     "${HPCLANG_ROOT}/runtime/core/rpl-bank-target.c"

@@ -2,6 +2,21 @@
 #include <hpclang/bootstrap.h>
 #include "../../third_party/tinf/tinf.h"
 
+uint32_t hpclang_stage_image_capabilities(const struct hpclang_image_header *image,
+                                          const void *payload, size_t capacity)
+{
+    if (!image || !payload || image->image_size > capacity || image->entry_offset < 8 ||
+        image->entry_offset >= image->image_size)
+        return 0;
+    const uint8_t *bytes = payload;
+    uint32_t magic = 0, capabilities = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        magic |= (uint32_t)bytes[i] << (i * 8);
+        capabilities |= (uint32_t)bytes[i + 4] << (i * 8);
+    }
+    return magic == HPCLANG_IMAGE_CAPABILITIES_MAGIC ? capabilities : 0;
+}
+
 int hpclang_stage_image_valid(const struct hpclang_image_header *image, size_t stored_size)
 {
     if (!image || stored_size <= sizeof(*image) || image->magic[0] != 'H' ||

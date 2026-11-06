@@ -88,6 +88,7 @@ extern "C"
 #define HPCLANG_RPL_BOUNDS_MAGIC_V2 UINT32_C(0x324c5052) /* "RPL2" prefix */
 #define HPCLANG_RPL_BOUNDS_MAGIC UINT32_C(0x334c5052)    /* "RPL3" adds ERAM fence */
 #define HPCLANG_RPL_BOUNDS_MAGIC_V4 UINT32_C(0x344c5052) /* "RPL4" adds root masks */
+#define HPCLANG_RPL_BOUNDS_MAGIC_V5 UINT32_C(0x354c5052) /* "RPL5" adds execution PC */
 #define HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG ((uintptr_t)1u)
 
     struct hpclang_rpl_memory_bounds
@@ -99,10 +100,18 @@ extern "C"
         uint32_t **native_roots;        /* private ARM-held Saturn addresses */
         uint32_t native_root_count;
         uint32_t port1_limit; /* exclusive nibble offset before ARM-owned ERAM */
-        /* RPL4 only: parallel caller-proven address fields, UINT32_MAX or
+        /* RPL4 and later: parallel caller-proven address fields, UINT32_MAX or
          * 0xfffff. NULL keeps whole-word semantics. Arrays and cells remain
          * owned by the launcher for the entire invocation. */
         const uint32_t *native_root_masks;
+        /* RPL5 only, negotiated by HPCLANG_IMAGE_CAP_RPL_EXECUTION: owned
+         * saved post-ARMSYS PC word in the launcher return frame on HP49g+/50g.
+         * It remains live and repairable throughout this invocation. This
+         * names a specific continuation, independently of native_roots order;
+         * it does not establish complete reference coverage or firmware identity.
+         * Retain a full-word guard and exclude execution/state changes until
+         * relocation completes. Older contexts must not read this extension. */
+        uint32_t *execution_pc;
     };
 
 /*

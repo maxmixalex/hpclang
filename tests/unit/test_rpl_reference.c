@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <string.h>
 
+void test_execution_plans(void);
+
 struct image
 {
     uint8_t data[128];
@@ -2206,6 +2208,7 @@ static void mapped_graph_traversal(void)
 
 int main(void)
 {
+    test_execution_plans();
     mapped_graph_traversal();
     flashptr_guard_composition(0);
     flashptr_guard_composition(1);

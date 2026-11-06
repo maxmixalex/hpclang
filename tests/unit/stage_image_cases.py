@@ -15,9 +15,11 @@ def main():
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "image.bin"
 
-        def check(packed, size, expected=None):
+        def check(packed, size, expected=None, capabilities=0):
             path.write_bytes(packed)
-            result = subprocess.run([executable, str(path), str(size)], capture_output=True)
+            result = subprocess.run(
+                [executable, str(path), str(size), str(capabilities)], capture_output=True
+            )
             if expected is None:
                 assert result.returncode == 1, (result.returncode, result.stderr)
             else:
@@ -49,6 +51,15 @@ def main():
                     len(data) + 1,
                 )
                 check(compressed[:4] + struct.pack("<I", len(data) - 1) + compressed[8:], len(data))
+        for flags in (0, 1, 0x80000001):
+            payload = struct.pack("<4sI", b"HPCX", flags) + bytes(2048)
+            for entry in (0, 4, 8):
+                expected_flags = flags if entry >= 8 else 0
+                header = struct.pack("<4sIII", b"HPC1", len(payload), entry, 0)
+                check(header + payload, len(payload), payload, expected_flags)
+                encoder = zlib.compressobj(level=9, wbits=-15)
+                compressed = encoder.compress(payload) + encoder.flush()
+                check(b"HPCZ" + header[4:] + compressed, len(payload), payload, expected_flags)
         for size in range(17):
             check(bytes(size), 64)
         for magic, size, entry, rw in (

@@ -83,6 +83,23 @@ The header is followed by the initialized code/load image. HPC1 contains no calc
 
 This is intentional: the same logical application image can be wrapped and launched by different calculator profiles without recompiling application code for a historical launcher ABI.
 
+Current runtime images begin their **payload** with an optional eight-byte
+capability prefix: little-endian `0x58435048` (`HPCX`) followed by capability
+bits. `_start` follows this prefix; launchers always use `entry_offset` rather
+than assuming entry at payload offset zero. The 16-byte HPC1 file header and
+fixed virtual layout are unchanged. Older launchers enter the declared entry
+point without interpreting the prefix. New launchers inspect it only after
+unpacking, when the payload extent and entry offset leave room for all eight
+bytes; older images without it retain their existing behavior.
+
+Bit 0 declares runtime support for the private RPL5 execution context. On
+HP49g+/HP50g, a supporting Stock launcher can then expose the saved post-ARMSYS
+PC word through a named field, independently of native-root array order. Old
+images continue to receive RPL2/RPL3/RPL4 contexts; new runtime code accepts
+those contexts without reading beyond their versioned prefixes. The field
+does not establish complete execution-reference coverage or grant relocation
+permission. Applications continue to treat `platform_cookie` as opaque.
+
 ## Entry and return
 
 The platform launcher maps the code and writable arena, writes the boot record, provides an 8-byte-aligned stack, and enters the HPC1 entry point.
