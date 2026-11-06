@@ -5765,3 +5765,32 @@ plan-analysis.json,analysis.json}. M8.0 and all retained M8 gates remain open.
 Fresh two-model Stock regression also passes the retained 87-step collection,
 normal return and catalog checks with sealed inputs: /work/nov06-unit-field/stock.json.
 Code commit d09703ef remains local; prior #31 CI is unfinished.
+
+## 2026-11-06 - Qualified 92-step arithmetic continuation
+
+The selected-field arithmetic producer is now constrained alongside all consumed
+addresses, constants, predicates, CONFIG and stored values in one edit builder.
+Both model plans contain 162 physical source constraints, four changed cells,
+39 address uses and nine branch operands. Five arithmetic rejection cases cover
+missing input/P provenance, changed result, stale carry and cyclic producer facts.
+Bounded recursive resolution retains producer-index limits and original inputs.
+Evidence: /work/nov06-unit-field/plan/plan.json.
+
+Actual catalog movement followed by 92 original-ROM transitions passes on HP49g+
+and HP50g. The proof checks temporal shadow reads, all 32 final stored digits,
+unchanged Flash/native configuration and four zero-write rejection cases per model.
+Evidence: /work/nov06-unit-field/writeback/writeback.json. The stop is before
+unsupported 0xb2ab; this is bounded continuation, not complete reference closure.
+
+The maintained fixture retains one arithmetic fact, validates it before exposing
+its tokens, and resolves later uses with strictly decreasing producer indices.
+Its EXECOBS version 9 keeps the 116-byte layout and compile-time 40 KiB workspace
+bound. Unit tests exercise the actual callback, altered output, future producers
+and cyclic sources. Fourteen ASan/UBSan targets, six launcher artifact audits,
+ARM fixture analysis and Ruff pass in /work/nov06-unit-maintained.
+Production Stage1 still stops at 0x67d2; whole-application resource acceptance,
+public libraries, Port1 and the retained Port2 requirements remain open.
+
+Maintained 92-step Stock collection, normal return and catalog checks now pass
+on both models with sealed inputs (/work/nov06-unit-maintained/stock.json).
+Local implementation commit fbc8c5e3 remains unpushed while prior CI is unfinished.
