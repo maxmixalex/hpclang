@@ -239,6 +239,35 @@ static int probe_attached_rejection(const struct hpclang_rpl_mutation_io *io)
     return 0;
 }
 
+/* This synchronous fixture keeps the native mapping stable. Intercept every
+ * nibble write instead of retaining another entire HOME body in the tiny heap.
+ * An identical write is harmless; any attempted value change is a failure. */
+struct body_guard
+{
+    const struct hpclang_rpl_mutation_io *original;
+    uint32_t first, end, writes, rejected;
+};
+
+static int body_guard_read(void *context, uint32_t at, uint8_t *value)
+{
+    struct body_guard *guard = context;
+    return guard->original->read_nibble(guard->original->context, at, value);
+}
+
+static int body_guard_write(void *context, uint32_t at, uint8_t value)
+{
+    struct body_guard *guard = context;
+    if (at >= guard->first && at < guard->end) {
+        uint8_t original;
+        if (!body_guard_read(guard, at, &original) || original != value) {
+            ++guard->rejected;
+            return 0;
+        }
+    }
+    ++guard->writes;
+    return guard->original->write_nibble(guard->original->context, at, value);
+}
+
 static int probe_detach(struct hpclang_rpl_mutation_io *io, int reattach)
 {
     uint32_t home, count, port;
@@ -268,42 +297,32 @@ static int probe_detach(struct hpclang_rpl_mutation_io *io, int reattach)
             second >= stack)
             return -1;
     }
-    /* Preserve every nibble without doubling the HOME body's storage. Stock
-     * CI retains both the original launcher and this call fixture in HOME;
-     * one byte per nibble can exceed the entire application RW allocation. */
-    uint8_t *snapshot = calloc(((size_t)(port - body) + 1u) / 2u, 1u);
-    if (!snapshot)
-        return -1;
-    int result = -1;
-    for (uint32_t i = 0; i < port - body; ++i) {
+    struct body_guard guard = {io, body, port, 0, 0};
+    struct hpclang_rpl_mutation_io guarded = *io;
+    guarded.context = &guard;
+    guarded.read_nibble = body_guard_read;
+    guarded.write_nibble = body_guard_write;
+    /* Validate every original nibble; unchanged-write interception proves that
+     * all remain identical throughout the operation, without a body-sized copy. */
+    for (uint32_t at = body; at < port; ++at) {
         uint8_t value;
-        if (!io->read_nibble(io->context, body + i, &value) || value > 15u)
-            goto done;
-        snapshot[i / 2u] |= (uint8_t)(value << (4u * (i & 1u)));
+        if (!body_guard_read(&guard, at, &value) || value > 15u)
+            return -1;
     }
-    if (hpclang_rpl_mutation_home_detach(io, 275))
-        goto done;
+    if (hpclang_rpl_mutation_home_detach(&guarded, 275))
+        return -1;
     uint32_t value;
     if (probe_read_word(io, 0x80711, 5, &value) || value != home + 13 ||
         probe_read_word(io, value + 5, 3, &value) || value != count - 1 ||
         probe_read_word(io, 0x80716, 5, &value) || value != port)
-        goto done;
-    if (reattach &&
-        (hpclang_rpl_mutation_home_attach(io, 275, first, second) ||
-         probe_read_word(io, 0x80711, 5, &value) || value != home ||
-         probe_read_word(io, value + 5, 3, &value) || value != count ||
-         probe_read_word(io, 0x80716, 5, &value) || value != port || probe_attached_rejection(io)))
-        goto done;
-    for (uint32_t i = 0; i < port - body; ++i) {
-        uint8_t actual;
-        uint8_t expected = (snapshot[i / 2u] >> (4u * (i & 1u))) & 15u;
-        if (!io->read_nibble(io->context, body + i, &actual) || actual != expected)
-            goto done;
-    }
-    result = 0;
-done:
-    free(snapshot);
-    return result;
+        return -1;
+    if (reattach && (hpclang_rpl_mutation_home_attach(&guarded, 275, first, second) ||
+                     probe_read_word(io, 0x80711, 5, &value) || value != home ||
+                     probe_read_word(io, value + 5, 3, &value) || value != count ||
+                     probe_read_word(io, 0x80716, 5, &value) || value != port ||
+                     probe_attached_rejection(&guarded)))
+        return -1;
+    return !guard.rejected && guard.writes ? 0 : -1;
 }
 
 static int probe_cache_move(struct hpclang_rpl_mutation_io *io, uint32_t position, uint32_t target,

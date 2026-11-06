@@ -143,8 +143,55 @@ static void multiple_stores(void)
     }
 }
 
+struct body_test_memory
+{
+    uint8_t data[32];
+    unsigned writes;
+};
+static int body_test_read(void *context, uint32_t at, uint8_t *out)
+{
+    struct body_test_memory *m = context;
+    if (at >= sizeof m->data)
+        return 0;
+    *out = m->data[at];
+    return 1;
+}
+static int body_test_write(void *context, uint32_t at, uint8_t value)
+{
+    struct body_test_memory *m = context;
+    if (at >= sizeof m->data)
+        return 0;
+    m->data[at] = value;
+    ++m->writes;
+    return 1;
+}
+static void protected_body(void)
+{
+    struct body_test_memory memory = {{0}, 0};
+    struct hpclang_rpl_mutation_io io = {
+        .read_nibble = body_test_read, .write_nibble = body_test_write, .context = &memory};
+    struct body_guard guard = {&io, 8, 24, 0, 0};
+    for (unsigned at = 0; at < 32; ++at)
+        memory.data[at] = at & 15;
+    for (unsigned at = 0; at < 32; ++at) {
+        uint8_t value = memory.data[at];
+        assert(body_guard_write(&guard, at, value));
+        unsigned before = memory.writes;
+        int result = body_guard_write(&guard, at, value ^ 1);
+        if (at >= 8 && at < 24) {
+            assert(!result && memory.data[at] == value && memory.writes == before);
+        } else
+            assert(result && memory.data[at] == (value ^ 1));
+    }
+    assert(guard.rejected == 16 && guard.writes == 48);
+    guard.first = 32;
+    guard.end = 33;
+    assert(!body_guard_write(&guard, 32, 0) && guard.rejected == 17);
+}
+
 int main(void)
 {
+    protected_body();
     multiple_stores();
     struct hpclang_rpl_code_store store = fixture();
     assert(!execution_store(&probe, &store));
