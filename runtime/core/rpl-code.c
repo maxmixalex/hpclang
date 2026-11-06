@@ -380,7 +380,56 @@ int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *ins
         result = read_word(instructions, pc, 4, &extended);
         if (result)
             return result;
-        if (extended == 0x1b18) {
+        if (extended == 0xeb18) {
+            /* Qualified HP49g+/HP50g ROM 81BE. The store precedes both
+             * dependent reads, so the callback must update the scratch view. */
+            if (next.values.carry) {
+                const uint32_t unknown[5] = {0};
+                next.control.pc = 0x2e15;
+                /* This target lives in the native ROM profile, not in the
+                 * instruction's Saturn operand cells. Do not invent origins. */
+                execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, next.control.pc,
+                              unknown, 0);
+                goto done;
+            }
+            if (!store)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            if (!data || !data->read_nibble)
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            uint32_t b = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_B];
+            uint32_t d0 = ((uint32_t)next.values.registers[HPCLANG_RPL_CODE_A] + 5) & 0xfffff;
+            if ((b & 0xfffff) > 0xffffb || d0 > 0xffffa ||
+                next.values.registers[HPCLANG_RPL_CODE_D0] > 0xfffff)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_STORE_ADDRESS, b & 0xfffff,
+                          next.origins.registers[HPCLANG_RPL_CODE_B],
+                          next.origins.adjustment[HPCLANG_RPL_CODE_B]);
+            struct hpclang_rpl_code_store effect = {
+                .instruction = pc,
+                .nibbles = 5,
+                .address = observed.addresses[0],
+                .value = next.values.registers[HPCLANG_RPL_CODE_D0],
+                .adjustment = next.origins.adjustment[HPCLANG_RPL_CODE_D0]};
+            for (unsigned digit = 0; digit < 16; ++digit)
+                effect.origins[digit] = next.origins.registers[HPCLANG_RPL_CODE_D0][digit];
+            result = store(context, &effect);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            next.values.registers[HPCLANG_RPL_CODE_B] =
+                (next.values.registers[HPCLANG_RPL_CODE_B] & ~UINT64_C(0xffffffff)) |
+                (uint32_t)(b + 5);
+            next.origins.adjustment[HPCLANG_RPL_CODE_B] =
+                (next.origins.adjustment[HPCLANG_RPL_CODE_B] + 5) & 0xfffff;
+            for (unsigned digit = 5; digit < 8; ++digit)
+                next.origins.registers[HPCLANG_RPL_CODE_B][digit] = 0;
+            next.values.registers[HPCLANG_RPL_CODE_D0] = d0;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                next.origins.registers[HPCLANG_RPL_CODE_D0][digit] =
+                    next.origins.registers[HPCLANG_RPL_CODE_A][digit];
+            next.origins.adjustment[HPCLANG_RPL_CODE_D0] =
+                (next.origins.adjustment[HPCLANG_RPL_CODE_A] + 5) & 0xfffff;
+        }
+        if (extended == 0x1b18 || extended == 0xeb18) {
             /* Native-ROM 81B1: A.A=read5(D0), PC=read5(A.A), D0+=5.
              * The ROM increments the full native D0 word; reject a result
              * outside the canonical 20-bit state instead of wrapping it. */

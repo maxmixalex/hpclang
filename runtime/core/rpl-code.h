@@ -361,7 +361,15 @@ struct hpclang_rpl_code_store
 typedef int (*hpclang_rpl_code_store_fn)(void *context, const struct hpclang_rpl_code_store *store);
 
 /* One C step combining the data/control evaluators with register/indirect PC
- * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81B1/81BD.
+ * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81B1/81BD/81BE.
+ * 81BE with carry clear stores D0.A at B.A, increments B.low32 by five,
+ * sets D0=(A.A+5) modulo 20 bits, then executes the 81B1 load sequence.
+ * Its store callback must supply subsequent reads/tokens from scratch; a later
+ * read failure requires discarding that speculative store. With carry set it
+ * jumps to native-ROM target 0x2e15 without a store. That target is emitted
+ * with unknown origins: planning requires separate ROM-profile qualification,
+ * never a fabricated Saturn operand. Native ROM profile qualification remains
+ * the caller's responsibility for all three instructions.
  * 81B1 emits D0 and its loaded pointer as load addresses, then the loaded PC
  * target. It replaces A's low five digits and sources, retaining its upper bits;
  * D0 retains its original sources with an additional offset of five. Both
