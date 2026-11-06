@@ -2803,6 +2803,76 @@ removed by the maintained harness after its count check and montage creation.
 This local result supports delivery of the pacing correction, not acceptance
 of #26 or proof that it explains every original packet-loss event.
 
+
+### Original filesystem gate historical delivery notes
+
+The following records precede the accepted merge of #15; its dependency is now satisfied. PR #19 itself remains unaccepted.
+
+Filesystem gate parent synchronization: PR #19 now includes parent #15 at
+ca1baf2b. The only conflicts were competing documentation additions; both
+filesystem and accepted HPGCC3 graphics evidence are retained. All runtime
+files match #15 and all four filesystem gate sources match the previously
+Quality-passed 74da9cf3. The merge remains dependent on #15 and its own CI;
+older local/submission checkpoints below are historical. M8 stays open.
+
+Original HPGCC2 filesystem delivery (local): pinned example2/example3 sources
+build through one relocated installed SDK, with explicit migration diffs and
+all-six-model launcher packaging. HP49g+/HP50g Direct and Stock runs pass file
+operations, real blocking input, settled return and independent raw FAT checks.
+Stock five-frame and Direct six-frame ROM/package-derived console pixel checks
+pass on both models, with nine corruption/missing/font negatives rejected.
+This gate depends on the protected SD Reset boundary in PR #15 (179b6c23).
+Other models have packaging evidence only; multiple volumes and physical-device
+acceptance remain open. Caller-supplied original archives/ROMs are not shipped.
+Evidence: /work/oct26-fsystem-fixed{,-runs} and oct26-fsystem-console-*.json.
+
+Before submission, reviewed previous #18: checks queued; #13/#14 pending, #15
+incomplete. #17 has newly failed system-services Direct jobs: retained result
+artifacts show 0x46417b03 on HP40gs/HP48gII/HP49g+ and 0x46417b8e on HP50g.
+Those match old fixture failure paths but do not independently prove the root
+cause; #17 lacks the deadline/diagnostic correction submitted in #13/#14.
+Logs and JSON are retained under research/oct26-format-ci-failures and
+research/oct26-ci-121*.log. Remote acceptance of these branches remains open.
+
+
+### 2026-11-04 Current filesystem SDK and Direct validation
+
+PR19 6a905dfa passes a fresh source-SDK installation, both pinned original
+HPGCC2 applications and all six launcher packages. The temporary SDK was
+removed after building. Inputs/build report: /work/nov04-fsystem-current-sdk.
+Three application HPC payloads match earlier native evidence; launcher binaries
+differ, so current runtime checks are required. Both HP49g+/HP50g Direct cases
+pass settled return and independent packaged-font console pixels. Current Stock
+cases are running in /work/nov04-fsystem-native (session 8642); no full current
+acceptance. The first private driver selected the wrong Direct font; after its
+terminal verifier failure, the correct newrpl_font6_menus.S was used to replay
+retained pixels without rerunning the completed application.
+
+Notebook resource matrix now independently verifies HP39g+/HP39gs/HP40gs
+(touched stack 1544, reserved heap peak 9460 bytes each) and HP48gII
+(touched stack 1904, reserved heap peak 9924 bytes). Two models remain. This
+is the startup/ON workload only; the existing independent-resource-audit.json
+records artifact identities and each actual RW/heap capacity.
+
+
+### 2026-11-04 Notebook resources and original filesystem matrices complete locally
+
+Notebook startup/ON resource/pixel/settled-return gates pass all six Stock models.
+Independent audit: /work/nov04-notebook-resources-matrix/independent-resource-audit.json.
+Touched-stack/allocator-reserved heap peaks are 1544/9460 bytes on HP39 models,
+1904/9924 on HP48gII, and 1912/13660 on HP49g+/HP50g. Observations include
+test instrumentation; save/export peaks, untouched stack reservations, native
+firmware and launcher RAM remain outside this workload. Verifier formatting
+after the sealed run preserves its Python AST; original verifier and both hashes
+are retained in research/nov04-notebook-{validated-verifier.py,format-equivalence.json}.
+Resource verifier negatives, ARM static analysis and source format/lint pass.
+
+PR19 current installed SDK passes both original source builds and six-model
+packaging. Both HP49g+/HP50g Direct and Stock executions pass, with independent
+22-frame console checks, settled returns and raw Stock FAT inspection. Audit:
+/work/nov04-fsystem-native/independent-audit.json; script
+research/nov04-fsystem-final-audit.py. Current-head CI remains pending; these
+results do not complete M8.4 or establish physical-device behavior.
 Retry-pacing delivery: `fce14d73` pushed in draft PR #29 after auditing and
 investigating preceding CI failures. New-head CI was not polled this turn.
 
@@ -4100,3 +4170,45 @@ both helper symbols: /work/nov05-native-integration/verified.txt.
 Runtime, platform, public headers and code-relocation test sources are unchanged
 from a0a31cb4. This is integration validation, not new runtime coverage or
 completion of the production memory-origin collector. Fresh CI remains required.
+
+## 2026-11-05 — Original HPGCC application integration and fresh SDK
+
+PR #19 local candidate 113e1a8f integrates accepted main 26140e1d. Only the
+roadmap/history required manual conflict resolution; union history preserves
+both sides. Functional differences from main remain the four original-application
+compatibility gate sources and documentation. Ruff and strict docs pass.
+
+A fresh temporary installed SDK builds both original HPGCC 2.0 SP2 filesystem
+applications, all six model packages, and the native observation fixture.
+The archive and current implementation inputs are hashed; report and logs live
+under /work/nov05-fsystem-integrated-sdk. Temporary SDK storage is removed by
+the completed build runner. Four new HP49g+/HP50g Direct/Stock executions are
+started under /work/nov05-fsystem-integrated-native using the current sealed
+emulator and firmware. Current-source/artifact, independent console/FAT and
+settled-return checks remain required; no new runtime completion or push claimed.
+
+The independent allocation/UI matrix now has nine saved passing cases, adding
+HP39g+ Stock and HP39gs Direct. The first seven have a separate passing partial
+audit; this does not imply that the latest two have already been re-audited.
+HP39gs Stock is confirmed running, followed by HP40gs Direct/Stock.
+
+## 2026-11-05 — Integrated original filesystem application acceptance
+
+Local PR #19 candidate 113e1a8f passes all four fresh HP49g+/HP50g Direct/Stock
+executions. The final independent audit checks current source/artifact hashes,
+all 22 saved console frames, settled return and raw FAT create/rename/delete/
+retained-file contents. Fresh installed SDK packaging already passed both
+original programs and all six model packages. Evidence:
+/work/nov05-fsystem-integrated-native/independent-audit.json and
+/work/nov05-fsystem-integrated-sdk/inputs.json. Ruff and strict docs pass.
+The pre-push audit of 6a905dfa retains 389 successful jobs, two skips and the
+cancelled Runtime publisher; it does not count cancellation as acceptance.
+These results do not prove physical hardware, all models' filesystem execution
+or completion of M8.4.
+
+The separate PR #27 HP40gs transfer failure now has a diagnostic local replay
+with exact failing-run artifacts (run 41942700281, job 126971037182), matching
+HPC payload/memory report and the original bundled emulator/tools. Only existing
+USB event logging is enabled. The diagnostic is running; no transport fix or
+successful replay is inferred. Inputs and results live at
+/work/nov05-pr27-usb-replay/replay.json.
