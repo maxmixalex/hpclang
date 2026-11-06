@@ -221,6 +221,33 @@ struct hpclang_rpl_code_values
     unsigned carry, decimal;
 };
 
+enum hpclang_rpl_code_relation
+{
+    HPCLANG_RPL_CODE_EQUAL,
+    HPCLANG_RPL_CODE_UNEQUAL,
+    HPCLANG_RPL_CODE_GREATER,
+    HPCLANG_RPL_CODE_LESS,
+    HPCLANG_RPL_CODE_GREATER_EQUAL,
+    HPCLANG_RPL_CODE_LESS_EQUAL
+};
+struct hpclang_rpl_code_predicate
+{
+    uint64_t left_value, right_value;
+    uint32_t instruction, first, nibbles, left, right, relation, taken, displacement;
+};
+/* Inspect the complete five-nibble opcode-9 compare/GOYES/RTNYES family.
+ * Values are unsigned selected fields; decimal mode does not change comparison.
+ * right == CONSTANT means literal zero, independent of the pseudo-register.
+ * displacement is the encoded byte; zero means a conditional stack return.
+ * Do not interpret that as a jump back into this instruction. No state or stack
+ * changes occur. Output changes only on success; inputs and mappings stay stable.
+ * Operand origins, guard retention and preservation of the predicate after edits
+ * remain caller obligations. A numeric result does not certify relocation. */
+int hpclang_rpl_code_predicate_inspect(const struct hpclang_rpl_reader *reader,
+                                       uint32_t instruction, uint32_t limit,
+                                       const struct hpclang_rpl_code_values *values,
+                                       struct hpclang_rpl_code_predicate *predicate);
+
 struct hpclang_rpl_code_control
 {
     uint32_t pc, carry, cursor, stack[8];

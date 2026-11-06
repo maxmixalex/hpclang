@@ -3144,8 +3144,44 @@ static void derived_execution(void)
     }
 }
 
+static void numeric_predicates(void)
+{
+    struct image image = {.data = {9, 3, 10, 6, 0}, .size = 5, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    struct hpclang_rpl_code_values values = {0};
+    values.registers[HPCLANG_RPL_CODE_C] = UINT64_C(0x80210000017f000);
+    values.registers[HPCLANG_RPL_CODE_CONSTANT] = UINT64_MAX;
+    struct hpclang_rpl_code_predicate predicate;
+    assert(!hpclang_rpl_code_predicate_inspect(&reader, 0, 5, &values, &predicate));
+    assert(predicate.taken && predicate.left == HPCLANG_RPL_CODE_C &&
+           predicate.right == HPCLANG_RPL_CODE_CONSTANT && predicate.nibbles == 3 &&
+           predicate.displacement == 6 && !predicate.left_value && !predicate.right_value);
+    struct hpclang_rpl_code_predicate saved = predicate;
+    for (unsigned i = 0; i < 5; ++i) {
+        image.fail = i;
+        assert(hpclang_rpl_code_predicate_inspect(&reader, 0, 5, &values, &predicate) < 0);
+        assert(!memcmp(&saved, &predicate, sizeof saved));
+        image.fail = UINT32_MAX;
+        uint8_t old = image.data[i];
+        image.data[i] = 16;
+        assert(hpclang_rpl_code_predicate_inspect(&reader, 0, 5, &values, &predicate) < 0);
+        assert(!memcmp(&saved, &predicate, sizeof saved));
+        image.data[i] = old;
+        assert(hpclang_rpl_code_predicate_inspect(&reader, 0, i, &values, &predicate) < 0);
+    }
+    values.registers[HPCLANG_RPL_CODE_P] = 16;
+    assert(hpclang_rpl_code_predicate_inspect(&reader, 0, 5, &values, &predicate) < 0);
+    assert(!memcmp(&saved, &predicate, sizeof saved));
+    values.registers[HPCLANG_RPL_CODE_P] = 0;
+    image.data[0] = 8;
+    assert(hpclang_rpl_code_predicate_inspect(&reader, 0, 5, &values, &predicate) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&saved, &predicate, sizeof saved));
+}
+
 int main(void)
 {
+    numeric_predicates();
     derived_execution();
     derived_address_subtraction();
     subtract_fields();

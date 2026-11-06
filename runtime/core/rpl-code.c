@@ -8,6 +8,76 @@ static uint64_t data_mask(unsigned nibbles)
     return nibbles == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * nibbles)) - 1;
 }
 
+int hpclang_rpl_code_predicate_inspect(const struct hpclang_rpl_reader *reader,
+                                       uint32_t instruction, uint32_t limit,
+                                       const struct hpclang_rpl_code_values *values,
+                                       struct hpclang_rpl_code_predicate *predicate)
+{
+    if (!reader || !reader->read_nibble || !values || !predicate)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000 || !limit || limit > 0x100000 - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(reader, instruction, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode != 9)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (limit < 5)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t encoded;
+    result = read_word(reader, instruction + 1, 4, &encoded);
+    if (result)
+        return result;
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    unsigned field = encoded & 7, operation = (encoded >> 4) & 15;
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    static const unsigned firsts[8] = {0, 0, 2, 0, 15, 3, 0, 0};
+    static const unsigned widths[8] = {1, 1, 1, 3, 1, 12, 2, 16};
+    static const unsigned lefts[4] = {0, 1, 2, 3}, rights[4] = {1, 2, 0, 2};
+    struct hpclang_rpl_code_predicate next = {.instruction = instruction,
+                                              .first = field ? firsts[field] : p,
+                                              .nibbles = field == 1 ? p + 1 : widths[field],
+                                              .left = lefts[operation & 3],
+                                              .right = rights[operation & 3],
+                                              .displacement = encoded >> 8};
+    if (encoded & 8)
+        next.relation = HPCLANG_RPL_CODE_GREATER + operation / 4;
+    else {
+        next.relation = (operation & 4) ? HPCLANG_RPL_CODE_UNEQUAL : HPCLANG_RPL_CODE_EQUAL;
+        if (operation & 8)
+            next.right = HPCLANG_RPL_CODE_CONSTANT;
+    }
+    next.left_value = (values->registers[next.left] >> (4 * next.first)) & data_mask(next.nibbles);
+    next.right_value =
+        next.right == HPCLANG_RPL_CODE_CONSTANT
+            ? 0
+            : (values->registers[next.right] >> (4 * next.first)) & data_mask(next.nibbles);
+    switch (next.relation) {
+    case HPCLANG_RPL_CODE_EQUAL:
+        next.taken = next.left_value == next.right_value;
+        break;
+    case HPCLANG_RPL_CODE_UNEQUAL:
+        next.taken = next.left_value != next.right_value;
+        break;
+    case HPCLANG_RPL_CODE_GREATER:
+        next.taken = next.left_value > next.right_value;
+        break;
+    case HPCLANG_RPL_CODE_LESS:
+        next.taken = next.left_value < next.right_value;
+        break;
+    case HPCLANG_RPL_CODE_GREATER_EQUAL:
+        next.taken = next.left_value >= next.right_value;
+        break;
+    default:
+        next.taken = next.left_value <= next.right_value;
+        break;
+    }
+    *predicate = next;
+    return 0;
+}
+
 static void origin_overwrite(struct hpclang_rpl_code_origins *state, unsigned reg, uint32_t digits)
 {
     if (!(digits & 31u))
