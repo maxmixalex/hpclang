@@ -5187,3 +5187,33 @@ is a candidate cause, not yet proven. A matching large-HOME replay is needed.
 Comparison: /work/nov06-current-detach/state-comparison.json.
 No blind CI retry or acceptance. Production Stage1 remains at 0x67d2; M8.0/M8
 remain incomplete.
+
+## 2026-11-06 - Large HOME detach fixture memory fix
+
+Local 9f11ffa0 fixes the two f97b100e native-detach CI failures. Decoding the
+saved MMU tables and boot info on both models proves rw_bytes=163840, while the
+fixture requests 166034 bytes for the HOME body alone. This cannot fit even
+before static data, stack and allocator overhead. The old packed-copy fixture
+also fails both local baselines with 60000 bytes of retained padding (snapshot
+request 174495 bytes), preserving the same round-trip failure result 0x46410ffd.
+
+The synchronous fixture now forwards reads/writes through a protected-body
+observer, rejects any write that would change a HOME-body nibble, and allows
+identical writes. It validates every original nibble and retains header, count,
+attachment, root/catalog and return checks; no full-body allocation or digest
+substitutes for preservation. The mutation backend's stable mapping/write-through
+contract applies. Host tests inject a change at each protected nibble, verify
+no delegate write, test both boundaries, identical writes and unreadable cells.
+
+Thirteen sanitizer targets, six launcher audits and ARM analysis pass. The fixed
+build passes native-detach and native-reattach on both HP49g+/HP50g with 60000
+retained padding bytes checked independently after each run. All four runs also
+validate the 59-step/four-store entry, unchanged Flash and settled return. The
+runtime is unchanged from e31343b8; earlier original-ROM evidence remains retained.
+The change fixes test workspace consumption, not a newly proven general mutation
+capability or complete M8.0. Fresh remote CI acceptance remains required.
+
+Evidence: /work/nov06-detach-guard/{ci-capacity.json,stock.json,unit.log,analysis.json,
+artifact-audit.json} and /work/nov06-detach-before/before.json. The old executable
+is reused with sealed inputs and archived source bytes; no redundant old build
+was created. CI artifacts/logs remain in research/nov06-pr31-failed-stock/.
