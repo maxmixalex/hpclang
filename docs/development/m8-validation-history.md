@@ -4513,3 +4513,18 @@ regression test blobs are byte-identical to previously green 1b24a09f. All
 four unittest cases, Ruff, normalized-shell ShellCheck, strict docs and diff
 checks pass. Previous exact-head CI passed twelve workflows, 390 jobs and
 two intentional skips. The new integration must pass fresh CI before merge.
+
+## 2026-11-06 - Allocation integration after green parent CI
+
+PR #13 exact head ab7842f255ab0a1d4c899b214920ae45aa3a1dd9 passes all seven
+workflows, 195 successful jobs and two intentional publisher skips. It could
+not merge because accepted main d47dcf50 caused documentation conflicts.
+Integration 7cf08668 preserves both validation histories and the current compact
+roadmap. Executable/test input comparison against the green head finds exactly
+two changes: tests/e2e/harness/setup-runtime.sh and tests/unit/test_setup_runtime.py,
+both byte-equivalent after newline normalization to accepted main. Other runtime,
+headers, platforms, tools, build settings, E2E and workflow inputs are unchanged.
+Four fresh setup-runtime tests and strict docs pass. Existing six-model Direct
+and Stock evidence is retained; no redundant application rebuild is claimed.
+Identity audit: research/nov06-allocation-main-identity.json. The integration
+requires new exact-head CI; this is not broader M8.2/M8.3/M8.5 completion.
