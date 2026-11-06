@@ -5794,3 +5794,26 @@ public libraries, Port1 and the retained Port2 requirements remain open.
 Maintained 92-step Stock collection, normal return and catalog checks now pass
 on both models with sealed inputs (/work/nov06-unit-maintained/stock.json).
 Local implementation commit fbc8c5e3 remains unpushed while prior CI is unfinished.
+
+## 2026-11-06 - Verified register-sum inspection
+
+A pure sum inspector now decodes C0..CB and Af0..AfB (f=0..7), retaining
+both operands, destination, field, radix, P, result and normalized carry.
+It preserves unselected digits, requires canonical selected BCD digits and
+leaves output unchanged on failure. The real 0xb2ab stop is C=C+A.A.
+No execution callback or relocation source relation is enabled by this change.
+
+The initial independent original-ROM matrix passes 7,776 cases. The C/original-ROM
+comparison expands to all sixteen P values: 41,472 cases covering twelve register
+combinations, nine fields, two radices and six operand patterns on HP49g+/50g.
+It verifies the full native state after each sum and the following carry branch,
+and checks retained C metadata/results without mutating input. Native true carry
+may be a mask; normalized logical carry does not claim byte-identical storage.
+Evidence: /work/nov06-binary/{rom/rom.json,c-rom/rom.json}.
+
+Focused ASan/UBSan rpl_code and stage_image targets pass, including inaccessible
+instruction digits, short bounds, invalid BCD, invalid P, overflow and preserved
+unselected digits. ARM analysis passes; the sum inspector's individual frame is
+120 bytes, not an aggregate stack guarantee. Evidence: /work/nov06-binary/{unit.log,
+code-analysis.json}. The prior 92-step relocation and maintained Stock checkpoint
+remains the accepted local bound; dual-operand provenance and repair are next.
