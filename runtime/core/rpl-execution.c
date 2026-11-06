@@ -33,12 +33,13 @@ static int observe_native(void *context, uint32_t at, uint8_t value)
     return observe(context, HPCLANG_RPL_EXECUTION_NATIVE, at, value);
 }
 
-int hpclang_rpl_execution_collect_native(const struct hpclang_boot_info *boot,
-                                         const struct hpclang_rpl_execution_io *io,
-                                         uint32_t native_origin_base, uint32_t budget,
-                                         struct hpclang_rpl_code_execution *state, uint32_t *steps,
-                                         hpclang_rpl_code_store_fn store,
-                                         hpclang_rpl_code_config_fn config)
+int hpclang_rpl_execution_collect_predicates(const struct hpclang_boot_info *boot,
+                                             const struct hpclang_rpl_execution_io *io,
+                                             uint32_t native_origin_base, uint32_t budget,
+                                             struct hpclang_rpl_code_execution *state,
+                                             uint32_t *steps, hpclang_rpl_code_store_fn store,
+                                             hpclang_rpl_code_config_fn config,
+                                             hpclang_rpl_code_predicate_fn predicate)
 {
     if (!io || !io->native.read_nibble || !io->code.read_nibble || !io->data.read_nibble ||
         !io->observe || !io->token || !io->visit || !state || !steps)
@@ -67,9 +68,9 @@ int hpclang_rpl_execution_collect_native(const struct hpclang_boot_info *boot,
     while (*steps < budget) {
         struct hpclang_rpl_code_step_uses uses;
         pc = state->control.pc;
-        result = hpclang_rpl_code_execution_step_native(&instructions, &memory, 0x100000u - pc,
-                                                        state, io->token, io->derive, store, config,
-                                                        io->context, &uses);
+        result = hpclang_rpl_code_execution_step_predicates(&instructions, &memory, 0x100000u - pc,
+                                                            state, io->token, io->derive, store,
+                                                            config, predicate, io->context, &uses);
         if (error || result)
             return error ? error : result;
         ++*steps;
@@ -99,4 +100,15 @@ int hpclang_rpl_execution_collect_effects(const struct hpclang_boot_info *boot,
 {
     return hpclang_rpl_execution_collect_native(boot, io, native_origin_base, budget, state, steps,
                                                 store, 0);
+}
+
+int hpclang_rpl_execution_collect_native(const struct hpclang_boot_info *boot,
+                                         const struct hpclang_rpl_execution_io *io,
+                                         uint32_t native_origin_base, uint32_t budget,
+                                         struct hpclang_rpl_code_execution *state, uint32_t *steps,
+                                         hpclang_rpl_code_store_fn store,
+                                         hpclang_rpl_code_config_fn config)
+{
+    return hpclang_rpl_execution_collect_predicates(boot, io, native_origin_base, budget, state,
+                                                    steps, store, config, 0);
 }

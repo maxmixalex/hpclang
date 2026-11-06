@@ -85,6 +85,16 @@ int hpclang_rpl_execution_collect_native(const struct hpclang_boot_info *boot,
                                          hpclang_rpl_code_store_fn store,
                                          hpclang_rpl_code_config_fn config);
 
+/* Native collection with explicit predicate qualification; all observation and
+ * failure-discard contracts above apply. Legacy collectors still reject opcode 9. */
+int hpclang_rpl_execution_collect_predicates(const struct hpclang_boot_info *boot,
+                                             const struct hpclang_rpl_execution_io *io,
+                                             uint32_t native_origin_base, uint32_t budget,
+                                             struct hpclang_rpl_code_execution *state,
+                                             uint32_t *steps, hpclang_rpl_code_store_fn store,
+                                             hpclang_rpl_code_config_fn config,
+                                             hpclang_rpl_code_predicate_fn predicate);
+
 /* Add all consumed address uses from one evaluated step to an initialized
  * edit builder. replacements has uses->count caller-qualified addresses;
  * include unchanged values, because their sources may alias other repairs.
@@ -136,6 +146,20 @@ int hpclang_rpl_execution_plan_payload(struct hpclang_rpl_reference_edit_builder
                                        uint64_t replacement,
                                        hpclang_rpl_code_origin_resolve_fn resolve,
                                        hpclang_rpl_execution_payload_fn derived, void *context);
+
+/* Constrain both selected predicate operands after caller-qualified full-register
+ * replacements. Verify the original descriptor against before and reject any
+ * changed truth value. Use the same normalized builder as address/store repairs;
+ * unknown/derived origins follow plan_payload's contract. The literal-zero right
+ * operand requires replacement zero and consumes no source. Caller guards the
+ * instruction, P/field selection and all producer relations through commit.
+ * Every failure invalidates the builder; no native state is modified. */
+int hpclang_rpl_execution_plan_predicate(struct hpclang_rpl_reference_edit_builder *builder,
+                                         const struct hpclang_rpl_code_predicate *predicate,
+                                         const struct hpclang_rpl_code_execution *before,
+                                         const uint64_t replacements[2],
+                                         hpclang_rpl_code_origin_resolve_fn resolve,
+                                         hpclang_rpl_execution_payload_fn derived, void *context);
 
 /* Plan both sources of a caller-proven selected-field subtraction. Values are
  * low 20-bit values; the selected field must lie within these five nibbles.

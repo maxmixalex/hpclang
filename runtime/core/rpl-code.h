@@ -402,6 +402,15 @@ struct hpclang_rpl_code_configuration
 typedef int (*hpclang_rpl_code_config_fn)(
     void *context, const struct hpclang_rpl_code_configuration *configuration);
 
+/* Validate/retain the predicate and operand provenance before committing this
+ * private step. before is the unchanged entry state, disjoint from callback
+ * storage. Guard instruction/P selection and reject unqualified changed outcomes.
+ * Zero accepts; negative errors propagate, positive errors are malformed.
+ * Discard all callback observations on any step/collection error. */
+typedef int (*hpclang_rpl_code_predicate_fn)(void *context,
+                                             const struct hpclang_rpl_code_predicate *predicate,
+                                             const struct hpclang_rpl_code_execution *before);
+
 /* One C step combining the data/control evaluators with register/indirect PC
  * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81B1/81BD/81BE.
  * 81BE with carry clear stores D0.A at B.A, increments B.low32 by five,
@@ -472,6 +481,16 @@ int hpclang_rpl_code_execution_step_native(
     uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
     hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
     hpclang_rpl_code_config_fn config, void *context, struct hpclang_rpl_code_step_uses *uses);
+
+/* Native step with explicit opcode-9 predicate qualification. The legacy entry
+ * points still reject predicates. Accepted comparisons update carry and execute
+ * GOYES/RTNYES, including taken returns with source/generated metadata retained. */
+int hpclang_rpl_code_execution_step_predicates(
+    const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
+    uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
+    hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
+    hpclang_rpl_code_config_fn config, hpclang_rpl_code_predicate_fn predicate, void *context,
+    struct hpclang_rpl_code_step_uses *uses);
 
 /* Validate a collected generated return against its guarded producing call,
  * and plan that call's branch operand for a caller-qualified move. The return

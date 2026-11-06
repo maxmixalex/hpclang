@@ -194,3 +194,75 @@ int hpclang_rpl_execution_plan_subtraction(
     const uint32_t replacements[] = {left, (left_replacement & ~mask) | (right & mask)};
     return hpclang_rpl_execution_plan_uses(builder, &uses, replacements, resolve, context);
 }
+
+static unsigned predicate_result(unsigned relation, uint64_t left, uint64_t right)
+{
+    switch (relation) {
+    case HPCLANG_RPL_CODE_EQUAL:
+        return left == right;
+    case HPCLANG_RPL_CODE_UNEQUAL:
+        return left != right;
+    case HPCLANG_RPL_CODE_GREATER:
+        return left > right;
+    case HPCLANG_RPL_CODE_LESS:
+        return left < right;
+    case HPCLANG_RPL_CODE_GREATER_EQUAL:
+        return left >= right;
+    default:
+        return left <= right;
+    }
+}
+
+int hpclang_rpl_execution_plan_predicate(struct hpclang_rpl_reference_edit_builder *builder,
+                                         const struct hpclang_rpl_code_predicate *predicate,
+                                         const struct hpclang_rpl_code_execution *before,
+                                         const uint64_t replacements[2],
+                                         hpclang_rpl_code_origin_resolve_fn resolve,
+                                         hpclang_rpl_execution_payload_fn derived, void *context)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (builder->error)
+        return builder->error;
+    if (!predicate || !before || !replacements || !resolve || predicate->first >= 16 ||
+        !predicate->nibbles || predicate->nibbles > 16 - predicate->first ||
+        predicate->left > HPCLANG_RPL_CODE_D ||
+        (predicate->right > HPCLANG_RPL_CODE_D && predicate->right != HPCLANG_RPL_CODE_CONSTANT) ||
+        predicate->relation > HPCLANG_RPL_CODE_LESS_EQUAL || predicate->taken > 1 ||
+        predicate->displacement > 255 || predicate->instruction > 0xffffb)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    unsigned regs[2] = {predicate->left, predicate->right};
+    uint64_t old[2], next[2];
+    uint64_t mask =
+        predicate->nibbles == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * predicate->nibbles)) - 1;
+    for (unsigned i = 0; i < 2; ++i) {
+        if (regs[i] == HPCLANG_RPL_CODE_CONSTANT) {
+            if (replacements[i])
+                return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+            old[i] = next[i] = 0;
+        } else {
+            old[i] = (before->values.registers[regs[i]] >> (4 * predicate->first)) & mask;
+            next[i] = (replacements[i] >> (4 * predicate->first)) & mask;
+        }
+    }
+    if (old[0] != predicate->left_value || old[1] != predicate->right_value ||
+        predicate_result(predicate->relation, old[0], old[1]) != predicate->taken)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    if (predicate_result(predicate->relation, next[0], next[1]) != predicate->taken)
+        return reject(builder, HPCLANG_RPL_SPAN_UNSUPPORTED);
+    for (unsigned i = 0; i < 2; ++i) {
+        if (regs[i] == HPCLANG_RPL_CODE_CONSTANT)
+            continue;
+        struct hpclang_rpl_code_store operand = {.first = predicate->first,
+                                                 .nibbles = predicate->nibbles,
+                                                 .value = before->values.registers[regs[i]],
+                                                 .adjustment = before->origins.adjustment[regs[i]]};
+        for (unsigned digit = 0; digit < 16; ++digit)
+            operand.origins[digit] = before->origins.registers[regs[i]][digit];
+        int result = hpclang_rpl_execution_plan_payload(builder, &operand, replacements[i], resolve,
+                                                        derived, context);
+        if (result)
+            return result;
+    }
+    return 0;
+}

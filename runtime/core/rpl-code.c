@@ -346,18 +346,20 @@ static void execution_use(struct hpclang_rpl_code_step_uses *uses, unsigned kind
         use->origins[i] = origins[i];
 }
 
-int hpclang_rpl_code_execution_step_native(
+int hpclang_rpl_code_execution_step_predicates(
     const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
     uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
     hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
-    hpclang_rpl_code_config_fn config, void *context, struct hpclang_rpl_code_step_uses *uses)
+    hpclang_rpl_code_config_fn config, hpclang_rpl_code_predicate_fn predicate, void *context,
+    struct hpclang_rpl_code_step_uses *uses)
 {
     if (!state || !uses || !token)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     if (state->values.carry != state->control.carry || state->control.cursor >= 8)
         return HPCLANG_RPL_SPAN_MALFORMED;
     for (unsigned slot = 0; slot < 8; ++slot)
-        if (state->stack_adjustment[slot] > 0xfffff ||
+        if (state->control.stack_generated[slot] > 0x100000 ||
+            state->stack_adjustment[slot] > 0xfffff ||
             (state->stack_adjustment[slot] && state->control.stack_generated[slot]))
             return HPCLANG_RPL_SPAN_MALFORMED;
     struct hpclang_rpl_code_execution next = *state;
@@ -417,6 +419,47 @@ int hpclang_rpl_code_execution_step_native(
     result = read_word(instructions, pc, 2, &opcode);
     if (result)
         return result;
+    if ((opcode & 15) == 9) {
+        if (!predicate)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        struct hpclang_rpl_code_predicate condition;
+        result =
+            hpclang_rpl_code_predicate_inspect(instructions, pc, limit, &next.values, &condition);
+        if (result)
+            return result;
+        next.values.carry = next.control.carry = condition.taken;
+        if (condition.displacement) {
+            result = hpclang_rpl_code_branch_inspect(instructions, pc, limit, &observed.branch);
+            if (result)
+                return result;
+            observed.has_branch = 1;
+            next.control.pc = condition.taken ? observed.branch.target : (pc + 5) & 0xfffff;
+        } else if (!condition.taken) {
+            next.control.pc = (pc + 5) & 0xfffff;
+        } else {
+            unsigned slot = (next.control.cursor + 7) & 7;
+            uint32_t target = next.control.stack[slot],
+                     generated = next.control.stack_generated[slot];
+            if (target > 0xfffff)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                if (generated && next.control.stack_origins[slot][digit])
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_RETURN_TARGET, target,
+                          next.control.stack_origins[slot], next.stack_adjustment[slot]);
+            observed.addresses[0].generated = generated;
+            next.control.cursor = slot;
+            next.control.pc = target;
+            next.control.stack[slot] = next.control.stack_generated[slot] =
+                next.stack_adjustment[slot] = 0;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                next.control.stack_origins[slot][digit] = 0;
+        }
+        result = predicate(context, &condition, state);
+        if (result)
+            return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        goto done;
+    }
     if (opcode == 0x08 && limit >= 3) {
         uint32_t operation;
         result = read_word(instructions, pc + 2, 1, &operation);
@@ -1973,4 +2016,14 @@ int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *ins
 {
     return hpclang_rpl_code_execution_step_native(instructions, data, limit, state, token, derive,
                                                   store, 0, context, uses);
+}
+
+int hpclang_rpl_code_execution_step_native(
+    const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
+    uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
+    hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
+    hpclang_rpl_code_config_fn config, void *context, struct hpclang_rpl_code_step_uses *uses)
+{
+    return hpclang_rpl_code_execution_step_predicates(instructions, data, limit, state, token,
+                                                      derive, store, config, 0, context, uses);
 }

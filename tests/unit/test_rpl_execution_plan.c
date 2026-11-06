@@ -306,8 +306,107 @@ static void payload_plans(void)
     assert(builder.count == 5); /* An upper-only store does not consume low-field adjustment. */
 }
 
+static void predicate_plans(void)
+{
+    /* Full-word unsigned relations must preserve both truth and high-digit sources. */
+    for (unsigned relation = 0; relation <= HPCLANG_RPL_CODE_LESS_EQUAL; ++relation) {
+        struct plan_fixture f = {0};
+        struct hpclang_rpl_code_execution state = {0};
+        const uint64_t left = UINT64_C(0x8000000000000000), right = UINT64_C(0x7fffffffffffffff);
+        state.values.registers[0] = left;
+        state.values.registers[2] = right;
+        for (unsigned i = 0; i < 16; ++i) {
+            f.memory[32 + i] = (left >> (4 * i)) & 15;
+            f.memory[64 + i] = (right >> (4 * i)) & 15;
+            state.origins.registers[0][i] = 33 + i;
+            state.origins.registers[2][i] = 65 + i;
+        }
+        const unsigned truths[] = {0, 1, 1, 0, 1, 0};
+        struct hpclang_rpl_code_predicate predicate = {.left_value = left,
+                                                       .right_value = right,
+                                                       .nibbles = 16,
+                                                       .left = 0,
+                                                       .right = 2,
+                                                       .relation = relation,
+                                                       .taken = truths[relation]};
+        struct hpclang_rpl_reference_edit edits[32];
+        struct hpclang_rpl_reference_edit_builder builder;
+        uint64_t replacements[2] = {left + 1, right - 1};
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 32));
+        assert(!hpclang_rpl_execution_plan_predicate(&builder, &predicate, &state, replacements,
+                                                     resolve_cell, NULL, &f));
+        assert(builder.count == 32 && edits[15].expected == 8 && edits[31].expected == 7);
+        replacements[0] = replacements[1];
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 32));
+        if (relation != HPCLANG_RPL_CODE_GREATER_EQUAL) {
+            int result = hpclang_rpl_execution_plan_predicate(&builder, &predicate, &state,
+                                                              replacements, resolve_cell, NULL, &f);
+            /* Equality changes all these predicates except strictly-less. */
+            if (relation == HPCLANG_RPL_CODE_LESS)
+                assert(!result);
+            else
+                assert(result < 0 && !builder.count);
+        }
+    }
+
+    for (unsigned mode = 0; mode < 8; ++mode) {
+        struct plan_fixture f = {0};
+        put(&f, 32, 0x10);
+        put(&f, 64, 0x20);
+        struct hpclang_rpl_code_execution state = {0};
+        state.values.registers[0] = 0x10;
+        state.values.registers[2] = 0x20;
+        for (unsigned i = 0; i < 5; ++i) {
+            state.origins.registers[0][i] = 33 + i;
+            state.origins.registers[2][i] = 65 + i;
+        }
+        struct hpclang_rpl_code_predicate predicate = {.left_value = 0x10,
+                                                       .right_value = 0x20,
+                                                       .nibbles = 5,
+                                                       .left = 0,
+                                                       .right = 2,
+                                                       .relation = HPCLANG_RPL_CODE_LESS,
+                                                       .taken = 1};
+        uint64_t replacements[2] = {0x30, 0x40};
+        if (mode == 1)
+            replacements[0] = 0x50;
+        if (mode == 2)
+            state.origins.registers[2][4] = 0;
+        if (mode == 3)
+            predicate.left_value ^= 1;
+        if (mode == 4)
+            predicate.taken = 0;
+        if (mode == 5) {
+            f.fail = 6;
+            f.error = -72;
+        }
+        if (mode == 7) {
+            predicate.right = HPCLANG_RPL_CODE_CONSTANT;
+            predicate.right_value = 0;
+            predicate.relation = HPCLANG_RPL_CODE_GREATER;
+            replacements[1] = 0;
+        }
+        struct hpclang_rpl_reference_edit edits[10];
+        struct hpclang_rpl_reference_edit_builder builder;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, mode == 6 ? 5 : 10));
+        int result = hpclang_rpl_execution_plan_predicate(&builder, &predicate, &state,
+                                                          replacements, resolve_cell, NULL, &f);
+        if (mode && mode != 7) {
+            assert(result < 0 && builder.error == result && !builder.count);
+            unsigned calls = f.calls;
+            assert(hpclang_rpl_execution_plan_predicate(&builder, &predicate, &state, replacements,
+                                                        resolve_cell, NULL, &f) == result &&
+                   calls == f.calls);
+        } else {
+            assert(!result && builder.count == (mode == 7 ? 5 : 10));
+            assert(edits[1].expected == 1 && edits[1].value == 3);
+        }
+    }
+}
+
 void test_execution_plans(void)
 {
+    predicate_plans();
     subtraction_plans();
     payload_plans();
     struct plan_fixture f = {0};
