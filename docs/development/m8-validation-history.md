@@ -4925,3 +4925,44 @@ are not claimed. All six launcher payloads match; ARM analysis is clean and the
 effects-step own frame is 1808 bytes (not aggregate stack bounds). Strict docs
 and source checks pass. This batch stays local while earlier CI progresses.
 Full M8.0/M8 remain incomplete; production and later native effects remain open.
+
+## 2026-11-06 — Maintained first-store boundary
+
+Local 58fcece4 moves the maintained call-root gate from 33 steps before the
+store to 34 steps after it. The opt-in callback retains the record, guards five
+destination cells and their mapping, excludes ROM/native CPU state, and requires all
+five payload sources to be covered by existing constraints in the shared 82-cell
+plan. Two initial live attempts rejected the gate: the origin resolver coalesces
+adjacent cells into a five-nibble edit, whereas the shared plan stores normalized
+single-nibble edits. Adding the overlapping field, then matching it as one cell,
+both failed. Saved heap evidence shows all five source digits agree with the
+existing unchanged constraints; the initial changing-value diagnosis was wrong.
+The corrected coverage check expands each resolved field into individual digits.
+Failed runs remain in /work/nov06-maintained-store/ and its -final directory.
+The gate stops immediately: code/data execution readers reject all later reads rather
+than misrepresent original memory as a post-store overlay. Both rejection probes
+preserve their output sentinel. Planning/guard readers retain original values.
+EXECOBS version 4 contains 28 words, including one store, five stored sources and
+two rejected later reads. No production mutation authority is enabled.
+
+Fresh HP49g+ and HP50g native Stock cases pass entry/34-step collection, catalog,
+attachment, unchanged Flash and settled return. Source/artifact inputs are sealed
+and rechecked. A subsequent report-label-only correction changes
+before_first_memory_store to after_first_simulated_store; its exact one-string
+diff and unchanged other inputs are audited in report-label-audit.json. The raw
+Stock evidence retains its original label, with numeric PC/store fields proving
+the actual boundary. All six launchers pass independent payload/decompression checks;
+ARM analysis reports zero diagnostics; Python lint/format and strict docs pass.
+Evidence: /work/nov06-maintained-store-cells/{stock.json,artifact-audit.json,analysis.json}.
+The earlier twelve sanitizer targets and actual-move snapshot replay belong to
+620f17a3; they were not rerun or relabeled as fresh live mutation proof here.
+
+Inspection of original-ROM ARM dispatch identifies 81B1's two dependent reads,
+A low-field update, jump and D0 increment. Both captured transitions match all
+retained CPU bytes and the target after independently reading the two pointers;
+the preceding store does not alias either read. Evidence is native81b1-observation.json.
+The trace labels change when R7 is
+written, before the handler completes, so matching only saturn_pc would omit its
+last D0 update. This is investigation, not completed continuation qualification.
+The batch stays local while previous exact-head CI runs; #14's two pre-entry USB
+failures remain unresolved. M8.0 and M8 remain incomplete.
