@@ -142,12 +142,19 @@ build the canonical payload with `tools/build-e2e.sh runtime`, prepare the
 shared Stock assets, then run:
 
 ```sh
-tests/e2e/harness/run-stock.sh hp49gplus build/e2e-runtime build/e2e-stock-assets
-tests/e2e/harness/run-stock.sh hp50g build/e2e-runtime build/e2e-stock-assets
+mkdir -p build/local-temp
+export RUNNER_TEMP="$(pwd)/build/local-temp"
+bash tests/e2e/harness/setup-runtime.sh stock hp4950 -- \
+  bash tests/e2e/harness/run-stock.sh hp49gplus build/e2e-runtime build/e2e-stock-assets
+bash tests/e2e/harness/setup-runtime.sh stock hp4950 -- \
+  bash tests/e2e/harness/run-stock.sh hp50g build/e2e-runtime build/e2e-stock-assets
 ```
 
-The runner requires the same runtime-library/tool paths and `RUNNER_TEMP` as
-CI.
+The `-- command` form validates the portable bundle and executes the command
+with its library directory and tools ahead of system tools, preserving command
+arguments and exit status. Running setup as a separate local process cannot
+change the caller's environment. Its two-argument CI form continues to write
+`GITHUB_ENV` and `GITHUB_PATH`. Keep `RUNNER_TEMP` unique to the running harness.
 
 ## Acceptance gates
 
