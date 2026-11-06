@@ -95,6 +95,16 @@ int hpclang_rpl_execution_collect_predicates(const struct hpclang_boot_info *boo
                                              hpclang_rpl_code_config_fn config,
                                              hpclang_rpl_code_predicate_fn predicate);
 
+/* Collection with the unified effect/constant observation callbacks. derive is
+ * taken from callbacks (not io->derive). NULL callbacks disable all optional
+ * facts/effects; existing entry points retain their previous behavior. */
+int hpclang_rpl_execution_collect_observed(const struct hpclang_boot_info *boot,
+                                           const struct hpclang_rpl_execution_io *io,
+                                           uint32_t native_origin_base, uint32_t budget,
+                                           struct hpclang_rpl_code_execution *state,
+                                           uint32_t *steps,
+                                           const struct hpclang_rpl_code_callbacks *callbacks);
+
 /* Add all consumed address uses from one evaluated step to an initialized
  * edit builder. replacements has uses->count caller-qualified addresses;
  * include unchanged values, because their sources may alias other repairs.
@@ -160,6 +170,21 @@ int hpclang_rpl_execution_plan_predicate(struct hpclang_rpl_reference_edit_build
                                          const uint64_t replacements[2],
                                          hpclang_rpl_code_origin_resolve_fn resolve,
                                          hpclang_rpl_execution_payload_fn derived, void *context);
+
+/* Validate a retained constant-assignment digit against its decoded producer.
+ * Constrain all producer instruction cells unchanged. If its selected field
+ * depends on P, constrain the captured P source too. expected/replacement must
+ * equal the proven constant; zero unknown tokens never acquire constant meaning.
+ * Readers/tokens must guard and normalize original code/mapping identities.
+ * Derived P facts use the caller-bounded producer resolver. Inputs stay stable
+ * and disjoint; errors invalidate the shared builder. No native writes. */
+int hpclang_rpl_execution_plan_constant(struct hpclang_rpl_reference_edit_builder *builder,
+                                        const struct hpclang_rpl_code_constant *constant,
+                                        unsigned digit, uint8_t expected, uint8_t replacement,
+                                        const struct hpclang_rpl_reader *instructions,
+                                        hpclang_rpl_code_token_fn token,
+                                        hpclang_rpl_code_origin_resolve_fn resolve,
+                                        hpclang_rpl_execution_payload_fn derived, void *context);
 
 /* Plan both sources of a caller-proven selected-field subtraction. Values are
  * low 20-bit values; the selected field must lie within these five nibbles.

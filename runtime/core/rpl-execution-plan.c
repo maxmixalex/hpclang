@@ -266,3 +266,62 @@ int hpclang_rpl_execution_plan_predicate(struct hpclang_rpl_reference_edit_build
     }
     return 0;
 }
+
+int hpclang_rpl_execution_plan_constant(struct hpclang_rpl_reference_edit_builder *builder,
+                                        const struct hpclang_rpl_code_constant *constant,
+                                        unsigned digit, uint8_t expected, uint8_t replacement,
+                                        const struct hpclang_rpl_reader *instructions,
+                                        hpclang_rpl_code_token_fn token,
+                                        hpclang_rpl_code_origin_resolve_fn resolve,
+                                        hpclang_rpl_execution_payload_fn derived, void *context)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (builder->error)
+        return builder->error;
+    if (!constant || !instructions || !instructions->read_nibble || !token || !resolve ||
+        constant->assignment.instruction >= 0x100000 || constant->p > 15 || constant->p_adjustment)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    const struct hpclang_rpl_code_assignment *fact = &constant->assignment;
+    struct hpclang_rpl_code_assignment original, alternate;
+    int result = hpclang_rpl_code_assignment_inspect(
+        instructions, fact->instruction, 0x100000 - fact->instruction, constant->p, &original);
+    if (result)
+        return reject(builder, result);
+    if (original.source != HPCLANG_RPL_CODE_CONSTANT || original.length != fact->length ||
+        original.source != fact->source || original.destination != fact->destination ||
+        original.source_first != fact->source_first ||
+        original.destination_first != fact->destination_first ||
+        original.nibbles != fact->nibbles || original.constant != fact->constant ||
+        digit >= original.nibbles)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    uint8_t value = ((uint64_t)original.constant >> (4 * digit)) & 15;
+    if (expected != value || replacement != value)
+        return reject(builder, HPCLANG_RPL_SPAN_UNSUPPORTED);
+    result = hpclang_rpl_code_assignment_inspect(
+        instructions, fact->instruction, 0x100000 - fact->instruction, constant->p ^ 1, &alternate);
+    if (result)
+        return reject(builder, result);
+    if (alternate.destination_first != original.destination_first ||
+        alternate.nibbles != original.nibbles) {
+        result = payload_digit(builder, constant->p_origin, constant->p, constant->p, resolve,
+                               derived, context);
+        if (result)
+            return reject(builder, result);
+    }
+    for (unsigned i = 0; i < original.length; ++i) {
+        uint8_t nibble;
+        uint32_t origin;
+        if (!instructions->read_nibble(instructions->context, fact->instruction + i, &nibble))
+            return reject(builder, HPCLANG_RPL_SPAN_UNAVAILABLE);
+        if (nibble > 15)
+            return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+        result = token(context, 0, fact->instruction + i, nibble, &origin);
+        if (result)
+            return reject(builder, result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED);
+        result = payload_digit(builder, origin, nibble, nibble, resolve, derived, context);
+        if (result)
+            return reject(builder, result);
+    }
+    return 0;
+}

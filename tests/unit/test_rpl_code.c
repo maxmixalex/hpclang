@@ -3144,6 +3144,69 @@ static void derived_execution(void)
     }
 }
 
+struct constant_test
+{
+    unsigned calls, missing;
+    int error;
+    struct hpclang_rpl_code_constant fact;
+};
+static int retain_constant(void *context, const struct hpclang_rpl_code_constant *fact,
+                           uint32_t tokens[16])
+{
+    struct constant_test *test = context;
+    ++test->calls;
+    test->fact = *fact;
+    for (unsigned i = 0; i < fact->assignment.nibbles; ++i)
+        tokens[i] = test->missing ? 0 : 0x600001 + i;
+    return test->error;
+}
+static void constant_steps(void)
+{
+    for (unsigned field = 0; field < 8; ++field)
+        for (unsigned p = 0; p < 16; ++p) {
+            struct image image = {.data = {10, 8 + field, 2}, .size = 3, .fail = UINT32_MAX};
+            struct hpclang_rpl_reader reader = {read_nibble, &image};
+            struct hpclang_rpl_code_execution state = {0};
+            state.values.registers[HPCLANG_RPL_CODE_C] = UINT64_MAX;
+            state.values.registers[HPCLANG_RPL_CODE_P] = p;
+            state.origins.registers[HPCLANG_RPL_CODE_P][0] = 99;
+            seed_origins(&state.origins);
+            state.origins.registers[HPCLANG_RPL_CODE_P][0] = 99;
+            struct hpclang_rpl_code_execution before = state;
+            struct hpclang_rpl_code_step_uses uses, saved;
+            struct hpclang_rpl_code_assignment assignment;
+            assert(!hpclang_rpl_code_assignment_inspect(&reader, 0, 3, p, &assignment));
+            struct hpclang_rpl_code_callbacks callbacks = {.constant = retain_constant};
+            for (unsigned mode = 0; mode < 4; ++mode) {
+                state = before;
+                memset(&uses, 0x77, sizeof uses);
+                saved = uses;
+                struct constant_test test = {.missing = mode == 1,
+                                             .error = mode == 2   ? -73
+                                                      : mode == 3 ? 73
+                                                                  : 0};
+                int result = hpclang_rpl_code_execution_step_observed(
+                    &reader, &reader, 3, &state, data_token, &callbacks, &test, &uses);
+                assert(test.calls == 1 && test.fact.p == p && test.fact.p_origin == 99);
+                if (mode) {
+                    assert(result < 0 && !memcmp(&state, &before, sizeof state) &&
+                           !memcmp(&uses, &saved, sizeof uses));
+                    continue;
+                }
+                for (unsigned i = 0; i < 16; ++i) {
+                    unsigned selected = i >= assignment.destination_first &&
+                                        i < assignment.destination_first + assignment.nibbles;
+                    assert(((state.values.registers[HPCLANG_RPL_CODE_C] >> (4 * i)) & 15) ==
+                           (selected ? 0 : 15));
+                    assert(state.origins.registers[HPCLANG_RPL_CODE_C][i] ==
+                           (selected ? 0x600001 + i - assignment.destination_first
+                                     : before.origins.registers[HPCLANG_RPL_CODE_C][i]));
+                }
+                assert(state.control.pc == 3 && !uses.count);
+            }
+        }
+}
+
 struct predicate_test
 {
     unsigned calls;
@@ -3258,6 +3321,7 @@ static void numeric_predicates(void)
 
 int main(void)
 {
+    constant_steps();
     predicate_steps();
     numeric_predicates();
     derived_execution();

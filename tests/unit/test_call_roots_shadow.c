@@ -219,6 +219,30 @@ static void configuration(void)
     }
 }
 
+static void constant_source(void)
+{
+    fixture();
+    ram[0x20018] = 0x8a;
+    ram[0x20019] = 0x42; /* C.P=0 at logical 0x90030. */
+    ram[0x20008] = 0x47;
+    struct hpclang_rpl_code_constant fact = {.assignment = {.instruction = 0x90030,
+                                                            .length = 3,
+                                                            .source = HPCLANG_RPL_CODE_CONSTANT,
+                                                            .destination = HPCLANG_RPL_CODE_C,
+                                                            .destination_first = 7,
+                                                            .nibbles = 1},
+                                             .p = 7,
+                                             .p_origin = 0x90011};
+    uint32_t tokens[16];
+    assert(!execution_constant(&probe, &fact, tokens) && tokens[0] == 0x600001);
+    assert(!execution_payload(&probe, &probe.plan, tokens[0], 0, 0));
+    assert(probe.constant_limit == 1);
+    assert(execution_payload(&probe, &probe.plan, 0x600011, 0, 0) < 0);
+    probe.constants[0].p_origin = tokens[0]; /* A cyclic producer cannot certify P. */
+    assert(execution_payload(&probe, &probe.plan, tokens[0], 0, 0) < 0);
+    assert(probe.constant_limit == 1);
+}
+
 struct body_test_memory
 {
     uint8_t data[32];
@@ -267,6 +291,7 @@ static void protected_body(void)
 
 int main(void)
 {
+    constant_source();
     overlapping_store();
     configuration();
     protected_body();

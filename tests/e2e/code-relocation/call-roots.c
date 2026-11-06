@@ -698,6 +698,8 @@ struct execution_probe
     } shadow[32];
     uint8_t native_before[0xc60], native_after[0xc60];
     unsigned configurations, payload_limit, payload_depth;
+    struct hpclang_rpl_code_constant constants[2];
+    unsigned constant_count, constant_limit, predicates;
 };
 
 _Static_assert(sizeof(struct execution_probe) <= 40 * 1024, "execution fixture heap budget");
@@ -878,6 +880,19 @@ static int execution_payload(void *context, struct hpclang_rpl_reference_edit_bu
                              uint32_t token, uint8_t expected, uint8_t replacement)
 {
     struct execution_probe *probe = context;
+    if (token >= 0x600001) {
+        unsigned index = (token - 0x600001) / 16, digit = (token - 0x600001) % 16;
+        if (index >= probe->constant_count || index >= probe->constant_limit)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        unsigned limit = probe->constant_limit;
+        probe->constant_limit = index;
+        const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
+        int result = hpclang_rpl_execution_plan_constant(
+            builder, &probe->constants[index], digit, expected, replacement, &instructions,
+            execution_token, execution_source, execution_payload, probe);
+        probe->constant_limit = limit;
+        return result;
+    }
     if (token >= 0x500001) {
         unsigned index = (token - 0x500001) / 16, digit = (token - 0x500001) % 16;
         if (index >= probe->payload_limit || digit >= 5 || replacement != expected ||
@@ -1015,6 +1030,36 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
     return 0;
 }
 
+static int execution_constant(void *context, const struct hpclang_rpl_code_constant *fact,
+                              uint32_t tokens[16])
+{
+    struct execution_probe *probe = context;
+    if (probe->constant_count >= 2 || !fact->assignment.nibbles || fact->assignment.nibbles > 16)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    unsigned index = probe->constant_count;
+    probe->constants[index] = *fact;
+    for (unsigned i = 0; i < fact->assignment.nibbles; ++i)
+        tokens[i] = 0x600001 + 16 * index + i;
+    probe->constant_limit = ++probe->constant_count;
+    return 0;
+}
+
+static int execution_predicate(void *context, const struct hpclang_rpl_code_predicate *predicate,
+                               const struct hpclang_rpl_code_execution *before)
+{
+    struct execution_probe *probe = context;
+    if (probe->predicates || predicate->instruction != 0xb283 ||
+        predicate->left != HPCLANG_RPL_CODE_C || predicate->right != HPCLANG_RPL_CODE_CONSTANT ||
+        predicate->first || predicate->nibbles != 3)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    const uint64_t replacements[2] = {before->values.registers[HPCLANG_RPL_CODE_C], 0};
+    int result = hpclang_rpl_execution_plan_predicate(&probe->plan, predicate, before, replacements,
+                                                      execution_source, execution_payload, probe);
+    if (!result)
+        ++probe->predicates;
+    return result;
+}
+
 static int execution_stale_source(void *context, uint32_t token,
                                   struct hpclang_rpl_code_origin_cell *cell)
 {
@@ -1120,8 +1165,8 @@ static int execution_visit(void *context, uint32_t pc,
         probe->derived_source = first - 1;
         probe->adjustment = use->adjustment;
     }
-    return state->control.pc == 0xb274 && probe->expression_uses == 1 && probe->stores == 6 &&
-           probe->configurations == 1;
+    return state->control.pc == 0xb28e && probe->expression_uses == 1 && probe->stores == 6 &&
+           probe->configurations == 1 && probe->predicates == 1 && probe->constant_count == 2;
     /* This selected boundary is not a complete relocation certificate. */
 }
 
@@ -1212,8 +1257,11 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         probe,
         execution_derive};
     uint32_t steps;
-    int stop = hpclang_rpl_execution_collect_native(boot, &execution, 0x200000, 80, &probe->state,
-                                                    &steps, execution_store, execution_config);
+    const struct hpclang_rpl_code_callbacks callbacks = {execution_derive, execution_store,
+                                                         execution_config, execution_predicate,
+                                                         execution_constant};
+    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 87, &probe->state,
+                                                      &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count)
         goto done;
@@ -1269,7 +1317,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 237)
         goto done;
-    uint32_t words[29] = {7,
+    uint32_t words[29] = {8,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,

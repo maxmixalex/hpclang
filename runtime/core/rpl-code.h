@@ -411,6 +411,37 @@ typedef int (*hpclang_rpl_code_predicate_fn)(void *context,
                                              const struct hpclang_rpl_code_predicate *predicate,
                                              const struct hpclang_rpl_code_execution *before);
 
+struct hpclang_rpl_code_constant
+{
+    struct hpclang_rpl_code_assignment assignment;
+    uint32_t p, p_origin, p_adjustment;
+};
+/* Retain the exact constant-producing instruction and P provenance. Return one
+ * nonzero relation token per assigned digit (relative to destination_first).
+ * Tokens identify producer facts, never pretend to be physical constant cells.
+ * No callback preserves legacy unknown origins. Errors leave step outputs intact;
+ * discard callback facts after any failure. Readers/state must remain immutable. */
+typedef int (*hpclang_rpl_code_constant_fn)(void *context,
+                                            const struct hpclang_rpl_code_constant *constant,
+                                            uint32_t tokens[16]);
+struct hpclang_rpl_code_callbacks
+{
+    hpclang_rpl_code_derive_fn derive;
+    hpclang_rpl_code_store_fn store;
+    hpclang_rpl_code_config_fn config;
+    hpclang_rpl_code_predicate_fn predicate;
+    hpclang_rpl_code_constant_fn constant;
+};
+/* Unified optional observation callbacks. Missing callbacks retain the legacy
+ * rejection/unknown-source behavior; all prior error/discard contracts apply. */
+int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *instructions,
+                                             const struct hpclang_rpl_reader *data, uint32_t limit,
+                                             struct hpclang_rpl_code_execution *state,
+                                             hpclang_rpl_code_token_fn token,
+                                             const struct hpclang_rpl_code_callbacks *callbacks,
+                                             void *context,
+                                             struct hpclang_rpl_code_step_uses *uses);
+
 /* One C step combining the data/control evaluators with register/indirect PC
  * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81B1/81BD/81BE.
  * 81BE with carry clear stores D0.A at B.A, increments B.low32 by five,

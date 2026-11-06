@@ -92,7 +92,8 @@ static int data_step(const struct hpclang_rpl_reader *instructions,
                      const struct hpclang_rpl_reader *data, uint32_t instruction, uint32_t limit,
                      struct hpclang_rpl_code_values *values,
                      struct hpclang_rpl_code_origins *origins, hpclang_rpl_code_token_fn token,
-                     void *context, uint32_t *length, hpclang_rpl_code_derive_fn derive)
+                     void *context, uint32_t *length, hpclang_rpl_code_derive_fn derive,
+                     hpclang_rpl_code_constant_fn constant)
 {
     if (!instructions || !instructions->read_nibble || !values || !origins || !token || !length)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
@@ -144,6 +145,20 @@ static int data_step(const struct hpclang_rpl_reader *instructions,
                                                   ~(mask << (4 * assignment.destination_first))) |
                                                  (value << (4 * assignment.destination_first));
         result = hpclang_rpl_code_origins_assign(&sources, &assignment, tokens);
+        if (!result && assignment.source == HPCLANG_RPL_CODE_CONSTANT && constant) {
+            const struct hpclang_rpl_code_constant fact = {
+                assignment, p, origins->registers[HPCLANG_RPL_CODE_P][0],
+                origins->adjustment[HPCLANG_RPL_CODE_P]};
+            result = constant(context, &fact, tokens);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            for (unsigned i = 0; i < assignment.nibbles; ++i) {
+                if (!tokens[i])
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+                sources.registers[assignment.destination][assignment.destination_first + i] =
+                    tokens[i];
+            }
+        }
         size = assignment.length;
         goto done;
     }
@@ -331,7 +346,7 @@ int hpclang_rpl_code_data_step(const struct hpclang_rpl_reader *instructions,
                                hpclang_rpl_code_token_fn token, void *context, uint32_t *length)
 {
     return data_step(instructions, data, instruction, limit, values, origins, token, context,
-                     length, 0);
+                     length, 0, 0);
 }
 
 static void execution_use(struct hpclang_rpl_code_step_uses *uses, unsigned kind, uint32_t value,
@@ -346,13 +361,18 @@ static void execution_use(struct hpclang_rpl_code_step_uses *uses, unsigned kind
         use->origins[i] = origins[i];
 }
 
-int hpclang_rpl_code_execution_step_predicates(
-    const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
-    uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
-    hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
-    hpclang_rpl_code_config_fn config, hpclang_rpl_code_predicate_fn predicate, void *context,
-    struct hpclang_rpl_code_step_uses *uses)
+int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *instructions,
+                                             const struct hpclang_rpl_reader *data, uint32_t limit,
+                                             struct hpclang_rpl_code_execution *state,
+                                             hpclang_rpl_code_token_fn token,
+                                             const struct hpclang_rpl_code_callbacks *callbacks,
+                                             void *context, struct hpclang_rpl_code_step_uses *uses)
 {
+    const hpclang_rpl_code_derive_fn derive = callbacks ? callbacks->derive : 0;
+    const hpclang_rpl_code_store_fn store = callbacks ? callbacks->store : 0;
+    const hpclang_rpl_code_config_fn config = callbacks ? callbacks->config : 0;
+    const hpclang_rpl_code_predicate_fn predicate = callbacks ? callbacks->predicate : 0;
+
     if (!state || !uses || !token)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     if (state->values.carry != state->control.carry || state->control.cursor >= 8)
@@ -366,7 +386,7 @@ int hpclang_rpl_code_execution_step_predicates(
     struct hpclang_rpl_code_step_uses observed = {0};
     uint32_t pc = next.control.pc, length;
     int result = data_step(instructions, data, pc, limit, &next.values, &next.origins, token,
-                           context, &length, derive);
+                           context, &length, derive, callbacks ? callbacks->constant : 0);
     if (!result) {
         struct hpclang_rpl_code_memory memory;
         int load = hpclang_rpl_code_memory_inspect(
@@ -2026,4 +2046,16 @@ int hpclang_rpl_code_execution_step_native(
 {
     return hpclang_rpl_code_execution_step_predicates(instructions, data, limit, state, token,
                                                       derive, store, config, 0, context, uses);
+}
+
+int hpclang_rpl_code_execution_step_predicates(
+    const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
+    uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
+    hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
+    hpclang_rpl_code_config_fn config, hpclang_rpl_code_predicate_fn predicate, void *context,
+    struct hpclang_rpl_code_step_uses *uses)
+{
+    const struct hpclang_rpl_code_callbacks callbacks = {derive, store, config, predicate, 0};
+    return hpclang_rpl_code_execution_step_observed(instructions, data, limit, state, token,
+                                                    &callbacks, context, uses);
 }

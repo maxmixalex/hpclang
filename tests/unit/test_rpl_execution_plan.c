@@ -404,8 +404,46 @@ static void predicate_plans(void)
     }
 }
 
+static void constant_plans(void)
+{
+    for (unsigned mode = 0; mode < 8; ++mode) {
+        struct plan_fixture f = {0};
+        f.memory[16] = 10;
+        f.memory[17] = 8;
+        f.memory[18] = 2;
+        f.memory[99] = 7;
+        const struct hpclang_rpl_reader reader = {read_cell, &f};
+        struct hpclang_rpl_code_constant fact = {.p = 7, .p_origin = 100};
+        assert(!hpclang_rpl_code_assignment_inspect(&reader, 16, 3, 7, &fact.assignment));
+        if (mode == 1)
+            fact.p_origin = 0;
+        if (mode == 2)
+            fact.assignment.destination_first = 6;
+        if (mode == 3)
+            f.memory[99] = 6;
+        if (mode == 4)
+            f.memory[18] = 1;
+        if (mode == 7) {
+            f.memory[16] = 13;
+            f.memory[17] = 2;
+            fact.p_origin = 0;
+            assert(!hpclang_rpl_code_assignment_inspect(&reader, 16, 2, 7, &fact.assignment));
+        }
+        struct hpclang_rpl_reference_edit edits[4];
+        struct hpclang_rpl_reference_edit_builder builder;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, mode == 5 ? 2 : 4));
+        int result = hpclang_rpl_execution_plan_constant(&builder, &fact, 0, 0, mode == 6, &reader,
+                                                         source_token, resolve_cell, NULL, &f);
+        if (mode && mode != 7)
+            assert(result < 0 && !builder.count && builder.error == result);
+        else
+            assert(!result && builder.count == (mode == 7 ? 2 : 4));
+    }
+}
+
 void test_execution_plans(void)
 {
+    constant_plans();
     predicate_plans();
     subtraction_plans();
     payload_plans();
