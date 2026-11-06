@@ -202,8 +202,9 @@ static int data_step(const struct hpclang_rpl_reader *instructions,
         } else if (((opcode & 15u) == 14 && (opcode >> 4) >= 4 && (opcode >> 4) <= 7) ||
                    ((opcode & 15u) == 12 && (opcode >> 4) >= 12)) {
             /* E4..E7 / CC..CF: increment/decrement A..D's address field.
-             * Incoming carry is ignored. The result is computed, so do not
-             * leave original-cell tokens attached to its changed low digits. */
+             * Hex arithmetic retains source + modular offset, including
+             * expression sources. BCD needs a different relation; leave its
+             * computed digits unknown rather than invent a binary offset. */
             unsigned decrement = (opcode & 15u) == 12;
             unsigned reg = (opcode >> 4) - (decrement ? 12u : 4u);
             uint32_t old = (uint32_t)next.registers[reg] & 0xfffffu;
@@ -224,11 +225,14 @@ static int data_step(const struct hpclang_rpl_reader *instructions,
                         digit = 0;
                 }
                 value |= digit << (4 * i);
-                sources.registers[reg][i] = 0;
+                if (next.decimal)
+                    sources.registers[reg][i] = 0;
             }
             next.registers[reg] = (next.registers[reg] & ~UINT64_C(0xfffff)) | value;
             next.carry = carry;
-            sources.adjustment[reg] = 0;
+            sources.adjustment[reg] =
+                next.decimal ? 0
+                             : (sources.adjustment[reg] + (decrement ? 0xfffffu : 1u)) & 0xfffffu;
         } else {
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
         }

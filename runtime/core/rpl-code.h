@@ -289,7 +289,11 @@ typedef int (*hpclang_rpl_code_derive_fn)(
  * exchanges, memory LOADS, D0/D1 immediate adjustments, SETHEX/SETDEC, A..D.A +/- 1
  * and EA/BfA (A=A-C, address field / fields 0..7). These arithmetic instructions use the proven
  * decimal flag (0 hexadecimal, 1 decimal); selected decimal input digits above
- * nine are unsupported. Arithmetic clears the affected origins. Increment,
+ * nine are unsupported. Hex increment/decrement retain the original or expression
+ * source plus a 20-bit modular offset; BCD increment/decrement clear the affected
+ * origins because their result is not a fixed binary offset. Missing sources stay
+ * unknown. Retained offsets alone do not prove carry or later-effect invariance
+ * under a proposed repair. Subtraction clears origins unless recorded. Increment,
  * decrement and EA/BfA ignore incoming carry, set carry to overflow/borrow and
  * preserve unselected digits. This entry does not retain derived expressions;
  * execution_step_derived can retain supported subtraction expressions through a callback.

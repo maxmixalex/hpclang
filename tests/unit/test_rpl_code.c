@@ -273,8 +273,10 @@ static void arithmetic_modes(void)
                 assert(!result && values.registers[HPCLANG_RPL_CODE_D] ==
                                       (UINT64_C(0xabcdef0000000000) | expected[decimal][i]));
                 assert(values.carry == (decimal ? i == 2 : i == 3));
-                for (unsigned digit = 0; digit < 5; ++digit)
-                    original.registers[HPCLANG_RPL_CODE_D][digit] = 0;
+                if (decimal)
+                    for (unsigned digit = 0; digit < 5; ++digit)
+                        original.registers[HPCLANG_RPL_CODE_D][digit] = 0;
+                original.adjustment[HPCLANG_RPL_CODE_D] = decimal ? 0 : 1;
                 assert(!memcmp(&origins, &original, sizeof origins));
             }
         }
@@ -319,12 +321,43 @@ static void register_unit_arithmetic(void)
                         expected.values.carry = expected.control.carry =
                             down ? n == 0 : inputs[n] == (decimal ? 0x99999u : 0xfffffu);
                         expected.control.pc = 2;
-                        expected.origins.adjustment[reg] = 0;
-                        for (unsigned digit = 0; digit < 5; ++digit)
-                            expected.origins.registers[reg][digit] = 0;
+                        expected.origins.adjustment[reg] = decimal ? 0 : down ? 0xffffa : 0xffffc;
+                        if (decimal)
+                            for (unsigned digit = 0; digit < 5; ++digit)
+                                expected.origins.registers[reg][digit] = 0;
                         assert(!result && !uses.count && !uses.has_branch);
                         assert(!memcmp(&state, &expected, sizeof state));
                     }
+}
+
+static void unit_arithmetic_origin_offsets(void)
+{
+    struct image code = {.size = 4, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    const uint32_t offsets[] = {0, 1, 0xfffff};
+    for (unsigned reg = 0; reg < 4; ++reg)
+        for (unsigned i = 0; i < 3; ++i) {
+            encode(&code, 0, 2, 0x4e + 16 * reg);
+            encode(&code, 2, 2, 0xcc + 16 * reg);
+            struct hpclang_rpl_code_execution state = {0};
+            seed_origins(&state.origins);
+            state.origins.registers[reg][2] = 0;
+            state.origins.adjustment[reg] = offsets[i];
+            state.values.registers[reg] = UINT64_C(0x123456789abfffff);
+            struct hpclang_rpl_code_origins before = state.origins;
+            struct hpclang_rpl_code_step_uses uses;
+            assert(!hpclang_rpl_code_execution_step(&reader, NULL, 4, &state, data_token, NULL,
+                                                    &uses));
+            assert(state.origins.adjustment[reg] == ((offsets[i] + 1) & 0xfffff));
+            assert(!memcmp(state.origins.registers, before.registers, sizeof before.registers));
+            assert(state.values.registers[reg] == UINT64_C(0x123456789ab00000));
+            assert(state.values.carry == 1);
+            assert(!hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL,
+                                                    &uses));
+            assert(!memcmp(&state.origins, &before, sizeof before));
+            assert(state.values.registers[reg] == UINT64_C(0x123456789abfffff));
+            assert(state.values.carry == 1);
+        }
 }
 
 static void execution_steps(void)
@@ -2677,8 +2710,9 @@ static int retain_subtraction(void *context, uint32_t instruction,
 
 static void derived_address_subtraction(void)
 {
-    struct image code = {.size = 2, .fail = UINT32_MAX};
+    struct image code = {.size = 4, .fail = UINT32_MAX};
     encode(&code, 0, 2, 0xae);
+    encode(&code, 2, 2, 0x4e);
     const struct hpclang_rpl_reader reader = {read_nibble, &code};
     for (unsigned flags = 0; flags < 4; ++flags)
         for (unsigned zero = 0; zero < 2; ++zero) {
@@ -2726,6 +2760,12 @@ static void derived_address_subtraction(void)
                                sizeof f.expression.right.origins));
                 for (unsigned digit = 0; digit < 5; ++digit)
                     assert(state.origins.registers[0][digit] == 0x400005 + digit);
+                assert(!hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL,
+                                                        &uses));
+                assert(state.origins.adjustment[0] == (flags >> 1 ? 0u : 1u));
+                for (unsigned digit = 0; digit < 5; ++digit)
+                    assert(state.origins.registers[0][digit] ==
+                           (flags >> 1 ? 0u : 0x400005 + digit));
             }
         }
     for (unsigned reg = 0; reg <= 2; reg += 2)
@@ -2819,6 +2859,7 @@ int main(void)
     execution_steps();
     arithmetic_modes();
     register_unit_arithmetic();
+    unit_arithmetic_origin_offsets();
     control_steps();
     data_steps();
     origin_repair_plans();
