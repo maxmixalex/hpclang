@@ -75,6 +75,16 @@ int hpclang_rpl_execution_collect_effects(const struct hpclang_boot_info *boot,
                                           struct hpclang_rpl_code_execution *state, uint32_t *steps,
                                           hpclang_rpl_code_store_fn store);
 
+/* As collect_effects, with scratch CONFIG simulation and the same context.
+ * Native/configuration effects and all reader-map changes are caller-owned;
+ * reject/discard the whole speculative collection on any callback error. */
+int hpclang_rpl_execution_collect_native(const struct hpclang_boot_info *boot,
+                                         const struct hpclang_rpl_execution_io *io,
+                                         uint32_t native_origin_base, uint32_t budget,
+                                         struct hpclang_rpl_code_execution *state, uint32_t *steps,
+                                         hpclang_rpl_code_store_fn store,
+                                         hpclang_rpl_code_config_fn config);
+
 /* Add all consumed address uses from one evaluated step to an initialized
  * edit builder. replacements has uses->count caller-qualified addresses;
  * include unchanged values, because their sources may alias other repairs.

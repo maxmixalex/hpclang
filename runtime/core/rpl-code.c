@@ -276,13 +276,11 @@ static void execution_use(struct hpclang_rpl_code_step_uses *uses, unsigned kind
         use->origins[i] = origins[i];
 }
 
-int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *instructions,
-                                            const struct hpclang_rpl_reader *data, uint32_t limit,
-                                            struct hpclang_rpl_code_execution *state,
-                                            hpclang_rpl_code_token_fn token,
-                                            hpclang_rpl_code_derive_fn derive,
-                                            hpclang_rpl_code_store_fn store, void *context,
-                                            struct hpclang_rpl_code_step_uses *uses)
+int hpclang_rpl_code_execution_step_native(
+    const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
+    uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
+    hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
+    hpclang_rpl_code_config_fn config, void *context, struct hpclang_rpl_code_step_uses *uses)
 {
     if (!state || !uses || !token)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
@@ -349,6 +347,27 @@ int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *ins
     result = read_word(instructions, pc, 2, &opcode);
     if (result)
         return result;
+    if (opcode == 0x08 && limit >= 3) {
+        uint32_t operation;
+        result = read_word(instructions, pc + 2, 1, &operation);
+        if (result)
+            return result;
+        if (operation == 5) {
+            if (!config)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            struct hpclang_rpl_code_configuration effect = {
+                .instruction = pc,
+                .value = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C] & 0xfffff,
+                .adjustment = next.origins.adjustment[HPCLANG_RPL_CODE_C]};
+            for (unsigned digit = 0; digit < 5; ++digit)
+                effect.origins[digit] = next.origins.registers[HPCLANG_RPL_CODE_C][digit];
+            result = config(context, &effect);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            next.control.pc = (pc + 3) & 0xfffff;
+            goto done;
+        }
+    }
     if (opcode == 0x28) {
         uint32_t mask;
         if (limit < 3)
@@ -1872,4 +1891,16 @@ int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instruction
 {
     return hpclang_rpl_code_execution_step_derived(instructions, data, limit, state, token, 0,
                                                    context, uses);
+}
+
+int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *instructions,
+                                            const struct hpclang_rpl_reader *data, uint32_t limit,
+                                            struct hpclang_rpl_code_execution *state,
+                                            hpclang_rpl_code_token_fn token,
+                                            hpclang_rpl_code_derive_fn derive,
+                                            hpclang_rpl_code_store_fn store, void *context,
+                                            struct hpclang_rpl_code_step_uses *uses)
+{
+    return hpclang_rpl_code_execution_step_native(instructions, data, limit, state, token, derive,
+                                                  store, 0, context, uses);
 }

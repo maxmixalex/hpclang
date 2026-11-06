@@ -11,6 +11,21 @@ struct hpclang_rpl_bank_effects
     uint32_t cache[4];    /* Saved read/read/write/write words at 0xc4c..0xc58. */
 };
 
+/* Predict the reviewed HP49g+/50g native CONFIG handler from a guarded native
+ * [0,0xc60) snapshot and the current C.A value. Models every flag-dispatch arm:
+ * IO, size/base phases for RAM/ERAM/port, bank-control routing, owner priority,
+ * read/write maps, sentinels and conditional two-page overlay caches. Other
+ * bytes survive, including CPU registers. c may contain the full native word;
+ * only its low 20 bits participate. No interpreter/PC step or native writes.
+ * Caller qualifies ROM identity, snapshot lifetime and all input dependencies;
+ * opaque physical words are predicted, not certified as accessible memory.
+ * Mapping spans outside 256 pages and active overlays outside pages 1..254
+ * are rejected before output changes. Zero-size maps skip overlay work, as
+ * the ROM does, but still refresh sentinels. Output may equal input exactly;
+ * otherwise the two buffers must be disjoint. No allocation or large scratch
+ * frame. This is a prediction primitive, not execution/mutation authority. */
+int hpclang_rpl_config_predict(const uint8_t state[0xc60], uint32_t c, uint8_t output[0xc60]);
+
 struct hpclang_rpl_bank_cpu_effects
 {
     /* Native-state byte slice [0x90c,0x99c): A..R4, D0/D1/P, flags,

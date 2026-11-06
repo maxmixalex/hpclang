@@ -363,6 +363,18 @@ struct hpclang_rpl_code_store
  * step/visitor/collection failure. This callback grants no mutation permission. */
 typedef int (*hpclang_rpl_code_store_fn)(void *context, const struct hpclang_rpl_code_store *store);
 
+struct hpclang_rpl_code_configuration
+{
+    uint32_t instruction, value, origins[5], adjustment;
+};
+/* CONFIG observes C.A and its relation. The callback owns a guarded scratch
+ * native snapshot, applies the qualified configuration model and updates its
+ * simulated readers/maps. It must not touch live native state. Preserve all
+ * original dependencies; discard scratch effects on any subsequent failure.
+ * Zero succeeds; negative errors propagate; positive errors are malformed. */
+typedef int (*hpclang_rpl_code_config_fn)(
+    void *context, const struct hpclang_rpl_code_configuration *configuration);
+
 /* One C step combining the data/control evaluators with register/indirect PC
  * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81B1/81BD/81BE.
  * 81BE with carry clear stores D0.A at B.A, increments B.low32 by five,
@@ -424,6 +436,15 @@ int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *ins
                                             hpclang_rpl_code_derive_fn derive,
                                             hpclang_rpl_code_store_fn store, void *context,
                                             struct hpclang_rpl_code_step_uses *uses);
+
+/* Extended step with caller-owned CONFIG simulation. Without config, 805 remains
+ * unsupported. On success only PC advances in execution state; native effects
+ * reside in the callback-owned snapshot. Other entry points retain their ABI. */
+int hpclang_rpl_code_execution_step_native(
+    const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
+    uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
+    hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
+    hpclang_rpl_code_config_fn config, void *context, struct hpclang_rpl_code_step_uses *uses);
 
 /* Validate a collected generated return against its guarded producing call,
  * and plan that call's branch operand for a caller-qualified move. The return
