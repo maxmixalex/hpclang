@@ -5087,3 +5087,32 @@ path/, plan/, writeback/, stock.json, artifact-audit.json, analysis.json).
 Multiple-expression/store integration, 0x2d9f, generic recursive and BCD source
 relations remain open. Production Stage1 still stops at 0x67d2. This closes a
 bounded payload gap, not M8.0 or M8. The batch remains local pending prior CI.
+
+## 2026-11-06 - Maintained four-store continuation
+
+Local 2fd7a761 extends the maintained Stock entry collector from 38 to
+59 steps at 0x2d9f. It retains two subtraction facts, qualifies the second fact's
+incremented payload with fixed operands, and simulates four non-overlapping SRAM
+stores. Eighteen payload digits retain physical origins; four computed digits
+use a separate result-fact namespace. Physical source resolution rejects those
+fact IDs. First-store address repairs remain in the shared plan; later literal
+payloads and subtraction operands add unchanged constraints. Unknown origins,
+invalid computation, aliases overlapping earlier stores, ROM/CPU destinations,
+capacity and malformed effects reject before publishing overlay cells.
+
+Both fresh HP49g+/HP50g Stock gates verify all 22 cells through code/data/token
+readers, original-memory guards, 30 planned addresses, 125 source cells, seven
+branches and both plan rejection controls. Entry/catalog/attachment, unchanged
+Flash and settled return checks pass. The 116-byte EXECOBS report is now v6.
+Thirteen sanitizer targets pass, including actual gate callbacks with four stores,
+computed-source rejection, stale mapping, alias overlap and no partial overlay
+publication. Six launcher payload checks, Ruff and ARM analyzer checks pass;
+individual visit/store/source frames are 336/176/64 bytes, not total stack bounds.
+
+Runtime/include/platform sources remain identical to 39d87747; its 512 original
+ROM arithmetic cases and actual-move 59-step replay evidence are retained, not
+rerun or claimed to cover more paths. Identity: research/nov06-multistore-runtime-identity.json.
+Fresh evidence: /work/nov06-multistore/{unit.log,stock.json,artifact-audit.json,analysis.json}.
+The finite fixture rejects overlapping stores and stops before unsupported 820;
+full recursive/BCD provenance and production integration remain open. Stage1
+still stops at 0x67d2. This is expanded maintained validation, not M8.0 completion.
