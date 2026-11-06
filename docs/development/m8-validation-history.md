@@ -5149,3 +5149,37 @@ also require padded synthetic memory at the final page. Driver, snapshots, ROMs
 and harness corrections are sealed in /work/nov06-native-store-next/qualification-audit.json;
 all cases are in rom-semantics.json. Prior tests did not qualify these new mapping
 conditions. Production Stage1 still stops at 0x67d2; full M8.0 remains open.
+
+## 2026-11-06 - Native 81BE evaluator and detach CI diagnosis
+
+Local e31343b8 implements the previously qualified 81BE semantics.
+Carry clear records a D0.A store at B.A before either dependent load, increments
+B.low32 by five, derives D0 from A.A+5, then reuses the 81B1 reads and final D0
+increment. Low-five-digit origins/offsets are retained; overwritten B high-word
+digits become unknown. The store callback supplies subsequent data and tokens
+from scratch, including overlaps. Failures leave execution state and uses intact;
+callers must discard speculative store effects after a later read/token failure.
+Carry set jumps to qualified native-ROM constant 0x2e15 without store effects.
+Its target origins remain unknown rather than fabricated Saturn source cells;
+full planning still requires separate native-ROM constant qualification.
+
+All 256 C-versus-original-ROM cases match registers, flags, return stack/cursor,
+PC and all simulated memory on both models. Tests include both radices and carry
+branches, wrap/boundary values and overlapping store/load addresses. Thirteen
+sanitizer targets pass; callback tests cover origin propagation, all downstream
+read/token failure positions, callback errors, bounds and missing callbacks.
+Six launcher payload audits and ARM analysis pass (execution-effects own frame
+1816 bytes, not total stack). Fresh maintained two-model Stock gates pass at the
+unchanged 59-step/four-store bound; no later maintained continuation is claimed.
+Evidence: /work/nov06-native-store-next-impl/.
+
+PR #31 exact head f97b100e has two failed Stock jobs (127698157693 and
+127698157726, run 42153189322). Both pass native/new-message/missing-message/remove
+then fail native-detach. Saved PC=0x012317b0 and R0=0x46410ffd identify the explicit
+application round-trip failure loop, not a pre-entry USB failure. The specific
+condition inside that round trip remains unresolved. Artifact/log/state audit:
+research/nov06-pr31-detach-audit.json and research/nov06-pr31-failed-stock/.
+A focused current-build detach replay reuses the just-built payload under
+/work/nov06-current-detach/; its result must be inspected before claiming a fix.
+No blind CI retry or acceptance. Production Stage1 remains at 0x67d2; M8.0/M8
+remain incomplete.
