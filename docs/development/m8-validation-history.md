@@ -4800,3 +4800,64 @@ execution step 1720 and legacy wrappers 32/24 bytes, not total call-chain bounds
 Formatting, Ruff and strict documentation checks pass. Current CI for #31,
 #13 and #18 is queued/running; no acceptance or merge is inferred. #14's known
 pre-entry USB failures remain unresolved. Full M8.0/M8 completion remains open.
+
+## 2026-11-06 — All consumed sources in one catalog movement
+
+A local integration probe combines all 19 consumed uses in the sealed 30-step
+collector path: ordinary values, native return source, two adjusted B uses,
+generated return and the automatically recorded subtraction. Physical SRAM
+coordinates unify native and logical aliases; Flash coordinates remain distinct.
+Both branch operands and the generating call need no encoded patch for this
+specific insertion. The normalized builder retains 77 source cells, including
+unchanged constraints; four nibble values change. ROM dependencies become guards,
+not attempted RAM edits. Recorded code/data/native observations also guard the
+actual mutation preflight.
+
+Both HP49g+/HP50g snapshot cases perform the real catalog-grow operation, then
+execute the original ARM ROM interpreter for all 30 transitions to 0x2c34.
+The complete PC sequence agrees with the relocated captured sequence and Flash
+remains unchanged. Stale RAM, Flash and native-state guards, plus a conflicting
+RAM edit, each reject with zero RAM/native/PC publication. This is bounded
+snapshot replay, not fresh live Stock return, arbitrary continuation or production
+root discovery. Maintaining this integration at the execution entry remains open.
+
+Evidence: /work/nov06-all-use-plan-v3/plan.json and
+/work/nov06-all-use-writeback/writeback.json. Drivers are
+research/nov06-all-use-{plan.py,writeback.c,writeback.py}. C compilation uses
+-Wall -Wextra -Werror; source/input hashes are checked again after both cases.
+The initial probe passed absolute physical coordinates to a 20-bit per-mapping
+field API; the second supplied an absolute end instead of an instruction extent.
+Both correctly rejected with BOUNDS. Corrected drivers use region-relative
+physical coordinates and remaining instruction extent; original failed output
+directories are retained. No runtime implementation change was needed for this
+bounded integration. CI #31 is queued; #13/#18 remain unaccepted and #14 retains
+its two unresolved pre-entry USB failures. M8.0 and M8 remain incomplete.
+
+## 2026-11-06 — Maintained Stock unified source-plan gate
+
+Implementation b5f6aa09 extends the maintained call-root entry test with one
+shared source-edit builder for a proposed 16-nibble catalog insertion. Ordinary,
+native and derived uses enter the same physically normalized SRAM coordinate
+space; immutable ROM uses separate bounded coordinates. Native tokens resolve
+only seeded register cells. Read-map words are guarded along with source values.
+Both branch operands and the generating call are checked against the same move;
+an unexpected operand patch rejects instead of being omitted. A proposed Flash
+write also rejects. The selected boundary still grants no mutation permission.
+
+Both fresh HP49g+/HP50g Stock runs pass all 30 steps/19 consumed uses, 77 merged
+source cells, two branch checks, one generated return and one seven-source
+subtraction. Two negative controls reject conflicting replacements and stale
+native-source values with failed, empty plans. Original guard, catalog, attachment,
+unchanged-Flash and settled-return checks remain. EXECOBS version 3 records the
+new counters; HP49g+ has 106 guards, four changed plan cells and code/data/native/PC
+reads 543/173/1062/8. The live test builds a proposed plan without applying it;
+actual catalog movement remains separately covered by the previous snapshot
+integration probe, not newly claimed as a live Stock mutation.
+
+Evidence: /work/nov06-unified-collection/{app.log,app-inputs.json,stock.json,
+artifact-audit.json,analysis.json}. Input hashes are checked before/after both
+Stock runs. All six launchers independently match the payload and negotiated
+entry prefix. ARM analysis has no diagnostics; execution visitor/source-resolver
+own frames are 320/64 bytes, not nested stack bounds. Ruff and strict docs pass.
+No runtime semantics changed, so existing runtime unit results are retained,
+not relabeled as fresh runs. Full M8.0 and M8 acceptance remain open.
