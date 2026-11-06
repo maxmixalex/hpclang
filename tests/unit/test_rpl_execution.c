@@ -91,6 +91,30 @@ static int visit(void *context, uint32_t pc, const struct hpclang_rpl_code_execu
     return f->visits == f->stop;
 }
 
+static int store_record(void *context, const struct hpclang_rpl_code_store *effect)
+{
+    struct fixture *f = context;
+    ++f->tokens; /* Count scratch records; no native/code/data write. */
+    assert(effect->instruction == 0 && effect->first == 0 && effect->nibbles == 5);
+    assert(effect->address.kind == HPCLANG_RPL_CODE_USE_STORE_ADDRESS);
+    assert(effect->address.value == 32 && effect->value == 0 && !effect->adjustment);
+    for (unsigned i = 0; i < 5; ++i) {
+        assert(effect->address.origins[i] == 0x200000 + 0x958 * 2 + i);
+        assert(effect->origins[i] == 0x200000 + 0x90c * 2 + i);
+    }
+    return f->visit_error;
+}
+
+static int store_visit(void *context, uint32_t pc, const struct hpclang_rpl_code_execution *state,
+                       const struct hpclang_rpl_code_step_uses *uses)
+{
+    struct fixture *f = context;
+    ++f->visits;
+    assert(pc == 0 && state->control.pc == 3 && uses->count == 1);
+    assert(uses->addresses[0].kind == HPCLANG_RPL_CODE_USE_STORE_ADDRESS);
+    return 0;
+}
+
 static void reset(struct fixture *f)
 {
     *f = (struct fixture){.stop = 2};
@@ -184,5 +208,25 @@ int main(void)
     assert(hpclang_rpl_execution_collect(&boot, &io, 0x200000, 20, &state, &steps) ==
            HPCLANG_RPL_SPAN_BOUNDS);
     assert(!steps && !f.reads);
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        reset(&f);
+        f.code[2] = 1; /* DAT1=A.A */
+        f.visit_error = mode == 1 ? -78 : mode == 2 ? 1 : 0;
+        struct hpclang_rpl_execution_io stores = io;
+        stores.visit = store_visit;
+        struct fixture before = f;
+        int result = hpclang_rpl_execution_collect_effects(&boot, &stores, 0x200000, 1, &state,
+                                                           &steps, mode == 3 ? NULL : store_record);
+        assert(result == (mode == 0   ? HPCLANG_RPL_EXECUTION_BUDGET
+                          : mode == 1 ? -78
+                          : mode == 2 ? HPCLANG_RPL_SPAN_MALFORMED
+                                      : HPCLANG_RPL_SPAN_UNSUPPORTED));
+        assert(steps == (mode == 0 ? 1u : 0u) && f.visits == steps);
+        assert(state.control.pc == (mode == 0 ? 3u : 0u));
+        assert(f.tokens == (mode == 3 ? 0u : 1u));
+        assert(!memcmp(f.native, before.native, sizeof f.native));
+        assert(!memcmp(f.data, before.data, sizeof f.data));
+        assert(!memcmp(f.code, before.code, sizeof f.code));
+    }
     return 0;
 }

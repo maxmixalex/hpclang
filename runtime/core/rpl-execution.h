@@ -54,7 +54,7 @@ enum hpclang_rpl_execution_stop
  * state is caller-owned scratch (prefer heap storage), disjoint from io, boot,
  * steps and callback storage. steps counts evaluated instructions. Valid calls
  * initialize steps to zero; errors may leave partial scratch/observations,
- * which must not authorize a write. Readers and callbacks are read-only.
+ * which must not authorize a write. Readers and callbacks never modify target state.
  * Return BOUNDARY, BUDGET or a negative span/callback error; never success zero.
  * Budget exhaustion and unsupported instructions do not establish closure.
  * No native writes, allocation, bank switching or implicit mutation permission. */
@@ -62,6 +62,18 @@ int hpclang_rpl_execution_collect(const struct hpclang_boot_info *boot,
                                   const struct hpclang_rpl_execution_io *io,
                                   uint32_t native_origin_base, uint32_t budget,
                                   struct hpclang_rpl_code_execution *state, uint32_t *steps);
+
+/* Same collection with caller-owned simulated stores. The store callback and
+ * code/data readers/token resolver share io->context-managed effect storage.
+ * Observe scratch reads as derived dependencies, not unchanged original memory.
+ * Retain the original sources/overwritten cells separately for validation.
+ * On any error discard all effect storage and partial observations. No target
+ * writes occur; the caller qualifies aliasing, mappings and store permissions. */
+int hpclang_rpl_execution_collect_effects(const struct hpclang_boot_info *boot,
+                                          const struct hpclang_rpl_execution_io *io,
+                                          uint32_t native_origin_base, uint32_t budget,
+                                          struct hpclang_rpl_code_execution *state, uint32_t *steps,
+                                          hpclang_rpl_code_store_fn store);
 
 /* Add all consumed address uses from one evaluated step to an initialized
  * edit builder. replacements has uses->count caller-qualified addresses;

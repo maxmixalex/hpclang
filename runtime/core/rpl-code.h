@@ -321,7 +321,8 @@ enum hpclang_rpl_code_use_kind
     HPCLANG_RPL_CODE_USE_LOAD_ADDRESS = 1,
     HPCLANG_RPL_CODE_USE_REGISTER_TARGET,
     HPCLANG_RPL_CODE_USE_MEMORY_TARGET,
-    HPCLANG_RPL_CODE_USE_RETURN_TARGET
+    HPCLANG_RPL_CODE_USE_RETURN_TARGET,
+    HPCLANG_RPL_CODE_USE_STORE_ADDRESS
 };
 
 struct hpclang_rpl_code_address_use
@@ -338,11 +339,29 @@ struct hpclang_rpl_code_step_uses
     struct hpclang_rpl_code_branch branch;
 };
 
+struct hpclang_rpl_code_store
+{
+    uint32_t instruction, first, nibbles;
+    struct hpclang_rpl_code_address_use address;
+    uint64_t value;                   /* Entire source register; selected digits start at first. */
+    uint32_t origins[16], adjustment; /* Preserve computed low-five-digit relation. */
+};
+
+/* Record a simulated store in caller-owned scratch only; never write the target.
+ * Qualify destination mapping/aliases, retain overwritten dependencies and supply
+ * subsequent code/data reads and tokens from the updated scratch view. Computed
+ * values need relation tokens: adjustment must not be flattened into old cell
+ * tokens. Unknown sources remain unknown. Return zero or a negative error;
+ * positive becomes MALFORMED. Discard all speculative effects on any later
+ * step/visitor/collection failure. This callback grants no mutation permission. */
+typedef int (*hpclang_rpl_code_store_fn)(void *context, const struct hpclang_rpl_code_store *store);
+
 /* One C step combining the data/control evaluators with register/indirect PC
  * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81BD.
  * 81BD emits three dependent load addresses followed by the memory PC target;
- * B retains its low-five-digit source plus a modular adjustment; arithmetic
- * on D and D0 clears affected origins. Full low-address copies/exchanges retain
+ * B retains its low-five-digit source plus a modular adjustment; D0 retains
+ * the first loaded pointer's source plus five. Arithmetic on D clears affected
+ * origins. Full low-address copies/exchanges retain
  * adjustments; partial overwrites discard the affected expression. Its B/D updates use
  * the low 32-bit ARM words, independent of Saturn decimal mode. A D0 result
  * beyond 20 bits is rejected. values.carry and control.carry
@@ -370,6 +389,20 @@ int hpclang_rpl_code_execution_step_derived(const struct hpclang_rpl_reader *ins
                                             struct hpclang_rpl_code_execution *state,
                                             hpclang_rpl_code_token_fn token,
                                             hpclang_rpl_code_derive_fn derive, void *context,
+                                            struct hpclang_rpl_code_step_uses *uses);
+
+/* As execution_step_derived, with optional simulated memory-store effects.
+ * Without store, stores still reject. A store's entire span must fit the
+ * 20-bit address space; callback rejection preserves state and uses. Readers
+ * must expose the caller's current simulated view, including physical aliases
+ * and instruction fetches affected by earlier stores. Other native/mapping/MMIO
+ * effects remain unsupported and must never be treated as ordinary RAM writes. */
+int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *instructions,
+                                            const struct hpclang_rpl_reader *data, uint32_t limit,
+                                            struct hpclang_rpl_code_execution *state,
+                                            hpclang_rpl_code_token_fn token,
+                                            hpclang_rpl_code_derive_fn derive,
+                                            hpclang_rpl_code_store_fn store, void *context,
                                             struct hpclang_rpl_code_step_uses *uses);
 
 /* Validate a collected generated return against its guarded producing call,
@@ -453,11 +486,12 @@ int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
                                     const struct hpclang_rpl_code_memory *transfer,
                                     uint32_t *memory, unsigned count);
 
-/* Address arithmetic destroys all five copied nibble origins of D0/D1,
- * including when some resulting digits happen to be unchanged. Other slots
- * are preserved. Validate a nonzero signed immediate in [-16,16] before any
- * change. Carry is not represented here; callers must separately replace or
- * invalidate their carry fact. This does not qualify the resulting address. */
+/* D0/D1 immediate arithmetic retains the original low-five source tokens and
+ * accumulates a modulo-20-bit adjustment. Other slots are preserved. Validate
+ * a nonzero immediate in [-16,16] and canonical incoming adjustment before
+ * any change. Carry is not represented here: callers separately qualify all
+ * carry-dependent effects of a proposed source repair. This relation alone
+ * does not qualify the resulting address or authorize source mutation. */
 int hpclang_rpl_code_origins_adjust(struct hpclang_rpl_code_origins *state,
                                     const struct hpclang_rpl_code_address_adjust *adjust);
 

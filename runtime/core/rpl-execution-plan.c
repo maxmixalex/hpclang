@@ -27,7 +27,7 @@ int hpclang_rpl_execution_plan_uses(struct hpclang_rpl_reference_edit_builder *b
         if (use->generated)
             return reject(builder, HPCLANG_RPL_SPAN_UNSUPPORTED);
         if (use->kind < HPCLANG_RPL_CODE_USE_LOAD_ADDRESS ||
-            use->kind > HPCLANG_RPL_CODE_USE_RETURN_TARGET)
+            use->kind > HPCLANG_RPL_CODE_USE_STORE_ADDRESS)
             return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
         if (use->adjustment > 0xfffff || use->value > 0xfffff || replacements[i] > 0xfffff)
             return reject(builder, HPCLANG_RPL_SPAN_BOUNDS);
