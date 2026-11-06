@@ -5729,3 +5729,39 @@ The local batch remains unpushed while prior exact-head CI is unfinished. PR14's
 two pre-entry USB failures remain unresolved. Production Stage1 still stops at
 0x67d2; public libraries, Port1, retained Port2 goals and all other M8 acceptance
 conditions remain open. This progress does not change the approved scope.
+
+## 2026-11-06 - Selected-field increment/decrement provenance
+
+The local arithmetic change inspects AfC..AfF and Bf4..Bf7 across eight fields,
+all P values and canonical binary/decimal inputs. Retained facts include input,
+output, selected field, radix, normalized carry and source provenance. Planning
+re-decodes the producer, preserves carry and P-dependent selection, constrains
+producer instructions and uses the existing payload planner for input sources.
+Unknown sources, changed carry, malformed facts and capacity exhaustion reject
+and invalidate the batch. Derived-fact recursion and mode/map guards remain the
+caller's responsibility; production integration is not claimed.
+
+The C implementation and original ROM agree across 24,576 cases on HP49g+/50g.
+Native true carry may be a nonzero mask: the model intentionally represents its
+truth as 0/1. The oracle additionally checks the next native carry branch; this
+is not a claim of byte-identical carry representation. Evidence:
+/work/nov06-unit-field/c-rom/rom.json and rom-carry/rom.json.
+
+Numeric collection reaches 92 steps on both captured original paths, stopping
+before unsupported 0xb2ab with no unknown consumed address sources. This extends
+execution comparison only: qualified catalog-movement replay and maintained
+Stock coverage remain at 87 steps. The new arithmetic fact still needs bounded
+recursive resolution in the common relocation proof before that gate can move.
+Evidence: /work/nov06-unit-field/continuation/collected-execution.json.
+
+Fourteen ASan/UBSan test targets, application build, six launcher artifact checks
+and ARM analysis pass. The first unit build exposed a missing callback initializer;
+that was corrected and the existing build directory reused for fresh validation.
+Individual ARM frames are 1880 bytes for observed step, 1568 for the data helper
+and 712 for the unit planner; these do not establish an aggregate stack bound.
+Evidence: /work/nov06-unit-field/{unit.log,artifact-audit.json,code-analysis.json,
+plan-analysis.json,analysis.json}. M8.0 and all retained M8 gates remain open.
+
+Fresh two-model Stock regression also passes the retained 87-step collection,
+normal return and catalog checks with sealed inputs: /work/nov06-unit-field/stock.json.
+Code commit d09703ef remains local; prior #31 CI is unfinished.
