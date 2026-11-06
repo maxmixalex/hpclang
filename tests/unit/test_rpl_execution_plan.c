@@ -171,9 +171,145 @@ static void subtraction_plans(void)
     assert(!builder.count); /* A borrow change must not change a later branch. */
 }
 
+struct payload_fixture
+{
+    struct plan_fixture physical;
+    unsigned derived_calls;
+    int derived_error;
+};
+static int payload_resolve(void *context, uint32_t token, struct hpclang_rpl_code_origin_cell *cell)
+{
+    struct payload_fixture *f = context;
+    if (token >= 1000)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    return resolve_cell(&f->physical, token, cell);
+}
+static int payload_derived(void *context, struct hpclang_rpl_reference_edit_builder *builder,
+                           uint32_t token, uint8_t expected, uint8_t replacement)
+{
+    struct payload_fixture *f = context;
+    ++f->derived_calls;
+    if (f->derived_error)
+        return f->derived_error;
+    if (token < 1000 || token >= 1005)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    /* A copied digit from (0xffffe + 5) mod 20 bits; retain the whole producer. */
+    if (expected != ((3u >> (4 * (token - 1000))) & 15u))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (replacement != expected)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    const struct hpclang_rpl_code_store producer = {
+        .nibbles = 5, .value = 3, .origins = {1, 2, 3, 4, 5}, .adjustment = 5};
+    return hpclang_rpl_execution_plan_payload(builder, &producer, 3, payload_resolve, NULL, f);
+}
+static void payload_plans(void)
+{
+    struct payload_fixture f = {0};
+    put(&f.physical, 0, 0xffffe);
+    put(&f.physical, 10, 0x12345);
+    struct hpclang_rpl_reference_edit edits[16];
+    struct hpclang_rpl_reference_edit_builder builder;
+    struct hpclang_rpl_code_store store = {
+        .first = 0, .nibbles = 1, .value = 3, .origins = {1, 2, 3, 4, 5}, .adjustment = 5};
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 16));
+    assert(!hpclang_rpl_execution_plan_payload(&builder, &store, 4, payload_resolve, NULL, &f));
+    assert(builder.count == 5 && edits[0].expected == 14 && edits[0].value == 15);
+    /* One selected adjusted digit still protects all five carry dependencies. */
+    for (unsigned i = 1; i < 5; ++i)
+        assert(edits[i].expected == 15 && edits[i].value == 15);
+    store = (struct hpclang_rpl_code_store){.nibbles = 10, .value = UINT64_C(0x0000312345)};
+    for (unsigned i = 0; i < 5; ++i) {
+        store.origins[i] = 11 + i;
+        store.origins[5 + i] = 1000 + i;
+    }
+    const struct hpclang_rpl_code_store original = store;
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 16));
+    assert(!hpclang_rpl_execution_plan_payload(&builder, &store, store.value, payload_resolve,
+                                               payload_derived, &f));
+    assert(builder.count == 10 && f.derived_calls == 5 && !memcmp(&store, &original, sizeof store));
+    /* The copied computed digits never become fake physical fields. */
+    for (unsigned i = 0; i < builder.count; ++i)
+        assert(edits[i].field < 15 && edits[i].width == 1);
+    for (unsigned mode = 0; mode < 9; ++mode) {
+        store = original;
+        f.physical.calls = f.physical.fail = 0;
+        f.derived_calls = 0;
+        f.derived_error = 0;
+        uint64_t next = store.value;
+        if (mode == 0)
+            store.origins[0] = 0;
+        if (mode == 1)
+            next ^= UINT64_C(1) << 20;
+        if (mode == 2)
+            f.derived_error = -73;
+        if (mode == 3)
+            f.derived_error = 73;
+        if (mode == 4) {
+            f.physical.fail = 1;
+            f.physical.error = -74;
+        }
+        if (mode == 5) {
+            f.physical.fail = 1;
+            f.physical.error = 74;
+        }
+        if (mode == 6)
+            store.origins[5] = 1999;
+        if (mode == 7)
+            store.value ^= 1;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, mode == 8 ? 9 : 16));
+        int result = hpclang_rpl_execution_plan_payload(&builder, &store, next, payload_resolve,
+                                                        payload_derived, &f);
+        assert(result < 0 && builder.count == 0 && builder.error == result);
+        if (mode == 0 || mode == 4 || mode == 5)
+            assert(!f.derived_calls);
+        unsigned calls = f.derived_calls;
+        assert(hpclang_rpl_execution_plan_payload(&builder, &original, original.value,
+                                                  payload_resolve, payload_derived, &f) == result);
+        assert(calls == f.derived_calls);
+    }
+    f.physical.fail = 0;
+    f.derived_error = 0;
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        store = original;
+        if (mode == 0)
+            store.nibbles = 0;
+        if (mode == 1)
+            store.nibbles = 17;
+        if (mode == 2)
+            store.first = 16;
+        if (mode == 3)
+            store.adjustment = 0x100000;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 16));
+        assert(hpclang_rpl_execution_plan_payload(&builder, &store, store.value, payload_resolve,
+                                                  payload_derived, &f) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!builder.count);
+    }
+    const struct hpclang_rpl_code_store producer = {
+        .nibbles = 5, .value = 3, .origins = {1, 2, 3, 4, 5}, .adjustment = 5};
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 16));
+    assert(!hpclang_rpl_execution_plan_payload(&builder, &producer, 4, payload_resolve, NULL, &f));
+    assert(hpclang_rpl_execution_plan_payload(&builder, &original, original.value, payload_resolve,
+                                              payload_derived, &f) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!builder.count);
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 16));
+    assert(hpclang_rpl_execution_plan_payload(&builder, &original, original.value, payload_resolve,
+                                              NULL, &f) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!builder.count);
+    store = original;
+    store.first = 5;
+    store.nibbles = 5;
+    store.adjustment = 5;
+    memset(store.origins, 0, 5 * sizeof(uint32_t));
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 16));
+    assert(!hpclang_rpl_execution_plan_payload(&builder, &store, store.value, payload_resolve,
+                                               payload_derived, &f));
+    assert(builder.count == 5); /* An upper-only store does not consume low-field adjustment. */
+}
+
 void test_execution_plans(void)
 {
     subtraction_plans();
+    payload_plans();
     struct plan_fixture f = {0};
     const uint8_t program[] = {1, 4, 7, 8, 0, 8, 14}; /* C=DAT1.A; PC=(C). */
     memcpy(f.memory, program, sizeof program);

@@ -108,6 +108,35 @@ int hpclang_rpl_execution_plan_uses(struct hpclang_rpl_reference_edit_builder *b
                                     const uint32_t *replacements,
                                     hpclang_rpl_code_origin_resolve_fn resolve, void *context);
 
+/* Resolve a computed payload digit by validating its retained producer and
+ * adding all required original-source constraints to the same builder. Called
+ * only for nonzero tokens rejected as UNSUPPORTED by the physical resolver.
+ * Never manufacture a physical cell for a computed digit. The owner bounds
+ * recursion, rejects cycles/unknown facts and qualifies any changed result.
+ * Zero succeeds; negative errors propagate; positive errors are malformed. */
+typedef int (*hpclang_rpl_execution_payload_fn)(void *context,
+                                                struct hpclang_rpl_reference_edit_builder *builder,
+                                                uint32_t token, uint8_t expected,
+                                                uint8_t replacement);
+
+/* Constrain a store's selected payload digits, including copied derived
+ * digits in upper fields. replacement is the caller-qualified full source
+ * register value after repair. A nonzero low-five adjustment is inverted as
+ * one modular word: if any selected digit touches it, constrain ALL five base
+ * digits, since carries can cross the selected-field boundary. Other selected
+ * digits are constrained independently. Unselected upper digits are ignored.
+ * Merge into the same normalized builder used for address/branch relations;
+ * every failure latches error and invalidates the batch. Unknown zero origins
+ * reject, even with a derived callback. Physical resolver errors other than
+ * UNSUPPORTED never fall through. Destination mapping, overlay chronology,
+ * dependency guards and complete relocation semantics remain caller duties.
+ * No reads/writes outside supplied callbacks; store stays unchanged. */
+int hpclang_rpl_execution_plan_payload(struct hpclang_rpl_reference_edit_builder *builder,
+                                       const struct hpclang_rpl_code_store *store,
+                                       uint64_t replacement,
+                                       hpclang_rpl_code_origin_resolve_fn resolve,
+                                       hpclang_rpl_execution_payload_fn derived, void *context);
+
 /* Plan both sources of a caller-proven selected-field subtraction. Values are
  * low 20-bit values; the selected field must lie within these five nibbles.
  * Verify original result/borrow against both operands, and proposed result

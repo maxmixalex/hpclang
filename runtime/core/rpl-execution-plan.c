@@ -52,6 +52,73 @@ int hpclang_rpl_execution_plan_uses(struct hpclang_rpl_reference_edit_builder *b
     return 0;
 }
 
+static int payload_digit(struct hpclang_rpl_reference_edit_builder *builder, uint32_t token,
+                         uint8_t expected, uint8_t replacement,
+                         hpclang_rpl_code_origin_resolve_fn resolve,
+                         hpclang_rpl_execution_payload_fn derived, void *context)
+{
+    if (!token)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_code_origin_cell cell;
+    int result = resolve(context, token, &cell);
+    if (result == HPCLANG_RPL_SPAN_UNSUPPORTED && derived) {
+        result = derived(context, builder, token, expected, replacement);
+        if (!result && builder->error)
+            result = builder->error;
+        if (!result && builder->count > builder->capacity)
+            result = HPCLANG_RPL_SPAN_MALFORMED;
+        return result > 0 ? HPCLANG_RPL_SPAN_MALFORMED : result;
+    }
+    if (result)
+        return result > 0 ? HPCLANG_RPL_SPAN_MALFORMED : result;
+    if (cell.expected != expected)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    const struct hpclang_rpl_reference_edit edit = {cell.mapping, cell.field, expected, replacement,
+                                                    1};
+    return hpclang_rpl_reference_edits_add(builder, &edit);
+}
+
+int hpclang_rpl_execution_plan_payload(struct hpclang_rpl_reference_edit_builder *builder,
+                                       const struct hpclang_rpl_code_store *store,
+                                       uint64_t replacement,
+                                       hpclang_rpl_code_origin_resolve_fn resolve,
+                                       hpclang_rpl_execution_payload_fn derived, void *context)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (builder->error)
+        return builder->error;
+    if (!store || !resolve || builder->count > builder->capacity ||
+        (builder->capacity && !builder->edits))
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    if (store->first >= 16 || !store->nibbles || store->nibbles > 16 - store->first ||
+        store->adjustment > 0xfffff)
+        return reject(builder, HPCLANG_RPL_SPAN_BOUNDS);
+    for (uint32_t i = 0; i < builder->count; ++i)
+        if (builder->edits[i].width != 1)
+            return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    int adjusted = store->adjustment && store->first < 5;
+    if (adjusted) {
+        uint32_t old = ((uint32_t)store->value - store->adjustment) & 0xfffff;
+        uint32_t next = ((uint32_t)replacement - store->adjustment) & 0xfffff;
+        for (unsigned i = 0; i < 5; ++i) {
+            int result = payload_digit(builder, store->origins[i], (old >> (4 * i)) & 15,
+                                       (next >> (4 * i)) & 15, resolve, derived, context);
+            if (result)
+                return reject(builder, result);
+        }
+    }
+    for (unsigned i = store->first; i < store->first + store->nibbles; ++i) {
+        if (adjusted && i < 5)
+            continue;
+        int result = payload_digit(builder, store->origins[i], (store->value >> (4 * i)) & 15,
+                                   (replacement >> (4 * i)) & 15, resolve, derived, context);
+        if (result)
+            return reject(builder, result);
+    }
+    return 0;
+}
+
 static int subtract_value(const struct hpclang_rpl_execution_subtraction *expression, uint32_t left,
                           uint32_t right, uint32_t *value, uint32_t *carry)
 {

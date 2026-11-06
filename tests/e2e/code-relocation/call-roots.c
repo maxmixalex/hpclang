@@ -869,21 +869,37 @@ static int execution_write_cell(struct execution_probe *probe, uint32_t at,
     return 0;
 }
 
+static int execution_payload(void *context, struct hpclang_rpl_reference_edit_builder *builder,
+                             uint32_t token, uint8_t expected, uint8_t replacement)
+{
+    struct execution_probe *probe = context;
+    if (probe->expression_count > 2 || token < 0x400001 ||
+        token >= 0x400001 + 5 * probe->expression_count || replacement != expected)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned index = (token - 0x400001) / 5, digit = (token - 0x400001) % 5;
+    const struct hpclang_rpl_execution_subtraction *fact =
+        index ? &probe->payload_expression : &probe->expression;
+    if (((fact->value >> (4 * digit)) & 15) != expected)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    return hpclang_rpl_execution_plan_subtraction(
+        builder, fact, fact->left.value, fact->right.value, fact->value, execution_source, probe);
+}
+
 static int execution_store(void *context, const struct hpclang_rpl_code_store *store)
 {
     struct execution_probe *probe = context;
+    const unsigned count = store->nibbles;
     /* Four effects observed in the original ROM continuation. This finite
      * fixture rejects overlaps and unsupported relations rather than granting
      * general store authority. The overlay is published only after validation. */
     static const uint32_t pcs[4] = {0x2c3c, 0x2a1ba, 0x2a1c1, 0x2a1e0};
     static const unsigned widths[4] = {5, 8, 4, 5};
-    if (probe->stores >= 4 || store->instruction != pcs[probe->stores] || store->first ||
-        store->nibbles != widths[probe->stores] ||
-        store->address.value > 0x100000 - store->nibbles ||
-        probe->stored_sources + store->nibbles > 22)
+    if (!count || count > 8 || probe->stores >= 4 || store->instruction != pcs[probe->stores] ||
+        store->first || count != widths[probe->stores] || store->address.value > 0x100000 - count ||
+        probe->stored_sources + count > 22)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     uint32_t fields[8], origins[8];
-    for (unsigned digit = 0; digit < store->nibbles; ++digit) {
+    for (unsigned digit = 0; digit < count; ++digit) {
         struct hpclang_rpl_code_origin_cell cell;
         int result = execution_write_cell(probe, store->address.value + digit, &cell);
         if (result)
@@ -901,6 +917,7 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
                 return HPCLANG_RPL_SPAN_UNSUPPORTED;
         origins[digit] = store->origins[digit];
     }
+    uint64_t replacement = store->value;
     if (probe->stores == 2) {
         const struct hpclang_rpl_execution_subtraction *fact = &probe->payload_expression;
         if (probe->expression_count != 2 || fact->decimal || store->adjustment != 1 ||
@@ -909,19 +926,15 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
         for (unsigned digit = 0; digit < 5; ++digit)
             if (store->origins[digit] != 0x400006 + digit)
                 return HPCLANG_RPL_SPAN_UNSUPPORTED;
-        /* Keeping both operands fixed proves the subtraction, increment and
-         * their flags unchanged. Result tokens are facts, never physical cells. */
-        int result = hpclang_rpl_execution_plan_subtraction(&probe->plan, fact, fact->left.value,
-                                                            fact->right.value, fact->value,
-                                                            execution_source, probe);
-        if (result)
-            return result;
-        for (unsigned digit = 0; digit < store->nibbles; ++digit)
+        for (unsigned digit = 0; digit < count; ++digit)
             origins[digit] = 0x500001 + 16 * probe->stores + digit;
-    } else {
-        if (store->adjustment)
-            return HPCLANG_RPL_SPAN_UNSUPPORTED;
-        for (unsigned digit = 0; digit < store->nibbles; ++digit) {
+    } else if (store->adjustment) {
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    if (!probe->stores) {
+        /* This first address payload already has a qualified replacement from
+         * its consumed use. Preserve that proposal in the common payload plan. */
+        for (unsigned digit = 0; digit < count; ++digit) {
             struct hpclang_rpl_code_origin_cell cell;
             int result = execution_source(probe, store->origins[digit], &cell);
             if (result)
@@ -929,37 +942,34 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
             uint32_t value = (uint32_t)(store->value >> (4 * digit)) & 15;
             if (cell.expected != value)
                 return HPCLANG_RPL_SPAN_MALFORMED;
-            if (!probe->stores) {
-                /* The first payload was consumed as an address already. Keep
-                 * its existing replacement, including any relocation repair. */
-                unsigned found = 0;
-                for (unsigned j = 0; j < probe->plan.count; ++j) {
-                    const struct hpclang_rpl_reference_edit *prior = &probe->edits[j];
-                    if (prior->mapping == cell.mapping && prior->field == cell.field &&
-                        prior->width == 1 && prior->expected == value)
-                        ++found;
+            unsigned found = 0;
+            for (unsigned j = 0; j < probe->plan.count; ++j) {
+                const struct hpclang_rpl_reference_edit *prior = &probe->edits[j];
+                if (prior->mapping == cell.mapping && prior->field == cell.field &&
+                    prior->width == 1 && prior->expected == value) {
+                    replacement = (replacement & ~(UINT64_C(15) << (4 * digit))) |
+                                  ((uint64_t)prior->value << (4 * digit));
+                    ++found;
                 }
-                if (found != 1)
-                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
-            } else {
-                const struct hpclang_rpl_reference_edit edit = {cell.mapping, cell.field, value,
-                                                                value, 1};
-                result = hpclang_rpl_reference_edits_add(&probe->plan, &edit);
-                if (result)
-                    return result;
             }
+            if (found != 1)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
         }
     }
+    int result = hpclang_rpl_execution_plan_payload(&probe->plan, store, replacement,
+                                                    execution_source, execution_payload, probe);
+    if (result)
+        return result;
     if (!probe->stores)
         probe->store = *store;
     probe->store_records[probe->stores] = *store;
-    for (unsigned digit = 0; digit < store->nibbles; ++digit) {
+    for (unsigned digit = 0; digit < count; ++digit) {
         unsigned at = probe->stored_sources + digit;
         probe->shadow[at].field = fields[digit];
         probe->shadow[at].value = (uint32_t)(store->value >> (4 * digit)) & 15;
         probe->shadow[at].origin = origins[digit];
     }
-    probe->stored_sources += store->nibbles;
+    probe->stored_sources += count;
     ++probe->stores;
     return 0;
 }
