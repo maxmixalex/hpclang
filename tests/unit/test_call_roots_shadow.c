@@ -243,6 +243,31 @@ static void constant_source(void)
     assert(probe.constant_limit == 1);
 }
 
+static void unit_source(void)
+{
+    fixture();
+    ram[0x20018] = 0x0b;
+    ram[0x20019] = 0x46; /* C=C+1.P at logical 0x90030. */
+    ram[0x20008] = 0x40;
+    struct hpclang_rpl_code_unit fact = {.instruction = 0x90030,
+                                         .length = 3,
+                                         .reg = HPCLANG_RPL_CODE_C,
+                                         .nibbles = 1,
+                                         .before = 4,
+                                         .after = 5,
+                                         .p_origin = 0x90011};
+    fact.origins[0] = 0x90012;
+    uint32_t tokens[16];
+    assert(!execution_unit(&probe, &fact, tokens) && tokens[0] == 0x700001);
+    assert(!execution_payload(&probe, &probe.plan, tokens[0], 5, 5));
+    assert(probe.unit_limit == 1);
+    assert(execution_payload(&probe, &probe.plan, tokens[0], 5, 6) < 0);
+    assert(execution_payload(&probe, &probe.plan, tokens[0] + 16, 5, 5) < 0);
+    probe.units[0].origins[0] = tokens[0];
+    assert(execution_payload(&probe, &probe.plan, tokens[0], 5, 5) < 0);
+    assert(probe.unit_limit == 1 && probe.plan.error < 0 && !probe.plan.count);
+}
+
 struct body_test_memory
 {
     uint8_t data[32];
@@ -292,6 +317,7 @@ static void protected_body(void)
 int main(void)
 {
     constant_source();
+    unit_source();
     overlapping_store();
     configuration();
     protected_body();
