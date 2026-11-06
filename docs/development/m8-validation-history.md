@@ -4147,3 +4147,23 @@ both helper symbols: /work/nov05-native-integration/verified.txt.
 Runtime, platform, public headers and code-relocation test sources are unchanged
 from a0a31cb4. This is integration validation, not new runtime coverage or
 completion of the production memory-origin collector. Fresh CI remains required.
+
+## 2026-11-05 — Local runtime environment branch integration
+
+PR #18 previous exact head 0390e023 has 389 successful jobs, two skips and
+one cancelled Font Gallery evidence publisher; Runtime publishing succeeds.
+PR #19 has the complementary unresolved Runtime publisher cancellation, with
+Gallery publishing successful. Neither cancellation counts as acceptance.
+Audits: research/nov05-pending-ci-18.json and nov05-pending-ci-19.json.
+
+PR #18 now integrates accepted main 26140e1d as 1b24a09f. Only roadmap/history
+conflicted; history uses a union merge and the current roadmap is retained.
+Relative to accepted main, functional changes remain limited to the local
+setup-runtime command entry, its four tests and transport documentation.
+All four tests, Ruff, normalized ShellCheck and strict docs pass. The result
+was pushed after the previous-head audit; new CI was not inspected that turn.
+No milestone or original hardware/transfer failure is declared complete.
+
+The allocation/UI matrix additionally completes HP50g Stock and HP39g+ Direct,
+bringing saved passing cases to seven of twelve. The HP39g+ Stock process is
+confirmed live. Independent saved-artifact revalidation passes all seven completed cases, including source/artifact hashes, saved pixels, stack budgets, native release and lifecycle free lists. The partial report /work/nov05-allocation-ui-combined/independent-partial-audit.json explicitly has complete=false; full twelve-case acceptance remains pending.
