@@ -5414,3 +5414,35 @@ inputs are unchanged. Four fresh setup-runtime tests and strict docs pass. Ident
 audit: research/nov06-pr31-main-identity.json. Prior exact-head CI was rechecked:
 f97b100e retains 157 successful/two failed/one queued jobs; the two known detach
 failures are covered by the above before/after fix. New remote acceptance is pending.
+
+## 2026-11-06 - Native HST capture and masked clear
+
+Local 5f971b61 adds the full native HST word to private execution state and
+captures its eight nibbles at CPU offset 0x96c through the guarded reader.
+Capture now observes 264 nibbles; all 264 read/observation failure positions
+retain the atomic output contract. 82x clears only the selected low-four bits,
+preserving upper HST bits, registers, flags, origins and return-stack state.
+Unit tests cover every mask/low-HST/flag combination, malformed input, short
+instructions and each instruction-read failure without publishing partial state.
+
+The independent original-ROM matrix passes 512 cases across HP49g+/HP50g:
+16 masks, four full-word patterns and four carry/decimal combinations per model.
+It compares native registers, HST, flags, stack/cursor, PC and simulated memory.
+The source collector matches both original-ROM traces for 60 steps, checking
+HST at every step, and stops deliberately before 81BE at 0x2da2. Four prior
+stores and both subtraction facts remain retained. The next adjusted stored-value
+relation is not yet integrated into the relocation plan.
+
+Thirteen ASan/UBSan targets, six launcher payload audits, fresh two-model Stock
+entry/return/catalog checks and the ARM analyzer pass. The maintained Stock
+fixture remains at 59 steps/four stores; the 60-step result is research evidence.
+The execution-step own stack frame is 1824 bytes (previously 1816); this is not
+a proof of aggregate nested stack capacity. Production Stage1 remains at 0x67d2,
+and M8.0 remains incomplete. No new push or remote acceptance is claimed.
+
+Evidence: /work/nov06-hst/{hst-rom.json,path/collected-execution.json,stock.json,
+unit.log,analysis.json,artifact-audit.json}, with sealed build/Stock inputs.
+Latest inspected PR31 head 7b9f1d35 has 12 queued workflows and 20 queued jobs;
+PR13 head 30cdca4f has 3 successful/9 queued workflows and 93 successful,
+8 running/173 queued jobs. PR14 retains two pre-entry USB failures (400 passed,
+2 skipped jobs). These observations do not establish CI acceptance.
