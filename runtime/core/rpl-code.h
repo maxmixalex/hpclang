@@ -319,6 +319,8 @@ struct hpclang_rpl_code_execution
     struct hpclang_rpl_code_origins origins;
     struct hpclang_rpl_code_control control;
     uint32_t hst; /* Native hardware status word; 82x clears only selected low bits. */
+    /* RSTK can save an adjusted address without materializing its base digits. */
+    uint32_t stack_adjustment[8];
 };
 
 enum hpclang_rpl_code_use_kind

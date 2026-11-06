@@ -2368,6 +2368,69 @@ static void native_threaded_store_next(void)
     }
 }
 
+static void adjusted_stack_roundtrip(void)
+{
+    struct image code = {.size = 4, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    const uint32_t offsets[] = {0, 5, 0xffffb, 0xfffff};
+    for (unsigned slot = 0; slot < 8; ++slot)
+        for (unsigned k = 0; k < 4; ++k) {
+            struct hpclang_rpl_code_execution state = {0};
+            seed_origins(&state.origins);
+            state.control.cursor = slot;
+            state.values.registers[HPCLANG_RPL_CODE_C] = UINT64_C(0xfedcba9876512345);
+            state.origins.adjustment[HPCLANG_RPL_CODE_C] = offsets[k];
+            const struct hpclang_rpl_code_execution initial = state;
+            struct hpclang_rpl_code_step_uses uses;
+            encode(&code, 0, 2, 0x60);
+            assert(!hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL,
+                                                    &uses));
+            assert(state.stack_adjustment[slot] == offsets[k]);
+            const struct hpclang_rpl_code_execution pushed = state;
+            /* A return consumes the relation and clears the vacated ring slot. */
+            encode(&code, 2, 2, 0x10);
+            assert(!hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL,
+                                                    &uses));
+            assert(uses.count == 1 && uses.addresses[0].adjustment == offsets[k]);
+            assert(uses.addresses[0].value == 0x12345 && state.control.cursor == slot);
+            assert(!memcmp(uses.addresses[0].origins, initial.origins.registers[HPCLANG_RPL_CODE_C],
+                           5 * sizeof(uint32_t)));
+            assert(!state.stack_adjustment[slot] && !state.control.stack[slot]);
+            /* Pop-to-C restores the offset even after C was independently overwritten. */
+            state = pushed;
+            state.values.registers[HPCLANG_RPL_CODE_C] &= ~UINT64_C(0xfffff);
+            state.origins.adjustment[HPCLANG_RPL_CODE_C] = 7;
+            encode(&code, 2, 2, 0x70);
+            assert(!hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL,
+                                                    &uses));
+            assert(state.values.registers[HPCLANG_RPL_CODE_C] ==
+                   initial.values.registers[HPCLANG_RPL_CODE_C]);
+            assert(!memcmp(&state.origins, &initial.origins, sizeof state.origins));
+            assert(!state.stack_adjustment[slot] && state.control.cursor == slot);
+            /* A call overwrites the current slot with a generated return, not its stale offset. */
+            state = pushed;
+            state.control.cursor = slot;
+            state.control.pc = 0;
+            encode(&code, 0, 4, 0x107);
+            assert(!hpclang_rpl_code_execution_step(&reader, NULL, 4, &state, data_token, NULL,
+                                                    &uses));
+            assert(state.control.stack_generated[slot] == 1 && !state.stack_adjustment[slot]);
+            for (unsigned mode = 0; mode < 2; ++mode) {
+                state = pushed;
+                if (mode)
+                    state.control.stack_generated[slot] = 1;
+                else
+                    state.stack_adjustment[slot] = 0x100000;
+                if (mode && !offsets[k])
+                    continue;
+                struct hpclang_rpl_code_execution before = state;
+                assert(hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL,
+                                                       &uses) < 0);
+                assert(!memcmp(&state, &before, sizeof state));
+            }
+        }
+}
+
 static void hardware_status_clear(void)
 {
     struct image code = {.size = 3, .fail = UINT32_MAX};
@@ -2694,14 +2757,18 @@ static void computed_origin_transfers(void)
     assert(state.control.stack[0] == 0x12345);
     assert(!state.control.stack_generated[0]);
     for (unsigned digit = 0; digit < 5; ++digit)
-        assert(!state.control.stack_origins[0][digit]); /* RSTK does not yet carry expressions. */
-    state.control.stack_generated[0] = 123;
+        assert(state.control.stack_origins[0][digit] ==
+               origins.registers[HPCLANG_RPL_CODE_C][digit]);
+    assert(state.stack_adjustment[0] == 0xffffb);
     state.control.pc = 0;
     encode(&code, 0, 2, 0x70);
     assert(!hpclang_rpl_code_execution_step(&reader, NULL, 2, &state, data_token, NULL, &uses));
     assert(!state.control.stack_generated[0]);
     for (unsigned digit = 0; digit < 5; ++digit)
-        assert(!state.origins.registers[HPCLANG_RPL_CODE_C][digit]);
+        assert(state.origins.registers[HPCLANG_RPL_CODE_C][digit] ==
+               origins.registers[HPCLANG_RPL_CODE_C][digit]);
+    assert(state.origins.adjustment[HPCLANG_RPL_CODE_C] == 0xffffb);
+    assert(!state.stack_adjustment[0]);
 }
 
 static void generated_return_plans(void)
@@ -3020,6 +3087,7 @@ int main(void)
     computed_origin_transfers();
     native_threaded_exit();
     native_threaded_store_next();
+    adjusted_stack_roundtrip();
     hardware_status_clear();
     native_threaded_next();
     execution_steps();

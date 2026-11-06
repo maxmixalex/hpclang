@@ -288,6 +288,10 @@ int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *ins
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     if (state->values.carry != state->control.carry || state->control.cursor >= 8)
         return HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned slot = 0; slot < 8; ++slot)
+        if (state->stack_adjustment[slot] > 0xfffff ||
+            (state->stack_adjustment[slot] && state->control.stack_generated[slot]))
+            return HPCLANG_RPL_SPAN_MALFORMED;
     struct hpclang_rpl_code_execution next = *state;
     struct hpclang_rpl_code_step_uses observed = {0};
     uint32_t pc = next.control.pc, length;
@@ -364,8 +368,8 @@ int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *ins
             next.control.stack[slot] =
                 (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C] & 0xfffffu;
             for (unsigned i = 0; i < 5; ++i)
-                next.control.stack_origins[slot][i] =
-                    next.origins.adjustment[HPCLANG_RPL_CODE_C] ? 0 : reg[i];
+                next.control.stack_origins[slot][i] = reg[i];
+            next.stack_adjustment[slot] = next.origins.adjustment[HPCLANG_RPL_CODE_C];
             next.control.cursor = (slot + 1) & 7u;
         } else {
             slot = (slot + 7) & 7u;
@@ -379,7 +383,8 @@ int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *ins
             next.control.stack[slot] = 0;
             next.control.stack_generated[slot] = 0;
             next.control.cursor = slot;
-            next.origins.adjustment[HPCLANG_RPL_CODE_C] = 0;
+            next.origins.adjustment[HPCLANG_RPL_CODE_C] = next.stack_adjustment[slot];
+            next.stack_adjustment[slot] = 0;
         }
         next.control.pc = (pc + 2) & 0xfffffu;
         goto done;
@@ -596,13 +601,16 @@ int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *ins
     next.values.carry = next.control.carry;
     if (returned.present) {
         execution_use(&observed, HPCLANG_RPL_CODE_USE_RETURN_TARGET, returned.target,
-                      returned.origins, 0);
+                      returned.origins, next.stack_adjustment[next.control.cursor]);
+        next.stack_adjustment[next.control.cursor] = 0;
         observed.addresses[observed.count - 1].generated = returned.generated;
     } else {
         result = hpclang_rpl_code_branch_inspect(instructions, pc, limit, &observed.branch);
         if (result && result != HPCLANG_RPL_SPAN_UNSUPPORTED)
             return result;
         observed.has_branch = result == 0;
+        if (observed.has_branch && observed.branch.call)
+            next.stack_adjustment[state->control.cursor] = 0;
     }
 done:
     *state = next;
