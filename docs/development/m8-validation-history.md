@@ -5446,3 +5446,45 @@ Latest inspected PR31 head 7b9f1d35 has 12 queued workflows and 20 queued jobs;
 PR13 head 30cdca4f has 3 successful/9 queued workflows and 93 successful,
 8 running/173 queued jobs. PR14 retains two pre-entry USB failures (400 passed,
 2 skipped jobs). These observations do not establish CI acceptance.
+
+## 2026-11-06 - Adjusted address relay through RSTK
+
+Local ddd620d9 retains a per-slot modular address offset alongside the original
+five source tokens. RSTK=C saves the relation, C=RSTK restores it, returns emit
+it as a consumed target, and calls clear the overwritten slot offset before
+publishing a generated return. Invalid offsets and generated/adjusted mixtures
+are rejected. Tests cover all eight ring slots, four offsets, push/pop, return,
+call overwrite and failure atomicity. An initial test caught a missing call
+clear; the final implementation passes all thirteen ASan/UBSan targets.
+
+The previously unknown 81BE payload is D0=0x1b86b, sourced from the pointer
+at 0x88d9e plus five. The relation was lost at the earlier RSTK save/restore,
+not in 81BE. Both models now retain it through the fifth store and continue
+66 instructions to 0xb247. All 35 consumed address uses and payload dependencies
+merge into 140 physical source cells (four changed); the research constraint
+buffer grows from 128 to 192 entries. This is not a production capacity claim.
+
+Actual catalog growth with those repairs passes original-ROM replay through
+all 66 steps on both models. All 27 stored digits are checked at relocated
+destinations; stale RAM/ROM/native guards and conflicting edits each reject with
+zero RAM/native/PC writes. The first replay check used the fifth store's old
+address and was corrected to follow its moved destination. The 66-step path
+also reads a preceding shadow write: original guards now use the original
+memory value after verifying the observed value against the retained overlay.
+Simulated post-store data is not an original pre-mutation guard. Earlier failed
+reports remain separate from the final passing follow-writeback-v2 evidence.
+
+Fresh two-model Stock entry/return/catalog checks, six launcher audits and ARM
+analysis pass; maintained Stock remains 59 steps/four stores. The ARM execution
+step own frame is 1856 bytes; aggregate nested stack bounds are not established
+by this measurement. Next opcode 805 at 0xb247 invokes the native configuration
+routine (0x24ad0), updating CPU configuration flags at 0xb9c in the captured path.
+It requires integration with the existing CONFIG/bank-route model, not merely
+scalar status-register emulation. Production Stage1 still stops at 0x67d2.
+
+Final evidence: /work/nov06-stack-relay-final/{follow/collected-execution.json,
+follow-plan/plan.json,follow-writeback-v2/writeback.json,stock.json,unit.log,
+analysis.json,artifact-audit.json}. Initial experiments remain under
+/work/nov06-stack-relation/. Local batch is not yet pushed; latest inspected
+PR31 head 7b9f1d35 remains queued. PR13 remains incomplete and PR14 retains its
+two pre-entry USB failures. No M8 milestone is marked complete.
