@@ -996,6 +996,19 @@ hpclang_unit(rpl_stock_view test_rpl_stock_view.c
     "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c")
 target_include_directories(test_rpl_stock_view PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    hpclang_unit(call_roots_shadow test_call_roots_shadow.c
+        "${HPCLANG_ROOT}/runtime/core/rpl-code.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-stock-view.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c")
+    target_include_directories(test_call_roots_shadow PRIVATE "${HPCLANG_ROOT}/include"
+        "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/platform/armtoolbox")
+    target_compile_options(test_call_roots_shadow PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(test_call_roots_shadow PRIVATE -Wl,--gc-sections)
+endif()
+
 hpclang_unit(rpl_bank_target test_rpl_bank_target.c
     "${HPCLANG_ROOT}/runtime/core/rpl-bank-target.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-stock-flash-data.c"

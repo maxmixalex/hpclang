@@ -671,8 +671,15 @@ struct execution_probe
     struct hpclang_rpl_code_step_uses first_use;
     uint32_t move_first, move_end, planned_uses, branches, changed_cells, rejected_plans;
     struct hpclang_rpl_code_store store;
-    uint32_t stores, stored_sources, rejected_reads;
+    uint32_t stores, stored_sources, checked_reads, d0_derived;
+    struct
+    {
+        uint32_t field, value, origin;
+    } shadow[5];
 };
+
+static int execution_shadow_value(void *context, uint32_t at, uint8_t *value, uint32_t *token);
+static int execution_shadow_read(void *context, uint32_t at, uint8_t *value);
 
 static int execution_observe(void *context, unsigned space, uint32_t at, uint8_t value)
 {
@@ -689,18 +696,23 @@ static int execution_observe(void *context, unsigned space, uint32_t at, uint8_t
 static int execution_token(void *context, unsigned data, uint32_t at, uint8_t value,
                            uint32_t *token)
 {
-    (void)context;
     (void)data;
-    (void)value;
-    *token = at + 1;
+    uint8_t expected;
+    uint32_t origin;
+    int result = execution_shadow_value(context, at, &expected, &origin);
+    if (result)
+        return result;
+    if (value != expected)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    *token = origin;
     return 0;
 }
 
 static int execution_plan_read(void *context, uint32_t at, uint8_t *value)
 {
     struct execution_probe *probe = context;
-    return hpclang_rpl_stock_view_saturn(&probe->view, at, value) &&
-           !execution_observe(context, HPCLANG_RPL_EXECUTION_CODE, at, *value);
+    ++probe->observations[HPCLANG_RPL_EXECUTION_CODE];
+    return execution_shadow_read(context, at, value);
 }
 
 static int execution_derive(void *context, uint32_t pc,
@@ -764,16 +776,46 @@ static uint32_t execution_shift(const struct execution_probe *probe, uint32_t va
     return value >= probe->move_first && value < probe->move_end ? value + 16 : value;
 }
 
-/* This maintained gate ends immediately after the first store. It deliberately
- * rejects every later execution read, so an original-memory reader can never
- * silently stand in for a simulated-memory overlay. Planning and guard readers
- * still inspect the original dependencies. No target memory is written. */
-static int execution_before_store_read(void *context, uint32_t at, uint8_t *value)
+/* Normalize aliases through the guarded original map. Store destinations are
+ * SRAM only and exclude native CPU state. Original dependency readers never
+ * consult this overlay: simulated values must not become original-memory guards. */
+static int execution_shadow_value(void *context, uint32_t at, uint8_t *value, uint32_t *token)
 {
     struct execution_probe *probe = context;
-    if (probe->stores)
+    if (at >= 0x100000)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct hpclang_rpl_code_origin_cell cell;
+    int result = execution_source(context, at + 1, &cell);
+    if (result)
+        return result;
+    uint32_t origin = at + 1;
+    if (probe->stores && cell.mapping == 1)
+        for (unsigned i = 0; i < 5; ++i)
+            if (probe->shadow[i].field == cell.field) {
+                cell.expected = probe->shadow[i].value;
+                origin = probe->shadow[i].origin;
+                break;
+            }
+    *value = (uint8_t)cell.expected;
+    *token = origin;
+    return 0;
+}
+
+static int execution_shadow_read(void *context, uint32_t at, uint8_t *value)
+{
+    uint32_t token;
+    return !execution_shadow_value(context, at, value, &token);
+}
+
+static int execution_collect_observe(void *context, unsigned space, uint32_t at, uint8_t value)
+{
+    struct execution_probe *probe = context;
+    if (space == HPCLANG_RPL_EXECUTION_CODE || space == HPCLANG_RPL_EXECUTION_DATA) {
+        /* shadow_read already guarded the original cell and mapping. */
+        ++probe->observations[space];
         return 0;
-    return hpclang_rpl_stock_view_saturn(&probe->view, at, value);
+    }
+    return execution_observe(context, space, at, value);
 }
 
 static int execution_store(void *context, const struct hpclang_rpl_code_store *store)
@@ -782,6 +824,7 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
     if (probe->stores || store->instruction != 0x2c3c || store->first || store->nibbles != 5 ||
         store->adjustment || store->address.value > 0xffffb)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t fields[5];
     for (unsigned digit = 0; digit < 5; ++digit) {
         struct hpclang_rpl_code_origin_cell cell;
         int result = execution_source(probe, store->address.value + digit + 1, &cell);
@@ -791,6 +834,10 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
             (cell.field >= probe->view.state_offset * 2 &&
              cell.field < (probe->view.state_offset + 0xc60) * 2))
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        fields[digit] = cell.field;
+        for (unsigned prior = 0; prior < digit; ++prior)
+            if (fields[prior] == cell.field)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
     }
     /* Resolve the stored bits without declaring them independent, unchanged
      * inputs. This fixture has already consumed all five sources as an address;
@@ -819,6 +866,11 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
         }
     }
     probe->store = *store;
+    for (unsigned digit = 0; digit < 5; ++digit) {
+        probe->shadow[digit].field = fields[digit];
+        probe->shadow[digit].value = ((uint32_t)store->value >> (4 * digit)) & 15;
+        probe->shadow[digit].origin = store->origins[digit];
+    }
     probe->stored_sources = covered;
     probe->stores = 1;
     return 0;
@@ -911,6 +963,12 @@ static int execution_visit(void *context, uint32_t pc,
         ++probe->planned_uses;
         if (!use->adjustment)
             continue;
+        if (probe->stores && !memcmp(use->origins, probe->store.origins, sizeof use->origins)) {
+            if (use->adjustment != 10)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            ++probe->d0_derived;
+            continue;
+        }
         uint32_t first = use->origins[0];
         if (!first || (probe->derived_uses && probe->derived_source != first - 1))
             return HPCLANG_RPL_SPAN_MALFORMED;
@@ -921,7 +979,7 @@ static int execution_visit(void *context, uint32_t pc,
         probe->derived_source = first - 1;
         probe->adjustment = use->adjustment;
     }
-    return state->control.pc == 0x2c3f && probe->expression_uses == 1 && probe->stores == 1;
+    return state->control.pc == 0x2a19d && probe->expression_uses == 1 && probe->stores == 1;
     /* This selected boundary is not a complete relocation certificate. */
 }
 
@@ -968,9 +1026,9 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
             goto done;
     const struct hpclang_rpl_execution_io execution = {
         {hpclang_rpl_stock_view_native, &probe->view},
-        {execution_before_store_read, probe},
-        {execution_before_store_read, probe},
-        execution_observe,
+        {execution_shadow_read, probe},
+        {execution_shadow_read, probe},
+        execution_collect_observe,
         execution_token,
         execution_visit,
         probe,
@@ -981,12 +1039,16 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count)
         goto done;
-    uint8_t unread = 0xa5;
-    if (execution.code.read_nibble(execution.code.context, probe->state.control.pc, &unread) ||
-        execution.data.read_nibble(execution.data.context, probe->store.address.value, &unread) ||
-        unread != 0xa5)
-        goto done;
-    probe->rejected_reads = 2;
+    for (unsigned digit = 0; digit < 5; ++digit) {
+        uint8_t code, data;
+        uint32_t token, at = probe->store.address.value + digit;
+        if (!execution.code.read_nibble(execution.code.context, at, &code) ||
+            !execution.data.read_nibble(execution.data.context, at, &data) || code != data ||
+            data != ((probe->store.value >> (4 * digit)) & 15) ||
+            execution_token(probe, 1, at, data, &token) || token != probe->store.origins[digit])
+            goto done;
+        ++probe->checked_reads;
+    }
     for (unsigned i = 0; i < probe->plan.count; ++i) {
         const struct hpclang_rpl_reference_edit *edit = &probe->edits[i];
         if (edit->expected != edit->value) {
@@ -1018,9 +1080,9 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     uint32_t length;
     if (hpclang_rpl_directory_find(&reader, home, (const uint8_t *)"EXECOBS", 7, &entry) ||
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
-        length != 229)
+        length != 237)
         goto done;
-    uint32_t words[28] = {4,
+    uint32_t words[29] = {5,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,
@@ -1047,8 +1109,9 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                           probe->rejected_plans,
                           probe->stores,
                           probe->stored_sources,
-                          probe->rejected_reads};
-    for (unsigned i = 0; i < 28; ++i)
+                          probe->checked_reads,
+                          probe->d0_derived};
+    for (unsigned i = 0; i < 29; ++i)
         if (probe_write_word(io, entry.object_address + 10 + i * 8, words[i], 8))
             goto done;
     result = 0;
