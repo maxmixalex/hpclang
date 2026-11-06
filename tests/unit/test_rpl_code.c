@@ -2591,9 +2591,9 @@ static void subtract_fields(void)
 {
     struct image code = {.size = 128, .fail = UINT32_MAX};
     const struct hpclang_rpl_reader reader = {read_nibble, &code};
-    static const unsigned firsts[] = {0, 0, 2, 0, 15, 3, 0, 0};
-    static const unsigned widths[] = {1, 1, 1, 3, 1, 12, 2, 16};
-    for (unsigned field = 0; field < 8; ++field)
+    static const unsigned firsts[] = {0, 0, 2, 0, 15, 3, 0, 0, 0};
+    static const unsigned widths[] = {1, 1, 1, 3, 1, 12, 2, 16, 5};
+    for (unsigned field = 0; field < 9; ++field)
         for (unsigned p = 0; p < 16; ++p)
             for (unsigned decimal = 0; decimal < 2; ++decimal) {
                 unsigned first = field == 0 ? p : firsts[field];
@@ -2609,14 +2609,15 @@ static void subtract_fields(void)
                 seed_origins(&origins);
                 origins.adjustment[HPCLANG_RPL_CODE_A] = 5;
                 struct hpclang_rpl_code_origins old = origins;
-                encode(&code, 0, 3, 0xa0b | (field << 4));
+                unsigned size = field == 8 ? 2 : 3;
+                encode(&code, 0, size, field == 8 ? 0xae : 0xa0b | (field << 4));
                 uint32_t length = 99;
                 assert(!hpclang_rpl_code_data_step(&reader, NULL, 0, 128, &values, &origins,
                                                    data_token, NULL, &length));
                 uint64_t expected = before.registers[HPCLANG_RPL_CODE_A] |
                                     ((decimal ? UINT64_C(0x9999999999999999) : UINT64_MAX) & mask);
                 assert(values.registers[HPCLANG_RPL_CODE_A] == expected);
-                assert(values.carry == 1 && values.decimal == decimal && length == 3);
+                assert(values.carry == 1 && values.decimal == decimal && length == size);
                 for (unsigned reg = 1; reg < 13; ++reg)
                     assert(values.registers[reg] == before.registers[reg]);
                 for (unsigned digit = 0; digit < 16; ++digit) {
@@ -2626,7 +2627,7 @@ static void subtract_fields(void)
                            (written || dependent ? 0 : old.registers[0][digit]));
                 }
                 assert(origins.adjustment[0] == (first < 5 ? 0 : 5));
-                for (unsigned digit = 0; digit < 3; ++digit) {
+                for (unsigned digit = 0; digit < size; ++digit) {
                     values = before;
                     origins = old;
                     length = 99;
@@ -2672,6 +2673,74 @@ static int retain_subtraction(void *context, uint32_t instruction,
     for (unsigned digit = 0; digit < 5; ++digit)
         tokens[digit] = f->bad_token && digit == 4 ? 0 : 0x400000 + 5 * f->count + digit;
     return f->error;
+}
+
+static void derived_address_subtraction(void)
+{
+    struct image code = {.size = 2, .fail = UINT32_MAX};
+    encode(&code, 0, 2, 0xae);
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    for (unsigned flags = 0; flags < 4; ++flags)
+        for (unsigned zero = 0; zero < 2; ++zero) {
+            struct hpclang_rpl_code_execution initial = {0};
+            seed_origins(&initial.origins);
+            initial.values.registers[0] = UINT64_C(0xfedcba9876500000) | (zero ? 0 : 0x10000);
+            initial.values.registers[2] = UINT64_C(0xabcdef0000000001);
+            initial.values.carry = initial.control.carry = flags & 1;
+            initial.values.decimal = flags >> 1;
+            initial.origins.adjustment[0] = 3;
+            initial.origins.adjustment[2] = 5;
+            initial.origins.registers[0][2] = 0;
+            struct hpclang_rpl_code_step_uses uses, sentinel;
+            memset(&sentinel, 0xa5, sizeof sentinel);
+            for (unsigned mode = 0; mode < 5; ++mode) {
+                struct hpclang_rpl_code_execution state = initial;
+                struct derived_fixture f = {.error = mode == 1   ? -77
+                                                     : mode == 2 ? 1
+                                                                 : 0,
+                                            .bad_token = mode == 3};
+                uses = sentinel;
+                int result = hpclang_rpl_code_execution_step_derived(
+                    &reader, NULL, mode == 4 ? 1 : 2, &state, data_token, retain_subtraction, &f,
+                    &uses);
+                if (mode) {
+                    assert(result == (mode == 1   ? -77
+                                      : mode == 4 ? HPCLANG_RPL_SPAN_BOUNDS
+                                                  : HPCLANG_RPL_SPAN_MALFORMED));
+                    assert(!memcmp(&state, &initial, sizeof state));
+                    assert(!memcmp(&uses, &sentinel, sizeof uses));
+                    continue;
+                }
+                uint32_t expected =
+                    flags >> 1 ? (zero ? 0x99999 : 0x9999) : (zero ? 0xfffff : 0xffff);
+                assert(!result && !uses.count && state.control.pc == 2);
+                assert(state.values.registers[0] == (UINT64_C(0xfedcba9876500000) | expected));
+                assert(state.values.carry == zero && state.control.carry == zero);
+                assert(f.count == 1 && f.expression.first == 0 && f.expression.nibbles == 5 &&
+                       f.expression.value == expected && f.expression.carry == zero &&
+                       f.expression.decimal == flags >> 1);
+                assert(f.expression.left.adjustment == 3 && f.expression.right.adjustment == 5);
+                assert(!memcmp(f.expression.left.origins, initial.origins.registers[0],
+                               sizeof f.expression.left.origins));
+                assert(!memcmp(f.expression.right.origins, initial.origins.registers[2],
+                               sizeof f.expression.right.origins));
+                for (unsigned digit = 0; digit < 5; ++digit)
+                    assert(state.origins.registers[0][digit] == 0x400005 + digit);
+            }
+        }
+    for (unsigned reg = 0; reg <= 2; reg += 2)
+        for (unsigned digit = 0; digit < 5; ++digit) {
+            struct hpclang_rpl_code_execution state = {0};
+            state.values.decimal = 1;
+            state.values.registers[reg] = UINT64_C(10) << (4 * digit);
+            struct hpclang_rpl_code_execution saved = state;
+            struct hpclang_rpl_code_step_uses uses;
+            struct derived_fixture f = {0};
+            assert(hpclang_rpl_code_execution_step_derived(&reader, NULL, 2, &state, data_token,
+                                                           retain_subtraction, &f,
+                                                           &uses) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+            assert(!f.count && !memcmp(&state, &saved, sizeof state));
+        }
 }
 
 static void derived_execution(void)
@@ -2741,6 +2810,7 @@ static void derived_execution(void)
 int main(void)
 {
     derived_execution();
+    derived_address_subtraction();
     subtract_fields();
     generated_return_plans();
     computed_origin_transfers();

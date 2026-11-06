@@ -279,7 +279,7 @@ struct hpclang_rpl_execution_subtraction
  * not implement recursive planning. Caller owns bounded storage and guards
  * instruction/P/mode. Return zero or a negative error; positive is malformed.
  * On any step/collection failure discard speculative records and observations.
- * Currently emitted for BfA fields wholly within the low five digits only. */
+ * Emitted for EA and BfA fields wholly within the low five digits only. */
 typedef int (*hpclang_rpl_code_derive_fn)(
     void *context, uint32_t instruction, const struct hpclang_rpl_execution_subtraction *expression,
     uint32_t tokens[5]);
@@ -287,12 +287,12 @@ typedef int (*hpclang_rpl_code_derive_fn)(
 /* Evaluate one supported data instruction from caller-proven incoming values,
  * propagating origins alongside values. Supports inspected literals, copies,
  * exchanges, memory LOADS, D0/D1 immediate adjustments, SETHEX/SETDEC, A..D.A +/- 1
- * and BfA (A=A-C, fields 0..7). These arithmetic instructions use the proven
+ * and EA/BfA (A=A-C, address field / fields 0..7). These arithmetic instructions use the proven
  * decimal flag (0 hexadecimal, 1 decimal); selected decimal input digits above
  * nine are unsupported. Arithmetic clears the affected origins. Increment,
- * decrement and BfA ignore incoming carry, set carry to overflow/borrow and
+ * decrement and EA/BfA ignore incoming carry, set carry to overflow/borrow and
  * preserve unselected digits. This entry does not retain derived expressions;
- * execution_step_derived can retain supported BfA expressions through a callback.
+ * execution_step_derived can retain supported subtraction expressions through a callback.
  * No stores or control
  * transfers: an unsupported instruction stops the caller's walk. P, D0/D1 and
  * carry/decimal must be canonical. NEXT_PC captures deliberately receive unknown
