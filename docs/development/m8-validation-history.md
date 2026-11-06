@@ -5116,3 +5116,36 @@ Fresh evidence: /work/nov06-multistore/{unit.log,stock.json,artifact-audit.json,
 The finite fixture rejects overlapping stores and stops before unsupported 820;
 full recursive/BCD provenance and production integration remain open. Stage1
 still stops at 0x67d2. This is expanded maintained validation, not M8.0 completion.
+
+## 2026-11-06 - Native write mapping and 81BE qualification
+
+Local 0c08b03a guards the native Write[] page (CPU+0x404+4*page) and
+both I/O dispatch selectors (CPU+0xba0 and CPU+0xbb0) before publishing simulated
+stores. Readable SRAM alone is insufficient: a write-disabled/differently mapped
+page or an I/O window may behave differently. Each destination must resolve to
+the same ordinary physical SRAM cell through guarded read and write mappings.
+The actual maintained callback tests now reject all four of those conditions.
+Thirteen sanitizer targets, six launcher audits and ARM analysis pass. Own
+visit/store/source frames are 336/200/64 bytes, not aggregate stack bounds.
+Fresh HP49g+/HP50g Stock entry/catalog/attachment/unchanged-Flash/settled-return
+gates retain 59 steps, four stores and all 22 code/data/token readbacks.
+Evidence: /work/nov06-write-mapping/.
+
+Independent original-ROM 81BE tests pass 256 cases across both models, radices,
+carry branches, pointer boundaries and overlapping store/load addresses. Carry
+set jumps to ROM-qualified constant 0x2e15 without the store. Carry clear stores
+D0.A at B.A, increments B's low native word by five, sets D0=(A.A+5) modulo 20
+bits, then loads A.A and PC through that new D0 before incrementing D0 by five.
+The store precedes dependent reads: overlap must use the new payload.
+The evaluator does not yet implement 81BE; these tests establish semantics only,
+not origins or production mutation authority. 820 clears a zero HST mask in this
+path; full HST state handling is not claimed.
+
+Initial synthetic-ROM harness attempts used the wrong Write[] start (+0x400)
+and then retained active I/O windows; the overlapping ordinary-RAM expectation
+failed. Correcting the map and isolating I/O windows produced the final matrix,
+and exposed the missing maintained-gate checks fixed above. Aligned word reads
+also require padded synthetic memory at the final page. Driver, snapshots, ROMs
+and harness corrections are sealed in /work/nov06-native-store-next/qualification-audit.json;
+all cases are in rom-semantics.json. Prior tests did not qualify these new mapping
+conditions. Production Stage1 still stops at 0x67d2; full M8.0 remains open.
