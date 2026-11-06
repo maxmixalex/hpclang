@@ -4995,3 +4995,36 @@ launcher artifacts match, ARM analysis is clean, effects-step own frame remains
 artifact-audit.json, analysis.json). The source-bounded path report's old scope
 label was corrected to 38 steps after checking both numeric result records.
 No push while previous CI is pending; M8.0 and M8 remain incomplete.
+
+## 2026-11-06 - Maintained simulated-memory continuation
+
+Local 97b7fd12 replaces the first-store stop-only reader with a physical
+SRAM-cell overlay. Code/data/token readers normalize through the guarded original
+map and return stored values and source tokens across aliases. Dependency and
+source-plan readers retain original memory values; simulated read observations
+never become original-memory guards. The one-store fixture still requires all
+five source cells to be covered by its prior plan and excludes native CPU state,
+ROM and unsupported computed payloads. Failed stores publish no overlay.
+
+The maintained gate now reaches 38 steps/27 uses/102 source cells on HP49g+ and
+HP50g. It checks all five stored digits through code/data/token readback, a
+separate D0-derived use, three B-derived uses and four branches. EXECOBS version 5
+has 29 words. Catalog/attachment/unchanged-Flash/settled-return checks pass.
+Source/artifact manifests are sealed and rechecked. The first attempt failed
+before entry while creating EXECOBS with a 95-byte remote command. A shorter
+command creates the same 116-byte string; fixture-command-audit.json proves
+that this line alone changed and compiled app/host-test inputs are identical.
+The failed transfer is retained in /work/nov06-maintained-shadow/. The 38-step trace itself does
+not naturally read the stored destination again; explicit maintained readback
+checks and host alias tests cover that behavior instead of claiming it occurred.
+
+All thirteen sanitizer targets pass. The new Linux host target exercises the
+actual maintained callbacks with owned SRAM, distinct logical aliases, original
+value guards, token mismatch, stale maps, duplicate stores and rejection of
+unknown/adjusted sources, out-of-range destinations, native state and ROM. No
+target memory writes occur. Six launcher payloads match; ARM analysis has zero
+diagnostics and strict docs/Python/source checks pass. Evidence:
+/work/nov06-maintained-shadow-fixed/{unit.log,stock.json,artifact-audit.json,analysis.json}.
+Prior aceeea10 ROM and actual-move snapshot checks remain separate evidence.
+EA4 at 0x2a19d, production Stage1 integration and broader M8 remain open. The
+batch stays local while previous exact-head CI is still pending.
