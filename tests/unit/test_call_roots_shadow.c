@@ -26,6 +26,10 @@ static struct hpclang_rpl_code_store fixture(void)
     memset(&probe, 0, sizeof probe);
     section = 0x08000c1a;
     word(0x80 * 4, 0x08010000);
+    word(0x404 + 0x80 * 4, 0x08010000);
+    word(0x404 + 0xa0 * 4, 0x08010000);
+    word(0xba0, UINT32_MAX);
+    word(0xbb0, UINT32_MAX);
     word(0x90 * 4, 0x08020000);
     word(0xa0 * 4, 0x08010000); /* A distinct logical page aliases the store. */
     ram[0x20000] = 0xde;
@@ -170,7 +174,7 @@ int main(void)
     assert(!execution_shadow_read(&probe, 0xa0002, &unread) && unread == 99);
     assert(hpclang_rpl_reference_guards_validate(&guards, probe.guards, guard_count) < 0);
 
-    for (unsigned mode = 0; mode < 5; ++mode) {
+    for (unsigned mode = 0; mode < 9; ++mode) {
         store = fixture();
         if (mode == 0)
             store.adjustment = 1;
@@ -182,6 +186,14 @@ int main(void)
             word(0x80 * 4, 0x08000000); /* Native CPU state. */
         if (mode == 4)
             word(0x80 * 4, 0); /* Immutable ROM. */
+        if (mode == 5)
+            word(0x404 + 0x80 * 4, 0x08018000); /* Different write alias. */
+        if (mode == 6)
+            word(0x404 + 0x80 * 4, 0); /* Write-disabled page. */
+        if (mode == 7)
+            word(0xba0, store.address.value >> 6); /* I/O nibble window. */
+        if (mode == 8)
+            word(0xbb0, store.address.value >> 12); /* I/O page window. */
         assert(execution_store(&probe, &store) < 0 && !probe.stores);
         for (unsigned i = 0; i < 5; ++i)
             assert(!probe.shadow[i].field && !probe.shadow[i].value && !probe.shadow[i].origin);

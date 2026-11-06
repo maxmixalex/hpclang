@@ -824,6 +824,32 @@ static int execution_collect_observe(void *context, unsigned space, uint32_t at,
     return execution_observe(context, space, at, value);
 }
 
+/* The native ROM store path has its own Write[] table and two I/O
+ * dispatch windows. A readable SRAM alias alone does not qualify a write. */
+static int execution_write_cell(struct execution_probe *probe, uint32_t at,
+                                struct hpclang_rpl_code_origin_cell *cell)
+{
+    uint32_t words[3] = {0};
+    const uint32_t offsets[3] = {0x404 + 4 * (at >> 12), 0xba0, 0xbb0};
+    for (unsigned word = 0; word < 3; ++word)
+        for (unsigned digit = 0; digit < 8; ++digit) {
+            uint8_t value;
+            if (!execution_native_read(probe, offsets[word] * 2 + digit, &value))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            words[word] |= (uint32_t)value << (4 * digit);
+        }
+    if (words[1] == (at >> 6) || words[2] == (at >> 12) || words[0] < 0x08000000 ||
+        words[0] > 0x0807f800)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    int result = execution_source(probe, at + 1, cell);
+    if (result)
+        return result;
+    uint32_t physical = (words[0] - 0x08000000) * 2 + (at & 0xfff);
+    if (cell->mapping != 1 || cell->field != physical)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    return 0;
+}
+
 static int execution_store(void *context, const struct hpclang_rpl_code_store *store)
 {
     struct execution_probe *probe = context;
@@ -840,7 +866,7 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
     uint32_t fields[8], origins[8];
     for (unsigned digit = 0; digit < store->nibbles; ++digit) {
         struct hpclang_rpl_code_origin_cell cell;
-        int result = execution_source(probe, store->address.value + digit + 1, &cell);
+        int result = execution_write_cell(probe, store->address.value + digit, &cell);
         if (result)
             return result;
         if (cell.mapping != 1 || cell.field >= 0x100000 ||
