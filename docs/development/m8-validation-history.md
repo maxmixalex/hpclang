@@ -4644,3 +4644,28 @@ all-use mutation integration and public library/Port1 acceptance stay open.
 #18 has eleven successful workflows and one pending ci-evidence publisher
 (job 127325531362); no acceptance/merge yet. #19's investigated HTTP 504 retry
 is queued, not passed. Historical failures remain retained.
+
+## 2026-11-06 — Continuation boundary and remote delivery audit
+
+Previous turn made progress: generated return producer validation was pushed
+in 98094351. Fresh original-ROM observation now records 81 dispatch states per
+model without emulator errors. The C collector matches the first 24 transitions
+(all registers, flags, PC and return stack), then returns UNSUPPORTED at 0x2900
+on B6A. This identifies the next implementation gap; the remaining original-ROM
+trace is observational evidence, not supported execution or complete coverage.
+Evidence: /work/nov06-continuation-arm/{hp49gplus,hp50g}.json and
+/work/nov06-continuation-check/collected-execution.json. Snapshot/ROM hashes are
+checked against the original entry; prior sealed reports are preserved.
+
+#19 afc9e70f passes all seven workflows and 197 jobs, including both previously
+failed toolchain-download jobs, and is merged as 89fe4a44. Installed-SDK and
+independent four-case console/FAT/return evidence were rechecked before merge.
+#13 e8ad129f and #18 1b24a09f each pass all twelve workflows, 390 jobs and two
+intentional skips; neither is merged yet following the main update.
+#14 384ae39d has 400 passing jobs, two skips and two failed Stock jobs:
+127337979669 (hp39gs system-services) and 127337980238 (hp39gplus display).
+Both logs show USB host-gate failure before application entry. Root causes
+remain unresolved; no rerun requested. #31 98094351 has two failed Quality jobs
+127654849622/127654830338, both reporting only stage1.c clang-format violations.
+The C correction changes whitespace only. Full checking also found Python line wrapping in call_roots.py; its correction preserves the AST. All 621 native files and 146 LF-normalized Python files pass formatting. Remaining CI jobs are ongoing.
+Logs: research/nov06-ci-<job>.log. No milestone is newly declared complete.

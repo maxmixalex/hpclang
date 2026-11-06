@@ -454,20 +454,46 @@ static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const ui
                 /* Stock save selects its copy. Keep the caller's contexts in
                  *
                    GC-traced native bindings and restore on success or error. */
-                0x9660u, 0x3f063u,                  /* CONTEXT@ dvbind */
-                0x126c6u, 0x3f063u,                 /* PGMCXT@ dvbind */
-                0x126e6u, 0x3f063u,                 /* NOTESCXT@ dvbind */
-                0x12706u, 0x3f063u,                 /* apletPTR@ dvbind */
-                0x565cu, 0x2d9du,                   /* ERRSET :: */
-                source, 0x7665u, 0x3f66eu, 0x775cu, /* RclAplet?Err */
-                saturn_base + HP39P_VARIABLE_OBJECT_NIBBLE, 0x7665u, 0x3f3cbu, 0x775cu, 0x312bu,
-                0x56b6u, 0x2d9du,  /* ; ERRTRAP :: */
-                0xfdaeu, 0x126f6u, /* 1GETABND apletPTR! */
-                0xfdaeu, 0x126d6u, /* 1GETABND NOTESCXT! */
-                0xfdaeu, 0x126b6u, /* 1GETABND PGMCXT! */
-                0xfdaeu, 0x960eu,  /* 1GETABND CONTEXT! */
-                0x56cfu, 0x312bu,  /* ERRJMP ; */
-                0xfdaeu, 0x126f6u, 0xfdaeu, 0x126d6u, 0xfdaeu, 0x126b6u, 0xfdaeu, 0x960eu, 0x4049u,
+                0x9660u,
+                0x3f063u, /* CONTEXT@ dvbind */
+                0x126c6u,
+                0x3f063u, /* PGMCXT@ dvbind */
+                0x126e6u,
+                0x3f063u, /* NOTESCXT@ dvbind */
+                0x12706u,
+                0x3f063u, /* apletPTR@ dvbind */
+                0x565cu,
+                0x2d9du, /* ERRSET :: */
+                source,
+                0x7665u,
+                0x3f66eu,
+                0x775cu, /* RclAplet?Err */
+                saturn_base + HP39P_VARIABLE_OBJECT_NIBBLE,
+                0x7665u,
+                0x3f3cbu,
+                0x775cu,
+                0x312bu,
+                0x56b6u,
+                0x2d9du, /* ; ERRTRAP :: */
+                0xfdaeu,
+                0x126f6u, /* 1GETABND apletPTR! */
+                0xfdaeu,
+                0x126d6u, /* 1GETABND NOTESCXT! */
+                0xfdaeu,
+                0x126b6u, /* 1GETABND PGMCXT! */
+                0xfdaeu,
+                0x960eu, /* 1GETABND CONTEXT! */
+                0x56cfu,
+                0x312bu, /* ERRJMP ; */
+                0xfdaeu,
+                0x126f6u,
+                0xfdaeu,
+                0x126d6u,
+                0xfdaeu,
+                0x126b6u,
+                0xfdaeu,
+                0x960eu,
+                0x4049u,
                 0x312bu, /* StoAplet */
             };
             return hp39_write_operation_helper(words, sizeof(words) / sizeof(words[0]));

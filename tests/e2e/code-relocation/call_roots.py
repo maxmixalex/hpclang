@@ -45,10 +45,7 @@ def attachment_records(read):
     if count > (0x100000 - home - 8) // 13:
         raise ValueError("Invalid native attachment extent")
     return [
-        tuple(
-            read(home + 8 + 13 * i + offset, width)
-            for offset, width in ((0, 3), (3, 5), (8, 5))
-        )
+        tuple(read(home + 8 + 13 * i + offset, width) for offset, width in ((0, 3), (3, 5), (8, 5)))
         for i in range(count)
     ]
 
@@ -78,10 +75,7 @@ def verify_bindings(before, read, *, removed=False):
     else:
         raise ValueError("Missing native Port 0 terminator")
     expected = [] if removed else matches
-    if (
-        len(matches) != 1
-        or [record for record in records if record[0] == 123] != expected
-    ):
+    if len(matches) != 1 or [record for record in records if record[0] == 123] != expected:
         raise ValueError("Catalog binding does not identify the Port 0 fixture")
 
 
@@ -98,8 +92,7 @@ def package(launcher, name):
     program += word(0x2911) + word(MARKER) + word(0x312B)
     program += "0" * (len(program) % 2)
     return b"HPHP49-C" + bytes(
-        int(program[i], 16) | int(program[i + 1], 16) << 4
-        for i in range(0, len(program), 2)
+        int(program[i], 16) | int(program[i + 1], 16) << 4 for i in range(0, len(program), 2)
     )
 
 
@@ -143,9 +136,7 @@ def verify_cache_lookup_program(read):
     )
     actual = "".join(format(read(lookup + i, 1), "x") for i in range(len(expected)))
     if actual != expected:
-        raise ValueError(
-            "ROM did not resolve PrRUN to the original Stock program encoding"
-        )
+        raise ValueError("ROM did not resolve PrRUN to the original Stock program encoding")
     return actual
 
 
@@ -163,9 +154,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
     original_records = catalog_records(before)
     original_attachments = attachment_records(before)
     if sum(record[0] == 275 for record in original_attachments) != 1:
-        raise ValueError(
-            "Call-root fixture requires one genuine library-275 attachment"
-        )
+        raise ValueError("Call-root fixture requires one genuine library-275 attachment")
     if 123 in original_ids:
         raise ValueError("Call-root fixture requires an unregistered library 123")
     results = []
@@ -227,9 +216,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             raise ValueError("Call-root fixture changed Flash")
         read = native_words((state / "sram").read_bytes(), flash)
         observation = home_string(read, b"ENTRYOBS")
-        words = verify_entry(
-            observation, (build / "launchers" / f"{args.model}.bin").read_bytes()
-        )
+        words = verify_entry(observation, (build / "launchers" / f"{args.model}.bin").read_bytes())
         execution = struct.unpack("<16I", home_string(read, b"EXECOBS"))
         if (
             execution[0:3] != (1, 1, 23)
@@ -244,9 +231,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             or execution[12:15] != (2, 0x806F3, 0xFFFF6)
             or execution[15] != 1
         ):
-            raise ValueError(
-                "Native execution collection/guard observation is incomplete"
-            )
+            raise ValueError("Native execution collection/guard observation is incomplete")
         (case / "entry.json").write_text(
             json.dumps(
                 dict(
@@ -356,9 +341,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                 if not field or field < 0x80000:
                     return field
                 if not cache_start <= field <= cache_end - 15:
-                    raise ValueError(
-                        "Fixture HOME field is outside reviewed cache storage"
-                    )
+                    raise ValueError("Fixture HOME field is outside reviewed cache storage")
                 return field + 16
 
             expected_attachments = [
@@ -371,9 +354,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             "native-cache-lookup",
             "native-cache-message",
         ):
-            expected_attachments += [
-                record for record in original_attachments if record[0] == 275
-            ]
+            expected_attachments += [record for record in original_attachments if record[0] == 275]
         if name in ("native-cache-lookup", "native-cache-message"):
             original = next(r for r in original_attachments if r[0] == 275)
             current = next(r for r in attachment_records(read) if r[0] == 275)
@@ -388,26 +369,19 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                     or read(new + 5) != before(old + 5)
                     or read(new + 10) != before(old + 10)
                 ):
-                    raise ValueError(
-                        "New wrapper differs from original table/switch identity"
-                    )
+                    raise ValueError("New wrapper differs from original table/switch identity")
             expected_attachments[-1] = current
             if name == "native-cache-lookup":
                 verify_cache_lookup_program(read)
             else:
                 verify_cache_message(read)
         if attachment_records(read) != expected_attachments:
-            raise ValueError(
-                "Native call did not preserve the expected HOME attachments"
-            )
+            raise ValueError("Native call did not preserve the expected HOME attachments")
         if name in ("native-new-message", "native-missing-message"):
             message = home_string(read, b"NEWMSG")
             if name == "native-new-message" and message != b"hpclang library message":
                 raise ValueError("Newly registered library message was not resolved")
-            if (
-                name == "native-missing-message"
-                and message == b"hpclang library message"
-            ):
+            if name == "native-missing-message" and message == b"hpclang library message":
                 raise ValueError("Unregistered library message unexpectedly resolved")
         results.append(
             dict(
