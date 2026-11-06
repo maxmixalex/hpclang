@@ -4966,3 +4966,32 @@ written, before the handler completes, so matching only saturn_pc would omit its
 last D0 update. This is investigation, not completed continuation qualification.
 The batch stays local while previous exact-head CI runs; #14's two pre-entry USB
 failures remain unresolved. M8.0 and M8 remain incomplete.
+
+## 2026-11-06 - Native 81B1 continuation
+
+Local aceeea10 implements A.A=read5(D0), PC=read5(A.A), D0+=5 with
+three consumed-address records. A retains upper bits and receives loaded origins;
+D0 retains its original origins plus a modular five-digit offset. Native D0
+increments beyond the canonical 20-bit range are rejected, not wrapped. Errors
+publish neither state nor uses. Tests cover all dependent digits, unavailable or
+malformed reads, negative/positive token errors, instruction truncation, missing
+memory, bounds, unknown D0 origin and offset wrap, with full-state preservation.
+
+All twelve sanitizer targets pass. Original ROM executes 144 independent cases
+across two models, page/address edges, target extremes and carry/decimal flags;
+all captured register/stack/PC fields match, with source memory unchanged. Full
+captured C paths reach 38 steps and stop at unsupported EA4 at 0x2a19d. All 27
+address uses enter one 102-cell plan (four changed digits, four branches).
+Actual catalog moves replay 38 original-ROM transitions and verify the five
+stored nibbles; four stale/conflict cases per model remain zero-write.
+
+Fresh maintained HP49g+/HP50g Stock entry, first-store boundary, catalog,
+attachment, unchanged-Flash and settled-return gates pass at 34 steps. Those
+gates still reject post-store execution reads; the 38-step result uses the
+research physical-alias overlay and is not live production closure. All six
+launcher artifacts match, ARM analysis is clean, effects-step own frame remains
+1808 bytes, and strict docs/source checks pass. Evidence: /work/nov06-native-next/
+(unit.log, rom-matrix.json, path/, plan/, writeback/, stock.json,
+artifact-audit.json, analysis.json). The source-bounded path report's old scope
+label was corrected to 38 steps after checking both numeric result records.
+No push while previous CI is pending; M8.0 and M8 remain incomplete.
