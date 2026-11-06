@@ -4757,3 +4757,46 @@ headers, platform, E2E, tools, CMake and workflow trees equal green e8ad129f.
 all-six Direct/Stock resource evidence is retained, not rerun or newly claimed.
 Its new integration still requires CI; #18 is also queued/running. #14's two
 pre-entry USB failures remain unresolved. M8 is incomplete.
+
+## 2026-11-06 — Automatic arithmetic expression recording in collection
+
+Implementation c1c7bf87 adds an optional caller-owned derivation callback to
+the execution collector. The derived evaluator records BfA fields wholly within
+the low five digits, using original operands and observed result/borrow. The
+callback returns five nonzero result-fact tokens in a separate namespace.
+Ordinary copies/exchanges propagate these tokens; partial overwrites replace
+only affected facts. Later records can refer to earlier facts, but recursive
+planning/partial-expression expansion remain separate work. Physical resolvers
+must reject expression tokens; they are not writable memory addresses.
+Legacy evaluator entry points retain their prior behavior with no callback.
+Failure leaves step outputs unchanged; all speculative callback records must
+be discarded if a step or collection fails. Caller supplies bounded storage.
+
+Twelve sanitizer targets pass, including callback errors/invalid tokens,
+copy-to-PC propagation, partial literal overwrite and nested record references.
+Both captured original-ROM paths reach a deliberate 30-step boundary at 0x2c34,
+with all 19 consumed uses carrying original/result facts or a generating call.
+One expression is recorded automatically at 0x2900 and consumed at 0x2903.
+Injected recorder failure stops at 24 completed steps with no arithmetic-state
+publication. The first Python-driver run failed on ctypes pointer slice
+assignment; corrected per-element assignment passes. Failed output directory
+is preserved separately from /work/nov06-derived-path-final/.
+
+The maintained Stock gate now records EXECOBS version 2 (80 bytes): 30 steps,
+19 uses, one recorded/consumed subtraction, and seven source constraints.
+Both HP49g+/HP50g fresh runs pass guard revalidation, catalog/attachment checks,
+unchanged Flash and settled return; source/artifact/state hashes are sealed and
+rechecked. HP49g+ observes 91 guards and code/data/native/PC reads 530/75/256/8.
+The current gate validates unchanged expression sources; it does not perform a
+new expression-based native relocation. The separate physically normalized
+source proof retains seven stale controls and prior-use conflict rejection on
+both models. Evidence: /work/nov06-derived-collection/{retest.log,stock.json,
+artifact-audit.json,source-proof.json,code.plist,code.su} and
+/work/nov06-derived-path-final/{collected-execution.json,operands.json}.
+
+All six launchers pass independent payload/decompression/prefix audit. ARM
+analysis has zero diagnostics; own frames are data evaluator 1416, derived
+execution step 1720 and legacy wrappers 32/24 bytes, not total call-chain bounds.
+Formatting, Ruff and strict documentation checks pass. Current CI for #31,
+#13 and #18 is queued/running; no acceptance or merge is inferred. #14's known
+pre-entry USB failures remain unresolved. Full M8.0/M8 completion remains open.
