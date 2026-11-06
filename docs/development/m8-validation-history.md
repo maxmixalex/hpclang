@@ -5028,3 +5028,37 @@ diagnostics and strict docs/Python/source checks pass. Evidence:
 Prior aceeea10 ROM and actual-move snapshot checks remain separate evidence.
 EA4 at 0x2a19d, production Stage1 integration and broader M8 remain open. The
 batch stays local while previous exact-head CI is still pending.
+
+## 2026-11-06 - EA subtraction and four-store captured continuation
+
+Local c8eb3166 adds the two-nibble EA encoding of A=A-C.A. Earlier
+roadmap references to EA4 included the first nibble of the following instruction;
+EA alone is the subtraction. It reuses the existing subtraction relation and
+numeric evaluator, preserves upper digits, ignores incoming carry and records
+borrow. Tests cover all P settings, both radices, origin clearing/derived facts,
+unknown operand origins, callback rejection, bounds and invalid BCD inputs.
+All thirteen sanitizer targets and 64 independent original-ROM cases pass.
+
+Both captured paths advance to 59 steps with four scratch stores and stop at
+unsupported 820 at 0x2d9f. Every modeled register/carry/mode/return-stack transition
+matches the retained original-ROM trace. An old one-store assertion correctly
+stopped the first exploratory driver; the expanded run retains all four records.
+The second subtraction's unchanged operands and eighteen known payload digits
+join all thirty consumed addresses in a 125-cell normalized plan. Four source
+cells change; seven branch encodings remain unchanged. Four scalar digits stored
+at 0x2a1c1 have unknown origins after increment: this gap is explicitly retained,
+not silently treated as original source memory or claimed as full provenance.
+
+Actual catalog moves replay all 59 original-ROM transitions and verify all 22
+stored physical nibbles on both snapshots. Four stale/conflict controls per model
+remain zero-write. These finite replays do not discharge the missing scalar
+relation or general continuation obligations. Collection/report hashes remain
+consistent with the plan and replay input seals. Evidence:
+/work/nov06-address-subtract/{unit.log,rom-matrix.json,path-qualified/,plan/,writeback/}.
+
+Fresh maintained HP49g+/HP50g Stock gates still stop at 38 steps, retaining their
+single-expression/single-store fixture, source readback, catalog/attachment,
+unchanged Flash and settled return. Six launcher payloads match; ARM analysis is
+clean (effects-step own frame 1808 bytes); strict docs/source checks pass. Those
+checks are in stock.json, artifact-audit.json and analysis.json beside the above.
+The batch remains local while previous CI is pending; M8.0/M8 remain incomplete.
