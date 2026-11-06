@@ -4278,3 +4278,13 @@ HPC payload/memory report and the original bundled emulator/tools. Only existing
 USB event logging is enabled. The diagnostic is running; no transport fix or
 successful replay is inferred. Inputs and results live at
 /work/nov05-pr27-usb-replay/replay.json.
+
+
+## 2026-11-06 — Environment integration after filesystem acceptance
+
+Integration 8956de50 includes accepted main 89fe4a44. Only roadmap/history
+conflicted; both historical additions are retained. Runtime setup and its
+regression test blobs are byte-identical to previously green 1b24a09f. All
+four unittest cases, Ruff, normalized-shell ShellCheck, strict docs and diff
+checks pass. Previous exact-head CI passed twelve workflows, 390 jobs and
+two intentional skips. The new integration must pass fresh CI before merge.
