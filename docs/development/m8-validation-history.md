@@ -4601,3 +4601,46 @@ complete public mutation planning remain open. M8.0 is incomplete.
 HTTP 504 failures. A failed-jobs-only rerun was accepted; no retry result was
 polled this turn. Original failures remain in history and acceptance is pending.
 Request record: research/nov05-toolchain-retry.json.
+
+## 2026-11-05 — Generated return producer validation
+
+Implementation 6816ae8d records call PC+1 separately from nibble origins in
+simulated return-stack slots. Calls overwrite stale provenance, nested calls
+retain their own producers, and returns consume/clear the corresponding tag.
+C/RSTK transfers conservatively discard tags instead of pretending a generated
+value is an original stored field. Ordinary source planning rejects tagged uses.
+
+hpclang_rpl_code_generated_return_plan re-inspects the guarded producing call,
+checks the observed old fallthrough and requires the proposed return to equal
+the relocated call's fallthrough. It returns any branch-operand patch through
+the existing qualified branch planner; it never invents a return-field write.
+Caller still proves mapping identity, complete instruction lifetime, guards and
+replacement semantics. Zero proves this relation only, not a complete plan.
+
+Twelve sanitizer targets pass. New tests cover nested calls at all stack
+cursors, overwrite/pop behavior, relative and absolute calls, source-only,
+target-only and combined movement, contraction, exclusive move endpoints,
+20-bit wrap, split instructions, read failures and malformed source records.
+ARM analysis has zero diagnostics; execution_step/control_step/generated-plan
+own frames are 1680/336/128 bytes, not total call-chain bounds. All six launcher
+payloads pass independent audit; strict docs and source quality checks pass.
+
+Both fresh live Stock cases validate one generated return against its original
+call and guard the additional reads. They retain 23 steps, 17 uses, two B-derived
+uses, catalog/attachment checks and settled return. The saved-state C trace
+identifies return 0x88996 as produced by call 0x8898f; no consumed use in this
+bounded trace lacks either original source tokens or a generating call.
+Evidence: /work/nov05-generated-execution/{unit.log,stock.json,artifact-audit.json,
+collected-execution.json,rom-matrix.json,code.plist}.
+
+Generated-return validation joins the separately qualified source/derived
+repair fixture. Both catalog moves perform 10658 nibble writes and continue
+through all 23 original-ROM steps to 0x28fc. Nine stale/conflict/unknown or
+incorrect-producer controls per model reject with zero writes and unchanged
+state. Evidence: /work/nov05-generated-repair/writeback.json; reproducer:
+research/nov05-generated-writeback.{c,py}. Remaining continuation, complete
+all-use mutation integration and public library/Port1 acceptance stay open.
+
+#18 has eleven successful workflows and one pending ci-evidence publisher
+(job 127325531362); no acceptance/merge yet. #19's investigated HTTP 504 retry
+is queued, not passed. Historical failures remain retained.
