@@ -143,6 +143,82 @@ static void multiple_stores(void)
     }
 }
 
+static void overlapping_store(void)
+{
+    struct hpclang_rpl_code_store store = payload_fixture();
+    assert(!execution_store(&probe, &store));
+    store.instruction = 0x2a1e0;
+    store.address.value = 0x80040;
+    store.nibbles = 5;
+    store.value = 0xabcde;
+    store.adjustment = 0;
+    for (unsigned i = 0; i < 5; ++i)
+        store.origins[i] = 0x90001 + i;
+    assert(!execution_store(&probe, &store));
+    store.instruction = 0x2da2;
+    store.address.value = 0x80050;
+    store.value = 0xabce3;
+    store.adjustment = 5;
+    assert(!execution_store(&probe, &store));
+    assert(probe.stored_sources == 27);
+    store.instruction = 0xb265;
+    store.nibbles = 10;
+    store.adjustment = 0;
+    store.value = UINT64_C(0xabce3abcde);
+    for (unsigned i = 0; i < 5; ++i)
+        store.origins[i + 5] = 0x500041 + i;
+    unsigned char saved[sizeof probe.shadow];
+    memcpy(saved, probe.shadow, sizeof saved);
+    store.origins[5] = 0x500051; /* A future producer must not resolve recursively. */
+    assert(execution_store(&probe, &store) < 0);
+    assert(probe.stores == 5 && probe.stored_sources == 27 && !probe.payload_depth);
+    assert(!memcmp(saved, probe.shadow, sizeof saved));
+    assert(!hpclang_rpl_reference_edits_begin(&probe.plan, probe.edits, 192));
+    store.origins[5] = 0x500041;
+    assert(!execution_store(&probe, &store));
+    assert(probe.stores == 6 && probe.stored_sources == 32);
+    for (unsigned i = 0; i < 10; ++i) {
+        uint8_t value;
+        uint32_t token;
+        assert(!execution_shadow_value(&probe, 0xa0050 + i, &value, &token));
+        assert(value == ((store.value >> (4 * i)) & 15) && token == store.origins[i]);
+    }
+    assert(!memcmp(before, ram, sizeof ram));
+}
+
+static void configuration(void)
+{
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        struct hpclang_rpl_code_store store = fixture();
+        word(0xb9c, mode == 1 ? 0 : 3);
+        memcpy(before, ram, sizeof ram);
+        struct hpclang_rpl_code_configuration config = {.instruction = 0xb247,
+                                                        .value = (uint32_t)store.value};
+        memcpy(config.origins, store.origins, sizeof config.origins);
+        assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards,
+                                                   mode == 2 ? 32 : 1536));
+        if (mode == 3)
+            config.origins[0] = 0;
+        int result = execution_config(&probe, &config);
+        assert(!memcmp(before, ram, sizeof ram));
+        if (mode) {
+            assert(result < 0 && !probe.configurations);
+            if (mode == 2)
+                assert(probe.builder.error && !probe.builder.count);
+            continue;
+        }
+        assert(!result && probe.configurations == 1);
+        assert(probe.builder.count > 1200 && probe.builder.count <= 1536);
+        assert(probe.native_before[0xb9c] == 3 && probe.native_after[0xb9c] == 35);
+        const struct hpclang_rpl_reference_reader guards = {execution_guard_read, &probe};
+        assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));
+        ram[0x123] ^= 1;
+        assert(hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count) <
+               0);
+        assert(execution_config(&probe, &config) < 0); /* No unmodelled second CONFIG. */
+    }
+}
+
 struct body_test_memory
 {
     uint8_t data[32];
@@ -191,6 +267,8 @@ static void protected_body(void)
 
 int main(void)
 {
+    overlapping_store();
+    configuration();
     protected_body();
     multiple_stores();
     struct hpclang_rpl_code_store store = fixture();
