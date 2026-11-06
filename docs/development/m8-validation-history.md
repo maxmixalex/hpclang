@@ -4711,3 +4711,49 @@ are identical to green 1b24a09f. Integration still needs submission/new CI;
 neither branch was merged.
 #14 retains two diagnosed pre-entry host-gate transfer failures, unresolved.
 M8.0 and M8 overall remain incomplete.
+
+## 2026-11-06 — Two-operand source repair constraints
+
+Implementation 4a78bb52 adds hpclang_rpl_execution_plan_subtraction. It verifies
+the original result/borrow from recorded operands and the proposed result from
+both replacements. A borrow change rejects, preserving carry-dependent flow.
+All five left digits and only participating right digits enter the same
+normalized edit builder as other consumed values. Unchanged dependencies remain
+constraints; aliases merge only when expectations/replacements agree. Left
+modular offsets are inverted; adjusted right operands remain unsupported.
+The caller still captures the original operands, guards instruction/P/mode and
+proves the relation supplies the consumed value. No automatic expression
+retention/propagation or complete mutation permission is claimed.
+
+Twelve final sanitizer targets pass (/work/nov06-expression-final/retest.log,
+retest-inputs.json). Tests execute original and repaired operands through the
+C evaluator, cover decimal/hex borrow, source offsets, stale/unknown operands,
+capacity, aliases and unchanged dependencies. An intermediate assertion wrongly
+required a conflict on unused right high digits after dependency narrowing;
+the corrected case conflicts on a participating digit and separately proves
+unused high-digit alias changes are harmless. The original failed log is kept
+in unit.log; final retest passes all twelve targets.
+
+Both captured C paths retain pre-subtraction operands from the verified ROM
+trace. The actual result 0x2907 depends on five A-source digits at Saturn
+0xffec4..0xffec8 (SRAM) and two C-literal digits at 0x28fe..0x28ff (Flash).
+The proof resolves physical aliases and requires exactly these seven sources.
+Every stale-source control rejects. An earlier consumed value shares A's source;
+a locally valid change to 0x3907 is rejected when that earlier use stays fixed.
+No native/Flash writes occur. Proof: /work/nov06-expression-plan/source-proof.json;
+captured operands and 30-step comparisons: /work/nov06-expression-operands/.
+This closes a relation-planning gap, not collection/full-mutation integration.
+
+ARM analysis has zero diagnostics. Own frames for ordinary-use planning,
+subtraction planning and its arithmetic helper are 208/272/40 bytes, not total
+call-chain bounds. Formatting and diff checks pass. Existing execution paths
+and the prior maintained Stock gate are unchanged; no fresh Stock claim is
+made for this new caller-driven planning API.
+
+During the concrete mainline sanitizer wait, #13 integrates accepted main as
+46a4cc74. Only roadmap/history conflict; both histories are preserved. Runtime,
+headers, platform, E2E, tools, CMake and workflow trees equal green e8ad129f.
+37 verifier tests, three Aplet identity tests and strict docs pass. Earlier
+all-six Direct/Stock resource evidence is retained, not rerun or newly claimed.
+Its new integration still requires CI; #18 is also queued/running. #14's two
+pre-entry USB failures remain unresolved. M8 is incomplete.
