@@ -51,8 +51,97 @@ static struct hpclang_rpl_code_store fixture(void)
     return store;
 }
 
+static struct hpclang_rpl_code_store payload_fixture(void)
+{
+    struct hpclang_rpl_code_store store = fixture();
+    assert(!execution_store(&probe, &store));
+    store.instruction = 0x2a1ba;
+    store.address.value = 0x80020;
+    store.nibbles = 8;
+    store.value = 0x444abcde;
+    for (unsigned i = 0; i < 8; ++i)
+        store.origins[i] = 0x90001 + i;
+    assert(!execution_store(&probe, &store));
+    assert(probe.stores == 2 && probe.stored_sources == 13);
+    for (unsigned i = 0; i < 3; ++i)
+        ram[0x20008 + i] = 0;
+    struct hpclang_rpl_execution_subtraction fact = {
+        .left = {.value = 0xabcde}, .right = {.value = 0}, .nibbles = 5, .value = 0xabcde};
+    for (unsigned i = 0; i < 5; ++i) {
+        fact.left.origins[i] = 0x90001 + i;
+        fact.right.origins[i] = 0x90011 + i;
+    }
+    uint32_t tokens[5];
+    assert(!execution_derive(&probe, 0x2900, &fact, tokens));
+    assert(!execution_derive(&probe, 0x2a19d, &fact, tokens));
+    store.instruction = 0x2a1c1;
+    store.address.value = 0x80030;
+    store.nibbles = 4;
+    store.value = 0xabcdf;
+    store.adjustment = 1;
+    memcpy(store.origins, tokens, sizeof tokens);
+    memcpy(before, ram, sizeof ram);
+    return store;
+}
+
+static void multiple_stores(void)
+{
+    struct hpclang_rpl_code_store store = payload_fixture();
+    assert(!execution_store(&probe, &store));
+    assert(probe.stores == 3 && probe.stored_sources == 17);
+    for (unsigned i = 0; i < 4; ++i) {
+        uint8_t value;
+        uint32_t token;
+        assert(!execution_shadow_value(&probe, 0xa0030 + i, &value, &token));
+        assert(value == ((store.value >> (4 * i)) & 15));
+        assert(token == 0x500021 + i);
+        struct hpclang_rpl_code_origin_cell cell;
+        assert(execution_source(&probe, token, &cell) < 0);
+    }
+    store.instruction = 0x2a1e0;
+    store.address.value = 0x80040;
+    store.nibbles = 5;
+    store.value = 0xabcde;
+    store.adjustment = 0;
+    for (unsigned i = 0; i < 5; ++i)
+        store.origins[i] = 0x90001 + i;
+    assert(!execution_store(&probe, &store));
+    assert(probe.stores == 4 && probe.stored_sources == 22);
+    assert(execution_store(&probe, &store) < 0);
+    assert(!memcmp(before, ram, sizeof ram));
+    const struct hpclang_rpl_reference_reader guards = {execution_guard_read, &probe};
+    assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));
+
+    for (unsigned mode = 0; mode < 6; ++mode) {
+        store = payload_fixture();
+        if (mode == 0)
+            store.origins[4] = 0;
+        if (mode == 1)
+            store.value ^= 1;
+        if (mode == 2)
+            store.adjustment = 2;
+        if (mode == 3)
+            probe.payload_expression.decimal = 1;
+        if (mode == 4)
+            store.address.value = 0xa0002; /* Physical alias overlap. */
+        if (mode == 5) {
+            struct hpclang_rpl_reference_edit conflict = probe.edits[0];
+            conflict.value ^= 1;
+            probe.edits[0] = conflict; /* Subtraction's fixed operand conflicts. */
+        }
+        unsigned count = probe.stored_sources;
+        unsigned char saved[sizeof probe.shadow];
+        memcpy(saved, probe.shadow, sizeof saved);
+        assert(execution_store(&probe, &store) < 0);
+        assert(probe.stores == 2 && probe.stored_sources == count);
+        assert(!memcmp(saved, probe.shadow, sizeof saved));
+        assert(!memcmp(before, ram, sizeof ram));
+    }
+}
+
 int main(void)
 {
+    multiple_stores();
     struct hpclang_rpl_code_store store = fixture();
     assert(!execution_store(&probe, &store));
     assert(probe.stores == 1 && probe.stored_sources == 5);

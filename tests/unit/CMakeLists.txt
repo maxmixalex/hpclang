@@ -999,6 +999,7 @@ target_include_directories(test_rpl_stock_view PRIVATE "${HPCLANG_ROOT}/include"
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     hpclang_unit(call_roots_shadow test_call_roots_shadow.c
         "${HPCLANG_ROOT}/runtime/core/rpl-code.c"
+        "${HPCLANG_ROOT}/runtime/core/rpl-execution-plan.c"
         "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
         "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c"
         "${HPCLANG_ROOT}/runtime/core/rpl-stock-view.c"
