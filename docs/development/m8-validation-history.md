@@ -5180,6 +5180,10 @@ application round-trip failure loop, not a pre-entry USB failure. The specific
 condition inside that round trip remains unresolved. Artifact/log/state audit:
 research/nov06-pr31-detach-audit.json and research/nov06-pr31-failed-stock/.
 A focused current-build detach replay reuses the just-built payload under
-/work/nov06-current-detach/; its result must be inspected before claiming a fix.
+/work/nov06-current-detach/ and passes both local baselines. CI saved HOME spans
+about 166 KB versus about 115 KB locally; library 275 remains attached in CI
+but is removed in the successful local case. The full HOME snapshot allocation
+is a candidate cause, not yet proven. A matching large-HOME replay is needed.
+Comparison: /work/nov06-current-detach/state-comparison.json.
 No blind CI retry or acceptance. Production Stage1 remains at 0x67d2; M8.0/M8
 remain incomplete.
