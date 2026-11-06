@@ -5571,3 +5571,37 @@ Maintained expansion, production continuation and broader M8.0 remain open.
 Latest inspected PR31 CI has two successful and ten queued workflows; PR13 is
 still running. PR14 retains two unresolved pre-entry USB failures. No remote or
 milestone acceptance is claimed.
+
+## 2026-11-06 - Maintained 80-step continuation and fixture memory bound
+
+Local 8e561821 expands the maintained Stock execution fixture from 59 to 80 steps.
+It qualifies six writes, including the final same-destination overlap, retains
+producer relations for computed payloads, and checks all 32 final shadow cells
+through code/data readers and normalized aliases. Earlier overwritten payloads
+remain constrained. Producer indices strictly decrease and recursion is bounded;
+unknown/future producers reject without publishing an overlay.
+
+The CONFIG callback constrains its input, guards the full original native state,
+and uses the reviewed pure predictor. This fixture requires flags 3 -> 35 with
+all other native bytes identical; it rejects map changes or a second CONFIG.
+Thus its readers retain the proven unchanged mapping. General CONFIG modelling
+exists separately; this fixture does not qualify arbitrary mapping changes.
+
+Both fresh Stock models pass collection, normal return and catalog checks with
+38 consumed/planned address uses, 155 source constraints, six stores and 32 final
+verified cells and 1369 packed guards per model. EXECOBS is version 7, retaining
+its 116-byte size. The separate retained actual catalog-movement ROM replay already
+covers the same 80-step path; Stock collection alone is not that movement proof.
+Fourteen ASan/UBSan targets include new alias/overlap, future-producer, configuration
+mismatch, changed-state guard and capacity-rejection cases. Six launcher audits,
+Ruff and ARM analyzer pass. Own ARM frames: store 272 bytes, CONFIG 200 bytes,
+visitor 336 bytes; these do not establish an aggregate stack bound.
+
+The fixture has fixed capacities of 1536 packed guards, 192 source edits, six
+store records and 32 shadow cells. A compile-time assertion caps its heap object
+at 40 KiB on host and ARM. Full application peak memory remains unaccepted.
+Evidence: /work/nov06-eightystep-final/{stock.json,unit.log,analysis.json,
+artifact-audit.json,app-inputs.json}. Production Stage1 still stops at 0x67d2;
+reference closure, public libraries, Port1 and all retained Port2 goals remain.
+The local batch is unpushed while preceding PR31 CI remains incomplete. PR14's
+two pre-entry USB failures remain unresolved. No milestone acceptance is claimed.
