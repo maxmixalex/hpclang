@@ -5605,3 +5605,43 @@ artifact-audit.json,app-inputs.json}. Production Stage1 still stops at 0x67d2;
 reference closure, public libraries, Port1 and all retained Port2 goals remain.
 The local batch is unpushed while preceding PR31 CI remains incomplete. PR14's
 two pre-entry USB failures remain unresolved. No milestone acceptance is claimed.
+
+## 2026-11-06 - Conditional comparison qualification and production gap
+
+Production inspection confirms Stage1 publishes a bounded list of original
+stack/register cells. The maintained collector additionally needs guarded memory
+sources, computed relations and simulated stores; copying its results into the
+old pointer-only root list would not preserve those contracts.
+
+Both original-ROM traces now retain 1,001 dispatch states. With the preceding
+8e561821 runtime, the C collector agrees for 85 transitions and stops unsupported
+at 0xb283 (93A: C.X equals zero, followed by GOYES). The six stores and 32 final
+shadow cells remain unchanged. This extended diagnostic is not relocation proof
+beyond the retained 80-step replay, nor a claim of complete continuation coverage.
+Evidence: /work/nov06-long-continuation/{native-trace,collection}.
+
+Local 03a96178 adds a pure opcode-9 predicate inspector covering all sixteen field
+selectors and sixteen operations. It records selected operands, register indices,
+relation, taken result and encoded displacement; zero displacement is a conditional
+return, not a branch to the operand. Decimal mode does not alter comparison.
+Unknown encodings, bad P, truncated/invalid/unreadable instructions leave output
+unchanged. The constant-zero operand ignores the synthetic constant register.
+No execution/repair authorization is added; predicate preservation and source
+relations still need integration before the collector may cross this instruction.
+
+The C inspector matches 13,824 original-ROM cases per model (27,648 total),
+including P=0/7/15, six register patterns, both decimal modes, taken/untaken,
+positive/negative displacements and conditional returns across all stack cursors.
+The oracle checks the entire native state and next PC. Initial fixture failures
+exposed stale native P-field mask caches; the final matrix initializes coherent
+P and WP masks, and retains the original failures separately. This is numeric
+predicate qualification, not proof of arbitrary native-cache consistency.
+Evidence: /work/nov06-long-continuation/predicates-c/rom.json.
+
+Fourteen ASan/UBSan targets, fresh application build, six launcher audits, fresh
+two-model 80-step Stock/catalog/return checks and ARM analyzer pass. The inspector's
+own ARM frame is 72 bytes; aggregate stack and full application memory acceptance
+remain open. Evidence: /work/nov06-predicate/{unit.log,stock.json,plan-analysis.json,
+artifact-audit.json}. Runtime/launcher artifacts changed, so the previous Stock
+run was not substituted for this fresh validation. Local delivery remains unpushed;
+previous exact-head CI is incomplete and PR14's two pre-entry USB failures remain.
