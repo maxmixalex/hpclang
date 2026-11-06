@@ -2803,6 +2803,53 @@ removed by the maintained harness after its count check and montage creation.
 This local result supports delivery of the pacing correction, not acceptance
 of #26 or proof that it explains every original packet-loss event.
 
+### Historical PR18 transport/environment delivery
+
+The following records precede accepted #29; its retransmission fix is now on main. The remaining environment-entry change still requires current CI.
+
+Pacing-branch CI follow-up (local): failed job 121168675610 at fb7dd394
+reports Direct HP39gs watchdog result 0x46417b03. Its saved log and artifact
+12600331275 retain the failure; that compound assertion alone does not prove
+a unique cause. Commit 6074ccaf carries the existing deadline-aware wait and
+first-failure diagnostics from c5b88cab. Runtime and Kermit code are unchanged.
+All 18 Direct normal/exit/_Exit and six Stock immediate-exit cases pass on all
+six models; queue 55984 exits zero. Independent replay checks all 24 unique
+saved results, exact summary identity, settled return and payload hashes.
+Evidence: /work/oct26-kermit-watchdog/final-audit.json. The reused build mirror
+matches all 4031 audited inputs, including the materialized font archive's LFS
+SHA-256. Pinned formatting passes. This is local validation, not remote acceptance.
+Before this follow-up push, previous #21 has four queued checks; #18 retains
+the same failed job alongside incomplete jobs. #13/#14/#15/#17/#20 remain
+incomplete; #19's two checks pass but its base conflicts. Review:
+research/oct26-conditional-prepush-ci.json. Do not poll newly triggered CI;
+M8 remains open.
+
+M8 transfer reliability delivery (local acceptance): Kermit retransmissions now
+honor configured SEND PAUSE before sampling the RTT timestamp. A real PTY
+regression rejects the previous bundled server and passes with the patch,
+including repeated NAK turnaround, byte/CRC identity and the existing timeout,
+dropped/delayed ACK, Init-Info and subsequent-file checks. Local setup-runtime
+also accepts -- command to inherit bundled tools/libraries; four regressions,
+Ruff, ShellCheck and strict docs pass. Existing CI exports remain unchanged.
+
+Using the exact failed CI 40175276034 notebook payload and matching emulator,
+explicitly patched Kermit passes HP39gs transfer, three Stock launches, settled
+return and independent notebook pixels (queue 35554 exits zero). Evidence:
+/work/oct26-notebook-paced/report.json and server-sha256.txt. System-Kermit
+control also passes; this proves local acceptance, not elimination of every
+intermittent CI stall. Remote transport acceptance and broader M8 remain open.
+
+
+### 2026-11-04 PR18 remaining environment-entry delivery
+
+Submitted 0390e023 integrates accepted main into PR18. The remaining functional
+diff is setup-runtime.sh command execution with the portable PATH/library
+environment; runtime, watchdog and Kermit retry-pacing sources match main.
+Four real subprocess tests verify literal arguments/status, CI exports, missing
+bundled tool rejection and invalid syntax. Ruff, normalized-shell ShellCheck,
+strict docs and diff checks pass. The prior-head remote API returns no runs
+(research/nov04-pr18-previous-ci-unavailable.json); historical failed jobs remain
+unresolved evidence. New-head CI was not polled during submission.
 
 ### Original filesystem gate historical delivery notes
 
@@ -4171,6 +4218,25 @@ Runtime, platform, public headers and code-relocation test sources are unchanged
 from a0a31cb4. This is integration validation, not new runtime coverage or
 completion of the production memory-origin collector. Fresh CI remains required.
 
+## 2026-11-05 — Local runtime environment branch integration
+
+PR #18 previous exact head 0390e023 has 389 successful jobs, two skips and
+one cancelled Font Gallery evidence publisher; Runtime publishing succeeds.
+PR #19 has the complementary unresolved Runtime publisher cancellation, with
+Gallery publishing successful. Neither cancellation counts as acceptance.
+Audits: research/nov05-pending-ci-18.json and nov05-pending-ci-19.json.
+
+PR #18 now integrates accepted main 26140e1d as 1b24a09f. Only roadmap/history
+conflicted; history uses a union merge and the current roadmap is retained.
+Relative to accepted main, functional changes remain limited to the local
+setup-runtime command entry, its four tests and transport documentation.
+All four tests, Ruff, normalized ShellCheck and strict docs pass. The result
+was pushed after the previous-head audit; new CI was not inspected that turn.
+No milestone or original hardware/transfer failure is declared complete.
+
+The allocation/UI matrix additionally completes HP50g Stock and HP39g+ Direct,
+bringing saved passing cases to seven of twelve. The HP39g+ Stock process is
+confirmed live. Independent saved-artifact revalidation passes all seven completed cases, including source/artifact hashes, saved pixels, stack budgets, native release and lifecycle free lists. The partial report /work/nov05-allocation-ui-combined/independent-partial-audit.json explicitly has complete=false; full twelve-case acceptance remains pending.
 ## 2026-11-05 — Original HPGCC application integration and fresh SDK
 
 PR #19 local candidate 113e1a8f integrates accepted main 26140e1d. Only the
@@ -4212,3 +4278,13 @@ HPC payload/memory report and the original bundled emulator/tools. Only existing
 USB event logging is enabled. The diagnostic is running; no transport fix or
 successful replay is inferred. Inputs and results live at
 /work/nov05-pr27-usb-replay/replay.json.
+
+
+## 2026-11-06 — Environment integration after filesystem acceptance
+
+Integration 8956de50 includes accepted main 89fe4a44. Only roadmap/history
+conflicted; both historical additions are retained. Runtime setup and its
+regression test blobs are byte-identical to previously green 1b24a09f. All
+four unittest cases, Ruff, normalized-shell ShellCheck, strict docs and diff
+checks pass. Previous exact-head CI passed twelve workflows, 390 jobs and
+two intentional skips. The new integration must pass fresh CI before merge.
