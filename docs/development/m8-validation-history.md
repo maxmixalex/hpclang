@@ -5062,3 +5062,28 @@ unchanged Flash and settled return. Six launcher payloads match; ARM analysis is
 clean (effects-step own frame 1808 bytes); strict docs/source checks pass. Those
 checks are in stock.json, artifact-audit.json and analysis.json beside the above.
 The batch remains local while previous CI is pending; M8.0/M8 remain incomplete.
+
+## 2026-11-06 - Hex unit arithmetic source offsets
+
+Local 39d87747 preserves low-five-digit hexadecimal increment/decrement
+origins with a modular offset, including existing expression facts. Missing
+sources stay unknown. BCD numeric execution remains supported but clears origins;
+a binary offset does not establish BCD provenance. Carry/effect invariance under
+changed operands still requires separate qualification.
+
+Thirteen sanitizer targets and 512 original-ROM numeric boundary cases pass.
+Both 59-step captured paths retain two subtraction facts and four stores.
+Eighteen stored digits have physical sources; four computed digits are bound to
+the second subtraction plus one. Both subtraction operands are constrained
+unchanged by the same 125-cell repair plan, qualifying that bounded result and
+carry. Computed facts are never passed off as physical source cells. Actual
+catalog moves replay all 59 original-ROM transitions and verify all 22 stored
+digits; four stale/conflict controls per model remain zero-write.
+
+Fresh two-model maintained Stock entry/catalog/attachment/unchanged-Flash/settled
+return checks pass at the existing 38-step bound. Six launcher payload audits and
+ARM analysis pass. Evidence: /work/nov06-unit-source/ (unit.log, rom-matrix.json,
+path/, plan/, writeback/, stock.json, artifact-audit.json, analysis.json).
+Multiple-expression/store integration, 0x2d9f, generic recursive and BCD source
+relations remain open. Production Stage1 still stops at 0x67d2. This closes a
+bounded payload gap, not M8.0 or M8. The batch remains local pending prior CI.
