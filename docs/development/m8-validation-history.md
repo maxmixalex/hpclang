@@ -5488,3 +5488,53 @@ analysis.json,artifact-audit.json}. Initial experiments remain under
 /work/nov06-stack-relation/. Local batch is not yet pushed; latest inspected
 PR31 head 7b9f1d35 remains queued. PR13 remains incomplete and PR14 retains its
 two pre-entry USB failures. No M8 milestone is marked complete.
+
+## 2026-11-06 - Native CONFIG model and execution integration
+
+Local 94c023e8 adds a pure native CONFIG predictor covering every reviewed
+flag-dispatch arm: IO setup, size/base phases for main RAM/ERAM/port, bank-control
+routing, page-owner priorities, read/write maps, sentinels and conditional overlay
+caches. Out-of-range spans and active overlays reject before output changes;
+zero-length mappings retain the ROM's sentinel/overlay behavior. Input/output
+may alias exactly; there is no allocation or native write. Opaque physical words
+are predicted, not certified as accessible memory. ROM identity, guarded inputs
+and exclusive lifetime remain caller obligations.
+
+The final original-ROM matrix completes 7,029 cases per model (14,058 total),
+checking the handler returns, full SRAM, native write scope and in-place parity.
+It covers all 64 low flag states plus high no-op states, full-word C patterns,
+zero/power-of-two/non-power-of-two/maximum spans, owner priorities and overlay
+boundaries. Another 99 out-of-range combinations per model reject without
+publishing output; unsafe native out-of-range writes are not executed.
+
+New execution_step_native/collect_native entry points deliver CONFIG's C.A
+value, five source tokens and offset to a scratch callback. Existing entry
+points keep their ABI and still reject CONFIG without a callback. Tests verify
+metadata, flags, malformed/truncated/read-failed instructions, positive/negative
+callback errors and atomic execution/uses outputs. Native-map/reader updates
+and original guard retention remain the callback owner's responsibility.
+
+Both models pass 75-step C collection with CPU state and complete non-register
+native/map/cache comparisons against independently replayed ROM states. CONFIG
+changes flags 3 to 35 in this path. All 37 address uses and the configuration
+input merge into 150 original source cells (four changed). Actual catalog growth
+then replays all 75 steps and verifies five stores/27 relocated digits, native
+configuration/maps/caches, unchanged Flash and four zero-write rejection cases.
+The bounded research proof retains 6,712 original guards; it does not establish
+a production low-memory guard budget. A numeric probe reaches 80 steps, but its
+sixth overlapping store carries derived digits and is not relocation-qualified;
+the accepted bounded replay deliberately ends before that store at 0xb265.
+
+Fourteen ASan/UBSan targets, six launcher audits, fresh two-model Stock return/
+catalog gates and ARM analyzers pass. CONFIG's own ARM frame is 64 bytes; the
+execution-step own frame remains 1856 bytes, without an aggregate-stack claim.
+Maintained Stock remains 59 steps/four stores and production Stage1 remains at
+0x67d2. Fixed native-ROM targets, general recursive/BCD provenance, overlapping
+store planning and the broader M8.0 completion conditions remain open.
+
+Evidence: /work/nov06-config-final/{matrix-return/rom.json,path-75/collected-execution.json,
+plan-75/plan.json,writeback-75/writeback.json,native-trace,stock.json,unit.log,
+analysis.json,config-analysis.json,artifact-audit.json}. Local batch is unpushed;
+latest inspected PR31 head 7b9f1d35 still has twelve queued workflows. PR13 remains
+in progress; PR14 retains two unresolved pre-entry USB failures. No new CI or
+milestone acceptance is claimed.
