@@ -5645,3 +5645,42 @@ remain open. Evidence: /work/nov06-predicate/{unit.log,stock.json,plan-analysis.
 artifact-audit.json}. Runtime/launcher artifacts changed, so the previous Stock
 run was not substituted for this fresh validation. Local delivery remains unpushed;
 previous exact-head CI is incomplete and PR14's two pre-entry USB failures remain.
+
+## 2026-11-06 - Predicate-preserving plans and explicit execution callback
+
+Local 80431b07 adds plan_predicate: validate captured operand fields and original
+truth, require replacement truth unchanged, then constrain both selected sources
+through the existing normalized payload planner. Constant-zero right operands
+consume no fabricated source. Full-word unsigned comparisons, all six relations,
+changed outcomes, stale descriptors, missing sources, callback errors and capacity
+failures are tested; errors invalidate the builder. Instruction/P/field-selection
+qualification and producer guards remain explicit caller obligations.
+
+New step_predicates/collect_predicates entries require a predicate callback before
+publishing accepted opcode-9 execution. Legacy entry points preserve rejection.
+Taken/untaken GOYES update carry; RTNYES pops only when taken and preserves consumed
+source, modular-offset and generated-call metadata. Invalid generated tags reject.
+Callback errors preserve state/uses; negative errors propagate and positive errors
+become malformed. The original-ROM matrix now compares the full C execution step,
+callback entry state, next PC, carry, register preservation and circular stack,
+not only the inspector. Both models pass 13,824 cases each (27,648 total).
+Evidence: /work/nov06-long-continuation/predicates-step/rom.json.
+
+Extended numerical collection matches 87 original-ROM transitions on both models,
+then stops at 0xb28e. Its one comparison at 0xb283 consumes an untagged low digit
+produced by C.P=0 at 0xb280. Decoder inspection corrects an initial numerical
+interpretation as decrement: the missing relation is constant assignment, not
+arithmetic. Applying the new planner to the actual captured predicate rejects
+with UNSUPPORTED, zero edits and no resolver calls; zero origins are never
+reinterpreted as literal zero. Constant-producer tokens and P/field guards are
+next. Numeric continuation is not accepted relocation coverage beyond 80 steps.
+Evidence: /work/nov06-predicate-step/{continuation/collected-execution.json,
+real-predicate/rejection.json}.
+
+Fourteen ASan/UBSan targets, fresh two-model maintained 80-step Stock/catalog/return,
+six launcher audits and ARM analyzers pass. Own ARM frames: execution step 1872
+bytes, predicate planner 256 bytes, relation helper 16 bytes; no aggregate stack
+claim. Evidence: /work/nov06-predicate-step-final/{unit.log,stock.json,
+code-analysis.json,plan-analysis.json,artifact-audit.json}. Production Stage1,
+full reference closure and broader M8 goals remain incomplete. The batch remains
+local while prior exact-head CI is unfinished; the two PR14 USB failures remain.
