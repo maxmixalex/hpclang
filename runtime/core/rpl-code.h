@@ -318,6 +318,7 @@ struct hpclang_rpl_code_execution
     struct hpclang_rpl_code_values values;
     struct hpclang_rpl_code_origins origins;
     struct hpclang_rpl_code_control control;
+    uint32_t hst; /* Native hardware status word; 82x clears only selected low bits. */
 };
 
 enum hpclang_rpl_code_use_kind
@@ -370,6 +371,7 @@ typedef int (*hpclang_rpl_code_store_fn)(void *context, const struct hpclang_rpl
  * with unknown origins: planning requires separate ROM-profile qualification,
  * never a fabricated Saturn operand. Native ROM profile qualification remains
  * the caller's responsibility for all three instructions.
+ * 82x clears the selected low-four HST bits, preserving all other state.
  * 81B1 emits D0 and its loaded pointer as load addresses, then the loaded PC
  * target. It replaces A's low five digits and sources, retaining its upper bits;
  * D0 retains its original sources with an additional offset of five. Both

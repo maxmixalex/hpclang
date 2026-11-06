@@ -134,6 +134,7 @@ static void test_execution_capture(void)
     execution_word(&fixture, 0x954, 0xabcde);
     execution_word(&fixture, 0x958, 0xdef01);
     execution_word(&fixture, 0x95c, 13);
+    execution_word(&fixture, 0x96c, 0xa5a5000f);
     execution_word(&fixture, 0x970, 1);
     execution_word(&fixture, 0x974, 0);
     execution_word(&fixture, 0x998, 7);
@@ -143,7 +144,8 @@ static void test_execution_capture(void)
     struct hpclang_rpl_code_execution state;
     assert(!hpclang_rpl_stock_execution_capture(&reader, 0x88b48, 0x200000, &state, route_observe,
                                                 &fixture));
-    assert(fixture.reads == 256 && fixture.observations == 256);
+    assert(fixture.reads == 264 && fixture.observations == 264);
+    assert(state.hst == 0xa5a5000f);
     assert(state.control.pc == 0x88b48 && state.control.cursor == 7);
     assert(state.control.carry == 1 && state.values.carry == 1 && state.values.decimal == 0);
     assert(state.values.registers[HPCLANG_RPL_CODE_D0] == 0xabcde);
@@ -223,7 +225,7 @@ static void test_execution_capture(void)
     assert(hpclang_rpl_stock_execution_origin(&source, uses[0][0], &cell) < 0);
     assert(fixture.reads == reads && !memcmp(&cell, &before, sizeof cell));
     for (unsigned mode = 1; mode <= 4; ++mode)
-        for (unsigned stop = 1; stop <= 256; ++stop) {
+        for (unsigned stop = 1; stop <= 264; ++stop) {
             fixture.mode = mode;
             fixture.stop = stop;
             fixture.reads = fixture.observations = 0;

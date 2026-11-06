@@ -2368,6 +2368,43 @@ static void native_threaded_store_next(void)
     }
 }
 
+static void hardware_status_clear(void)
+{
+    struct image code = {.size = 3, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+    struct hpclang_rpl_code_execution initial = {0}, state, expected;
+    seed_origins(&initial.origins);
+    initial.values.registers[HPCLANG_RPL_CODE_A] = UINT64_C(0x123456789abcdef0);
+    struct hpclang_rpl_code_step_uses uses, sentinel;
+    memset(&sentinel, 0xa5, sizeof sentinel);
+    for (unsigned mask = 0; mask < 16; ++mask)
+        for (unsigned low = 0; low < 16; ++low)
+            for (unsigned flags = 0; flags < 4; ++flags) {
+                encode(&code, 0, 3, 0x28 | (mask << 8));
+                initial.hst = 0xa5a50000 | low;
+                initial.values.carry = initial.control.carry = flags & 1;
+                initial.values.decimal = flags >> 1;
+                state = expected = initial;
+                expected.hst &= ~mask;
+                expected.control.pc = 3;
+                assert(!hpclang_rpl_code_execution_step(&instructions, NULL, 3, &state, data_token,
+                                                        NULL, &uses));
+                assert(!memcmp(&state, &expected, sizeof state));
+                assert(!uses.count && !uses.has_branch);
+            }
+    for (unsigned mode = 0; mode < 5; ++mode) {
+        code.fail = mode < 3 ? mode : UINT32_MAX;
+        if (mode == 4)
+            code.data[2] = 16;
+        state = initial;
+        uses = sentinel;
+        assert(hpclang_rpl_code_execution_step(&instructions, NULL, mode == 3 ? 2 : 3, &state,
+                                               data_token, NULL, &uses) < 0);
+        assert(!memcmp(&state, &initial, sizeof state));
+        assert(!memcmp(&uses, &sentinel, sizeof uses));
+    }
+}
+
 static void native_threaded_next(void)
 {
     struct image code = {.size = 4, .fail = UINT32_MAX};
@@ -2983,6 +3020,7 @@ int main(void)
     computed_origin_transfers();
     native_threaded_exit();
     native_threaded_store_next();
+    hardware_status_clear();
     native_threaded_next();
     execution_steps();
     arithmetic_modes();

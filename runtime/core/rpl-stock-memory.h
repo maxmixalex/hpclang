@@ -48,7 +48,7 @@ int hpclang_rpl_stock_execution_edit(const struct hpclang_rpl_stock_execution_so
                                      hpclang_rpl_reference_dependency_fn dependency, void *context);
 
 /* Capture the reviewed HP49g+/50g CPU register layout through the existing
- * state-relative nibble reader (e.g. stock_view_native). Observe all 256 read
+ * state-relative nibble reader (e.g. stock_view_native). Observe all 264 read
  * nibbles as dependencies, including full scalar/stack words. pc is the
  * separately proven suspended continuation; the caller guards that cell too.
  * Seed native-cell tokens as origin_base + state-relative nibble offset.
