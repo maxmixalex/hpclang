@@ -666,6 +666,10 @@ struct execution_probe
     uint32_t generated_uses;
     struct hpclang_rpl_execution_subtraction expression;
     uint32_t expression_count, expression_uses, expression_pc, expression_sources;
+    struct hpclang_rpl_reference_edit edits[128];
+    struct hpclang_rpl_reference_edit_builder plan;
+    struct hpclang_rpl_code_step_uses first_use;
+    uint32_t move_first, move_end, planned_uses, branches, changed_cells, rejected_plans;
 };
 
 static int execution_observe(void *context, unsigned space, uint32_t at, uint8_t value)
@@ -712,18 +716,58 @@ static int execution_derive(void *context, uint32_t pc,
     return 0;
 }
 
+static int execution_native_read(void *context, uint32_t at, uint8_t *value)
+{
+    struct execution_probe *probe = context;
+    return hpclang_rpl_stock_view_native(&probe->view, at, value) &&
+           !execution_observe(context, HPCLANG_RPL_EXECUTION_NATIVE, at, *value);
+}
+
 static int execution_source(void *context, uint32_t token,
                             struct hpclang_rpl_code_origin_cell *cell)
 {
     struct execution_probe *probe = context;
+    if (token >= 0x200000 && token < 0x400000) {
+        const struct hpclang_rpl_reader native = {execution_native_read, probe};
+        const struct hpclang_rpl_stock_execution_source source = {&native, 0x200000, 1,
+                                                                  probe->view.state_offset * 2};
+        return hpclang_rpl_stock_execution_origin((void *)&source, token, cell);
+    }
     if (!token || token > 0x100000)
         return HPCLANG_RPL_SPAN_UNSUPPORTED; /* Never treat expression IDs as memory. */
+    /* Guard Read[] too. Logical SRAM aliases and native-state tokens must share
+     * physical coordinates before they enter the common constraint builder. */
+    uint32_t page = 0, at = token - 1;
+    for (unsigned digit = 0; digit < 8; ++digit) {
+        uint8_t value;
+        if (!execution_native_read(probe, (at >> 12) * 8 + digit, &value))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        page |= (uint32_t)value << (4 * digit);
+    }
     uint8_t value;
-    if (!hpclang_rpl_stock_view_saturn(&probe->view, token - 1, &value))
+    if (!hpclang_rpl_stock_view_saturn(&probe->view, at, &value))
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
-    int result = execution_observe(context, HPCLANG_RPL_EXECUTION_DATA, token - 1, value);
+    int result = execution_observe(context, HPCLANG_RPL_EXECUTION_DATA, at, value);
+    if (!result) {
+        uint32_t physical = page + (at & 0xfff) / 2;
+        uint32_t mapping = physical >= 0x08000000 ? 1 : 4 + physical / 0x80000;
+        uint32_t field = physical >= 0x08000000 ? physical - 0x08000000 : physical % 0x80000;
+        *cell = (struct hpclang_rpl_code_origin_cell){mapping, field * 2 + (at & 1), value};
+    }
+    return result;
+}
+
+static uint32_t execution_shift(const struct execution_probe *probe, uint32_t value)
+{
+    return value >= probe->move_first && value < probe->move_end ? value + 16 : value;
+}
+
+static int execution_stale_source(void *context, uint32_t token,
+                                  struct hpclang_rpl_code_origin_cell *cell)
+{
+    int result = execution_source(context, token, cell);
     if (!result)
-        *cell = (struct hpclang_rpl_code_origin_cell){1, token - 1, value};
+        cell->expected ^= 1;
     return result;
 }
 
@@ -731,9 +775,21 @@ static int execution_visit(void *context, uint32_t pc,
                            const struct hpclang_rpl_code_execution *state,
                            const struct hpclang_rpl_code_step_uses *uses)
 {
-    (void)pc;
     struct execution_probe *probe = context;
     probe->uses += uses->count;
+    if (uses->has_branch) {
+        const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
+        const struct hpclang_rpl_reference_mappings mappings = {1, 1, 1};
+        struct hpclang_rpl_code_patch patch;
+        int result =
+            hpclang_rpl_code_branch_plan_shift(&instructions, pc, 0x100000 - pc, &mappings,
+                                               probe->move_first, probe->move_end, 16, &patch);
+        /* This fixture's two branches keep their encodings. A changed operand
+         * needs its own source constraints, never silent omission. */
+        if (result)
+            return result < 0 ? result : HPCLANG_RPL_SPAN_UNSUPPORTED;
+        ++probe->branches;
+    }
     for (unsigned i = 0; i < uses->count; ++i) {
         const struct hpclang_rpl_code_address_use *use = &uses->addresses[i];
         unsigned expression_digits = 0;
@@ -762,17 +818,35 @@ static int execution_visit(void *context, uint32_t pc,
                     return HPCLANG_RPL_SPAN_MALFORMED;
             ++probe->expression_uses;
             probe->expression_sources = builder.count;
+            result = hpclang_rpl_execution_plan_subtraction(
+                &probe->plan, &probe->expression,
+                execution_shift(probe, probe->expression.left.value), probe->expression.right.value,
+                execution_shift(probe, use->value), execution_source, probe);
+            if (result)
+                return result;
         }
         if (use->generated) {
             const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
             const struct hpclang_rpl_reference_mappings mappings = {1, 1, 1};
             struct hpclang_rpl_code_patch patch;
-            int result = hpclang_rpl_code_generated_return_plan(&instructions, use, &mappings, 0,
-                                                                0x100000, 0, use->value, &patch);
+            int result = hpclang_rpl_code_generated_return_plan(
+                &instructions, use, &mappings, probe->move_first, probe->move_end, 16,
+                execution_shift(probe, use->value), &patch);
             if (result)
                 return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
             ++probe->generated_uses;
         }
+        if (!expression_digits && !use->generated) {
+            const struct hpclang_rpl_code_step_uses single = {.count = 1, .addresses = {*use}};
+            uint32_t replacement = execution_shift(probe, use->value);
+            int result = hpclang_rpl_execution_plan_uses(&probe->plan, &single, &replacement,
+                                                         execution_source, probe);
+            if (result)
+                return result;
+            if (!probe->first_use.count)
+                probe->first_use = single;
+        }
+        ++probe->planned_uses;
         if (!use->adjustment)
             continue;
         uint32_t first = use->origins[0];
@@ -812,8 +886,24 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     probe->pc = hpclang_launch_execution_pc(boot);
     if (!probe->pc || hpclang_rpl_stock_view_reader(&probe->view) ||
-        hpclang_rpl_reference_guards_begin(&probe->builder, probe->guards, 512))
+        hpclang_rpl_reference_guards_begin(&probe->builder, probe->guards, 512) ||
+        hpclang_rpl_reference_edits_begin(&probe->plan, probe->edits, 128))
         goto done;
+    uint32_t catalog_count;
+    if (probe_read_word(io, io->library_table, 3, &catalog_count) ||
+        probe_read_word(io, 0x806f3, 5, &probe->move_end))
+        goto done;
+    probe->move_first = io->library_table + 3 + catalog_count * 16;
+    if (probe->move_first >= probe->move_end || probe->move_end > 0xffff0)
+        goto done;
+    for (unsigned digit = 0; digit < 3; ++digit)
+        if (execution_observe(probe, HPCLANG_RPL_EXECUTION_DATA, io->library_table + digit,
+                              (catalog_count >> (4 * digit)) & 15))
+            goto done;
+    for (unsigned digit = 0; digit < 5; ++digit)
+        if (execution_observe(probe, HPCLANG_RPL_EXECUTION_DATA, 0x806f3 + digit,
+                              (probe->move_end >> (4 * digit)) & 15))
+            goto done;
     const struct hpclang_rpl_execution_io execution = {
         {hpclang_rpl_stock_view_native, &probe->view},
         {hpclang_rpl_stock_view_saturn, &probe->view},
@@ -825,6 +915,31 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         execution_derive};
     uint32_t steps;
     int stop = hpclang_rpl_execution_collect(boot, &execution, 0x200000, 64, &probe->state, &steps);
+    if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
+        probe->planned_uses != probe->uses || !probe->first_use.count)
+        goto done;
+    for (unsigned i = 0; i < probe->plan.count; ++i) {
+        const struct hpclang_rpl_reference_edit *edit = &probe->edits[i];
+        if (edit->expected != edit->value) {
+            if (edit->mapping != 1)
+                goto done; /* A proposed ROM write invalidates this test plan. */
+            ++probe->changed_cells;
+        }
+    }
+    struct hpclang_rpl_reference_edit_builder rejected = probe->plan;
+    struct hpclang_rpl_reference_edit conflict = probe->edits[0];
+    conflict.value ^= 1;
+    if (hpclang_rpl_reference_edits_add(&rejected, &conflict) >= 0 || rejected.count ||
+        !rejected.error)
+        goto done;
+    ++probe->rejected_plans;
+    rejected = probe->plan;
+    uint32_t replacement = execution_shift(probe, probe->first_use.addresses[0].value);
+    if (hpclang_rpl_execution_plan_uses(&rejected, &probe->first_use, &replacement,
+                                        execution_stale_source, probe) >= 0 ||
+        rejected.count || !rejected.error)
+        goto done;
+    ++probe->rejected_plans;
     const struct hpclang_rpl_reference_reader guards = {execution_guard_read, probe};
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY ||
         hpclang_rpl_reference_guards_validate(&guards, probe->guards, probe->builder.count))
@@ -834,9 +949,9 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     uint32_t length;
     if (hpclang_rpl_directory_find(&reader, home, (const uint8_t *)"EXECOBS", 7, &entry) ||
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
-        length != 165)
+        length != 205)
         goto done;
-    uint32_t words[20] = {2,
+    uint32_t words[25] = {3,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,
@@ -855,8 +970,13 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                           probe->expression_count,
                           probe->expression_uses,
                           probe->expression_pc,
-                          probe->expression_sources};
-    for (unsigned i = 0; i < 20; ++i)
+                          probe->expression_sources,
+                          probe->planned_uses,
+                          probe->plan.count,
+                          probe->changed_cells,
+                          probe->branches,
+                          probe->rejected_plans};
+    for (unsigned i = 0; i < 25; ++i)
         if (probe_write_word(io, entry.object_address + 10 + i * 8, words[i], 8))
             goto done;
     result = 0;
