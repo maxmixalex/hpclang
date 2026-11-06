@@ -2280,8 +2280,75 @@ static void generated_return_plans(void)
     assert(!memcmp(&patch, &sentinel, sizeof patch));
 }
 
+static void subtract_fields(void)
+{
+    struct image code = {.size = 128, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    static const unsigned firsts[] = {0, 0, 2, 0, 15, 3, 0, 0};
+    static const unsigned widths[] = {1, 1, 1, 3, 1, 12, 2, 16};
+    for (unsigned field = 0; field < 8; ++field)
+        for (unsigned p = 0; p < 16; ++p)
+            for (unsigned decimal = 0; decimal < 2; ++decimal) {
+                unsigned first = field == 0 ? p : firsts[field];
+                unsigned width = field == 1 ? p + 1 : widths[field];
+                uint64_t mask = width == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * width)) - 1;
+                mask <<= 4 * first;
+                struct hpclang_rpl_code_values values = {.carry = 1, .decimal = decimal};
+                values.registers[HPCLANG_RPL_CODE_P] = p;
+                values.registers[HPCLANG_RPL_CODE_A] = UINT64_C(0x8888888888888888) & ~mask;
+                values.registers[HPCLANG_RPL_CODE_C] = UINT64_C(1) << (4 * first);
+                struct hpclang_rpl_code_values before = values;
+                struct hpclang_rpl_code_origins origins;
+                seed_origins(&origins);
+                origins.adjustment[HPCLANG_RPL_CODE_A] = 5;
+                struct hpclang_rpl_code_origins old = origins;
+                encode(&code, 0, 3, 0xa0b | (field << 4));
+                uint32_t length = 99;
+                assert(!hpclang_rpl_code_data_step(&reader, NULL, 0, 128, &values, &origins,
+                                                   data_token, NULL, &length));
+                uint64_t expected = before.registers[HPCLANG_RPL_CODE_A] |
+                                    ((decimal ? UINT64_C(0x9999999999999999) : UINT64_MAX) & mask);
+                assert(values.registers[HPCLANG_RPL_CODE_A] == expected);
+                assert(values.carry == 1 && values.decimal == decimal && length == 3);
+                for (unsigned reg = 1; reg < 13; ++reg)
+                    assert(values.registers[reg] == before.registers[reg]);
+                for (unsigned digit = 0; digit < 16; ++digit) {
+                    unsigned written = digit >= first && digit < first + width;
+                    unsigned dependent = first < 5 && digit < 5;
+                    assert(origins.registers[0][digit] ==
+                           (written || dependent ? 0 : old.registers[0][digit]));
+                }
+                assert(origins.adjustment[0] == (first < 5 ? 0 : 5));
+                for (unsigned digit = 0; digit < 3; ++digit) {
+                    values = before;
+                    origins = old;
+                    length = 99;
+                    code.fail = digit;
+                    assert(hpclang_rpl_code_data_step(&reader, NULL, 0, 128, &values, &origins,
+                                                      data_token, NULL, &length) < 0);
+                    assert(!memcmp(&values, &before, sizeof values));
+                    assert(!memcmp(&origins, &old, sizeof origins) && length == 99);
+                }
+                code.fail = UINT32_MAX;
+            }
+    /* Invalid BCD inputs cannot partially publish arithmetic or provenance. */
+    encode(&code, 0, 3, 0xa6b);
+    struct hpclang_rpl_code_values values = {.decimal = 1};
+    values.registers[0] = 0xa0;
+    struct hpclang_rpl_code_values before = values;
+    struct hpclang_rpl_code_origins origins;
+    seed_origins(&origins);
+    struct hpclang_rpl_code_origins old = origins;
+    uint32_t length = 99;
+    assert(hpclang_rpl_code_data_step(&reader, NULL, 0, 128, &values, &origins, data_token, NULL,
+                                      &length) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&values, &before, sizeof values));
+    assert(!memcmp(&origins, &old, sizeof origins) && length == 99);
+}
+
 int main(void)
 {
+    subtract_fields();
     generated_return_plans();
     computed_origin_transfers();
     native_threaded_exit();

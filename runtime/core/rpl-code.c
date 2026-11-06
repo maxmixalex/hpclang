@@ -128,7 +128,44 @@ int hpclang_rpl_code_data_step(const struct hpclang_rpl_reader *instructions,
         if (result)
             return result;
         size = 2;
-        if (opcode == 0x40 || opcode == 0x50) {
+        if ((opcode & 15u) == 11 && (opcode >> 4) < 8) {
+            /* BfA: A=A-C over the selected field. A subtraction result is
+             * not an original stored value. Until expressions with two
+             * operands are represented, invalidate its written origins. */
+            uint32_t operation;
+            if (limit < 3)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            result = read_word(instructions, instruction + 2, 1, &operation);
+            if (result)
+                return result;
+            if (operation != 10)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            static const unsigned firsts[] = {0, 0, 2, 0, 15, 3, 0, 0};
+            static const unsigned widths[] = {1, 1, 1, 3, 1, 12, 2, 16};
+            unsigned field = opcode >> 4;
+            unsigned first = field == 0 ? p : firsts[field];
+            unsigned width = field == 1 ? p + 1 : widths[field];
+            uint64_t a = next.registers[HPCLANG_RPL_CODE_A];
+            uint64_t c = next.registers[HPCLANG_RPL_CODE_C];
+            unsigned borrow = 0, radix = next.decimal ? 10 : 16;
+            uint32_t written = ((1u << width) - 1u) << first;
+            origin_overwrite(&sources, HPCLANG_RPL_CODE_A, written);
+            for (unsigned i = first; i < first + width; ++i) {
+                unsigned left = (a >> (4 * i)) & 15u;
+                unsigned right = (c >> (4 * i)) & 15u;
+                if (left >= radix || right >= radix)
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+                int digit = (int)left - (int)right - (int)borrow;
+                borrow = digit < 0;
+                if (borrow)
+                    digit += radix;
+                a = (a & ~(UINT64_C(15) << (4 * i))) | ((uint64_t)digit << (4 * i));
+                sources.registers[HPCLANG_RPL_CODE_A][i] = 0;
+            }
+            next.registers[HPCLANG_RPL_CODE_A] = a;
+            next.carry = borrow;
+            size = 3;
+        } else if (opcode == 0x40 || opcode == 0x50) {
             next.decimal = opcode == 0x50;
         } else if (opcode == 0x7e) {
             uint32_t old = (uint32_t)next.registers[HPCLANG_RPL_CODE_D] & 0xfffffu;
