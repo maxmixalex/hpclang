@@ -173,7 +173,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             remote_commands=[
                 "-95 CF HOME CLEAR",
                 "\"0\" 1 7 START DUP + NEXT 'ENTRYOBS' STO",
-                '"0" 1 6 START DUP + NEXT "000000000000000000000000000000000000" + \'EXECOBS\' STO',
+                '"0" 1 6 START DUP + NEXT "000000000000000000000000000000000000000000000000" + \'EXECOBS\' STO',
                 "'CALLROOT' RCL",
             ],
         )
@@ -217,11 +217,11 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         read = native_words((state / "sram").read_bytes(), flash)
         observation = home_string(read, b"ENTRYOBS")
         words = verify_entry(observation, (build / "launchers" / f"{args.model}.bin").read_bytes())
-        execution = struct.unpack("<25I", home_string(read, b"EXECOBS"))
+        execution = struct.unpack("<28I", home_string(read, b"EXECOBS"))
         if (
-            execution[0:3] != (3, 1, 33)
-            or execution[3] != 0x2C3C
-            or execution[4] != 19
+            execution[0:3] != (4, 1, 34)
+            or execution[3] != 0x2C3F
+            or execution[4] != 20
             or not 0 < execution[5] <= 512
             or not execution[6]
             or not execution[7]
@@ -232,9 +232,10 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             or execution[12:15] != (2, 0x806F3, 0xFFFF6)
             or execution[15] != 1
             or execution[16:20] != (1, 1, 0x2900, 7)
-            or execution[20:22] != (19, 77)
+            or execution[20:22] != (20, 82)
             or not 0 < execution[22] <= execution[21]
             or execution[23:25] != (3, 2)
+            or execution[25:28] != (1, 5, 2)
         ):
             raise ValueError("Native execution collection/guard observation is incomplete")
         (case / "entry.json").write_text(
@@ -256,7 +257,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                     saved_registers=list(words[12:22]),
                     stage0_prefix=observation[88:120].hex(),
                     execution_collection=dict(
-                        stop="before_first_memory_store",
+                        stop="after_first_simulated_store",
                         steps=execution[2],
                         pc=execution[3],
                         address_uses=execution[4],
@@ -275,6 +276,9 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                         changed_cells=execution[22],
                         branches=execution[23],
                         rejected_plans=execution[24],
+                        simulated_stores=execution[25],
+                        stored_sources=execution[26],
+                        rejected_post_store_reads=execution[27],
                     ),
                 ),
                 indent=2,
