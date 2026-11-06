@@ -1043,6 +1043,7 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "frame-checkpoint.h",
         "memory-checkpoint.h",
         "pool-checkpoint.h",
+        "native-allocation.h",
         "resource-snapshot.h",
         "reset-checkpoint.h",
         "input-checkpoint.h",
