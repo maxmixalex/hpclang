@@ -370,6 +370,49 @@ int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *ins
         result = read_word(instructions, pc, 4, &extended);
         if (result)
             return result;
+        if (extended == 0x1b18) {
+            /* Native-ROM 81B1: A.A=read5(D0), PC=read5(A.A), D0+=5.
+             * The ROM increments the full native D0 word; reject a result
+             * outside the canonical 20-bit state instead of wrapping it. */
+            if (!data || !data->read_nibble)
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            uint32_t d0 = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_D0];
+            if (d0 > 0xffffa)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            uint32_t address = d0, sources[5];
+            for (unsigned digit = 0; digit < 5; ++digit)
+                sources[digit] = next.origins.registers[HPCLANG_RPL_CODE_D0][digit];
+            for (unsigned load = 0; load < 2; ++load) {
+                execution_use(&observed, HPCLANG_RPL_CODE_USE_LOAD_ADDRESS, address, sources,
+                              load ? 0 : next.origins.adjustment[HPCLANG_RPL_CODE_D0]);
+                if (address > 0xffffb)
+                    return HPCLANG_RPL_SPAN_BOUNDS;
+                uint32_t value;
+                result = read_word(data, address, 5, &value);
+                if (result)
+                    return result;
+                for (unsigned digit = 0; digit < 5; ++digit) {
+                    result = token(context, 1, address + digit, (value >> (4 * digit)) & 15,
+                                   &sources[digit]);
+                    if (result)
+                        return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+                }
+                if (!load) {
+                    next.values.registers[HPCLANG_RPL_CODE_A] =
+                        (next.values.registers[HPCLANG_RPL_CODE_A] & ~UINT64_C(0xfffff)) | value;
+                    for (unsigned digit = 0; digit < 5; ++digit)
+                        next.origins.registers[HPCLANG_RPL_CODE_A][digit] = sources[digit];
+                    next.origins.adjustment[HPCLANG_RPL_CODE_A] = 0;
+                }
+                address = value;
+            }
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, address, sources, 0);
+            next.values.registers[HPCLANG_RPL_CODE_D0] = d0 + 5;
+            next.origins.adjustment[HPCLANG_RPL_CODE_D0] =
+                (next.origins.adjustment[HPCLANG_RPL_CODE_D0] + 5) & 0xfffff;
+            next.control.pc = address;
+            goto done;
+        }
         if (extended == 0xdb18) {
             /* Qualified native-ROM 81BD: three dependent reads, not a
              * fallthrough. Retain B's source and accumulated 20-bit offset;

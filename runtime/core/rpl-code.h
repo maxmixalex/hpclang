@@ -357,7 +357,11 @@ struct hpclang_rpl_code_store
 typedef int (*hpclang_rpl_code_store_fn)(void *context, const struct hpclang_rpl_code_store *store);
 
 /* One C step combining the data/control evaluators with register/indirect PC
- * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81BD.
+ * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81B1/81BD.
+ * 81B1 emits D0 and its loaded pointer as load addresses, then the loaded PC
+ * target. It replaces A's low five digits and sources, retaining its upper bits;
+ * D0 retains its original sources with an additional offset of five. Both
+ * instructions leave carry/decimal mode unchanged and require canonical D0.
  * 81BD emits three dependent load addresses followed by the memory PC target;
  * B retains its low-five-digit source plus a modular adjustment; D0 retains
  * the first loaded pointer's source plus five. Arithmetic on D clears affected
