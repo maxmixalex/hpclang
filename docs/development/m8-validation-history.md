@@ -5538,3 +5538,36 @@ analysis.json,config-analysis.json,artifact-audit.json}. Local batch is unpushed
 latest inspected PR31 head 7b9f1d35 still has twelve queued workflows. PR13 remains
 in progress; PR14 retains two unresolved pre-entry USB failures. No new CI or
 milestone acceptance is claimed.
+
+## 2026-11-06 - Derived store payloads and overlapping replay
+
+Local 26ab5530 adds a shared payload planner. Physical source cells are resolved
+first; only explicit unsupported tokens may use a derived-fact callback. Unknown
+zero tokens reject. Adjusted low fields constrain all five base digits, including
+partial stores. Conflicts, missing/stale facts and callback/capacity errors clear
+the plan. Provenance validity and bounded recursion remain caller obligations.
+
+Both models pass actual catalog growth followed by 80 original-ROM transitions:
+38 address uses, 155 original source cells (four changed), six stores and 32 final
+stored digits. Five temporal shadow reads per model are checked against only
+preceding stores. The overlapping sixth store carries a previous computed value;
+its five derived digits resolve through the producer, without fake physical cells.
+Each model retains 6,727 original guards and four zero-write rejection controls.
+This research storage size is not a production low-memory budget.
+
+The common planner is integrated into the maintained four-store/59-step Stock
+fixture. A fixed local store width keeps validation and publication loops bounded
+across callbacks; ARM analysis has zero diagnostics. Fourteen ASan/UBSan targets,
+fresh two-model Stock/catalog/return and six launcher audits pass. The payload
+planner and digit helper each have a 72-byte own ARM frame; execution_store has
+216 bytes. These are individual frames, not an aggregate stack bound.
+
+Evidence: /work/nov06-payload/{path/collected-execution.json,plan/plan.json,
+writeback/writeback.json}, /work/nov06-payload-final/{unit.log,stock.json,
+analysis.json,artifact-audit.json}, and
+/work/nov06-payload-maintained/plan-analysis.json. The final fixture-only width
+change leaves the runtime/header inputs of the 80-step proof unchanged.
+Maintained expansion, production continuation and broader M8.0 remain open.
+Latest inspected PR31 CI has two successful and ten queued workflows; PR13 is
+still running. PR14 retains two unresolved pre-entry USB failures. No remote or
+milestone acceptance is claimed.
