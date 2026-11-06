@@ -122,7 +122,8 @@ int hpclang_rpl_execution_collect_predicates(const struct hpclang_boot_info *boo
 {
     if (!io)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
-    const struct hpclang_rpl_code_callbacks callbacks = {io->derive, store, config, predicate, 0};
+    const struct hpclang_rpl_code_callbacks callbacks = {io->derive, store, config,
+                                                         predicate,  0,     0};
     return hpclang_rpl_execution_collect_observed(boot, io, native_origin_base, budget, state,
                                                   steps, &callbacks);
 }

@@ -3144,6 +3144,86 @@ static void derived_execution(void)
     }
 }
 
+struct unit_test
+{
+    int error;
+    unsigned calls, missing;
+    struct hpclang_rpl_code_unit fact;
+};
+static int retain_unit(void *context, const struct hpclang_rpl_code_unit *fact, uint32_t tokens[16])
+{
+    struct unit_test *test = context;
+    ++test->calls;
+    test->fact = *fact;
+    for (unsigned i = 0; i < fact->nibbles; ++i)
+        tokens[i] = test->missing ? 0 : 0x700001 + i;
+    return test->error;
+}
+static void selected_unit_steps(void)
+{
+    for (unsigned field = 0; field < 8; ++field)
+        for (unsigned p = 0; p < 16; ++p)
+            for (unsigned decrement = 0; decrement < 2; ++decrement) {
+                struct image image = {.data = {decrement ? 10 : 11, field, decrement ? 14 : 6},
+                                      .size = 3,
+                                      .fail = UINT32_MAX};
+                const struct hpclang_rpl_reader reader = {read_nibble, &image};
+                struct hpclang_rpl_code_execution state = {0};
+                state.values.registers[HPCLANG_RPL_CODE_C] = decrement ? 0 : UINT64_MAX;
+                state.values.registers[HPCLANG_RPL_CODE_P] = p;
+                seed_origins(&state.origins);
+                const struct hpclang_rpl_code_execution before = state;
+                struct hpclang_rpl_code_callbacks callbacks = {.unit = retain_unit};
+                for (unsigned mode = 0; mode < 4; ++mode) {
+                    state = before;
+                    struct unit_test test = {.error = mode == 2   ? -74
+                                                      : mode == 3 ? 74
+                                                                  : 0,
+                                             .missing = mode == 1};
+                    struct hpclang_rpl_code_step_uses uses, saved;
+                    memset(&uses, 0x77, sizeof uses);
+                    saved = uses;
+                    int result = hpclang_rpl_code_execution_step_observed(
+                        &reader, &reader, 3, &state, data_token, &callbacks, &test, &uses);
+                    assert(test.calls == 1 && test.fact.p == p &&
+                           test.fact.reg == HPCLANG_RPL_CODE_C);
+                    if (mode) {
+                        assert(result < 0 && !memcmp(&state, &before, sizeof state) &&
+                               !memcmp(&uses, &saved, sizeof uses));
+                        continue;
+                    }
+                    assert(!result && state.values.carry == 1 && state.control.carry == 1 &&
+                           state.control.pc == 3);
+                    for (unsigned i = 0; i < 16; ++i) {
+                        unsigned selected =
+                            i >= test.fact.first && i < test.fact.first + test.fact.nibbles;
+                        assert(((state.values.registers[HPCLANG_RPL_CODE_C] >> (4 * i)) & 15) ==
+                               (selected    ? decrement ? 15 : 0
+                                : decrement ? 0
+                                            : 15));
+                        assert(state.origins.registers[HPCLANG_RPL_CODE_C][i] ==
+                               (selected ? 0x700001 + i - test.fact.first
+                                         : before.origins.registers[HPCLANG_RPL_CODE_C][i]));
+                    }
+                }
+                state = before;
+                state.values.decimal = 1;
+                state.values.registers[HPCLANG_RPL_CODE_C] = UINT64_MAX;
+                struct hpclang_rpl_code_unit result, saved;
+                memset(&result, 0x77, sizeof result);
+                saved = result;
+                assert(hpclang_rpl_code_unit_inspect(&reader, 0, 3, &state.values, &result) ==
+                       HPCLANG_RPL_SPAN_UNSUPPORTED);
+                assert(!memcmp(&result, &saved, sizeof result));
+                for (unsigned i = 0; i < 3; ++i) {
+                    image.fail = i;
+                    assert(hpclang_rpl_code_unit_inspect(&reader, 0, 3, &before.values, &result) <
+                           0);
+                    assert(!memcmp(&result, &saved, sizeof result));
+                }
+            }
+}
+
 struct constant_test
 {
     unsigned calls, missing;
@@ -3321,6 +3401,7 @@ static void numeric_predicates(void)
 
 int main(void)
 {
+    selected_unit_steps();
     constant_steps();
     predicate_steps();
     numeric_predicates();

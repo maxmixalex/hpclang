@@ -441,8 +441,59 @@ static void constant_plans(void)
     }
 }
 
+static void selected_unit_plans(void)
+{
+    for (unsigned mode = 0; mode < 9; ++mode) {
+        struct plan_fixture f = {0};
+        f.memory[0] = 11;
+        f.memory[1] = 0;
+        f.memory[2] = 6;
+        put(&f, 32, 1);
+        const struct hpclang_rpl_reader reader = {read_cell, &f};
+        struct hpclang_rpl_code_values values = {0};
+        values.registers[2] = 1;
+        struct hpclang_rpl_code_unit fact;
+        assert(!hpclang_rpl_code_unit_inspect(&reader, 0, 3, &values, &fact));
+        fact.p_origin = 100;
+        for (unsigned i = 0; i < 5; ++i)
+            fact.origins[i] = 33 + i;
+        uint64_t input = 2, output = 3;
+        if (mode == 1)
+            output = 4;
+        if (mode == 2) {
+            input = 15;
+            output = 0;
+        }
+        if (mode == 3)
+            fact.origins[0] = 0;
+        if (mode == 4)
+            fact.p_origin = 0;
+        if (mode == 5)
+            fact.after = 3;
+        if (mode == 6) {
+            fact.decimal = 1;
+            input = 10;
+            output = 11;
+        }
+        if (mode == 8) {
+            fact.adjustment = 1;
+            put(&f, 32, 0);
+        }
+        struct hpclang_rpl_reference_edit edits[10];
+        struct hpclang_rpl_reference_edit_builder builder;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, mode == 7 ? 4 : 10));
+        int result = hpclang_rpl_execution_plan_unit(&builder, &fact, input, output, &reader,
+                                                     source_token, resolve_cell, NULL, &f);
+        if (mode && mode != 8)
+            assert(result < 0 && !builder.count && builder.error == result);
+        else
+            assert(!result && builder.count == (mode == 8 ? 9 : 5));
+    }
+}
+
 void test_execution_plans(void)
 {
+    selected_unit_plans();
     constant_plans();
     predicate_plans();
     subtraction_plans();

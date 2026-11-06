@@ -424,6 +424,23 @@ struct hpclang_rpl_code_constant
 typedef int (*hpclang_rpl_code_constant_fn)(void *context,
                                             const struct hpclang_rpl_code_constant *constant,
                                             uint32_t tokens[16]);
+struct hpclang_rpl_code_unit
+{
+    uint64_t before, after;
+    uint32_t instruction, length, reg, first, nibbles, decrement, decimal, carry;
+    uint32_t p, p_origin, p_adjustment, origins[16], adjustment;
+};
+/* Inspect AfC..AfF decrements and Bf4..Bf7 increments, f=0..7. Selected BCD
+ * digits must be canonical. carry is normalized truth (native ROM may encode
+ * a true carry as a nonzero mask); the numerical result preserves other digits.
+ * Origin fields are zero here; the execution observer fills captured provenance.
+ * No execution or mutation; errors leave output unchanged. */
+int hpclang_rpl_code_unit_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                  uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                  struct hpclang_rpl_code_unit *unit);
+typedef int (*hpclang_rpl_code_unit_fn)(void *context, const struct hpclang_rpl_code_unit *unit,
+                                        uint32_t tokens[16]);
+
 struct hpclang_rpl_code_callbacks
 {
     hpclang_rpl_code_derive_fn derive;
@@ -431,6 +448,7 @@ struct hpclang_rpl_code_callbacks
     hpclang_rpl_code_config_fn config;
     hpclang_rpl_code_predicate_fn predicate;
     hpclang_rpl_code_constant_fn constant;
+    hpclang_rpl_code_unit_fn unit;
 };
 /* Unified optional observation callbacks. Missing callbacks retain the legacy
  * rejection/unknown-source behavior; all prior error/discard contracts apply. */

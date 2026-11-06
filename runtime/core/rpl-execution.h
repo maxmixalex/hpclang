@@ -186,6 +186,19 @@ int hpclang_rpl_execution_plan_constant(struct hpclang_rpl_reference_edit_builde
                                         hpclang_rpl_code_origin_resolve_fn resolve,
                                         hpclang_rpl_execution_payload_fn derived, void *context);
 
+/* Validate a retained selected-field unit arithmetic fact and proposed full
+ * input/output. Preserve normalized carry, all producer instruction cells and
+ * P-dependent field selection; constrain the entire consumed input field through
+ * plan_payload (including adjusted low-five carry dependencies). Caller resolves
+ * derived facts with bounded recursion and guards all readers/mappings/modes.
+ * Changed output must equal the recomputed result. Errors invalidate the batch. */
+int hpclang_rpl_execution_plan_unit(struct hpclang_rpl_reference_edit_builder *builder,
+                                    const struct hpclang_rpl_code_unit *unit, uint64_t input,
+                                    uint64_t output, const struct hpclang_rpl_reader *instructions,
+                                    hpclang_rpl_code_token_fn token,
+                                    hpclang_rpl_code_origin_resolve_fn resolve,
+                                    hpclang_rpl_execution_payload_fn derived, void *context);
+
 /* Plan both sources of a caller-proven selected-field subtraction. Values are
  * low 20-bit values; the selected field must lie within these five nibbles.
  * Verify original result/borrow against both operands, and proposed result

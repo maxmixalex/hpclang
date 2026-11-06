@@ -325,3 +325,76 @@ int hpclang_rpl_execution_plan_constant(struct hpclang_rpl_reference_edit_builde
     }
     return 0;
 }
+
+int hpclang_rpl_execution_plan_unit(struct hpclang_rpl_reference_edit_builder *builder,
+                                    const struct hpclang_rpl_code_unit *unit, uint64_t input,
+                                    uint64_t output, const struct hpclang_rpl_reader *instructions,
+                                    hpclang_rpl_code_token_fn token,
+                                    hpclang_rpl_code_origin_resolve_fn resolve,
+                                    hpclang_rpl_execution_payload_fn derived, void *context)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (builder->error)
+        return builder->error;
+    if (!unit || !instructions || !instructions->read_nibble || !token || !resolve ||
+        unit->reg > HPCLANG_RPL_CODE_D || unit->instruction >= 0x100000 || unit->p_adjustment)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    struct hpclang_rpl_code_values values = {.decimal = unit->decimal};
+    values.registers[unit->reg] = unit->before;
+    values.registers[HPCLANG_RPL_CODE_P] = unit->p;
+    struct hpclang_rpl_code_unit original, next, alternate;
+    int result = hpclang_rpl_code_unit_inspect(instructions, unit->instruction,
+                                               0x100000 - unit->instruction, &values, &original);
+    if (result)
+        return reject(builder, result);
+    if (original.length != unit->length || original.reg != unit->reg ||
+        original.first != unit->first || original.nibbles != unit->nibbles ||
+        original.decrement != unit->decrement || original.after != unit->after ||
+        original.carry != unit->carry)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    values.registers[unit->reg] = input;
+    result = hpclang_rpl_code_unit_inspect(instructions, unit->instruction,
+                                           0x100000 - unit->instruction, &values, &next);
+    if (result)
+        return reject(builder, result);
+    if (next.after != output)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    if (next.carry != original.carry)
+        return reject(builder, HPCLANG_RPL_SPAN_UNSUPPORTED);
+    values.registers[HPCLANG_RPL_CODE_P] ^= 1;
+    /* A zero input is valid in both radices and lets field selection be inspected
+     * independently of unrelated noncanonical digits outside the original field. */
+    values.registers[unit->reg] = 0;
+    result = hpclang_rpl_code_unit_inspect(instructions, unit->instruction,
+                                           0x100000 - unit->instruction, &values, &alternate);
+    if (result)
+        return reject(builder, result);
+    if (alternate.first != original.first || alternate.nibbles != original.nibbles) {
+        result =
+            payload_digit(builder, unit->p_origin, unit->p, unit->p, resolve, derived, context);
+        if (result)
+            return reject(builder, result);
+    }
+    for (unsigned i = 0; i < original.length; ++i) {
+        uint8_t nibble;
+        uint32_t origin;
+        if (!instructions->read_nibble(instructions->context, unit->instruction + i, &nibble))
+            return reject(builder, HPCLANG_RPL_SPAN_UNAVAILABLE);
+        if (nibble > 15)
+            return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+        result = token(context, 0, unit->instruction + i, nibble, &origin);
+        if (result)
+            return reject(builder, result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED);
+        result = payload_digit(builder, origin, nibble, nibble, resolve, derived, context);
+        if (result)
+            return reject(builder, result);
+    }
+    struct hpclang_rpl_code_store operand = {.first = unit->first,
+                                             .nibbles = unit->nibbles,
+                                             .value = unit->before,
+                                             .adjustment = unit->adjustment};
+    for (unsigned i = 0; i < 16; ++i)
+        operand.origins[i] = unit->origins[i];
+    return hpclang_rpl_execution_plan_payload(builder, &operand, input, resolve, derived, context);
+}
