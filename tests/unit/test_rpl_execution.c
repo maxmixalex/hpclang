@@ -114,7 +114,8 @@ int main(void)
                                                 observe,
                                                 token,
                                                 visit,
-                                                &f};
+                                                &f,
+                                                NULL};
     struct hpclang_rpl_memory_bounds bounds = {.magic = HPCLANG_RPL_BOUNDS_MAGIC_V5,
                                                .temp_limit = 0xa0000,
                                                .user_limit = 0xb0000,

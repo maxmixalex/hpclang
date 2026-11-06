@@ -173,7 +173,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             remote_commands=[
                 "-95 CF HOME CLEAR",
                 "\"0\" 1 7 START DUP + NEXT 'ENTRYOBS' STO",
-                "\"0\" 1 6 START DUP + NEXT 'EXECOBS' STO",
+                '"0" 1 6 START DUP + NEXT "0000000000000000" + \'EXECOBS\' STO',
                 "'CALLROOT' RCL",
             ],
         )
@@ -217,11 +217,11 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         read = native_words((state / "sram").read_bytes(), flash)
         observation = home_string(read, b"ENTRYOBS")
         words = verify_entry(observation, (build / "launchers" / f"{args.model}.bin").read_bytes())
-        execution = struct.unpack("<16I", home_string(read, b"EXECOBS"))
+        execution = struct.unpack("<20I", home_string(read, b"EXECOBS"))
         if (
-            execution[0:3] != (1, 1, 23)
-            or execution[3] != 0x28FC
-            or execution[4] != 17
+            execution[0:3] != (2, 1, 30)
+            or execution[3] != 0x2C34
+            or execution[4] != 19
             or not 0 < execution[5] <= 512
             or not execution[6]
             or not execution[7]
@@ -230,6 +230,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             or execution[11] != 0x45584543
             or execution[12:15] != (2, 0x806F3, 0xFFFF6)
             or execution[15] != 1
+            or execution[16:20] != (1, 1, 0x2900, 7)
         ):
             raise ValueError("Native execution collection/guard observation is incomplete")
         (case / "entry.json").write_text(
@@ -251,7 +252,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                     saved_registers=list(words[12:22]),
                     stage0_prefix=observation[88:120].hex(),
                     execution_collection=dict(
-                        stop="after_two_81bd_steps",
+                        stop="after_derived_pointer_use",
                         steps=execution[2],
                         pc=execution[3],
                         address_uses=execution[4],
@@ -261,6 +262,10 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                         derived_source=execution[13],
                         final_adjustment=execution[14],
                         generated_uses=execution[15],
+                        expressions=execution[16],
+                        expression_uses=execution[17],
+                        expression_pc=execution[18],
+                        expression_sources=execution[19],
                     ),
                 ),
                 indent=2,

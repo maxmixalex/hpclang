@@ -35,6 +35,7 @@ struct hpclang_rpl_execution_io
     hpclang_rpl_code_token_fn token;
     hpclang_rpl_execution_visit_fn visit;
     void *context;
+    hpclang_rpl_code_derive_fn derive; /* Optional caller-owned expression arena. */
 };
 
 enum hpclang_rpl_execution_stop
@@ -84,17 +85,6 @@ int hpclang_rpl_execution_plan_uses(struct hpclang_rpl_reference_edit_builder *b
                                     const struct hpclang_rpl_code_step_uses *uses,
                                     const uint32_t *replacements,
                                     hpclang_rpl_code_origin_resolve_fn resolve, void *context);
-
-struct hpclang_rpl_execution_value
-{
-    uint32_t value, origins[5], adjustment;
-};
-
-struct hpclang_rpl_execution_subtraction
-{
-    struct hpclang_rpl_execution_value left, right;
-    uint32_t first, nibbles, decimal, value, carry;
-};
 
 /* Plan both sources of a caller-proven selected-field subtraction. Values are
  * low 20-bit values; the selected field must lie within these five nibbles.

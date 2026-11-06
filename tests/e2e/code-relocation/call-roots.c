@@ -664,6 +664,8 @@ struct execution_probe
     uint32_t *pc;
     uint32_t observations[4], uses, indirect_targets, derived_uses, derived_source, adjustment;
     uint32_t generated_uses;
+    struct hpclang_rpl_execution_subtraction expression;
+    uint32_t expression_count, expression_uses, expression_pc, expression_sources;
 };
 
 static int execution_observe(void *context, unsigned space, uint32_t at, uint8_t value)
@@ -695,16 +697,72 @@ static int execution_plan_read(void *context, uint32_t at, uint8_t *value)
            !execution_observe(context, HPCLANG_RPL_EXECUTION_CODE, at, *value);
 }
 
+static int execution_derive(void *context, uint32_t pc,
+                            const struct hpclang_rpl_execution_subtraction *expression,
+                            uint32_t tokens[5])
+{
+    struct execution_probe *probe = context;
+    if (probe->expression_count)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    probe->expression = *expression;
+    probe->expression_pc = pc;
+    ++probe->expression_count;
+    for (unsigned digit = 0; digit < 5; ++digit)
+        tokens[digit] = 0x400001 + digit;
+    return 0;
+}
+
+static int execution_source(void *context, uint32_t token,
+                            struct hpclang_rpl_code_origin_cell *cell)
+{
+    struct execution_probe *probe = context;
+    if (!token || token > 0x100000)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED; /* Never treat expression IDs as memory. */
+    uint8_t value;
+    if (!hpclang_rpl_stock_view_saturn(&probe->view, token - 1, &value))
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    int result = execution_observe(context, HPCLANG_RPL_EXECUTION_DATA, token - 1, value);
+    if (!result)
+        *cell = (struct hpclang_rpl_code_origin_cell){1, token - 1, value};
+    return result;
+}
+
 static int execution_visit(void *context, uint32_t pc,
                            const struct hpclang_rpl_code_execution *state,
                            const struct hpclang_rpl_code_step_uses *uses)
 {
     (void)pc;
-    (void)state;
     struct execution_probe *probe = context;
     probe->uses += uses->count;
     for (unsigned i = 0; i < uses->count; ++i) {
         const struct hpclang_rpl_code_address_use *use = &uses->addresses[i];
+        unsigned expression_digits = 0;
+        for (unsigned digit = 0; digit < 5; ++digit)
+            expression_digits += use->origins[digit] >= 0x400000;
+        if (expression_digits) {
+            if (expression_digits != 5 || probe->expression_count != 1 || use->adjustment ||
+                use->generated || use->value != probe->expression.value)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                if (use->origins[digit] != 0x400001 + digit)
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            struct hpclang_rpl_reference_edit edits[7];
+            struct hpclang_rpl_reference_edit_builder builder;
+            int result = hpclang_rpl_reference_edits_begin(&builder, edits, 7);
+            if (!result)
+                result = hpclang_rpl_execution_plan_subtraction(
+                    &builder, &probe->expression, probe->expression.left.value,
+                    probe->expression.right.value, use->value, execution_source, probe);
+            if (result)
+                return result;
+            if (builder.count != 7)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            for (unsigned cell = 0; cell < builder.count; ++cell)
+                if (edits[cell].expected != edits[cell].value)
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+            ++probe->expression_uses;
+            probe->expression_sources = builder.count;
+        }
         if (use->generated) {
             const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
             const struct hpclang_rpl_reference_mappings mappings = {1, 1, 1};
@@ -727,11 +785,8 @@ static int execution_visit(void *context, uint32_t pc,
         probe->derived_source = first - 1;
         probe->adjustment = use->adjustment;
     }
-    for (unsigned i = 0; i < uses->count; ++i)
-        if (uses->addresses[i].kind == HPCLANG_RPL_CODE_USE_MEMORY_TARGET &&
-            ++probe->indirect_targets == 3)
-            return 1; /* Includes two 81BD steps; never a relocation certificate. */
-    return 0;
+    return state->control.pc == 0x2c34 && probe->expression_uses == 1;
+    /* This selected boundary is not a complete relocation certificate. */
 }
 
 static int execution_guard_read(void *context, uint32_t mapping, uint32_t at, uint8_t *value)
@@ -766,7 +821,8 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         execution_observe,
         execution_token,
         execution_visit,
-        probe};
+        probe,
+        execution_derive};
     uint32_t steps;
     int stop = hpclang_rpl_execution_collect(boot, &execution, 0x200000, 64, &probe->state, &steps);
     const struct hpclang_rpl_reference_reader guards = {execution_guard_read, probe};
@@ -778,9 +834,9 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     uint32_t length;
     if (hpclang_rpl_directory_find(&reader, home, (const uint8_t *)"EXECOBS", 7, &entry) ||
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
-        length != 133)
+        length != 165)
         goto done;
-    uint32_t words[16] = {1,
+    uint32_t words[20] = {2,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,
@@ -795,8 +851,12 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                           probe->derived_uses,
                           probe->derived_source,
                           probe->adjustment,
-                          probe->generated_uses};
-    for (unsigned i = 0; i < 16; ++i)
+                          probe->generated_uses,
+                          probe->expression_count,
+                          probe->expression_uses,
+                          probe->expression_pc,
+                          probe->expression_sources};
+    for (unsigned i = 0; i < 20; ++i)
         if (probe_write_word(io, entry.object_address + 10 + i * 8, words[i], 8))
             goto done;
     result = 0;

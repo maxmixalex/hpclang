@@ -2346,8 +2346,94 @@ static void subtract_fields(void)
     assert(!memcmp(&origins, &old, sizeof origins) && length == 99);
 }
 
+struct derived_fixture
+{
+    struct hpclang_rpl_execution_subtraction expression;
+    uint32_t instruction;
+    unsigned count, bad_token;
+    int error;
+};
+
+static int retain_subtraction(void *context, uint32_t instruction,
+                              const struct hpclang_rpl_execution_subtraction *expression,
+                              uint32_t tokens[5])
+{
+    struct derived_fixture *f = context;
+    f->expression = *expression;
+    f->instruction = instruction;
+    ++f->count;
+    for (unsigned digit = 0; digit < 5; ++digit)
+        tokens[digit] = f->bad_token && digit == 4 ? 0 : 0x400000 + 5 * f->count + digit;
+    return f->error;
+}
+
+static void derived_execution(void)
+{
+    struct image code = {.size = 128, .fail = UINT32_MAX};
+    encode(&code, 0, 3, 0xa6b);  /* A=A-C.B */
+    encode(&code, 3, 2, 0x6d);   /* C=A.A */
+    encode(&code, 5, 4, 0x3b18); /* PC=C */
+    encode(&code, 9, 3, 0xe03);  /* LC(1) E */
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    struct hpclang_rpl_code_execution initial = {0};
+    initial.values.registers[0] = 0x2911;
+    initial.values.registers[2] = 0x18d0a;
+    seed_origins(&initial.origins);
+    struct derived_fixture f = {0};
+    struct hpclang_rpl_code_execution state = initial;
+    struct hpclang_rpl_code_step_uses uses;
+    assert(!hpclang_rpl_code_execution_step_derived(&reader, &reader, 128, &state, data_token,
+                                                    retain_subtraction, &f, &uses));
+    assert(f.count == 1 && f.instruction == 0 && f.expression.first == 0 &&
+           f.expression.nibbles == 2 && f.expression.value == 0x2907 && !f.expression.carry);
+    assert(f.expression.left.value == 0x2911 && f.expression.right.value == 0x18d0a);
+    assert(!memcmp(f.expression.left.origins, initial.origins.registers[0], 5 * sizeof(uint32_t)));
+    assert(!memcmp(f.expression.right.origins, initial.origins.registers[2], 5 * sizeof(uint32_t)));
+    for (unsigned digit = 0; digit < 5; ++digit)
+        assert(state.origins.registers[0][digit] == 0x400005 + digit);
+    assert(!hpclang_rpl_code_execution_step_derived(&reader, &reader, 125, &state, data_token,
+                                                    retain_subtraction, &f, &uses));
+    assert(!hpclang_rpl_code_execution_step_derived(&reader, &reader, 123, &state, data_token,
+                                                    retain_subtraction, &f, &uses));
+    assert(f.count == 1 && state.control.pc == 0x2907 && uses.count == 1);
+    for (unsigned digit = 0; digit < 5; ++digit)
+        assert(uses.addresses[0].origins[digit] == 0x400005 + digit);
+    state.control.pc = 9;
+    assert(!hpclang_rpl_code_execution_step_derived(&reader, &reader, 119, &state, data_token,
+                                                    retain_subtraction, &f, &uses));
+    assert(f.count == 1 && state.origins.registers[2][0] == 0x10000b);
+    for (unsigned digit = 1; digit < 5; ++digit)
+        assert(state.origins.registers[2][digit] == 0x400005 + digit);
+    /* A later derivation can refer to earlier expression tokens. The caller
+     * must expand that dependency graph, never resolve it as physical memory. */
+    state.control.pc = 0;
+    assert(!hpclang_rpl_code_execution_step_derived(&reader, &reader, 128, &state, data_token,
+                                                    retain_subtraction, &f, &uses));
+    assert(f.count == 2);
+    for (unsigned digit = 0; digit < 5; ++digit) {
+        assert(f.expression.left.origins[digit] == 0x400005 + digit);
+        assert(state.origins.registers[0][digit] == 0x40000a + digit);
+    }
+    for (unsigned mode = 0; mode < 3; ++mode) {
+        state = initial;
+        struct hpclang_rpl_code_step_uses before;
+        memset(&before, 0xa5, sizeof before);
+        uses = before;
+        f = (struct derived_fixture){.error = mode == 0   ? -77
+                                              : mode == 1 ? 1
+                                                          : 0,
+                                     .bad_token = mode == 2};
+        assert(hpclang_rpl_code_execution_step_derived(&reader, &reader, 128, &state, data_token,
+                                                       retain_subtraction, &f, &uses) ==
+               (mode == 0 ? -77 : HPCLANG_RPL_SPAN_MALFORMED));
+        assert(!memcmp(&state, &initial, sizeof state));
+        assert(!memcmp(&uses, &before, sizeof uses));
+    }
+}
+
 int main(void)
 {
+    derived_execution();
     subtract_fields();
     generated_return_plans();
     computed_origin_transfers();

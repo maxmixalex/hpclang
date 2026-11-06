@@ -65,8 +65,9 @@ int hpclang_rpl_execution_collect(const struct hpclang_boot_info *boot,
     while (*steps < budget) {
         struct hpclang_rpl_code_step_uses uses;
         pc = state->control.pc;
-        result = hpclang_rpl_code_execution_step(&instructions, &memory, 0x100000u - pc, state,
-                                                 io->token, io->context, &uses);
+        result =
+            hpclang_rpl_code_execution_step_derived(&instructions, &memory, 0x100000u - pc, state,
+                                                    io->token, io->derive, io->context, &uses);
         if (error || result)
             return error ? error : result;
         ++*steps;

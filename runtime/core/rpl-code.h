@@ -258,6 +258,32 @@ int hpclang_rpl_code_control_step(const struct hpclang_rpl_reader *instructions,
 typedef int (*hpclang_rpl_code_token_fn)(void *context, unsigned data, uint32_t address,
                                          uint8_t value, uint32_t *token);
 
+struct hpclang_rpl_execution_value
+{
+    uint32_t value, origins[5], adjustment;
+};
+
+struct hpclang_rpl_execution_subtraction
+{
+    struct hpclang_rpl_execution_value left, right;
+    uint32_t first, nibbles, decimal, value, carry;
+};
+
+/* Optional subtraction recorder. Save the immutable relation and return five
+ * nonzero tokens naming its RESULT digits, in a namespace disjoint from all
+ * original/native sources. These tokens are expression facts, never writable
+ * physical cells. Their resolver must reject them until the expression is
+ * expanded/qualified; do not pass them through a physical-address resolver.
+ * Copies/exchanges propagate these ordinary nibble facts. Partial overwrites
+ * replace affected digits. Nested operands can name older records; this does
+ * not implement recursive planning. Caller owns bounded storage and guards
+ * instruction/P/mode. Return zero or a negative error; positive is malformed.
+ * On any step/collection failure discard speculative records and observations.
+ * Currently emitted for BfA fields wholly within the low five digits only. */
+typedef int (*hpclang_rpl_code_derive_fn)(
+    void *context, uint32_t instruction, const struct hpclang_rpl_execution_subtraction *expression,
+    uint32_t tokens[5]);
+
 /* Evaluate one supported data instruction from caller-proven incoming values,
  * propagating origins alongside values. Supports inspected literals, copies,
  * exchanges, memory LOADS, D0/D1 immediate adjustments, SETHEX/SETDEC, D.A+1
@@ -336,6 +362,14 @@ int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instruction
                                     struct hpclang_rpl_code_execution *state,
                                     hpclang_rpl_code_token_fn token, void *context,
                                     struct hpclang_rpl_code_step_uses *uses);
+
+/* Same evaluator, with optional caller-owned arithmetic result records. */
+int hpclang_rpl_code_execution_step_derived(const struct hpclang_rpl_reader *instructions,
+                                            const struct hpclang_rpl_reader *data, uint32_t limit,
+                                            struct hpclang_rpl_code_execution *state,
+                                            hpclang_rpl_code_token_fn token,
+                                            hpclang_rpl_code_derive_fn derive, void *context,
+                                            struct hpclang_rpl_code_step_uses *uses);
 
 /* Validate a collected generated return against its guarded producing call,
  * and plan that call's branch operand for a caller-qualified move. The return
