@@ -3144,6 +3144,38 @@ static void derived_execution(void)
     }
 }
 
+static void sum_inspection(void)
+{
+    struct image image = {.data = {12, 2}, .size = 2, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    struct hpclang_rpl_code_values values = {0};
+    values.registers[HPCLANG_RPL_CODE_C] = UINT64_C(0x123456789abfffff);
+    values.registers[HPCLANG_RPL_CODE_A] = 1;
+    struct hpclang_rpl_code_sum sum;
+    assert(!hpclang_rpl_code_sum_inspect(&reader, 0, 2, &values, &sum));
+    assert(sum.result == UINT64_C(0x123456789ab00000) && sum.carry == 1);
+    assert(sum.left == HPCLANG_RPL_CODE_C && sum.right == HPCLANG_RPL_CODE_A);
+    assert(sum.destination == HPCLANG_RPL_CODE_C && sum.nibbles == 5 && !sum.first);
+    struct hpclang_rpl_code_sum before = sum;
+    for (unsigned i = 0; i < 2; ++i) {
+        image.fail = i;
+        assert(hpclang_rpl_code_sum_inspect(&reader, 0, 2, &values, &sum) < 0);
+        assert(!memcmp(&before, &sum, sizeof sum));
+    }
+    image.fail = UINT32_MAX;
+    assert(hpclang_rpl_code_sum_inspect(&reader, 0, 1, &values, &sum) == HPCLANG_RPL_SPAN_BOUNDS);
+    values.decimal = 1;
+    assert(hpclang_rpl_code_sum_inspect(&reader, 0, 2, &values, &sum) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&before, &sum, sizeof sum));
+    values.registers[HPCLANG_RPL_CODE_C] = UINT64_C(0xabcdef0000099999);
+    assert(!hpclang_rpl_code_sum_inspect(&reader, 0, 2, &values, &sum));
+    assert(sum.result == UINT64_C(0xabcdef0000000000) && sum.carry == 1);
+    values.registers[HPCLANG_RPL_CODE_P] = 16;
+    assert(hpclang_rpl_code_sum_inspect(&reader, 0, 2, &values, &sum) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+}
+
 struct unit_test
 {
     int error;
@@ -3401,6 +3433,7 @@ static void numeric_predicates(void)
 
 int main(void)
 {
+    sum_inspection();
     selected_unit_steps();
     constant_steps();
     predicate_steps();

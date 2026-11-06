@@ -78,6 +78,66 @@ int hpclang_rpl_code_predicate_inspect(const struct hpclang_rpl_reader *reader,
     return 0;
 }
 
+int hpclang_rpl_code_sum_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                 uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                 struct hpclang_rpl_code_sum *sum)
+{
+    if (!reader || !reader->read_nibble || !values || !sum)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000 || !limit || limit > 0x100000 - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int status = read_word(reader, instruction, 1, &opcode);
+    if (status)
+        return status;
+    if (opcode != 12 && opcode != 10)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned length = opcode == 12 ? 2 : 3;
+    if (limit < length)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t tail;
+    status = read_word(reader, instruction + 1, length - 1, &tail);
+    if (status)
+        return status;
+    unsigned field = opcode == 12 ? 8 : tail & 15;
+    unsigned operation = opcode == 12 ? tail : tail >> 4;
+    if (operation >= 12 || (opcode == 10 && field >= 8))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->decimal > 1)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    static const unsigned lefts[12] = {0, 1, 2, 3, 0, 1, 2, 3, 1, 2, 0, 2};
+    static const unsigned rights[12] = {1, 2, 0, 2, 0, 1, 2, 3, 0, 1, 2, 3};
+    static const unsigned firsts[9] = {0, 0, 2, 0, 15, 3, 0, 0, 0};
+    static const unsigned widths[9] = {1, 1, 1, 3, 1, 12, 2, 16, 5};
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    struct hpclang_rpl_code_sum next = {.instruction = instruction,
+                                        .length = length,
+                                        .left = lefts[operation],
+                                        .right = rights[operation],
+                                        .destination = lefts[operation],
+                                        .first = field ? firsts[field] : p,
+                                        .nibbles = field == 1 ? p + 1 : widths[field],
+                                        .decimal = values->decimal,
+                                        .p = p};
+    next.left_value = values->registers[next.left];
+    next.right_value = values->registers[next.right];
+    next.result = next.left_value;
+    unsigned radix = next.decimal ? 10 : 16;
+    for (unsigned i = next.first; i < next.first + next.nibbles; ++i) {
+        unsigned left = (next.left_value >> (4 * i)) & 15;
+        unsigned right = (next.right_value >> (4 * i)) & 15;
+        if (left >= radix || right >= radix)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        unsigned digit = left + right + next.carry;
+        next.carry = digit >= radix;
+        if (next.carry)
+            digit -= radix;
+        next.result = (next.result & ~(UINT64_C(15) << (4 * i))) | ((uint64_t)digit << (4 * i));
+    }
+    *sum = next;
+    return 0;
+}
+
 int hpclang_rpl_code_unit_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
                                   uint32_t limit, const struct hpclang_rpl_code_values *values,
                                   struct hpclang_rpl_code_unit *unit)

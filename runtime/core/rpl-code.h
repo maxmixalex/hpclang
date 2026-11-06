@@ -424,6 +424,20 @@ struct hpclang_rpl_code_constant
 typedef int (*hpclang_rpl_code_constant_fn)(void *context,
                                             const struct hpclang_rpl_code_constant *constant,
                                             uint32_t tokens[16]);
+struct hpclang_rpl_code_sum
+{
+    uint64_t left_value, right_value, result;
+    uint32_t instruction, length, left, right, destination, first, nibbles, decimal, carry, p;
+};
+/* Inspect C0..CB address-field and Af0..AfB selected-field sums (f=0..7).
+ * Both operands are retained; only the selected destination digits change.
+ * Canonical BCD is required in decimal mode. Carry is normalized logical truth.
+ * This pure inspector neither executes nor supplies provenance; errors leave
+ * output unchanged. Execution integration and source repair are separate. */
+int hpclang_rpl_code_sum_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                 uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                 struct hpclang_rpl_code_sum *sum);
+
 struct hpclang_rpl_code_unit
 {
     uint64_t before, after;
