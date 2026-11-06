@@ -43,8 +43,137 @@ static void put(struct plan_fixture *f, unsigned at, uint32_t value)
         f->memory[at + i] = (value >> (4 * i)) & 15;
 }
 
+static void subtraction_plans(void)
+{
+    static const uint32_t cases[][7] = {
+        {0x2911, 0x18d0a, 0x2907, 0x3911, 0x18d0a, 0x3907, 0},
+        {0x2911, 0x18d0a, 0x2907, 0x3913, 0x18d0c, 0x3907, 0},
+        {0x2900, 0x18d0a, 0x29f6, 0x2a00, 0x18d0a, 0x2af6, 0},
+        {0x2910, 0x1101, 0x2909, 0x3910, 0x1101, 0x3909, 1},
+        {0x2911, 0x18d0a, 0x2907, 0x3911, 0x18d0a, 0x3907, 0},
+    };
+    for (unsigned n = 0; n < sizeof cases / sizeof cases[0]; ++n) {
+        struct plan_fixture f = {0};
+        uint32_t adjustment = n == 4 ? 5 : 0;
+        put(&f, 32, cases[n][0] - adjustment);
+        put(&f, 64, cases[n][1]);
+        f.memory[0] = 11;
+        f.memory[1] = 6;
+        f.memory[2] = 10;
+        struct hpclang_rpl_code_execution state = {0};
+        state.values.registers[0] = cases[n][0];
+        state.values.registers[2] = cases[n][1];
+        state.values.decimal = cases[n][6];
+        struct hpclang_rpl_execution_subtraction expression = {.left.value = cases[n][0],
+                                                               .right.value = cases[n][1],
+                                                               .nibbles = 2,
+                                                               .decimal = cases[n][6],
+                                                               .value = cases[n][2]};
+        expression.left.adjustment = state.origins.adjustment[0] = adjustment;
+        for (unsigned i = 0; i < 5; ++i) {
+            expression.left.origins[i] = state.origins.registers[0][i] = 33 + i;
+            expression.right.origins[i] = state.origins.registers[2][i] = 65 + i;
+        }
+        const struct hpclang_rpl_reader reader = {read_cell, &f};
+        struct hpclang_rpl_code_step_uses uses;
+        assert(!hpclang_rpl_code_execution_step(&reader, &reader, 128, &state, source_token, NULL,
+                                                &uses));
+        assert(state.values.registers[0] == expression.value);
+        expression.carry = state.values.carry;
+        struct hpclang_rpl_reference_edit edits[10];
+        struct hpclang_rpl_reference_edit_builder builder;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 10));
+        assert(!hpclang_rpl_execution_plan_subtraction(&builder, &expression, cases[n][3],
+                                                       cases[n][4], cases[n][5], resolve_cell, &f));
+        assert(builder.count == 7 && f.calls == 10);
+        for (unsigned i = 0; i < builder.count; ++i) {
+            assert(edits[i].width == 1 && f.memory[edits[i].field] == edits[i].expected);
+            f.memory[edits[i].field] = edits[i].value;
+        }
+        state.control.pc = 0;
+        for (unsigned operand = 0; operand < 2; ++operand) {
+            uint32_t value = 0;
+            for (unsigned i = 0; i < 5; ++i)
+                value |= (uint32_t)f.memory[(operand ? 64 : 32) + i] << (4 * i);
+            state.values.registers[operand ? 2 : 0] = value + (operand ? 0 : adjustment);
+        }
+        assert(!hpclang_rpl_code_execution_step(&reader, &reader, 128, &state, source_token, NULL,
+                                                &uses));
+        assert(state.values.registers[0] == cases[n][5] && state.values.carry == expression.carry);
+        put(&f, 32, cases[n][0] - adjustment);
+        put(&f, 64, cases[n][1]);
+        for (unsigned i = 0; i < 7; ++i) {
+            unsigned at = (i < 5 ? 32 : 64) + i % 5;
+            f.memory[at] ^= 1;
+            assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 10));
+            assert(hpclang_rpl_execution_plan_subtraction(&builder, &expression, cases[n][3],
+                                                          cases[n][4], cases[n][5], resolve_cell,
+                                                          &f) == HPCLANG_RPL_SPAN_MALFORMED);
+            assert(!builder.count && builder.error);
+            f.memory[at] ^= 1;
+        }
+        for (unsigned mode = 0; mode < 8; ++mode) {
+            struct hpclang_rpl_execution_subtraction bad = expression;
+            if (mode == 0)
+                bad.value ^= 1;
+            if (mode == 1)
+                bad.carry ^= 1;
+            if (mode == 2)
+                bad.left.origins[0] = 0;
+            if (mode == 3)
+                bad.right.origins[1] = 0;
+            if (mode == 4)
+                bad.nibbles = 6;
+            if (mode == 5)
+                bad.decimal = 2;
+            if (mode == 6)
+                bad.right.adjustment = 1;
+            if (mode == 7)
+                bad.first = 5;
+            assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 10));
+            assert(hpclang_rpl_execution_plan_subtraction(&builder, &bad, cases[n][3], cases[n][4],
+                                                          cases[n][5], resolve_cell, &f) < 0);
+            assert(!builder.count && builder.error);
+        }
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 6));
+        assert(hpclang_rpl_execution_plan_subtraction(&builder, &expression, cases[n][3],
+                                                      cases[n][4], cases[n][5], resolve_cell,
+                                                      &f) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!builder.count);
+        for (unsigned i = 2; i < 5; ++i) {
+            expression.right.origins[i] = 0;
+            f.memory[64 + i] ^= 1;
+        }
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 7));
+        assert(!hpclang_rpl_execution_plan_subtraction(&builder, &expression, cases[n][3],
+                                                       cases[n][4], cases[n][5], resolve_cell, &f));
+        assert(builder.count == 7); /* Unused right digits are not dependencies. */
+    }
+    struct plan_fixture f = {0};
+    put(&f, 32, 0x2911);
+    struct hpclang_rpl_execution_subtraction alias = {
+        .left.value = 0x2911, .right.value = 0x2911, .nibbles = 2, .value = 0x2900};
+    for (unsigned i = 0; i < 5; ++i)
+        alias.left.origins[i] = alias.right.origins[i] = 33 + i;
+    struct hpclang_rpl_reference_edit edits[10];
+    struct hpclang_rpl_reference_edit_builder builder;
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 10));
+    assert(hpclang_rpl_execution_plan_subtraction(&builder, &alias, 0x3912, 0x2911, 0x3901,
+                                                  resolve_cell, &f) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!builder.count);
+    assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 10));
+    assert(!hpclang_rpl_execution_plan_subtraction(&builder, &alias, 0x3911, 0x2911, 0x3900,
+                                                   resolve_cell, &f));
+    assert(builder.count == 5);
+    assert(hpclang_rpl_execution_plan_subtraction(&builder, &alias, 0x3910, 0x2911, 0x39ff,
+                                                  resolve_cell,
+                                                  &f) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!builder.count); /* A borrow change must not change a later branch. */
+}
+
 void test_execution_plans(void)
 {
+    subtraction_plans();
     struct plan_fixture f = {0};
     const uint8_t program[] = {1, 4, 7, 8, 0, 8, 14}; /* C=DAT1.A; PC=(C). */
     memcpy(f.memory, program, sizeof program);

@@ -85,4 +85,36 @@ int hpclang_rpl_execution_plan_uses(struct hpclang_rpl_reference_edit_builder *b
                                     const uint32_t *replacements,
                                     hpclang_rpl_code_origin_resolve_fn resolve, void *context);
 
+struct hpclang_rpl_execution_value
+{
+    uint32_t value, origins[5], adjustment;
+};
+
+struct hpclang_rpl_execution_subtraction
+{
+    struct hpclang_rpl_execution_value left, right;
+    uint32_t first, nibbles, decimal, value, carry;
+};
+
+/* Plan both sources of a caller-proven selected-field subtraction. Values are
+ * low 20-bit values; the selected field must lie within these five nibbles.
+ * Verify original result/borrow against both operands, and proposed result
+ * against both caller-qualified replacements. Preserve borrow so this repair
+ * cannot silently change subsequent carry-dependent control flow. Resolve all
+ * left origins and selected right origins, including unchanged digits; unused
+ * right digits need no origins and cannot be changed. Right-side modular
+ * adjustments are not supported. Merge with the SAME
+ * normalized builder used for other consumed values. Conflicting aliases,
+ * stale/unknown sources or any error invalidate the whole batch.
+ *
+ * The caller records operands BEFORE execution, guards the instruction/P/mode,
+ * and proves this relation supplies the consumed value. No inference from a
+ * numeric match, automatic expression tracking, operand selection, or complete
+ * coverage is provided. Other uses/effects of both repaired operands remain
+ * independent obligations. Inputs/storage must be stable and disjoint. */
+int hpclang_rpl_execution_plan_subtraction(
+    struct hpclang_rpl_reference_edit_builder *builder,
+    const struct hpclang_rpl_execution_subtraction *expression, uint32_t left, uint32_t right,
+    uint32_t replacement, hpclang_rpl_code_origin_resolve_fn resolve, void *context);
+
 #endif
