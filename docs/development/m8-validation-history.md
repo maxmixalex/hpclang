@@ -5684,3 +5684,48 @@ claim. Evidence: /work/nov06-predicate-step-final/{unit.log,stock.json,
 code-analysis.json,plan-analysis.json,artifact-audit.json}. Production Stage1,
 full reference closure and broader M8 goals remain incomplete. The batch remains
 local while prior exact-head CI is unfinished; the two PR14 USB failures remain.
+
+## 2026-11-06 - Constant provenance and qualified 87-step continuation
+
+Local a77dbc68 records constant assignments as retained producer facts, with exact
+assignment metadata, captured P and its source/offset. Optional callbacks return
+nonzero fact tokens for selected digits; unknown zero tokens never mean literal
+zero. Unified step_observed/collect_observed callback bundles retain all existing
+entry-point behavior and avoid extending each positional callback list again.
+Legacy callers still produce unknown constant origins and reject predicates.
+
+plan_constant re-decodes the instruction, checks the retained assignment/digit,
+requires the proven constant unchanged, and constrains every producer instruction
+cell. Re-decoding with alternate P identifies P-dependent field selection, whose
+captured source is constrained too. Derived P facts use bounded owner resolution.
+The maintained fixture rejects recursive/future constant producers by strictly
+decreasing fact indices. No constant is represented as a fake physical cell.
+Tests cover all eight zero-assignment fields at all sixteen P values, callback
+errors/missing tokens, stale descriptors/P, capacity exhaustion and cyclic facts.
+
+Both real captured comparisons now plan successfully, alongside all 39 consumed
+address uses, eight branch operands, CONFIG and six store effects. The common
+batch contains 159 physical source constraints (four changed). Missing constant/P
+sources, changed constant values and stale field metadata reject and clear the
+batch. Actual catalog movement followed by 87 original-ROM transitions passes on
+both models, with 32 final stored digits, temporal shadow reads, unchanged Flash,
+native configuration and four zero-write rejection controls. Stop remains before
+unsupported 0xb28e; complete execution/reference closure is not claimed.
+Evidence: /work/nov06-constant/{continuation/collected-execution.json,plan/plan.json,
+writeback/writeback.json}.
+
+The maintained Stock fixture now uses the same constant/predicate planners and
+passes 87 steps, six stores, 159 source constraints and all 32 final readbacks on
+both models, including normal return and catalog checks. EXECOBS version 8 retains
+116 bytes. Its compile-time 40 KiB workspace bound and fixed capacities remain.
+Fourteen ASan/UBSan targets, 27,648 original-ROM predicate regression cases, six
+launcher audits, Ruff and ARM analyzers pass. Own ARM frames: observed step 1872,
+data helper 1432, constant planner 136 bytes; no aggregate stack bound is inferred.
+Evidence: /work/nov06-constant-final/{unit.log,stock.json,code-analysis.json,
+plan-analysis.json,analysis.json,artifact-audit.json}, and
+/work/nov06-long-continuation/constant-predicate-regression/rom.json.
+
+The local batch remains unpushed while prior exact-head CI is unfinished. PR14's
+two pre-entry USB failures remain unresolved. Production Stage1 still stops at
+0x67d2; public libraries, Port1, retained Port2 goals and all other M8 acceptance
+conditions remain open. This progress does not change the approved scope.
