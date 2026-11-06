@@ -4669,3 +4669,45 @@ remain unresolved; no rerun requested. #31 98094351 has two failed Quality jobs
 127654849622/127654830338, both reporting only stage1.c clang-format violations.
 The C correction changes whitespace only. Full checking also found Python line wrapping in call_roots.py; its correction preserves the AST. All 621 native files and 146 LF-normalized Python files pass formatting. Remaining CI jobs are ongoing.
 Logs: research/nov06-ci-<job>.log. No milestone is newly declared complete.
+
+## 2026-11-06 — Selected-field subtraction and the next provenance gap
+
+Implementation c9a5139f evaluates BfA (A=A-C, fields 0..7), including P/WP
+fields, independent borrow and decimal/hexadecimal modes. Unselected register
+digits survive. Selected invalid BCD digits reject atomically. Written source
+tokens are cleared; overlapping modular-offset expressions are invalidated.
+The two-operand expression is not yet represented for relocation planning.
+
+Twelve sanitizer targets pass, including full mutation allocation checks.
+Field/P/mode tests cover output and origin preservation/invalidation and each
+instruction read failure. 160 controlled original-ROM cases pass across both
+models. The ROM fixture executes a real P-setting instruction from a distinct
+old P value so interpreter caches are updated; directly overwriting P alone
+initially produced an inconsistent decimal fixture, corrected before acceptance.
+No ROM behavior was weakened to match the implementation.
+
+Both saved-entry C traces now match all registers, flags, PC and return stack
+for 30 transitions, stopping unsupported at 0x2c34. The indirect use at 0x2903
+has value 0x2907 and two unknown low source digits following A-C; retaining
+numerical execution does not establish repair authority. This is a concrete
+remaining source-expression gap, not full reference coverage.
+
+ARM static analysis has zero diagnostics. At -O2 the data-step and execution-step
+own frames are 1336/1712 bytes, not total call-chain bounds. All six launchers
+pass independent payload/decompression/prefix checks. Fresh maintained Stock
+regression passes on HP49g+/HP50g with source/artifact/state hashes checked
+before and after, retaining its 23-step bounded probe and settled return. It
+does not claim the new 30-step trace is integrated into live mutation planning.
+Evidence: /work/nov06-subtract/{unit.log,rom-matrix.json,code.plist,code.su,
+artifact-audit.json,stock.json} and
+/work/nov06-subtract-continuation/collected-execution.json.
+
+Exact-head audit: #31 1edc4599 has two pending/four queued workflows and seven
+queued jobs; no failure reported yet. #13 remains all-green at its head but conflicts with accepted main. During
+the mainline Stock wait, #18 integration 8956de50 resolves documentation-only
+conflicts with 89fe4a44, preserving both histories. Four actual unittest cases,
+Ruff, ShellCheck and strict docs pass; runtime entry and regression source blobs
+are identical to green 1b24a09f. Integration still needs submission/new CI;
+neither branch was merged.
+#14 retains two diagnosed pre-entry host-gate transfer failures, unresolved.
+M8.0 and M8 overall remain incomplete.
