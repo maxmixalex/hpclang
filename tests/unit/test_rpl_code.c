@@ -279,6 +279,53 @@ static void arithmetic_modes(void)
         }
 }
 
+static void register_unit_arithmetic(void)
+{
+    struct image code = {.size = 128, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    const uint32_t inputs[] = {0, 1, 9, 0x10, 0x10000, 0x99999, 0xfffff, 0xa0001};
+    const uint32_t increment[2][8] = {{1, 2, 0xa, 0x11, 0x10001, 0x9999a, 0, 0xa0002},
+                                      {1, 2, 0x10, 0x11, 0x10001, 0, 0, 0}};
+    const uint32_t decrement[2][8] = {{0xfffff, 0, 8, 0xf, 0xffff, 0x99998, 0xffffe, 0xa0000},
+                                      {0x99999, 0, 8, 9, 0x9999, 0x99998, 0, 0}};
+    for (unsigned reg = 0; reg < 4; ++reg)
+        for (unsigned down = 0; down < 2; ++down)
+            for (unsigned decimal = 0; decimal < 2; ++decimal)
+                for (unsigned incoming = 0; incoming < 2; ++incoming)
+                    for (unsigned n = 0; n < 8; ++n) {
+                        encode(&code, 0, 2, down ? 0xcc + reg * 16 : 0x4e + reg * 16);
+                        struct hpclang_rpl_code_execution state = {0};
+                        seed_origins(&state.origins);
+                        state.origins.adjustment[reg] = 0xffffb;
+                        state.values.registers[reg] = UINT64_C(0xfedcba9876500000) | inputs[n];
+                        state.values.registers[HPCLANG_RPL_CODE_P] = 15;
+                        state.values.decimal = decimal;
+                        state.values.carry = state.control.carry = incoming;
+                        struct hpclang_rpl_code_execution before = state, expected = state;
+                        struct hpclang_rpl_code_step_uses uses, untouched;
+                        memset(&untouched, 0xa5, sizeof untouched);
+                        uses = untouched;
+                        int result = hpclang_rpl_code_execution_step(&reader, NULL, 128, &state,
+                                                                     data_token, NULL, &uses);
+                        if (decimal && n >= 6) {
+                            assert(result == HPCLANG_RPL_SPAN_UNSUPPORTED);
+                            assert(!memcmp(&state, &before, sizeof state));
+                            assert(!memcmp(&uses, &untouched, sizeof uses));
+                            continue;
+                        }
+                        uint32_t value = down ? decrement[decimal][n] : increment[decimal][n];
+                        expected.values.registers[reg] = UINT64_C(0xfedcba9876500000) | value;
+                        expected.values.carry = expected.control.carry =
+                            down ? n == 0 : inputs[n] == (decimal ? 0x99999u : 0xfffffu);
+                        expected.control.pc = 2;
+                        expected.origins.adjustment[reg] = 0;
+                        for (unsigned digit = 0; digit < 5; ++digit)
+                            expected.origins.registers[reg][digit] = 0;
+                        assert(!result && !uses.count && !uses.has_branch);
+                        assert(!memcmp(&state, &expected, sizeof state));
+                    }
+}
+
 static void execution_steps(void)
 {
     struct image code = {.size = 128, .fail = UINT32_MAX};
@@ -2440,6 +2487,7 @@ int main(void)
     native_threaded_exit();
     execution_steps();
     arithmetic_modes();
+    register_unit_arithmetic();
     control_steps();
     data_steps();
     origin_repair_plans();

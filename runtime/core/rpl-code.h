@@ -286,12 +286,13 @@ typedef int (*hpclang_rpl_code_derive_fn)(
 
 /* Evaluate one supported data instruction from caller-proven incoming values,
  * propagating origins alongside values. Supports inspected literals, copies,
- * exchanges, memory LOADS, D0/D1 immediate adjustments, SETHEX/SETDEC, D.A+1
+ * exchanges, memory LOADS, D0/D1 immediate adjustments, SETHEX/SETDEC, A..D.A +/- 1
  * and BfA (A=A-C, fields 0..7). These arithmetic instructions use the proven
  * decimal flag (0 hexadecimal, 1 decimal); selected decimal input digits above
- * nine are unsupported. Arithmetic clears the affected origins. BfA ignores
- * incoming carry, sets carry to borrow, and preserves unselected digits.
- * Its two-operand expression is not yet represented for source repair.
+ * nine are unsupported. Arithmetic clears the affected origins. Increment,
+ * decrement and BfA ignore incoming carry, set carry to overflow/borrow and
+ * preserve unselected digits. This entry does not retain derived expressions;
+ * execution_step_derived can retain supported BfA expressions through a callback.
  * No stores or control
  * transfers: an unsupported instruction stops the caller's walk. P, D0/D1 and
  * carry/decimal must be canonical. NEXT_PC captures deliberately receive unknown

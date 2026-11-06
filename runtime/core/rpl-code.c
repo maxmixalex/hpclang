@@ -193,24 +193,36 @@ static int data_step(const struct hpclang_rpl_reader *instructions,
             size = 3;
         } else if (opcode == 0x40 || opcode == 0x50) {
             next.decimal = opcode == 0x50;
-        } else if (opcode == 0x7e) {
-            uint32_t old = (uint32_t)next.registers[HPCLANG_RPL_CODE_D] & 0xfffffu;
+        } else if (((opcode & 15u) == 14 && (opcode >> 4) >= 4 && (opcode >> 4) <= 7) ||
+                   ((opcode & 15u) == 12 && (opcode >> 4) >= 12)) {
+            /* E4..E7 / CC..CF: increment/decrement A..D's address field.
+             * Incoming carry is ignored. The result is computed, so do not
+             * leave original-cell tokens attached to its changed low digits. */
+            unsigned decrement = (opcode & 15u) == 12;
+            unsigned reg = (opcode >> 4) - (decrement ? 12u : 4u);
+            uint32_t old = (uint32_t)next.registers[reg] & 0xfffffu;
             uint32_t value = 0, carry = 1;
             for (unsigned i = 0; i < 5; ++i) {
                 unsigned digit = (old >> (4 * i)) & 15u;
                 if (next.decimal && digit > 9)
                     return HPCLANG_RPL_SPAN_UNSUPPORTED;
-                digit += carry;
-                carry = digit >= (next.decimal ? 10u : 16u);
-                if (carry)
-                    digit = 0;
+                unsigned radix = next.decimal ? 10u : 16u;
+                if (decrement) {
+                    unsigned borrow = digit < carry;
+                    digit = digit + (borrow ? radix : 0) - carry;
+                    carry = borrow;
+                } else {
+                    digit += carry;
+                    carry = digit >= radix;
+                    if (carry)
+                        digit = 0;
+                }
                 value |= digit << (4 * i);
-                sources.registers[HPCLANG_RPL_CODE_D][i] = 0;
+                sources.registers[reg][i] = 0;
             }
-            next.registers[HPCLANG_RPL_CODE_D] =
-                (next.registers[HPCLANG_RPL_CODE_D] & ~UINT64_C(0xfffff)) | value;
+            next.registers[reg] = (next.registers[reg] & ~UINT64_C(0xfffff)) | value;
             next.carry = carry;
-            sources.adjustment[HPCLANG_RPL_CODE_D] = 0;
+            sources.adjustment[reg] = 0;
         } else {
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
         }

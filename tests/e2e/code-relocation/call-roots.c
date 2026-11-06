@@ -784,7 +784,7 @@ static int execution_visit(void *context, uint32_t pc,
         int result =
             hpclang_rpl_code_branch_plan_shift(&instructions, pc, 0x100000 - pc, &mappings,
                                                probe->move_first, probe->move_end, 16, &patch);
-        /* This fixture's two branches keep their encodings. A changed operand
+        /* This fixture's branches keep their encodings. A changed operand
          * needs its own source constraints, never silent omission. */
         if (result)
             return result < 0 ? result : HPCLANG_RPL_SPAN_UNSUPPORTED;
@@ -859,7 +859,7 @@ static int execution_visit(void *context, uint32_t pc,
         probe->derived_source = first - 1;
         probe->adjustment = use->adjustment;
     }
-    return state->control.pc == 0x2c34 && probe->expression_uses == 1;
+    return state->control.pc == 0x2c3c && probe->expression_uses == 1;
     /* This selected boundary is not a complete relocation certificate. */
 }
 
