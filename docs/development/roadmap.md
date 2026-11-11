@@ -120,7 +120,7 @@ its requirements from M8.
 
 | Work | Proven locally / accepted | Next acceptance gate |
 | --- | --- | --- |
-| M8.0 native storage, PRs #26/#31 | Local 46512d69 verifies dispatcher lineage: B derives from RSKTOP minus 10, and D from AVMEM plus 2 through retained arithmetic facts. Fresh original/relocated ROM replays confirm only the corresponding CPU words differ. Both models pass the strengthened 194-step Stock/full-SRAM gates; fourteen sanitizer targets, six-model builds, formatting and ARM analysis pass. Fixture remains 37,496 bytes. | Finish the remaining live-reference/continuation contract and production integration; the captured dispatcher relations do not authorize arbitrary continuations. Larger-capacity scratch diagnostics reach a further overlap at 0x291c but are not validated. Complete validated boundary: 194 steps. Broader P/cache paths, libraries, Port1 and retained Port2 gates remain open; Stage1 stays at 0x67d2. |
+| M8.0 native storage, PRs #26/#31 | Local ca6610fc retains the dispatcher lineage checkpoint and extends execution to 208 steps with 395 source cells. Both models pass full Stock launch/return with sealed inputs, original/relocated ROM full-SRAM comparisons, unchanged Flash and four zero-write rejections/model. Fourteen sanitizer targets, six-model builds, formatting and ARM analysis pass; fixture uses 38,256 bytes within 40 KiB. | Complete the next overlapping store at 0x291c, remaining live-reference/continuation contract and production integration. This bounded continuation does not authorize arbitrary execution. Broader P/cache paths, libraries, Port1 and retained Port2 gates remain open; Stage1 stays at 0x67d2. |
 | M8.0 Port2 | Both supported ID769 recovery/rejection matrices pass locally; explicit recovery-ID support accepted in #25. | Trusted recovery installation, transaction authority lifecycle, safe startup and space reclamation. Mutable-Flash configuration execution remains unqualified; forty resolved data targets retain separate execution obligations. |
 | M8.2/M8.3 UI, PR #28 | Accepted in cdd6bd86 after all 11 workflows pass. Application/launcher stack observers, return-capacity checks and update-cost gates are merged. | Finish borrowed-stack attribution, reservation bounds and whole-application resource/lifecycle acceptance. |
 | M8.4 compatibility | SD Reset #15, explicit opt-in formatting #17 and async/KOS sound adapters #25 and original filesystem gates #19 accepted. | Retained historical application/API coverage and remaining migration/branch acceptance. |
@@ -148,7 +148,7 @@ Remote acceptance and broader M8.5 completion remain open.
 
 | Delivery | Current acceptance state |
 | --- | --- |
-| #31 / `488d6b85` | Latest exact-head audit: 5 successful/5 queued workflows; jobs 202 successful/20 running/149 queued, no failures observed. Both Quality workflows pass. Acceptance pending. Local 46512d69 and preceding overlap/configuration changes strengthen the 194-step relocation gate and are not yet submitted. Earlier HP39gs pre-entry USB failure remains unresolved. |
+| #31 / continuation and CI fix | Submitted batch includes ca6610fc (208-step continuation) and 7b095dd0 (packed bank-guard coverage); fresh CI acceptance pending. Pre-push exact-head 488d6b85 audit: 5 successful/5 queued workflows; jobs 261 successful/20 running/89 queued/1 failure. The HP50g failure was an obsolete 20-guard expectation; both corrected ROM matrices pass locally with exact 19-guard coverage and 1,700 ACPTR stale-input rejections/model. Earlier HP39gs pre-entry USB failure remains unresolved. |
 | #13 / `30cdca4f` | Exact-head audit on 2026-11-12: all 12 workflows pass, 390 successful jobs and two intentional publisher skips. Accepted and merged as `91c631c8`; broader UI resource/lifecycle acceptance remains open. |
 | #14 / `384ae39d` | Integration 3ce8acb0 passes fresh six-model persistence/maximum-length backup and independent audit (18 launches), plus two-model SD export (4 launches) with retained raw-card re-read. All 172 C/C++ sanitizer tests, 25 focused Python tests and strict docs pass. Previous 3312be9c CI: 9 successful workflows/1 failure, 383 successful jobs/2 skips/1 failure; HP40gs system-services USB failure before entry remains unresolved. Fresh delivery remains unaccepted. Parent acceptance and broader M8.5/M8.6 completion remain open. Latest exact-head CI workflows: 11 success, 1 failure; jobs: 400 success, 2 skipped, 2 failure. Two Stock failures before application entry: hp39gs system-services and hp39gplus display USB host-gate-failed. Logs retained; root causes unresolved, no blind retry. |
 | #18 / `c5781e2e` | Accepted and merged as `d47dcf50`: all seven exact-head workflows pass, 195 successful jobs and two intentional publisher skips. Local runtime command environment, argument/exit behavior and missing-tool checks are integrated. Historical transport/IRQ failures remain separately recorded. |
@@ -176,8 +176,9 @@ Private saved-state/ROM interpreter checks supplement full Stock tests; they do
 not establish hardware behavior or complete milestone acceptance.
 
 Keep M0–M7 summaries and their acceptance links on this page. Keep this page concise. Put reproducible checks in tests and link their reports
-from the relevant PR. Keep historical evidence in the frozen archive; do not
-append per-turn experiment narration to the roadmap or board. Record only
+from the relevant PR. Preserve requirements and concise accepted conclusions in the
+frozen archive; discard superseded reproducible build/test artifacts instead of
+archiving them. Do not append per-turn experiment narration to the roadmap or board. Record only
 current decisions, meaningful state changes, blockers and next acceptance gates.
 
 ## Deferred research — HP39gs / HP40gs ROM storage
