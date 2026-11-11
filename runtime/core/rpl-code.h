@@ -348,6 +348,7 @@ struct hpclang_rpl_code_execution
     uint32_t hst; /* Native hardware status word; 82x clears only selected low bits. */
     /* RSTK can save an adjusted address without materializing its base digits. */
     uint32_t stack_adjustment[8];
+    uint32_t status; /* Native software status word; 84n/85n clear/set bit n. */
 };
 
 enum hpclang_rpl_code_use_kind

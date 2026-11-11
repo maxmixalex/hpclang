@@ -1338,7 +1338,7 @@ static int execution_visit(void *context, uint32_t pc,
         probe->derived_source = first - 1;
         probe->adjustment = use->adjustment;
     }
-    return state->control.pc == 0x3019 && probe->bank_writes == 1 && probe->expression_uses == 1 &&
+    return state->control.pc == 0x301c && probe->bank_writes == 1 && probe->expression_uses == 1 &&
            probe->stores == 13 && probe->configurations == 2 && probe->unconfigurations == 1 &&
            probe->predicates == 4 && probe->constant_count == 6 && probe->unit_count == 2 &&
            probe->sum_count == 8 && probe->expression_count == 3;
@@ -1487,11 +1487,20 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     const struct hpclang_rpl_code_callbacks callbacks = {
         execution_derive,   execution_store, execution_config, execution_predicate,
         execution_constant, execution_unit,  execution_sum,    execution_unconfig};
-    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 168,
+    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 169,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count)
         goto done;
+    uint32_t original_status = 0;
+    for (unsigned digit = 0; digit < 8; ++digit) {
+        uint8_t value;
+        if (!execution_native_read(probe, 0x968 * 2 + digit, &value))
+            goto done;
+        original_status |= (uint32_t)value << (4 * digit);
+    }
+    if (probe->state.status != (original_status & ~UINT32_C(2)))
+        goto done; /* The 841 instruction clears only software status bit one. */
     /* Validate the final overlay with last-writer-wins semantics. Earlier
      * overwritten payloads remain constrained by their retained producers. */
     for (unsigned effect = 0; effect < probe->stores; ++effect) {
@@ -1546,7 +1555,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 237)
         goto done;
-    uint32_t words[29] = {13,
+    uint32_t words[29] = {14,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,

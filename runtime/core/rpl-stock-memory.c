@@ -140,7 +140,9 @@ int hpclang_rpl_stock_execution_capture(const struct hpclang_rpl_reader *state, 
         for (unsigned digit = 0; digit < (index == 2 ? 1u : 5u); ++digit)
             next.origins.registers[registers[index]][digit] = origin_base + at + digit;
     }
-    int result = state_word(state, 0x96cu * 2u, 8, &next.hst, dependency, context);
+    int result = state_word(state, 0x968u * 2u, 8, &next.status, dependency, context);
+    if (!result)
+        result = state_word(state, 0x96cu * 2u, 8, &next.hst, dependency, context);
     if (!result)
         result = state_word(state, 0x970u * 2u, 8, &next.control.carry, dependency, context);
     if (!result)

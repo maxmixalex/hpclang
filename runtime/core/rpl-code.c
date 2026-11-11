@@ -697,6 +697,20 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
             goto done;
         }
     }
+    if (opcode == 0x48 || opcode == 0x58) {
+        uint32_t bit;
+        if (limit < 3)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(instructions, pc + 2, 1, &bit);
+        if (result)
+            return result;
+        if (opcode == 0x48)
+            next.status &= ~(UINT32_C(1) << bit);
+        else
+            next.status |= UINT32_C(1) << bit;
+        next.control.pc = (pc + 3) & 0xfffff;
+        goto done;
+    }
     if (opcode == 0x28) {
         uint32_t mask;
         if (limit < 3)

@@ -2506,6 +2506,51 @@ static void configuration_step(unsigned unconfig)
     }
 }
 
+static void software_status_bits(void)
+{
+    struct image code = {.size = 3, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+    struct hpclang_rpl_code_execution initial = {0}, state, expected;
+    seed_origins(&initial.origins);
+    initial.hst = 0xa5a5000f;
+    initial.values.registers[HPCLANG_RPL_CODE_A] = UINT64_C(0x123456789abcdef0);
+    struct hpclang_rpl_code_step_uses uses, sentinel;
+    memset(&sentinel, 0xa5, sizeof sentinel);
+    for (unsigned operation = 4; operation <= 5; ++operation)
+        for (unsigned bit = 0; bit < 16; ++bit) {
+            uint32_t mask = UINT32_C(1) << bit;
+            const uint32_t statuses[] = {0, 0xffff, 0xa5a50000, 0x5a5affff, mask, ~mask};
+            for (unsigned index = 0; index < sizeof statuses / sizeof statuses[0]; ++index)
+                for (unsigned flags = 0; flags < 4; ++flags) {
+                    encode(&code, 0, 3, 8 | (operation << 4) | (bit << 8));
+                    initial.status = statuses[index];
+                    initial.values.carry = initial.control.carry = flags & 1;
+                    initial.values.decimal = flags >> 1;
+                    state = expected = initial;
+                    expected.status =
+                        operation == 4 ? initial.status & ~mask : initial.status | mask;
+                    expected.control.pc = 3;
+                    assert(!hpclang_rpl_code_execution_step(&instructions, NULL, 3, &state,
+                                                            data_token, NULL, &uses));
+                    assert(!memcmp(&state, &expected, sizeof state));
+                    assert(!uses.count && !uses.has_branch);
+                }
+        }
+    for (unsigned operation = 4; operation <= 5; ++operation)
+        for (unsigned mode = 0; mode < 5; ++mode) {
+            encode(&code, 0, 3, 8 | (operation << 4) | (15u << 8));
+            code.fail = mode < 3 ? mode : UINT32_MAX;
+            if (mode == 4)
+                code.data[2] = 16;
+            state = initial;
+            uses = sentinel;
+            assert(hpclang_rpl_code_execution_step(&instructions, NULL, mode == 3 ? 2 : 3, &state,
+                                                   data_token, NULL, &uses) < 0);
+            assert(!memcmp(&state, &initial, sizeof state));
+            assert(!memcmp(&uses, &sentinel, sizeof uses));
+        }
+}
+
 static void hardware_status_clear(void)
 {
     struct image code = {.size = 3, .fail = UINT32_MAX};
@@ -3526,6 +3571,7 @@ int main(void)
     adjusted_stack_roundtrip();
     configuration_step(0);
     configuration_step(1);
+    software_status_bits();
     hardware_status_clear();
     native_threaded_next();
     execution_steps();
