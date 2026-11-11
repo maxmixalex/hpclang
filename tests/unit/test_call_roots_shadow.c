@@ -216,6 +216,28 @@ static void configuration(void)
         assert(hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count) <
                0);
         assert(execution_config(&probe, &config) < 0); /* No unmodelled second CONFIG. */
+        ram[0x123] ^= 1;
+        ram[0x20008] = 0x24;
+        ram[0x20009] = 0xf0;
+        ram[0x2000a] = 0x47;
+        config.instruction = 0xb2d1;
+        config.value = 0x7f024;
+        for (unsigned i = 0; i < 5; ++i)
+            config.origins[i] = 0x90011 + i;
+        memcpy(before, ram, sizeof ram);
+        assert(!execution_config(&probe, &config) && probe.configurations == 2);
+        assert(!memcmp(before, ram, sizeof ram));
+        assert(probe.native_before[0xb9c] == 35 && probe.native_after[0xb9c] == 7);
+        assert(probe.native_after[0xbb0] == 0x7f && !probe.native_after[0xbb1]);
+        uint8_t value = 17;
+        uint32_t token = 123;
+        struct hpclang_rpl_code_origin_cell cell;
+        assert(execution_shadow_value(&probe, 0x7f000, &value, &token) ==
+               HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(value == 17 && token == 123);
+        assert(execution_write_cell(&probe, 0x7ffff, &cell) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));
+        assert(execution_config(&probe, &config) < 0);
     }
 }
 
