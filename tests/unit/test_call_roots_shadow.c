@@ -241,6 +241,54 @@ static void configuration(void)
     }
 }
 
+static void bank_write(void)
+{
+    for (unsigned mode = 0; mode < 6; ++mode) {
+        fixture();
+        word(0xbcc, 1);
+        word(0xbd0, 2);
+        ram[0x20008] = 0x24;
+        ram[0x20009] = 0xf0;
+        ram[0x2000a] = 0x47;
+        memcpy(probe.native_after, ram, sizeof probe.native_after);
+        memset(probe.native_after + 0xbb0, 0, 4);
+        probe.native_after[0xbb0] = 0x7f;
+        probe.configurations = 2;
+        struct hpclang_rpl_code_store effect = {.instruction = 0xb2d7,
+                                                .nibbles = 2,
+                                                .address = {.value = 0x7f024},
+                                                .value = UINT64_MAX};
+        for (unsigned i = 0; i < 5; ++i)
+            effect.address.origins[i] = 0x90011 + i;
+        if (mode == 1)
+            probe.native_after[0xbcc] ^= 1;
+        if (mode == 2)
+            effect.address.origins[0] = 0;
+        if (mode == 3) {
+            probe.move_first = effect.address.value;
+            probe.move_end = effect.address.value + 1;
+        }
+        if (mode == 4)
+            probe.native_after[0xbb0] = 0x80;
+        if (mode == 5)
+            effect.instruction++;
+        memcpy(before, ram, sizeof ram);
+        int result = execution_bank_write(&probe, &effect);
+        assert(!memcmp(before, ram, sizeof ram) && !probe.stores && !probe.stored_sources);
+        if (mode) {
+            assert(result < 0 && !probe.bank_writes);
+            continue;
+        }
+        assert(!result && probe.bank_writes == 1);
+        const struct hpclang_rpl_reference_reader guards = {execution_guard_read, &probe};
+        assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));
+        ram[0xbd0] ^= 1;
+        assert(hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count) <
+               0);
+        assert(execution_bank_write(&probe, &effect) < 0);
+    }
+}
+
 static void constant_source(void)
 {
     fixture();
@@ -367,6 +415,7 @@ static void protected_body(void)
 
 int main(void)
 {
+    bank_write();
     constant_source();
     unit_source();
     sum_source();

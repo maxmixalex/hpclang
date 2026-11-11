@@ -697,7 +697,7 @@ struct execution_probe
         uint32_t field, value, origin;
     } shadow[37];
     uint8_t native_before[0xc60], native_after[0xc60];
-    unsigned configurations, payload_limit, payload_depth;
+    unsigned configurations, bank_writes, payload_limit, payload_depth;
     struct hpclang_rpl_code_constant constants[3];
     unsigned constant_count, constant_limit, predicates;
     struct hpclang_rpl_code_unit units[1];
@@ -969,9 +969,39 @@ static int execution_payload(void *context, struct hpclang_rpl_reference_edit_bu
         builder, fact, fact->left.value, fact->right.value, fact->value, execution_source, probe);
 }
 
+static int execution_bank_write(struct execution_probe *probe,
+                                const struct hpclang_rpl_code_store *store)
+{
+    if (probe->bank_writes || probe->configurations != 2 || store->instruction != 0xb2d7 ||
+        store->first || store->nibbles != 2 ||
+        execution_shift(probe, store->address.value) != store->address.value)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    const uint32_t offsets[] = {0xba0, 0xbb0, 0xbcc, 0xbd0};
+    for (unsigned word = 0; word < 4; ++word)
+        for (unsigned digit = 0; digit < 8; ++digit) {
+            uint8_t value;
+            if (!execution_native_read(probe, offsets[word] * 2 + digit, &value))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        }
+    struct hpclang_rpl_bank_write effect;
+    int result = hpclang_rpl_bank_write_inspect(probe->native_after, store->address.value, &effect);
+    if (result || !effect.unchanged)
+        return result ? result : HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_code_store address = {
+        .nibbles = 5, .value = store->address.value, .adjustment = store->address.adjustment};
+    memcpy(address.origins, store->address.origins, sizeof store->address.origins);
+    result = hpclang_rpl_execution_plan_payload(&probe->plan, &address, address.value,
+                                                execution_source, execution_payload, probe);
+    if (!result)
+        ++probe->bank_writes;
+    return result;
+}
+
 static int execution_store(void *context, const struct hpclang_rpl_code_store *store)
 {
     struct execution_probe *probe = context;
+    if (store->instruction == 0xb2d7)
+        return execution_bank_write(probe, store);
     const unsigned count = store->nibbles;
     /* Seven effects observed in the original ROM continuation. This finite
      * fixture permits only the sixth same-destination overlap, without granting
@@ -1270,9 +1300,9 @@ static int execution_visit(void *context, uint32_t pc,
         probe->derived_source = first - 1;
         probe->adjustment = use->adjustment;
     }
-    return state->control.pc == 0xb2d7 && probe->expression_uses == 1 && probe->stores == 7 &&
-           probe->configurations == 2 && probe->predicates == 2 && probe->constant_count == 3 &&
-           probe->unit_count == 1 && probe->sum_count == 4;
+    return state->control.pc == 0xb2da && probe->bank_writes == 1 && probe->expression_uses == 1 &&
+           probe->stores == 7 && probe->configurations == 2 && probe->predicates == 2 &&
+           probe->constant_count == 3 && probe->unit_count == 1 && probe->sum_count == 4;
     /* This selected boundary is not a complete relocation certificate. */
 }
 
@@ -1377,7 +1407,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     const struct hpclang_rpl_code_callbacks callbacks = {
         execution_derive,   execution_store, execution_config, execution_predicate,
         execution_constant, execution_unit,  execution_sum};
-    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 106,
+    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 107,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count)
@@ -1434,7 +1464,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 237)
         goto done;
-    uint32_t words[29] = {11,
+    uint32_t words[29] = {12,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,
