@@ -6170,3 +6170,22 @@ entry; it does not establish changed-map effects. ARM analysis has no diagnostic
 Current reports reuse `/work/nov06-sum/io-store-probe`. The execution callback
 remains closed to I/O writes pending dependency guarding/integration; maintained
 Stock stays at 106 steps. No generic device-write permission is added.
+
+
+## 2026-11-12 — Guarded bank write in maintained Stock
+
+Local `209157a8` integrates the unchanged-selector write at 0xb2d7, preserving
+original native dispatch/selector guards and address-source constraints. The
+callback rejects changed selection, missing origins, relocated target addresses,
+unexpected instruction/window and repeat effects. It never inserts the I/O
+effect into the SRAM shadow. Host sanitizer tests verify zero real SRAM changes
+and stale-selector guard rejection. Both maintained Stock models pass 107 steps,
+43 address uses, 187 source constraints and 37 shadow digits with clean return
+and unchanged sealed inputs. Six launcher checks, ARM analysis and Ruff pass.
+
+The matching actual-movement ROM replay verifies all 107 transitions, final
+stored digits and four zero-write controls per model. Current outputs reuse
+`/work/nov06-sum/bank-stock.json`, `bank-plan` and `bank-writeback`. The next
+boundary is UNCONFIG at 0xb2da; production Stage1 remains at 0x67d2. Exact-head
+CI for 5d4cb7bd has 8 workflows running/3 queued and 1 successful job/13 running/
+4 queued. These local follow-ups are not submitted or accepted remotely.
