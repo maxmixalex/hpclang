@@ -517,6 +517,76 @@ static void unit_source(void)
     assert(probe.unit_limit == 1 && probe.plan.error < 0 && !probe.plan.count);
 }
 
+static void late_overlapping_stores(void)
+{
+    for (unsigned effect = 13; effect <= 14; ++effect)
+        for (unsigned mode = 0; mode < 9; ++mode) {
+            struct hpclang_rpl_code_store store = fixture();
+            store.instruction = effect == 13 ? 0xb35d : 0xb367;
+            unsigned previous = effect == 13 ? 5 : 6;
+            struct hpclang_rpl_code_store old = store;
+            old.value = 0x12345;
+            word(0x20010, (uint32_t)old.value);
+            for (unsigned i = 0; i < 5; ++i)
+                old.origins[i] = 0x90021 + i;
+            assert(!hpclang_rpl_execution_plan_payload(
+                &probe.plan, &old, old.value, execution_source, execution_payload, &probe));
+            probe.store_records[previous] = old;
+            probe.stores = effect;
+            probe.stored_sources = 75;
+            probe.native_save_count = 2;
+            for (unsigned i = 0; i < 75; ++i)
+                probe.shadow[i].field = 0x70000 + i;
+            for (unsigned i = 0; i < 5; ++i) {
+                struct hpclang_rpl_code_origin_cell cell;
+                assert(!execution_write_cell(&probe, store.address.value + i, &cell));
+                probe.shadow[i].field = cell.field;
+                probe.shadow[i].value = (old.value >> (4 * i)) & 15;
+                probe.shadow[i].origin = old.origins[i];
+            }
+            if (mode == 1)
+                ++store.address.value;
+            if (mode == 2)
+                ++probe.shadow[0].origin;
+            if (mode == 3)
+                probe.shadow[0].value ^= 1;
+            if (mode == 4)
+                ++probe.shadow[0].field;
+            if (mode == 5)
+                probe.native_save_count = 1;
+            if (mode == 6)
+                probe.stored_sources = 74;
+            if (mode == 7)
+                store.origins[0] = 0;
+            if (mode == 8)
+                ++store.instruction;
+            uint8_t saved[sizeof probe.shadow];
+            memcpy(saved, probe.shadow, sizeof saved);
+            memcpy(before, ram, sizeof ram);
+            int result = execution_store(&probe, &store);
+            assert(!memcmp(before, ram, sizeof ram));
+            if (mode) {
+                assert(result < 0 && probe.stores == effect &&
+                       !memcmp(saved, probe.shadow, sizeof saved));
+                continue;
+            }
+            assert(!result && probe.stores == effect + 1 && probe.stored_sources == 75);
+            assert(!memcmp(&probe.store_records[previous], &old, sizeof old));
+            for (unsigned i = 0; i < 5; ++i) {
+                assert(probe.shadow[i].value == ((store.value >> (4 * i)) & 15));
+                assert(probe.shadow[i].origin == store.origins[i]);
+            }
+            assert(!memcmp(saved + 5 * sizeof probe.shadow[0], probe.shadow + 5,
+                           sizeof saved - 5 * sizeof probe.shadow[0]));
+            const struct hpclang_rpl_reference_reader reader = {execution_guard_read, &probe};
+            assert(
+                !hpclang_rpl_reference_guards_validate(&reader, probe.guards, probe.builder.count));
+            ram[0x20010] ^= 1;
+            assert(hpclang_rpl_reference_guards_validate(&reader, probe.guards,
+                                                         probe.builder.count) < 0);
+        }
+}
+
 static void immediate_unit_source(void)
 {
     for (unsigned mode = 0; mode < 8; ++mode) {
@@ -790,6 +860,7 @@ int main(void)
     constant_source();
     unit_source();
     immediate_unit_source();
+    late_overlapping_stores();
     sum_source();
     overlapping_store();
     configuration();
