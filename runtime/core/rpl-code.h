@@ -510,6 +510,29 @@ struct hpclang_rpl_code_unit
     uint32_t instruction, length, reg, first, nibbles, decrement, decimal, carry;
     uint32_t p, p_origin, p_adjustment, origins[16], adjustment;
 };
+struct hpclang_rpl_code_logical
+{
+    uint64_t left_value, right_value, result;
+    uint32_t instruction, length, left, right, first, nibbles, disjunction, p;
+};
+/* 0Efr: AND/OR selected fields (f=0..7 or address field F). The destination
+ * is left. Carry, decimal mode and unselected digits are unchanged. Errors
+ * leave output untouched. This inspector supplies no relocation authority. */
+int hpclang_rpl_code_logical_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                     uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                     struct hpclang_rpl_code_logical *logical);
+struct hpclang_rpl_code_logical_source
+{
+    struct hpclang_rpl_code_logical logical;
+    uint32_t p_origin, p_adjustment, origins[2][16], adjustment[2];
+};
+/* Retain both operands and field-selection provenance. Supply nonzero producer
+ * tokens in selected-digit order; they are relations, not physical cells.
+ * Missing observer leaves computed origins unknown. Errors preserve step
+ * outputs; discard callback scratch facts on any later error. */
+typedef int (*hpclang_rpl_code_logical_fn)(void *context,
+                                           const struct hpclang_rpl_code_logical_source *fact,
+                                           uint32_t tokens[16]);
 /* Inspect AfC..AfF decrements and Bf4..Bf7 increments, f=0..7, and binary
  * 818frk additions/subtractions of k+1 (r=0..3/8..11, f=0..7 or address field F).
  * The immediate form ignores decimal mode. Other field extensions are unsupported.
@@ -565,6 +588,7 @@ struct hpclang_rpl_code_callbacks
     hpclang_rpl_code_scan_fn native_scan;
     uint32_t native_scan_max_reads; /* Explicit bound; zero rejects the scan. */
     hpclang_rpl_code_native_word_fn native_word;
+    hpclang_rpl_code_logical_fn logical;
 };
 /* Unified optional observation callbacks. Missing callbacks retain the legacy
  * rejection/unknown-source behavior; all prior error/discard contracts apply. */

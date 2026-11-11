@@ -3662,6 +3662,150 @@ static void sum_inspection(void)
            HPCLANG_RPL_SPAN_MALFORMED);
 }
 
+struct logical_test
+{
+    int error;
+    unsigned missing, calls;
+    struct hpclang_rpl_code_logical_source fact;
+};
+static int retain_logical(void *context, const struct hpclang_rpl_code_logical_source *fact,
+                          uint32_t tokens[16])
+{
+    struct logical_test *test = context;
+    test->fact = *fact;
+    ++test->calls;
+    for (unsigned i = 0; i < fact->logical.nibbles; ++i)
+        tokens[i] = i == test->missing ? 0 : 0xb00001 + i;
+    return test->error;
+}
+
+static void logical_steps(void)
+{
+    /* SASM operand pairs, independent per-bit truth-table oracle. */
+    const unsigned pairs[8][2] = {{0, 1}, {1, 2}, {2, 0}, {3, 2}, {1, 0}, {2, 1}, {0, 2}, {2, 3}};
+    const unsigned fields[] = {0, 1, 2, 3, 4, 5, 6, 7, 15};
+    for (unsigned f = 0; f < 9; ++f)
+        for (unsigned p = 0; p < 16; ++p)
+            for (unsigned op = 0; op < 16; ++op)
+                for (unsigned flags = 0; flags < 4; ++flags) {
+                    struct image image = {
+                        .data = {0, 14, fields[f], op}, .size = 4, .fail = UINT32_MAX};
+                    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+                    struct hpclang_rpl_code_execution before = {0};
+                    for (unsigned r = 0; r < 4; ++r)
+                        before.values.registers[r] =
+                            UINT64_C(0x0123456789abcdef) ^ (UINT64_C(0xaaaaaaaaaaaaaaaa) * r);
+                    before.values.registers[HPCLANG_RPL_CODE_P] = p;
+                    before.control.carry = before.values.carry = flags & 1;
+                    before.values.decimal = flags >> 1;
+                    before.status = 0x5aa58071;
+                    before.hst = 0xa5a5000f;
+                    seed_origins(&before.origins);
+                    unsigned left = pairs[op & 7][0], right = pairs[op & 7][1];
+                    before.origins.adjustment[left] = flags & 1 ? 0xfffff : 0;
+                    before.origins.adjustment[right] = 7;
+                    before.origins.adjustment[HPCLANG_RPL_CODE_P] = 1;
+                    unsigned first = f == 0 ? p : f == 2 ? 2 : f == 4 ? 15 : f == 5 ? 3 : 0;
+                    unsigned last = f == 0 || f == 1   ? p
+                                    : f == 2 || f == 3 ? 2
+                                    : f == 4 || f == 7 ? 15
+                                    : f == 5           ? 14
+                                    : f == 6           ? 1
+                                                       : 4;
+                    uint64_t expected_value = before.values.registers[left];
+                    for (unsigned bit = first * 4; bit < (last + 1) * 4; ++bit) {
+                        unsigned a = (before.values.registers[left] >> bit) & 1;
+                        unsigned b = (before.values.registers[right] >> bit) & 1;
+                        unsigned value = op < 8 ? a && b : a || b;
+                        expected_value =
+                            (expected_value & ~(UINT64_C(1) << bit)) | ((uint64_t)value << bit);
+                    }
+                    for (unsigned mode = 0; mode < 5; ++mode) {
+                        struct hpclang_rpl_code_execution state = before, expected = before;
+                        struct hpclang_rpl_code_step_uses uses, saved;
+                        memset(&saved, 0xa5, sizeof saved);
+                        uses = saved;
+                        struct logical_test test = {.error = mode == 1   ? -77
+                                                             : mode == 2 ? 1
+                                                                         : 0,
+                                                    .missing = mode == 3 ? last - first : 16};
+                        struct hpclang_rpl_code_callbacks callbacks = {
+                            .logical = mode == 4 ? NULL : retain_logical};
+                        int result = hpclang_rpl_code_execution_step_observed(
+                            &reader, NULL, 4, &state, data_token, &callbacks, &test, &uses);
+                        if (mode && mode < 4) {
+                            assert(result == (mode == 1   ? -77
+                                              : mode == 2 ? HPCLANG_RPL_SPAN_MALFORMED
+                                                          : HPCLANG_RPL_SPAN_UNSUPPORTED));
+                            assert(!memcmp(&state, &before, sizeof state));
+                            assert(!memcmp(&uses, &saved, sizeof uses));
+                        } else {
+                            expected.control.pc = 4;
+                            expected.values.registers[left] = expected_value;
+                            if (first < 5) {
+                                if (expected.origins.adjustment[left])
+                                    for (unsigned i = 0; i < 5; ++i)
+                                        expected.origins.registers[left][i] = 0;
+                                expected.origins.adjustment[left] = 0;
+                            }
+                            for (unsigned i = first; i <= last; ++i)
+                                expected.origins.registers[left][i] =
+                                    mode == 4 ? 0 : 0xb00001 + i - first;
+                            assert(!result && !memcmp(&state, &expected, sizeof state));
+                            assert(!uses.count && !uses.has_branch);
+                        }
+                        assert(test.calls == (mode == 4 ? 0u : 1u));
+                        if (test.calls) {
+                            assert(test.fact.logical.left == left &&
+                                   test.fact.logical.right == right);
+                            assert(test.fact.logical.first == first &&
+                                   test.fact.logical.nibbles == last - first + 1);
+                            assert(test.fact.logical.result == expected_value &&
+                                   test.fact.logical.p == p);
+                            assert(test.fact.p_origin ==
+                                   before.origins.registers[HPCLANG_RPL_CODE_P][0]);
+                            assert(test.fact.p_adjustment == 1);
+                            assert(test.fact.adjustment[0] == before.origins.adjustment[left]);
+                            assert(test.fact.adjustment[1] == before.origins.adjustment[right]);
+                            assert(!memcmp(test.fact.origins[0], before.origins.registers[left],
+                                           sizeof test.fact.origins[0]));
+                            assert(!memcmp(test.fact.origins[1], before.origins.registers[right],
+                                           sizeof test.fact.origins[1]));
+                        }
+                    }
+                }
+    for (unsigned mode = 0; mode < 20; ++mode) {
+        struct image image = {.data = {0, 14, 6, 2}, .size = 4, .fail = UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {read_nibble, &image};
+        struct hpclang_rpl_code_execution state = {0};
+        if (mode < 4)
+            image.fail = mode;
+        if (mode >= 4 && mode < 8)
+            image.data[mode - 4] = 16;
+        if (mode >= 8 && mode < 15)
+            image.data[2] = mode;
+        if (mode == 15)
+            state.values.registers[HPCLANG_RPL_CODE_P] = 16;
+        if (mode == 16)
+            state.values.carry = state.control.carry = 2;
+        if (mode == 17)
+            state.values.decimal = 2;
+        unsigned limit = mode >= 18 ? mode - 17 : 4;
+        struct hpclang_rpl_code_logical fact, saved;
+        memset(&saved, 0xa5, sizeof saved);
+        fact = saved;
+        assert(hpclang_rpl_code_logical_inspect(&reader, 0, limit, &state.values, &fact) < 0);
+        assert(!memcmp(&fact, &saved, sizeof fact));
+        const struct hpclang_rpl_code_execution before = state;
+        struct hpclang_rpl_code_step_uses uses, sentinel;
+        memset(&sentinel, 0xa5, sizeof sentinel);
+        uses = sentinel;
+        assert(hpclang_rpl_code_execution_step(&reader, NULL, limit, &state, data_token, NULL,
+                                               &uses) < 0);
+        assert(!memcmp(&state, &before, sizeof state) && !memcmp(&uses, &sentinel, sizeof uses));
+    }
+}
+
 struct sum_test
 {
     int error;
@@ -4048,6 +4192,7 @@ static void numeric_predicates(void)
 int main(void)
 {
     sum_inspection();
+    logical_steps();
     sum_steps();
     selected_unit_steps();
     immediate_unit_steps();
