@@ -960,6 +960,33 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
             goto done;
         }
     }
+    if (opcode == 0x18 && limit >= 3) {
+        uint32_t operation;
+        result = read_word(instructions, pc + 2, 1, &operation);
+        if (result)
+            return result;
+        if (operation < 8) {
+            unsigned reg = operation & 3, right = operation >> 2;
+            uint64_t value = next.values.registers[reg];
+            uint32_t origins[16];
+            for (unsigned i = 0; i < 16; ++i)
+                origins[i] =
+                    next.origins.adjustment[reg] && i < 5 ? 0 : next.origins.registers[reg][i];
+            /* Rotation is a digit permutation, not a 20-bit affine operation.
+             * Preserve exact sources; invalidate digits still represented by
+             * a nonzero low-address adjustment before moving their positions. */
+            next.origins.adjustment[reg] = 0;
+            for (unsigned i = 0; i < 16; ++i)
+                next.origins.registers[reg][i] = origins[(i + (right ? 1 : 15)) & 15];
+            next.values.registers[reg] =
+                right ? (value >> 4) | (value << 60) : (value << 4) | (value >> 60);
+            /* The qualified HP49g+/HP50g native interpreters preserve HST
+             * for both directions, unlike hardware Saturn's documented SB
+             * update on right wrap. Do not manufacture that side effect. */
+            next.control.pc = (pc + 3) & 0xfffff;
+            goto done;
+        }
+    }
     if (opcode == 0x48 || opcode == 0x58) {
         uint32_t bit;
         if (limit < 3)

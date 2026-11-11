@@ -600,6 +600,11 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
                                              void *context,
                                              struct hpclang_rpl_code_step_uses *uses);
 
+/* 810..817 circular nibble shifts follow the qualified HP49g+/HP50g native ROM:
+ * digit origins are permuted and HST is unchanged (hardware Saturn documents
+ * a right-wrap SB update instead). Nonzero adjustments cannot survive rotation:
+ * their five affected origins become unknown before permutation. Carry and
+ * other status bits are preserved; this supplies no new source authority. */
 /* One C step combining the data/control evaluators with register/indirect PC
  * transfers, PC exchanges, C/RSTK transfers and qualified HP49g+/HP50g 81B1/81BD/81BE.
  * 81BE with carry clear stores D0.A at B.A, increments B.low32 by five,

@@ -2865,6 +2865,64 @@ static void software_status_bits(void)
         }
 }
 
+static void circular_shifts(void)
+{
+    for (unsigned operation = 0; operation < 8; ++operation)
+        for (unsigned position = 0; position < 16; ++position)
+            for (unsigned digit = 0; digit < 16; ++digit)
+                for (unsigned mode = 0; mode < 8; ++mode) {
+                    struct image code = {.data = {8, 1, operation}, .size = 3, .fail = UINT32_MAX};
+                    const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+                    struct hpclang_rpl_code_execution initial = {0};
+                    unsigned reg = operation & 3, right = operation >= 4;
+                    for (unsigned r = 0; r < 9; ++r)
+                        initial.values.registers[r] = UINT64_C(0x123456789abcdef0) + r;
+                    initial.values.registers[reg] = (uint64_t)digit << (4 * position);
+                    initial.values.registers[HPCLANG_RPL_CODE_P] = 15;
+                    initial.values.carry = initial.control.carry = mode & 1;
+                    initial.values.decimal = (mode >> 1) & 1;
+                    initial.status = 0xa5a58071;
+                    initial.hst = mode & 2 ? 0xa5a5000f : 0xa5a5000d;
+                    seed_origins(&initial.origins);
+                    initial.origins.adjustment[reg] = mode & 4 ? 0xfffff : 0;
+                    struct hpclang_rpl_code_execution expected = initial, state = initial;
+                    expected.values.registers[reg] = 0;
+                    expected.origins.adjustment[reg] = 0;
+                    for (unsigned source = 0; source < 16; ++source) {
+                        unsigned target = (source + (right ? 15 : 1)) & 15;
+                        uint64_t nibble = (initial.values.registers[reg] >> (4 * source)) & 15;
+                        expected.values.registers[reg] |= nibble << (4 * target);
+                        expected.origins.registers[reg][target] =
+                            mode & 4 && source < 5 ? 0 : initial.origins.registers[reg][source];
+                    }
+                    expected.control.pc = 3;
+                    struct hpclang_rpl_code_step_uses uses;
+                    assert(!hpclang_rpl_code_execution_step(&instructions, NULL, 3, &state,
+                                                            data_token, NULL, &uses));
+                    assert(!memcmp(&state, &expected, sizeof state));
+                    assert(!uses.count && !uses.has_branch);
+                }
+    for (unsigned mode = 0; mode < 9; ++mode) {
+        struct image code = {.data = {8, 1, 6}, .size = 3, .fail = UINT32_MAX};
+        const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+        struct hpclang_rpl_code_execution state = {0};
+        if (mode < 3)
+            code.fail = mode;
+        if (mode >= 3 && mode < 6)
+            code.data[mode - 3] = 16;
+        if (mode == 8)
+            state.origins.adjustment[2] = 0x100000;
+        const struct hpclang_rpl_code_execution before = state;
+        struct hpclang_rpl_code_step_uses uses, saved;
+        memset(&saved, 0xa5, sizeof saved);
+        uses = saved;
+        unsigned limit = mode == 6 ? 1 : mode == 7 ? 2 : 3;
+        assert(hpclang_rpl_code_execution_step(&instructions, NULL, limit, &state, data_token, NULL,
+                                               &uses) < 0);
+        assert(!memcmp(&state, &before, sizeof state) && !memcmp(&uses, &saved, sizeof uses));
+    }
+}
+
 static void hardware_status_clear(void)
 {
     struct image code = {.size = 3, .fail = UINT32_MAX};
@@ -4213,6 +4271,7 @@ int main(void)
     native_scan();
     native_scan_bounds();
     software_status_bits();
+    circular_shifts();
     hardware_status_clear();
     native_threaded_next();
     execution_steps();
