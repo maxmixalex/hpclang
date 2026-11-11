@@ -189,7 +189,10 @@ static int probe_collect(struct live_probe *p, struct hpclang_rpl_reader *reader
         if (edits_full)
             edit_capacity *= 2;
         if (guards_full)
-            guard_capacity *= 2;
+            /* The full 4096-entry table can exceed the Stock heap even when
+             * the actual dependency set fits. Retry in bounded 512-entry
+             * increments; keep every guard and the original capacity ceiling. */
+            guard_capacity += 512;
     }
     free(p->scratch);
     p->scratch = NULL;
