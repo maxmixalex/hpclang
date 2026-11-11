@@ -114,7 +114,9 @@ int hpclang_rpl_execution_collect_observed(const struct hpclang_boot_info *boot,
  * preserves all other uses/effects; an invertible expression alone is not that proof.
  * Normalize each source into a one-nibble edit so consistent partial overlaps
  * across uses/steps merge and conflicting requirements invalidate the batch.
- * Use this builder exclusively for normalized one-nibble edits. Resolvers
+ * Use an ordinary builder exclusively for normalized one-nibble edits, or
+ * opt in with edits_begin_packed to retain equivalent pointwise constraints
+ * in 1..5-nibble records. Resolvers
  * normalize physical aliases and retain guards/source identity independently.
  * All errors latch builder->error and clear count; restart with edits_begin.
  * Inputs/callback state and builder storage must be disjoint and stable.

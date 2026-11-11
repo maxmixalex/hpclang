@@ -17,10 +17,11 @@ int hpclang_rpl_execution_plan_uses(struct hpclang_rpl_reference_edit_builder *b
     if (builder->error)
         return builder->error;
     if (!uses || !resolve || uses->count > 4 || (uses->count && !replacements) ||
-        builder->count > builder->capacity || (builder->capacity && !builder->edits))
+        builder->packed > 1 || builder->count > builder->capacity ||
+        (builder->capacity && !builder->edits))
         return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
     for (uint32_t i = 0; i < builder->count; ++i)
-        if (builder->edits[i].width != 1)
+        if (!builder->edits[i].width || builder->edits[i].width > (builder->packed ? 5u : 1u))
             return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
     for (uint32_t i = 0; i < uses->count; ++i) {
         const struct hpclang_rpl_code_address_use *use = &uses->addresses[i];
@@ -88,14 +89,14 @@ int hpclang_rpl_execution_plan_payload(struct hpclang_rpl_reference_edit_builder
         return HPCLANG_RPL_SPAN_MALFORMED;
     if (builder->error)
         return builder->error;
-    if (!store || !resolve || builder->count > builder->capacity ||
+    if (!store || !resolve || builder->packed > 1 || builder->count > builder->capacity ||
         (builder->capacity && !builder->edits))
         return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
     if (store->first >= 16 || !store->nibbles || store->nibbles > 16 - store->first ||
         store->adjustment > 0xfffff)
         return reject(builder, HPCLANG_RPL_SPAN_BOUNDS);
     for (uint32_t i = 0; i < builder->count; ++i)
-        if (builder->edits[i].width != 1)
+        if (!builder->edits[i].width || builder->edits[i].width > (builder->packed ? 5u : 1u))
             return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
     int adjusted = store->adjustment && store->first < 5;
     if (adjusted) {

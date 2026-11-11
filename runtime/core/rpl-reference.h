@@ -337,6 +337,7 @@ struct hpclang_rpl_reference_edit_builder
     struct hpclang_rpl_reference_edit *edits;
     uint32_t capacity, count;
     int error;
+    uint32_t packed;
 };
 
 /* Merge independently discovered 1..5-nibble edits into a sorted, nonoverlapping batch.
@@ -350,6 +351,16 @@ int hpclang_rpl_reference_edits_begin(struct hpclang_rpl_reference_edit_builder 
                                       struct hpclang_rpl_reference_edit *edits, uint32_t capacity);
 int hpclang_rpl_reference_edits_add(struct hpclang_rpl_reference_edit_builder *builder,
                                     const struct hpclang_rpl_reference_edit *edit);
+
+/* Opt in to pointwise constraints: consistent overlaps are accepted and adjacent
+ * cells share records of at most five nibbles. Both expected and replacement
+ * values must agree at every overlap, including unchanged cells. Mapping IDs
+ * remain distinct; callers normalize aliases. Errors invalidate the whole batch.
+ * Record boundaries/count are not source boundaries and can change on insertion.
+ * Ordinary edits_begin retains its strict overlap contract. No IO/allocation. */
+int hpclang_rpl_reference_edits_begin_packed(struct hpclang_rpl_reference_edit_builder *builder,
+                                             struct hpclang_rpl_reference_edit *edits,
+                                             uint32_t capacity);
 
 struct hpclang_rpl_reference_reader
 {

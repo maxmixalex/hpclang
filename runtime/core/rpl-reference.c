@@ -153,9 +153,76 @@ int hpclang_rpl_reference_edits_begin(struct hpclang_rpl_reference_edit_builder 
 {
     if (!builder)
         return HPCLANG_RPL_SPAN_MALFORMED;
-    *builder = (struct hpclang_rpl_reference_edit_builder){edits, capacity, 0, 0};
+    *builder = (struct hpclang_rpl_reference_edit_builder){edits, capacity, 0, 0, 0};
     if (capacity && !edits)
         return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    return 0;
+}
+
+int hpclang_rpl_reference_edits_begin_packed(struct hpclang_rpl_reference_edit_builder *builder,
+                                             struct hpclang_rpl_reference_edit *edits,
+                                             uint32_t capacity)
+{
+    int result = hpclang_rpl_reference_edits_begin(builder, edits, capacity);
+    if (!result)
+        builder->packed = 1;
+    return result;
+}
+
+static int packed_cell(struct hpclang_rpl_reference_edit_builder *builder, uint32_t mapping,
+                       uint32_t field, uint32_t expected, uint32_t value)
+{
+    struct hpclang_rpl_reference_edit *edits = builder->edits;
+    uint32_t first = 0, end = builder->count;
+    while (first < end) {
+        uint32_t middle = first + (end - first) / 2;
+        if (edits[middle].mapping < mapping ||
+            (edits[middle].mapping == mapping && edits[middle].field <= field))
+            first = middle + 1;
+        else
+            end = middle;
+    }
+    uint32_t index = first;
+    if (index && edits[index - 1].mapping == mapping &&
+        field - edits[index - 1].field < edits[index - 1].width) {
+        const struct hpclang_rpl_reference_edit *old = &edits[index - 1];
+        unsigned shift = 4 * (field - old->field);
+        if (((old->expected >> shift) & 15) != expected || ((old->value >> shift) & 15) != value)
+            return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+        return 0;
+    }
+    if (index && edits[index - 1].mapping == mapping && edits[index - 1].width < 5 &&
+        edits[index - 1].field + edits[index - 1].width == field) {
+        --index;
+        unsigned shift = 4 * edits[index].width;
+        edits[index].expected |= expected << shift;
+        edits[index].value |= value << shift;
+        ++edits[index].width;
+    } else if (index < builder->count && edits[index].mapping == mapping &&
+               edits[index].field == field + 1 && edits[index].width < 5) {
+        --edits[index].field;
+        edits[index].expected = (edits[index].expected << 4) | expected;
+        edits[index].value = (edits[index].value << 4) | value;
+        ++edits[index].width;
+    } else {
+        if (builder->count == builder->capacity)
+            return edit_builder_error(builder, HPCLANG_RPL_SPAN_BOUNDS);
+        for (uint32_t i = builder->count; i > index; --i)
+            edits[i] = edits[i - 1];
+        edits[index] = (struct hpclang_rpl_reference_edit){mapping, field, expected, value, 1};
+        ++builder->count;
+    }
+    if (index + 1 < builder->count && edits[index].mapping == edits[index + 1].mapping &&
+        edits[index].field + edits[index].width == edits[index + 1].field &&
+        edits[index].width + edits[index + 1].width <= 5) {
+        unsigned shift = 4 * edits[index].width;
+        edits[index].expected |= edits[index + 1].expected << shift;
+        edits[index].value |= edits[index + 1].value << shift;
+        edits[index].width += edits[index + 1].width;
+        for (uint32_t i = index + 1; i + 1 < builder->count; ++i)
+            edits[i] = edits[i + 1];
+        --builder->count;
+    }
     return 0;
 }
 
@@ -166,12 +233,32 @@ int hpclang_rpl_reference_edits_add(struct hpclang_rpl_reference_edit_builder *b
         return HPCLANG_RPL_SPAN_MALFORMED;
     if (builder->error)
         return builder->error;
-    if (!edit || builder->count > builder->capacity || (builder->capacity && !builder->edits))
+    if (!edit || builder->packed > 1 || builder->count > builder->capacity ||
+        (builder->capacity && !builder->edits))
         return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
     const struct hpclang_rpl_reference_edit next = *edit;
     int result = edit_metadata(&next);
     if (result)
         return edit_builder_error(builder, result);
+    if (builder->packed) {
+        for (uint32_t i = 0; i < builder->count; ++i) {
+            const struct hpclang_rpl_reference_edit *current = &builder->edits[i];
+            if (edit_metadata(current))
+                return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+            if (i && (builder->edits[i - 1].mapping > current->mapping ||
+                      (builder->edits[i - 1].mapping == current->mapping &&
+                       builder->edits[i - 1].field + builder->edits[i - 1].width > current->field)))
+                return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+        }
+        for (uint32_t digit = 0; digit < next.width; ++digit) {
+            result =
+                packed_cell(builder, next.mapping, next.field + digit,
+                            (next.expected >> (4 * digit)) & 15, (next.value >> (4 * digit)) & 15);
+            if (result)
+                return result;
+        }
+        return 0;
+    }
     struct hpclang_rpl_reference_edit *edits = builder->edits;
     uint32_t first = 0, end = builder->count;
     while (first < end) {

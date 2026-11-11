@@ -173,7 +173,8 @@ static void overlapping_store(void)
     assert(execution_store(&probe, &store) < 0);
     assert(probe.stores == 5 && probe.stored_sources == 27 && !probe.payload_depth);
     assert(!memcmp(saved, probe.shadow, sizeof saved));
-    assert(!hpclang_rpl_reference_edits_begin(&probe.plan, probe.edits, 192));
+    assert(!hpclang_rpl_reference_edits_begin(&probe.plan, probe.edits,
+                                              sizeof probe.edits / sizeof probe.edits[0]));
     store.origins[5] = 0x500041;
     assert(!execution_store(&probe, &store));
     assert(probe.stores == 6 && probe.stored_sources == 32);

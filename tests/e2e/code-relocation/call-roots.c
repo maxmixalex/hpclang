@@ -686,7 +686,7 @@ struct execution_probe
     uint32_t generated_uses;
     struct hpclang_rpl_execution_subtraction expression, payload_expression, stack_expression;
     uint32_t expression_count, expression_uses, expression_pc, expression_sources;
-    struct hpclang_rpl_reference_edit edits[448];
+    struct hpclang_rpl_reference_edit edits[160];
     struct hpclang_rpl_reference_edit_builder plan;
     struct hpclang_rpl_code_step_uses first_use;
     uint32_t move_first, move_end, planned_uses, branches, changed_cells, rejected_plans;
@@ -1187,10 +1187,11 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
             unsigned found = 0;
             for (unsigned j = 0; j < probe->plan.count; ++j) {
                 const struct hpclang_rpl_reference_edit *prior = &probe->edits[j];
-                if (prior->mapping == cell.mapping && prior->field == cell.field &&
-                    prior->width == 1 && prior->expected == value) {
+                unsigned offset = cell.field - prior->field;
+                if (prior->mapping == cell.mapping && offset < prior->width &&
+                    ((prior->expected >> (4 * offset)) & 15) == value) {
                     replacement = (replacement & ~(UINT64_C(15) << (4 * digit))) |
-                                  ((uint64_t)prior->value << (4 * digit));
+                                  ((uint64_t)((prior->value >> (4 * offset)) & 15) << (4 * digit));
                     ++found;
                 }
             }
@@ -1838,7 +1839,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     probe->pc = hpclang_launch_execution_pc(boot);
     if (!probe->pc || hpclang_rpl_stock_view_reader(&probe->view) ||
         hpclang_rpl_reference_guards_begin(&probe->builder, probe->guards, 1152) ||
-        hpclang_rpl_reference_edits_begin(&probe->plan, probe->edits, 448))
+        hpclang_rpl_reference_edits_begin_packed(&probe->plan, probe->edits, 160))
         goto done;
     uint32_t catalog_count;
     if (probe_read_word(io, io->library_table, 3, &catalog_count) ||
@@ -1931,12 +1932,16 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                 goto done;
             ++probe->checked_reads;
         }
+    unsigned source_cells = 0;
     for (unsigned i = 0; i < probe->plan.count; ++i) {
         const struct hpclang_rpl_reference_edit *edit = &probe->edits[i];
+        source_cells += edit->width;
         if (edit->expected != edit->value) {
             if (edit->mapping != 1)
                 goto done; /* A proposed ROM write invalidates this test plan. */
-            ++probe->changed_cells;
+            for (unsigned digit = 0; digit < edit->width; ++digit)
+                if (((edit->expected ^ edit->value) >> (4 * digit)) & 15)
+                    ++probe->changed_cells;
         }
     }
     struct hpclang_rpl_reference_edit_builder rejected = probe->plan;
@@ -1985,7 +1990,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                           probe->expression_pc,
                           probe->expression_sources,
                           probe->planned_uses,
-                          probe->plan.count,
+                          source_cells,
                           probe->changed_cells,
                           probe->branches,
                           probe->rejected_plans,

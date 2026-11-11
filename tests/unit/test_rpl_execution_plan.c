@@ -43,6 +43,56 @@ static void put(struct plan_fixture *f, unsigned at, uint32_t value)
         f->memory[at + i] = (value >> (4 * i)) & 15;
 }
 
+static void packed_payload_plans(void)
+{
+    struct plan_fixture f = {0};
+    struct hpclang_rpl_code_store store = {.nibbles = 12};
+    uint64_t replacement = 0;
+    for (unsigned digit = 0; digit < 12; ++digit) {
+        f.memory[32 + digit] = digit;
+        store.value |= (uint64_t)digit << (4 * digit);
+        replacement |= (uint64_t)(15 - digit) << (4 * digit);
+        store.origins[digit] = 33 + digit;
+    }
+    const struct plan_fixture original = f;
+    struct hpclang_rpl_reference_edit single[12], packed[3];
+    struct hpclang_rpl_reference_edit_builder ordinary, compact;
+    assert(!hpclang_rpl_reference_edits_begin(&ordinary, single, 12));
+    assert(!hpclang_rpl_reference_edits_begin_packed(&compact, packed, 3));
+    assert(!hpclang_rpl_execution_plan_payload(&ordinary, &store, replacement, resolve_cell, NULL,
+                                               &f));
+    assert(
+        !hpclang_rpl_execution_plan_payload(&compact, &store, replacement, resolve_cell, NULL, &f));
+    assert(ordinary.count == 12 && compact.count == 3);
+    unsigned cell = 0;
+    for (unsigned record = 0; record < compact.count; ++record)
+        for (unsigned digit = 0; digit < packed[record].width; ++digit, ++cell) {
+            assert(cell < ordinary.count && single[cell].mapping == packed[record].mapping);
+            assert(single[cell].field == packed[record].field + digit);
+            assert(single[cell].expected == ((packed[record].expected >> (4 * digit)) & 15));
+            assert(single[cell].value == ((packed[record].value >> (4 * digit)) & 15));
+        }
+    assert(cell == ordinary.count && !memcmp(f.memory, original.memory, sizeof f.memory));
+    struct hpclang_rpl_code_step_uses uses = {.count = 1};
+    uses.addresses[0].kind = HPCLANG_RPL_CODE_USE_LOAD_ADDRESS;
+    uses.addresses[0].value = (uint32_t)store.value & 0xfffff;
+    memcpy(uses.addresses[0].origins, store.origins, sizeof uses.addresses[0].origins);
+    uint32_t address = (uint32_t)replacement & 0xfffff;
+    assert(!hpclang_rpl_execution_plan_uses(&compact, &uses, &address, resolve_cell, &f));
+    assert(compact.count == 3);
+    address ^= 0x100;
+    assert(hpclang_rpl_execution_plan_uses(&compact, &uses, &address, resolve_cell, &f) < 0);
+    assert(!compact.count && compact.error);
+    unsigned calls = f.calls;
+    assert(hpclang_rpl_execution_plan_payload(&compact, &store, replacement, resolve_cell, NULL,
+                                              &f) < 0);
+    assert(f.calls == calls);
+    assert(!hpclang_rpl_reference_edits_begin_packed(&compact, packed, 2));
+    assert(hpclang_rpl_execution_plan_payload(&compact, &store, replacement, resolve_cell, NULL,
+                                              &f) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!compact.count && compact.error);
+}
+
 static void subtraction_plans(void)
 {
     static const uint32_t cases[][7] = {
@@ -660,6 +710,7 @@ void test_execution_plans(void)
     constant_plans();
     predicate_plans();
     subtraction_plans();
+    packed_payload_plans();
     payload_plans();
     struct plan_fixture f = {0};
     const uint8_t program[] = {1, 4, 7, 8, 0, 8, 14}; /* C=DAT1.A; PC=(C). */
