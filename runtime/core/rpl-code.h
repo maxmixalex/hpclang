@@ -373,6 +373,49 @@ int hpclang_rpl_code_native_scan_inspect(const struct hpclang_rpl_reader *instru
                                          uint32_t max_reads,
                                          struct hpclang_rpl_code_native_scan *output);
 
+enum hpclang_rpl_code_scan_read_kind
+{
+    HPCLANG_RPL_CODE_SCAN_POINTER = 1,
+    HPCLANG_RPL_CODE_SCAN_TAG,
+    HPCLANG_RPL_CODE_SCAN_TARGET
+};
+struct hpclang_rpl_code_scan_read
+{
+    uint32_t kind, address, value;
+};
+/* Ordered five-nibble reads, after each complete successful word. The caller
+ * retains addresses, values and their provenance, including branch decisions.
+ * No writes. Any error invalidates ALL prior observations; positive callback
+ * errors become MALFORMED and the scan output remains unchanged. */
+typedef int (*hpclang_rpl_code_scan_read_fn)(void *context,
+                                             const struct hpclang_rpl_code_scan_read *read);
+int hpclang_rpl_code_native_scan_observed(const struct hpclang_rpl_reader *instructions,
+                                          const struct hpclang_rpl_reader *data, uint32_t limit,
+                                          const struct hpclang_rpl_code_execution *state,
+                                          uint32_t max_reads, hpclang_rpl_code_scan_read_fn observe,
+                                          void *context,
+                                          struct hpclang_rpl_code_native_scan *output);
+
+struct hpclang_rpl_code_scan_origins
+{
+    uint32_t b[8], d1[5], target[5], d1_adjustment, target_adjustment;
+};
+/* Qualify the entire scan before accepting a private execution step. Retain
+ * ordered reads/predicates (replay native_scan_observed with immutable readers),
+ * ROM identity, native padded reads, P=0/cache invariants and BOTH CPU-relative
+ * RAM saves at 0xcb0/0xcb4 with original D1/B provenance. Record saves only in
+ * caller scratch and preserve overwritten dependencies. This grants no live
+ * writes. On dispatch supply nonzero producer tokens for B.low32, D1 and target;
+ * D1/target relations must preserve their adjustments. Return paths retain
+ * original B/D1 provenance and use the existing return-stack relation instead.
+ * Callbacks cannot change state/readers/output effects. Discard all scratch on
+ * any later step/visitor/collection error. Zero accepts, negative propagates,
+ * positive becomes MALFORMED. A missing callback rejects native execution. */
+typedef int (*hpclang_rpl_code_scan_fn)(void *context,
+                                        const struct hpclang_rpl_code_native_scan *effect,
+                                        const struct hpclang_rpl_code_execution *before,
+                                        struct hpclang_rpl_code_scan_origins *origins);
+
 enum hpclang_rpl_code_use_kind
 {
     HPCLANG_RPL_CODE_USE_LOAD_ADDRESS = 1,
@@ -499,6 +542,8 @@ struct hpclang_rpl_code_callbacks
     /* Separate from CONFIG: caller qualifies cancellation and any map rebuild.
      * A missing callback rejects UNCONFIG without changing execution state. */
     hpclang_rpl_code_config_fn unconfig;
+    hpclang_rpl_code_scan_fn native_scan;
+    uint32_t native_scan_max_reads; /* Explicit bound; zero rejects the scan. */
 };
 /* Unified optional observation callbacks. Missing callbacks retain the legacy
  * rejection/unknown-source behavior; all prior error/discard contracts apply. */

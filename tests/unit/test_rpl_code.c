@@ -2506,6 +2506,159 @@ static void configuration_step(unsigned unconfig)
     }
 }
 
+struct scan_fixture
+{
+    const struct hpclang_rpl_reader *instructions, *data;
+    const struct hpclang_rpl_code_execution *before;
+    struct hpclang_rpl_code_scan_read reads[10];
+    unsigned count, fail_read, calls, omit;
+    int error;
+};
+
+static int record_scan_read(void *context, const struct hpclang_rpl_code_scan_read *read)
+{
+    struct scan_fixture *fixture = context;
+    assert(fixture->count < 10);
+    fixture->reads[fixture->count++] = *read;
+    return fixture->count == fixture->fail_read ? fixture->error : 0;
+}
+
+static int retain_scan(void *context, const struct hpclang_rpl_code_native_scan *effect,
+                       const struct hpclang_rpl_code_execution *before,
+                       struct hpclang_rpl_code_scan_origins *origins)
+{
+    struct scan_fixture *fixture = context;
+    ++fixture->calls;
+    assert(!memcmp(before, fixture->before, sizeof *before));
+    struct hpclang_rpl_code_native_scan replay;
+    fixture->count = 0;
+    int result = hpclang_rpl_code_native_scan_observed(
+        fixture->instructions, fixture->data, 4, before, 10, record_scan_read, fixture, &replay);
+    if (result)
+        return result;
+    assert(!memcmp(effect, &replay, sizeof replay));
+    /* These are test producer tokens; a live caller must qualify both RAM saves
+     * and retain read/predicate provenance before supplying such tokens. */
+    for (unsigned i = 0; i < 8; ++i)
+        origins->b[i] = fixture->omit == i + 1 ? 0 : 0x1000 + i;
+    for (unsigned i = 0; i < 5; ++i) {
+        origins->d1[i] = fixture->omit == i + 9 ? 0 : 0x2000 + i;
+        origins->target[i] = fixture->omit == i + 14 ? 0 : 0x3000 + i;
+    }
+    origins->d1_adjustment = fixture->omit == 19 ? 0x100000 : 3;
+    origins->target_adjustment = fixture->omit == 20 ? 0x100000 : 7;
+    return fixture->error;
+}
+
+static void scan_step(const struct hpclang_rpl_reader *instructions,
+                      const struct hpclang_rpl_reader *data,
+                      const struct hpclang_rpl_code_execution *initial,
+                      const struct hpclang_rpl_code_native_scan *effect)
+{
+    struct hpclang_rpl_code_execution before = *initial;
+    seed_origins(&before.origins);
+    before.origins.adjustment[HPCLANG_RPL_CODE_D0] = 0xffffe;
+    unsigned slot = (before.control.cursor + 7) & 7;
+    for (unsigned i = 0; i < 5; ++i)
+        before.control.stack_origins[slot][i] = 0x4000 + i;
+    before.stack_adjustment[slot] = 9;
+    struct scan_fixture fixture = {instructions, data, &before, {{0}}, 0, 0, 0, 0, 0};
+    struct hpclang_rpl_code_callbacks callbacks = {.native_scan = retain_scan,
+                                                   .native_scan_max_reads = effect->reads};
+    struct hpclang_rpl_code_execution state = before, expected = before;
+    struct hpclang_rpl_code_step_uses uses, sentinel;
+    memset(&sentinel, 0xa5, sizeof sentinel);
+    uses = sentinel;
+    assert(!hpclang_rpl_code_execution_step_observed(instructions, data, 4, &state, data_token,
+                                                     &callbacks, &fixture, &uses));
+    assert(fixture.calls == 1 && fixture.count == effect->reads);
+    assert(uses.count == 1 && !uses.has_branch && uses.addresses[0].value == effect->target);
+    expected.values.registers[HPCLANG_RPL_CODE_D0] = effect->d0;
+    expected.origins.adjustment[HPCLANG_RPL_CODE_D0] =
+        (0xffffe + effect->d0 - initial->values.registers[HPCLANG_RPL_CODE_D0]) & 0xfffff;
+    expected.control.pc = effect->target;
+    expected.control.cursor = effect->cursor;
+    expected.control.carry = expected.values.carry = effect->carry;
+    if (effect->returns) {
+        assert(uses.addresses[0].kind == HPCLANG_RPL_CODE_USE_RETURN_TARGET);
+        assert(uses.addresses[0].adjustment == 9 && !uses.addresses[0].generated);
+        assert(!memcmp(uses.addresses[0].origins, before.control.stack_origins[slot], 20));
+        expected.control.stack[slot] = expected.stack_adjustment[slot] = 0;
+        memset(expected.control.stack_origins[slot], 0, 20);
+    } else {
+        expected.values.registers[HPCLANG_RPL_CODE_B] = effect->b;
+        expected.values.registers[HPCLANG_RPL_CODE_D1] = effect->d1;
+        expected.origins.adjustment[HPCLANG_RPL_CODE_B] = 0;
+        expected.origins.adjustment[HPCLANG_RPL_CODE_D1] = 3;
+        for (unsigned i = 0; i < 8; ++i)
+            expected.origins.registers[HPCLANG_RPL_CODE_B][i] = 0x1000 + i;
+        memset(expected.origins.registers[HPCLANG_RPL_CODE_D1], 0,
+               sizeof expected.origins.registers[HPCLANG_RPL_CODE_D1]);
+        for (unsigned i = 0; i < 5; ++i) {
+            expected.origins.registers[HPCLANG_RPL_CODE_D1][i] = 0x2000 + i;
+            assert(uses.addresses[0].origins[i] == 0x3000 + i);
+        }
+        assert(uses.addresses[0].kind == HPCLANG_RPL_CODE_USE_MEMORY_TARGET);
+        assert(uses.addresses[0].adjustment == 7 && !uses.addresses[0].generated);
+    }
+    assert(!memcmp(&state, &expected, sizeof state));
+    for (unsigned fault = 0; fault < (effect->returns ? 6u : 26u); ++fault) {
+        state = before;
+        uses = sentinel;
+        fixture.calls = fixture.omit = fixture.fail_read = 0;
+        fixture.error = fault == 0 ? -73 : fault == 1 ? 73 : 0;
+        callbacks.native_scan = fault == 2 ? NULL : retain_scan;
+        callbacks.native_scan_max_reads = fault == 3 ? effect->reads - 1 : effect->reads;
+        if (fault == 4)
+            state.origins.adjustment[HPCLANG_RPL_CODE_D0] = 0x100000;
+        if (fault == 5) {
+            fixture.fail_read = effect->reads;
+            fixture.error = -74;
+        }
+        if (fault >= 6)
+            fixture.omit = fault - 5;
+        expected = state;
+        int result = hpclang_rpl_code_execution_step_observed(
+            instructions, data, 4, &state, data_token, &callbacks, &fixture, &uses);
+        assert(result < 0);
+        if (fault == 0)
+            assert(result == -73);
+        if (fault == 1)
+            assert(result == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&state, &expected, sizeof state));
+        assert(!memcmp(&uses, &sentinel, sizeof uses));
+    }
+    if (effect->returns) {
+        callbacks.native_scan = retain_scan;
+        callbacks.native_scan_max_reads = effect->reads;
+        fixture.error = 0;
+        fixture.fail_read = fixture.omit = 0;
+        for (unsigned fault = 0; fault < 3; ++fault) {
+            struct hpclang_rpl_code_execution generated = before;
+            generated.control.stack_generated[slot] = 0x56789;
+            generated.stack_adjustment[slot] = fault == 1 ? 1 : 0;
+            memset(generated.control.stack_origins[slot], 0, 20);
+            if (fault == 2)
+                generated.control.stack_origins[slot][4] = 1;
+            fixture.before = &generated;
+            state = generated;
+            uses = sentinel;
+            int result = hpclang_rpl_code_execution_step_observed(
+                instructions, data, 4, &state, data_token, &callbacks, &fixture, &uses);
+            if (fault) {
+                assert(result == HPCLANG_RPL_SPAN_MALFORMED);
+                assert(!memcmp(&state, &generated, sizeof state));
+                assert(!memcmp(&uses, &sentinel, sizeof uses));
+            } else {
+                assert(!result && uses.count == 1 && uses.addresses[0].generated == 0x56789);
+                assert(!uses.addresses[0].adjustment && !state.control.stack_generated[slot]);
+                for (unsigned digit = 0; digit < 5; ++digit)
+                    assert(!uses.addresses[0].origins[digit]);
+            }
+        }
+    }
+}
+
 static void native_scan(void)
 {
     struct image code = {.size = 4, .fail = UINT32_MAX};
@@ -2552,6 +2705,46 @@ static void native_scan(void)
                 assert(result.b == (dispatch ? UINT64_C(0x1234567800000000) + (mode == 7)
                                              : state.values.registers[HPCLANG_RPL_CODE_B]));
                 assert(result.d1 == (dispatch ? (mode == 7 ? 0x160u : 0x140u) : 0x180u));
+                scan_step(&instructions, &data, &before, &result);
+                struct scan_fixture trace = {&instructions, &data, &before, {{0}}, 0, 0, 0, 0, 0};
+                struct hpclang_rpl_code_native_scan observed;
+                assert(!hpclang_rpl_code_native_scan_observed(&instructions, &data, 4, &state,
+                                                              reads[mode], record_scan_read, &trace,
+                                                              &observed));
+                assert(!memcmp(&observed, &result, sizeof result) && trace.count == reads[mode]);
+                uint32_t d0 = 0x100, pointer = 0x140;
+                for (unsigned i = 0; i < trace.count; ++i) {
+                    const struct hpclang_rpl_code_scan_read *read = &trace.reads[i];
+                    if (read->kind == HPCLANG_RPL_CODE_SCAN_POINTER) {
+                        assert(read->address == d0);
+                        d0 += 5;
+                        pointer = read->value;
+                    } else if (read->kind == HPCLANG_RPL_CODE_SCAN_TAG)
+                        assert(read->address == pointer);
+                    else
+                        assert(read->kind == HPCLANG_RPL_CODE_SCAN_TARGET &&
+                               read->address == pointer - 5 && i &&
+                               trace.reads[i - 1].kind == HPCLANG_RPL_CODE_SCAN_TAG &&
+                               trace.reads[i - 1].value == 0x28fc);
+                    uint32_t value = 0;
+                    for (unsigned j = 0; j < 5; ++j)
+                        value |= (uint32_t)memory.data[read->address - memory.address + j]
+                                 << (4 * j);
+                    assert(value == read->value);
+                }
+                for (unsigned fail = 1; fail <= reads[mode]; ++fail)
+                    for (unsigned positive = 0; positive < 2; ++positive) {
+                        trace.count = 0;
+                        trace.fail_read = fail;
+                        trace.error = positive ? 73 : -73;
+                        observed = sentinel;
+                        assert(hpclang_rpl_code_native_scan_observed(
+                                   &instructions, &data, 4, &state, reads[mode], record_scan_read,
+                                   &trace,
+                                   &observed) == (positive ? HPCLANG_RPL_SPAN_MALFORMED : -73));
+                        assert(trace.count == fail &&
+                               !memcmp(&observed, &sentinel, sizeof observed));
+                    }
                 for (unsigned fault = 0; fault < 10; ++fault) {
                     state = before;
                     uint32_t budget = reads[mode], limit = 4;
