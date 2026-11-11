@@ -173,7 +173,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             remote_commands=[
                 "-95 CF HOME CLEAR",
                 "\"0\" 1 7 START DUP + NEXT 'ENTRYOBS' STO",
-                "\"0\" 1 7 START DUP + NEXT 1 116 SUB 'EXECOBS' STO",
+                "\"0\" 1 7 START DUP + NEXT 1 124 SUB 'EXECOBS' STO",
                 "'CALLROOT' RCL",
             ],
         )
@@ -217,11 +217,11 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         read = native_words((state / "sram").read_bytes(), flash)
         observation = home_string(read, b"ENTRYOBS")
         words = verify_entry(observation, (build / "launchers" / f"{args.model}.bin").read_bytes())
-        execution = struct.unpack("<29I", home_string(read, b"EXECOBS"))
+        execution = struct.unpack("<31I", home_string(read, b"EXECOBS"))
         if (
-            execution[0:3] != (14, 1, 169)
-            or execution[3] != 0x301C
-            or execution[4] != 78
+            execution[0:3] != (15, 1, 170)
+            or execution[3] != 0x4EC7
+            or execution[4] != 81
             or not 0 < execution[5] <= 1152
             or not execution[6]
             or not execution[7]
@@ -230,12 +230,13 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             or execution[10] != words[2]
             or execution[11] != 0x45584543
             or execution[12:15] != (3, 0x806F3, 0xFFFF1)
-            or execution[15] != 2
+            or execution[15] != 3
             or execution[16:20] != (3, 1, 0x2900, 7)
-            or execution[20:22] != (78, 326)
+            or execution[20:22] != (81, 349)
             or not 0 < execution[22] <= execution[21]
             or execution[23:25] != (17, 2)
-            or execution[25:29] != (13, 59, 59, 1)
+            or execution[25:29] != (13, 75, 75, 1)
+            or execution[29:31] != (2, 2)
         ):
             raise ValueError("Native execution collection/guard observation is incomplete")
         (case / "entry.json").write_text(
@@ -280,6 +281,8 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                         stored_sources=execution[26],
                         verified_shadow_cells=execution[27],
                         derived_d0_uses=execution[28],
+                        native_saves=execution[29],
+                        scan_reads=execution[30],
                     ),
                 ),
                 indent=2,

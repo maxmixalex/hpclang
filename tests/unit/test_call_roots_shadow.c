@@ -627,8 +627,102 @@ static void native_word_payload(void)
     }
 }
 
+static void native_scan_saves(void)
+{
+    for (unsigned mode = 0; mode < 12; ++mode) {
+        (void)fixture();
+        word(3 * 4, 0x08020000);
+        word(0xa1 * 4, 0x08000800);
+        ram[0x2000e] = 0x18;
+        ram[0x2000f] = 0xab;
+        ram[0x20000] = 0;
+        ram[0x20001] = 0;
+        ram[0x20002] = 8; /* read5(D0) == 0x80000. */
+        ram[0x10000] = ram[0x10001] = 0x11;
+        ram[0x10002] = 1;
+        word(0x954, 0x90000);
+        word(0x958, 0xabcde);
+        word(0x914, 0x444abcde);
+        word(0x95c, 0);
+        assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards, 512));
+        assert(!hpclang_rpl_reference_edits_begin(&probe.plan, probe.edits, 128));
+        struct hpclang_rpl_code_execution state = {0};
+        state.control.pc = 0x301c;
+        state.control.stack[7] = 0x4ec7;
+        const unsigned regs[] = {HPCLANG_RPL_CODE_D0, HPCLANG_RPL_CODE_D1, HPCLANG_RPL_CODE_B};
+        const unsigned offsets[] = {0x954, 0x958, 0x914};
+        const uint32_t values[] = {0x90000, 0xabcde, 0x444abcde};
+        for (unsigned i = 0; i < 3; ++i) {
+            state.values.registers[regs[i]] = values[i];
+            for (unsigned digit = 0; digit < (i == 2 ? 8u : 5u); ++digit)
+                state.origins.registers[regs[i]][digit] = 0x200000 + offsets[i] * 2 + digit;
+        }
+        state.origins.registers[HPCLANG_RPL_CODE_P][0] = 0x200000 + 0x95c * 2;
+        probe.stores = 13;
+        probe.stored_sources = 59;
+        const struct hpclang_rpl_reader reader = {execution_shadow_read, &probe};
+        struct hpclang_rpl_code_native_scan effect;
+        assert(!hpclang_rpl_code_native_scan_inspect(&reader, &reader, 4, &state, 2, &effect));
+        if (mode == 1)
+            state.values.registers[HPCLANG_RPL_CODE_P] = 1;
+        if (mode == 2)
+            state.status = 2;
+        if (mode == 3)
+            effect.reads = 3;
+        if (mode == 4) {
+            ++state.values.registers[HPCLANG_RPL_CODE_D0];
+            ++effect.d0;
+        }
+        if (mode == 5) {
+            state.values.registers[HPCLANG_RPL_CODE_D0] = 0xa1960;
+            effect.d0 = 0xa1965;
+        }
+        if (mode == 6)
+            section ^= 0x1000;
+        if (mode == 7)
+            assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards, 0));
+        if (mode == 8)
+            state.origins.registers[HPCLANG_RPL_CODE_B][7] = 0;
+        if (mode == 9) {
+            state.values.registers[HPCLANG_RPL_CODE_D1] = effect.d1 = 0x100000;
+            effect.saved_d1 = 0x100000;
+        }
+        if (mode == 10)
+            probe.shadow[0].field = 0xcb0 * 2;
+        if (mode == 11)
+            probe.view.state_offset = 0x80000 - 0xcb8 + 1;
+        memcpy(before, ram, sizeof ram);
+        struct hpclang_rpl_code_scan_origins origins = {0};
+        int result = execution_scan(&probe, &effect, &state, &origins);
+        assert(!memcmp(before, ram, sizeof ram));
+        if (mode) {
+            assert(result < 0 && !probe.native_save_count && probe.stored_sources == 59);
+            continue;
+        }
+        assert(!result && probe.native_save_count == 2 && probe.scan_reads == 2);
+        assert(probe.stored_sources == 75 && probe.uses == 2 && probe.planned_uses == 2);
+        for (unsigned word = 0; word < 2; ++word)
+            for (unsigned digit = 0; digit < 8; ++digit) {
+                uint8_t value;
+                uint32_t origin;
+                assert(
+                    !execution_shadow_value(&probe, 0xa1960 + 8 * word + digit, &value, &origin));
+                assert(value == ((values[word ? 2 : 1] >> (4 * digit)) & 15));
+                assert(origin == 0x900001 + 16 * word + digit);
+                assert(!execution_payload(&probe, &probe.plan, origin, value, value));
+            }
+        assert(execution_scan(&probe, &effect, &state, &origins) < 0);
+        const struct hpclang_rpl_reference_reader guards = {execution_guard_read, &probe};
+        assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));
+        ram[0xcb7] ^= 0x10;
+        assert(hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count) <
+               0);
+    }
+}
+
 int main(void)
 {
+    native_scan_saves();
     native_word_payload();
     later_stores();
     boundary_address();
