@@ -260,7 +260,7 @@ static void configuration(void)
                                                         .value = (uint32_t)store.value};
         memcpy(config.origins, store.origins, sizeof config.origins);
         assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards,
-                                                   mode == 2 ? 32 : 1536));
+                                                   mode == 2 ? 32 : 1152));
         if (mode == 3)
             config.origins[0] = 0;
         int result = execution_config(&probe, &config);
@@ -272,7 +272,7 @@ static void configuration(void)
             continue;
         }
         assert(!result && probe.configurations == 1);
-        assert(probe.builder.count >= 792 && probe.builder.count <= 1536);
+        assert(probe.builder.count >= 792 && probe.builder.count <= 1152);
         assert(ram[0xb9c] == 3 && probe.native_after[0xb9c] == 35);
         const struct hpclang_rpl_reference_reader guards = {execution_guard_read, &probe};
         assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));
@@ -352,7 +352,7 @@ static void unconfiguration(void)
 {
     for (unsigned mode = 0; mode < 8; ++mode) {
         struct hpclang_rpl_code_store store = fixture();
-        assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards, 1536));
+        assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards, 1152));
         word(0xb9c, 3);
         word(0xbcc, 1);
         word(0xbd0, 2);

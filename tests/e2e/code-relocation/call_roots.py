@@ -222,7 +222,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             execution[0:3] != (14, 1, 169)
             or execution[3] != 0x301C
             or execution[4] != 78
-            or not 0 < execution[5] <= 1536
+            or not 0 < execution[5] <= 1152
             or not execution[6]
             or not execution[7]
             or execution[8] < 256

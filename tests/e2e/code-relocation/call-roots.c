@@ -678,7 +678,7 @@ static int library_nibble(void *context, uint32_t at, uint8_t *out)
 struct execution_probe
 {
     struct hpclang_rpl_code_execution state;
-    struct hpclang_rpl_reference_guard guards[1536];
+    struct hpclang_rpl_reference_guard guards[1152];
     struct hpclang_rpl_reference_guard_builder builder;
     struct hpclang_rpl_stock_view view;
     uint32_t *pc;
@@ -1456,7 +1456,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     probe->pc = hpclang_launch_execution_pc(boot);
     if (!probe->pc || hpclang_rpl_stock_view_reader(&probe->view) ||
-        hpclang_rpl_reference_guards_begin(&probe->builder, probe->guards, 1536) ||
+        hpclang_rpl_reference_guards_begin(&probe->builder, probe->guards, 1152) ||
         hpclang_rpl_reference_edits_begin(&probe->plan, probe->edits, 328))
         goto done;
     uint32_t catalog_count;
