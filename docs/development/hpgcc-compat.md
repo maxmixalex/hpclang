@@ -2138,3 +2138,25 @@ footer native-font glyphs are outside this checker. A wrong selected-row pixel
 is rejected. Every saved return record passes. Stock 51380 uses the same fixed
 artifact; full 150-test regression 29287 and analysis 29830 run. Logs use
 `/work/oct24-choose-*`. Stock and CI acceptance remain open.
+
+### Historical formatted-input entry points
+
+`hpstdio.h` provides `_scanf`, `_sscanf` and `_vsscanf`, as declared by HPGCC
+2.0 `sources/hplib/hpstdio.h`. The original `examples/scanf.c` date/time format
+is covered by a regression test. String conversions delegate to standard C
+`vsscanf`; standard `scanf`, `sscanf` and `vsscanf` names remain unchanged.
+This does not reproduce the old `_vsscanf.c` parser's documented incomplete
+features or conversion bugs.
+
+`_scanf` retains the historical read-one-line-then-parse behavior, using the
+existing bounded console editor with a 1024-byte buffer. It accepts at most
+1023 calculator bytes; further typed characters follow the editor's full-line
+behavior until deletion or submission. EOF without input, cancellation and
+input failure return `EOF`, preserving the editor's error indication. Use
+conversion widths for destination arrays, as with standard C scanning.
+
+Local sanitizer tests cover the original date/time conversion, `va_list`,
+field widths, suppression, scansets, `%n`, partial conversion and input failure.
+ARMv4T compilation and analysis pass; `_scanf` has a 1056-byte own frame,
+excluding nested editor/libc stack use. Installed-SDK and native execution
+acceptance of these new entry points remain open.

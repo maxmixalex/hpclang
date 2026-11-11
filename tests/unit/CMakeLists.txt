@@ -265,6 +265,9 @@ target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpgcc_string test_hpgcc_string.c "${HPCLANG_ROOT}/runtime/core/hpgcc-string.c")
 target_include_directories(test_hpgcc_string PRIVATE "${HPCLANG_ROOT}/include")
 
+hpclang_unit(hpgcc_scan test_hpgcc_scan.c "${HPCLANG_ROOT}/runtime/core/hpgcc-scan.c")
+target_include_directories(test_hpgcc_scan PRIVATE "${HPCLANG_ROOT}/include")
+
 hpclang_unit(hpgcc_number test_hpgcc_number.c "${HPCLANG_ROOT}/runtime/core/hpgcc-number.c")
 target_include_directories(test_hpgcc_number PRIVATE "${HPCLANG_ROOT}/include")
 
