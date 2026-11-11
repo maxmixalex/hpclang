@@ -678,13 +678,23 @@ static void dispatch_root_relations(void)
 
 static void late_overlapping_stores(void)
 {
-    for (unsigned effect = 13; effect <= 15; ++effect)
+    const unsigned effects[] = {13, 14, 15, 17};
+    for (unsigned e = 0; e < 4; ++e)
         for (unsigned mode = 0; mode < 9; ++mode) {
+            unsigned effect = effects[e];
             struct hpclang_rpl_code_store store = fixture();
-            store.instruction = effect == 13 ? 0xb35d : effect == 14 ? 0xb367 : 0x291c;
-            unsigned previous = effect == 13 ? 5 : effect == 14 ? 6 : 3;
+            store.instruction = effect == 13   ? 0xb35d
+                                : effect == 14 ? 0xb367
+                                : effect == 15 ? 0x291c
+                                               : 0x2da2;
+            unsigned previous = effect == 13 ? 5 : effect == 14 ? 6 : effect == 15 ? 3 : 13;
+            if (effect == 17) {
+                store.adjustment = 15;
+                store.value += 15;
+            }
             struct hpclang_rpl_code_store old = store;
             old.value = 0x12345;
+            old.adjustment = 0;
             word(0x20010, (uint32_t)old.value);
             for (unsigned i = 0; i < 5; ++i)
                 old.origins[i] = 0x90021 + i;
@@ -692,7 +702,7 @@ static void late_overlapping_stores(void)
                 &probe.plan, &old, old.value, execution_source, execution_payload, &probe));
             probe.store_records[previous] = old;
             probe.stores = effect;
-            probe.stored_sources = 75;
+            probe.stored_sources = effect == 17 ? 80 : 75;
             probe.native_save_count = 2;
             for (unsigned i = 0; i < 75; ++i)
                 probe.shadow[i].field = 0x70000 + i;
@@ -729,11 +739,12 @@ static void late_overlapping_stores(void)
                        !memcmp(saved, probe.shadow, sizeof saved));
                 continue;
             }
-            assert(!result && probe.stores == effect + 1 && probe.stored_sources == 75);
+            assert(!result && probe.stores == effect + 1 &&
+                   probe.stored_sources == (effect == 17 ? 80u : 75u));
             assert(!memcmp(&probe.store_records[previous], &old, sizeof old));
             for (unsigned i = 0; i < 5; ++i) {
                 assert(probe.shadow[i].value == ((store.value >> (4 * i)) & 15));
-                assert(probe.shadow[i].origin == store.origins[i]);
+                assert(probe.shadow[i].origin == (effect == 17 ? 0x500111 + i : store.origins[i]));
             }
             assert(!memcmp(saved + 5 * sizeof probe.shadow[0], probe.shadow + 5,
                            sizeof saved - 5 * sizeof probe.shadow[0]));
@@ -744,6 +755,75 @@ static void late_overlapping_stores(void)
             assert(hpclang_rpl_reference_guards_validate(&reader, probe.guards,
                                                          probe.builder.count) < 0);
         }
+}
+
+static void late_scratch_clear(void)
+{
+    for (unsigned mode = 0; mode < 10; ++mode) {
+        struct hpclang_rpl_code_store store = fixture();
+        word(8 * 4, 0x08030000);
+        ram[0x30697] = 0xd4;
+        ram[0x30698] = 0x40; /* A.A=0 at logical 0x8d2f. */
+        struct hpclang_rpl_code_constant fact = {.assignment = {.instruction = 0x8d2f,
+                                                                .length = 2,
+                                                                .source = HPCLANG_RPL_CODE_CONSTANT,
+                                                                .destination = HPCLANG_RPL_CODE_A,
+                                                                .nibbles = 5}};
+        probe.constant_count = 6;
+        uint32_t tokens[16] = {0};
+        assert(!execution_constant(&probe, &fact, tokens));
+        probe.stores = 16;
+        probe.stored_sources = 75;
+        probe.native_save_count = 2;
+        probe.dispatch_roots_checked = 1;
+        for (unsigned i = 0; i < 75; ++i)
+            probe.shadow[i].field = 0x70000 + i;
+        store.instruction = 0x8d1f;
+        store.address.value = 0x8082e;
+        store.value = UINT64_C(0xabcde00000);
+        memcpy(store.origins, tokens, sizeof tokens);
+        if (mode == 1)
+            ++store.address.value;
+        if (mode == 2)
+            ++store.value;
+        if (mode == 3)
+            ++store.origins[0];
+        if (mode == 4)
+            probe.constant_count = 6;
+        if (mode == 5)
+            probe.dispatch_roots_checked = 0;
+        if (mode == 6)
+            probe.shadow[0].field = 0x2082e; /* Unexpected physical overlap. */
+        if (mode == 7)
+            probe.native_save_count = 1;
+        if (mode == 8)
+            ram[0x30697] = 0xc4; /* The retained producer is no longer a clear. */
+        if (mode == 9)
+            word(0x404 + 0x80 * 4, 0x08018000); /* Mismatched write alias. */
+        uint8_t saved[sizeof probe.shadow];
+        memcpy(saved, probe.shadow, sizeof saved);
+        memcpy(before, ram, sizeof ram);
+        int result = execution_store(&probe, &store);
+        assert(!memcmp(before, ram, sizeof ram));
+        if (mode) {
+            assert(result < 0 && probe.stores == 16 && probe.stored_sources == 75);
+            assert(!memcmp(saved, probe.shadow, sizeof saved));
+            continue;
+        }
+        assert(!result && probe.stores == 17 && probe.stored_sources == 80);
+        assert(!memcmp(saved, probe.shadow, 75 * sizeof probe.shadow[0]));
+        for (unsigned i = 0; i < 5; ++i) {
+            uint8_t value;
+            uint32_t origin;
+            assert(!execution_shadow_value(&probe, 0x8082e + i, &value, &origin));
+            assert(!value && origin == tokens[i]);
+        }
+        const struct hpclang_rpl_reference_reader reader = {execution_guard_read, &probe};
+        assert(!hpclang_rpl_reference_guards_validate(&reader, probe.guards, probe.builder.count));
+        ram[0x30697] ^= 0x10;
+        assert(hpclang_rpl_reference_guards_validate(&reader, probe.guards, probe.builder.count) <
+               0);
+    }
 }
 
 static void immediate_unit_source(void)
@@ -1021,6 +1101,7 @@ int main(void)
     unit_source();
     immediate_unit_source();
     late_overlapping_stores();
+    late_scratch_clear();
     dispatch_root_relations();
     sum_source();
     overlapping_store();
