@@ -2506,6 +2506,127 @@ static void configuration_step(unsigned unconfig)
     }
 }
 
+static void native_scan(void)
+{
+    struct image code = {.size = 4, .fail = UINT32_MAX};
+    struct image memory = {.address = 0x100, .size = 128, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+    const struct hpclang_rpl_reader data = {read_nibble, &memory};
+    encode(&code, 0, 4, 0xab18);
+    const unsigned deltas[] = {5, 0, 0, 5, 10, 20, 5, 10};
+    const unsigned reads[] = {2, 1, 2, 3, 5, 10, 4, 6};
+    struct hpclang_rpl_code_native_scan result, sentinel;
+    memset(&sentinel, 0xa5, sizeof sentinel);
+    for (unsigned mode = 0; mode < 8; ++mode)
+        for (unsigned cursor = 0; cursor < 8; ++cursor)
+            for (unsigned carry = 0; carry < 2; ++carry) {
+                memset(memory.data, 0, sizeof memory.data);
+                encode(&memory, 0, 5, mode == 6 ? 0x160 : 0x140);
+                encode(&memory, 5, 5, mode == 5 ? 0x140 : 0x160);
+                encode(&memory, 10, 5, 0x160);
+                encode(&memory, 15, 5, 0x160);
+                encode(&memory, 0x40, 5, mode == 2 ? 0x3130 : mode >= 3 ? 0x28fc : 0x11111);
+                encode(&memory, 0x3b, 5, mode == 3 ? 0x45678 : 0x3077);
+                encode(&memory, 0x60, 5, mode == 7 ? 0x28fc : 0x3130);
+                encode(&memory, 0x5b, 5, 0x45678);
+                struct hpclang_rpl_code_execution state = {0};
+                state.values.registers[HPCLANG_RPL_CODE_A] = 0x140;
+                state.values.registers[HPCLANG_RPL_CODE_B] = UINT64_C(0x12345678abcdef01);
+                state.values.registers[HPCLANG_RPL_CODE_D0] = 0x100;
+                state.values.registers[HPCLANG_RPL_CODE_D1] = 0x180;
+                state.status = mode == 1 || mode == 6 ? 2 : 0;
+                state.values.carry = state.control.carry = carry;
+                state.control.cursor = cursor;
+                state.control.stack[(cursor + 7) & 7] = 0x12345;
+                struct hpclang_rpl_code_execution before = state;
+                assert(!hpclang_rpl_code_native_scan_inspect(&instructions, &data, 4, &state,
+                                                             reads[mode], &result));
+                assert(!memcmp(&state, &before, sizeof state));
+                unsigned dispatch = mode == 3 || mode == 7;
+                assert(result.instruction == 0 && result.d0 == 0x100 + deltas[mode]);
+                assert(result.reads == reads[mode] && result.returns == !dispatch);
+                assert(result.saved_b == 0xabcdef01 && result.saved_d1 == 0x180);
+                assert(result.target == (dispatch ? 0x45678u : 0x12345u));
+                assert(result.cursor == (dispatch ? cursor : (cursor + 7) & 7));
+                assert(result.carry == (dispatch ? carry : 0));
+                assert(result.b == (dispatch ? UINT64_C(0x1234567800000000) + (mode == 7)
+                                             : state.values.registers[HPCLANG_RPL_CODE_B]));
+                assert(result.d1 == (dispatch ? (mode == 7 ? 0x160u : 0x140u) : 0x180u));
+                for (unsigned fault = 0; fault < 10; ++fault) {
+                    state = before;
+                    uint32_t budget = reads[mode], limit = 4;
+                    if (fault == 0)
+                        budget--;
+                    if (fault == 1)
+                        limit = 3;
+                    if (fault == 2)
+                        state.values.registers[HPCLANG_RPL_CODE_P] = 1;
+                    if (fault == 3)
+                        state.control.cursor = 8;
+                    if (fault == 4)
+                        state.values.carry ^= 1;
+                    if (fault == 5)
+                        state.values.registers[HPCLANG_RPL_CODE_D0] = 0x100000;
+                    if (fault == 6)
+                        state.values.registers[HPCLANG_RPL_CODE_D1] = 0x100000;
+                    if (fault == 7)
+                        code.fail = 2;
+                    if (fault == 8)
+                        memory.fail = (mode == 1 || mode == 6) ? 0x140 : 0x100;
+                    if (fault == 9)
+                        code.data[3] = 16;
+                    result = sentinel;
+                    assert(hpclang_rpl_code_native_scan_inspect(&instructions, &data, limit, &state,
+                                                                budget, &result) < 0);
+                    assert(!memcmp(&result, &sentinel, sizeof result));
+                    code.fail = memory.fail = UINT32_MAX;
+                    code.data[3] = 10;
+                }
+            }
+}
+
+static void native_scan_bounds(void)
+{
+    struct image code = {.size = 4, .fail = UINT32_MAX};
+    struct image memory = {.size = 128, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+    const struct hpclang_rpl_reader data = {read_nibble, &memory};
+    struct hpclang_rpl_code_execution state = {0};
+    struct hpclang_rpl_code_native_scan result, sentinel;
+    memset(&sentinel, 0xa5, sizeof sentinel);
+    encode(&code, 0, 4, 0xab18);
+    state.values.registers[HPCLANG_RPL_CODE_D0] = 0x40;
+    encode(&memory, 0x40, 5, 4);
+    encode(&memory, 4, 5, 0x28fc);
+    result = sentinel;
+    assert(hpclang_rpl_code_native_scan_inspect(&instructions, &data, 4, &state, 3, &result) ==
+           HPCLANG_RPL_SPAN_BOUNDS); /* The dispatch pointer cannot be decremented by five. */
+    assert(!memcmp(&result, &sentinel, sizeof result));
+    state.status = 2;
+    state.values.registers[HPCLANG_RPL_CODE_A] = 0x40;
+    state.values.registers[HPCLANG_RPL_CODE_D0] = 4;
+    encode(&memory, 0x40, 5, 0x3130);
+    assert(hpclang_rpl_code_native_scan_inspect(&instructions, &data, 4, &state, 1, &result) ==
+           HPCLANG_RPL_SPAN_BOUNDS); /* A-started closing marker would underflow D0. */
+    assert(!memcmp(&result, &sentinel, sizeof result));
+    state.values.registers[HPCLANG_RPL_CODE_D0] = 0x40;
+    encode(&memory, 0x40, 5, 0x11111);
+    state.control.stack[7] = 0x100000;
+    assert(hpclang_rpl_code_native_scan_inspect(&instructions, &data, 4, &state, 1, &result) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&result, &sentinel, sizeof result));
+    state.control.stack[7] = 0x12345;
+    code.data[3] = 9;
+    assert(hpclang_rpl_code_native_scan_inspect(&instructions, &data, 4, &state, 1, &result) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&result, &sentinel, sizeof result));
+    assert(hpclang_rpl_code_native_scan_inspect(NULL, &data, 4, &state, 1, &result) < 0);
+    assert(hpclang_rpl_code_native_scan_inspect(&instructions, NULL, 4, &state, 1, &result) < 0);
+    assert(hpclang_rpl_code_native_scan_inspect(&instructions, &data, 4, NULL, 1, &result) < 0);
+    assert(hpclang_rpl_code_native_scan_inspect(&instructions, &data, 4, &state, 1, NULL) < 0);
+    assert(!memcmp(&result, &sentinel, sizeof result));
+}
+
 static void software_status_bits(void)
 {
     struct image code = {.size = 3, .fail = UINT32_MAX};
@@ -3571,6 +3692,8 @@ int main(void)
     adjusted_stack_roundtrip();
     configuration_step(0);
     configuration_step(1);
+    native_scan();
+    native_scan_bounds();
     software_status_bits();
     hardware_status_clear();
     native_threaded_next();

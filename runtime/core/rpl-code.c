@@ -8,6 +8,108 @@ static uint64_t data_mask(unsigned nibbles)
     return nibbles == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * nibbles)) - 1;
 }
 
+static int scan_word(const struct hpclang_rpl_reader *data, uint32_t address, uint32_t limit,
+                     uint32_t *reads, uint32_t *value)
+{
+    if (*reads >= limit || address > 0xffffb)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    int result = read_word(data, address, 5, value);
+    if (!result)
+        ++*reads;
+    return result;
+}
+
+int hpclang_rpl_code_native_scan_inspect(const struct hpclang_rpl_reader *instructions,
+                                         const struct hpclang_rpl_reader *data, uint32_t limit,
+                                         const struct hpclang_rpl_code_execution *state,
+                                         uint32_t max_reads,
+                                         struct hpclang_rpl_code_native_scan *output)
+{
+    if (!instructions || !instructions->read_nibble || !data || !data->read_nibble || !state ||
+        !output)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    uint32_t pc = state->control.pc;
+    if (pc > 0xffffc || limit < 4 || limit > 0x100000 - pc || !max_reads)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (state->values.registers[HPCLANG_RPL_CODE_P])
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (state->values.registers[HPCLANG_RPL_CODE_D0] > 0xfffff ||
+        state->values.registers[HPCLANG_RPL_CODE_D1] > 0xfffff || state->control.cursor >= 8 ||
+        state->control.carry > 1 || state->values.carry != state->control.carry ||
+        state->values.decimal > 1)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t opcode;
+    int result = read_word(instructions, pc, 4, &opcode);
+    if (result)
+        return result;
+    if (opcode != 0xab18)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_code_native_scan next = {
+        .b = state->values.registers[HPCLANG_RPL_CODE_B],
+        .instruction = pc,
+        .d0 = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_D0],
+        .d1 = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_D1],
+        .saved_b = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_B],
+        .saved_d1 = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_D1],
+        .cursor = state->control.cursor,
+        .carry = state->control.carry};
+    uint32_t depth = 0, pointer = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_A] & 0xfffff;
+    unsigned from_a = (state->status & 2) != 0;
+    for (;;) {
+        if (!from_a) {
+            /* Native increments the full word. Do not admit an intermediate
+             * D0 outside this evaluator's canonical 20-bit contract. */
+            if (next.d0 > 0xffffa)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            result = scan_word(data, next.d0, max_reads, &next.reads, &pointer);
+            if (result)
+                return result;
+            next.d0 += 5;
+        }
+        from_a = 0;
+        uint32_t tag;
+        result = scan_word(data, pointer, max_reads, &next.reads, &tag);
+        if (result)
+            return result;
+        if (tag == 0x28fc) {
+            if (pointer < 5)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            result = scan_word(data, pointer - 5, max_reads, &next.reads, &next.target);
+            if (result)
+                return result;
+            if (next.target != 0x3077) {
+                next.b = (next.b & UINT64_C(0xffffffff00000000)) | depth;
+                next.d1 = pointer;
+                *output = next;
+                return 0;
+            }
+            if (depth == UINT32_MAX)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            ++depth;
+            continue;
+        }
+        if (tag == 0x3130) {
+            if (!depth) {
+                if (next.d0 < 5)
+                    return HPCLANG_RPL_SPAN_BOUNDS;
+                next.d0 -= 5;
+                break;
+            }
+            --depth;
+        }
+        if (!depth)
+            break;
+    }
+    next.cursor = (next.cursor + 7) & 7;
+    next.target = state->control.stack[next.cursor];
+    if (next.target > 0xfffff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    next.carry = 0;
+    next.returns = 1;
+    *output = next;
+    return 0;
+}
+
 int hpclang_rpl_code_predicate_inspect(const struct hpclang_rpl_reader *reader,
                                        uint32_t instruction, uint32_t limit,
                                        const struct hpclang_rpl_code_values *values,

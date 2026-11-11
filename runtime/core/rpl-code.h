@@ -351,6 +351,28 @@ struct hpclang_rpl_code_execution
     uint32_t status; /* Native software status word; 84n/85n clear/set bit n. */
 };
 
+struct hpclang_rpl_code_native_scan
+{
+    uint64_t b;
+    uint32_t instruction, d0, d1, saved_b, saved_d1, target, cursor, carry, returns, reads;
+};
+/* Inspect the HP49g+/HP50g 81BA scan with P=0. Follow ordinary, nested-marker,
+ * dispatch and return paths, bounded by max_reads five-nibble data reads.
+ * Result describes B/D0/D1, carry, target and RSTK cursor; returns means the
+ * popped stack word is cleared. All other modeled CPU values stay unchanged.
+ * Native execution also saves old D1/B.low32 at CPU-relative byte offsets
+ * 0xcb0/0xcb4, outside the captured CPU slice. These mandatory RAM effects are
+ * described by saved_d1/saved_b, NOT performed or authorized here.
+ * Caller must qualify ROM/mappings, padded native word reads, every read's
+ * provenance, both saves and eventual target. P changes/cache effects remain
+ * unsupported. No execution integration, allocation or writes. Failure leaves
+ * output unchanged; readers may have observed a partial dependency sequence. */
+int hpclang_rpl_code_native_scan_inspect(const struct hpclang_rpl_reader *instructions,
+                                         const struct hpclang_rpl_reader *data, uint32_t limit,
+                                         const struct hpclang_rpl_code_execution *state,
+                                         uint32_t max_reads,
+                                         struct hpclang_rpl_code_native_scan *output);
+
 enum hpclang_rpl_code_use_kind
 {
     HPCLANG_RPL_CODE_USE_LOAD_ADDRESS = 1,
