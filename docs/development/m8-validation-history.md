@@ -6099,3 +6099,19 @@ Four fresh setup-runtime tests and strict docs pass. Existing six-model Direct
 and Stock evidence is retained; no redundant application rebuild is claimed.
 Identity audit: research/nov06-allocation-main-identity.json. The integration
 requires new exact-head CI; this is not broader M8.2/M8.3/M8.5 completion.
+
+
+## 2026-11-12 — Fixed A-field predicate execution
+
+Local `0f2f2bb3` supports 8A/8B comparisons through existing predicate-source
+qualification and branch/return handling. Both original ROMs pass 1,728 cases
+each: comparison results, forward/backward branches, conditional returns and
+full native CPU state. Native carry may be a nonzero mask; its truth is verified
+then normalized to the evaluator boolean contract. Fourteen sanitizer targets,
+additional 8A/8B step/return/callback-failure tests and ARM analysis pass.
+Both numeric continuation traces reach 106 steps at `0xb2d7`, with seven stores,
+37 shadow digits and no unknown consumed address origins. This is not yet
+repair-plan or Stock qualification for the extended path; maintained Stock
+remains at 101 steps. Current reports reuse `/work/nov06-sum/fixed-predicates`
+and `/work/nov06-sum/fixed-continuation`. PR #31 head `5d4cb7bd` was submitted
+in the preceding turn; this local follow-up has not been pushed.

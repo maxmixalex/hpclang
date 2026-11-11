@@ -235,7 +235,7 @@ struct hpclang_rpl_code_predicate
     uint64_t left_value, right_value;
     uint32_t instruction, first, nibbles, left, right, relation, taken, displacement;
 };
-/* Inspect the complete five-nibble opcode-9 compare/GOYES/RTNYES family.
+/* Inspect five-nibble opcode-9 and fixed A-field 8A/8B compare/GOYES/RTNYES.
  * Values are unsigned selected fields; decimal mode does not change comparison.
  * right == CONSTANT means literal zero, independent of the pseudo-register.
  * displacement is the encoded byte; zero means a conditional stack return.
@@ -555,7 +555,7 @@ int hpclang_rpl_code_execution_step_native(
     hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
     hpclang_rpl_code_config_fn config, void *context, struct hpclang_rpl_code_step_uses *uses);
 
-/* Native step with explicit opcode-9 predicate qualification. The legacy entry
+/* Native step with explicit opcode-9/8A/8B predicate qualification. The legacy entry
  * points still reject predicates. Accepted comparisons update carry and execute
  * GOYES/RTNYES, including taken returns with source/generated metadata retained. */
 int hpclang_rpl_code_execution_step_predicates(
