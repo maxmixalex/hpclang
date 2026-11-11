@@ -678,11 +678,11 @@ static void dispatch_root_relations(void)
 
 static void late_overlapping_stores(void)
 {
-    for (unsigned effect = 13; effect <= 14; ++effect)
+    for (unsigned effect = 13; effect <= 15; ++effect)
         for (unsigned mode = 0; mode < 9; ++mode) {
             struct hpclang_rpl_code_store store = fixture();
-            store.instruction = effect == 13 ? 0xb35d : 0xb367;
-            unsigned previous = effect == 13 ? 5 : 6;
+            store.instruction = effect == 13 ? 0xb35d : effect == 14 ? 0xb367 : 0x291c;
+            unsigned previous = effect == 13 ? 5 : effect == 14 ? 6 : 3;
             struct hpclang_rpl_code_store old = store;
             old.value = 0x12345;
             word(0x20010, (uint32_t)old.value);

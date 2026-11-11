@@ -690,7 +690,7 @@ struct execution_probe
     struct hpclang_rpl_reference_edit_builder plan;
     struct hpclang_rpl_code_step_uses first_use;
     uint32_t move_first, move_end, planned_uses, branches, changed_cells, rejected_plans;
-    struct hpclang_rpl_code_store store, store_records[15];
+    struct hpclang_rpl_code_store store, store_records[16];
     uint32_t stores, stored_sources, checked_reads, d0_derived;
     struct
     {
@@ -1086,18 +1086,19 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
     if (store->instruction == 0xb2d7 || store->instruction == 0xb37c)
         return execution_bank_write(probe, store);
     const unsigned count = store->nibbles;
-    /* Fifteen effects observed in the original ROM continuation. This finite
-     * fixture permits only three proven same-destination overlaps, without granting
+    /* Sixteen effects observed in the original ROM continuation. This finite
+     * fixture permits only four proven same-destination overlaps, without granting
      * general store authority. The overlay is published only after validation. */
-    static const uint32_t pcs[15] = {0x2c3c,  0x2a1ba, 0x2a1c1, 0x2a1e0, 0x2da2,
-                                     0xb265,  0xb2ce,  0x2da2,  0x2da2,  0x20476,
-                                     0x20482, 0x153eb, 0x92f0,  0xb35d,  0xb367};
-    static const unsigned widths[15] = {5, 8, 4, 5, 5, 10, 5, 5, 5, 5, 1, 5, 1, 5, 5};
+    static const uint32_t pcs[16] = {0x2c3c, 0x2a1ba, 0x2a1c1, 0x2a1e0, 0x2da2,  0xb265,
+                                     0xb2ce, 0x2da2,  0x2da2,  0x20476, 0x20482, 0x153eb,
+                                     0x92f0, 0xb35d,  0xb367,  0x291c};
+    static const unsigned widths[16] = {5, 8, 4, 5, 5, 10, 5, 5, 5, 5, 1, 5, 1, 5, 5, 5};
     unsigned overlap_effect = probe->stores == 5    ? 4
                               : probe->stores == 13 ? 5
                               : probe->stores == 14 ? 6
+                              : probe->stores == 15 ? 3
                                                     : UINT32_MAX;
-    if (!count || count > 10 || probe->stores >= 15 || store->instruction != pcs[probe->stores] ||
+    if (!count || count > 10 || probe->stores >= 16 || store->instruction != pcs[probe->stores] ||
         store->first != ((probe->stores == 10 || probe->stores == 12) ? 15u : 0u) ||
         count != widths[probe->stores] || store->address.value > 0x100000 - count ||
         (overlap_effect != UINT32_MAX &&
@@ -1454,9 +1455,9 @@ static int execution_visit(void *context, uint32_t pc,
             return result;
         probe->dispatch_roots_checked = 1;
     }
-    return state->control.pc == 0x291c && probe->dispatch_roots_checked &&
+    return state->control.pc == 0x8d2f && probe->dispatch_roots_checked &&
            probe->native_word_count == 15 && probe->bank_writes == 2 &&
-           probe->expression_uses == 1 && probe->stores == 15 && probe->configurations == 4 &&
+           probe->expression_uses == 1 && probe->stores == 16 && probe->configurations == 4 &&
            probe->unconfigurations == 2 && probe->predicates == 4 && probe->constant_count == 6 &&
            probe->unit_count == 3 && probe->sum_count == 8 && probe->expression_count == 3 &&
            probe->native_save_count == 2 && probe->scan_reads == 2;
@@ -1862,7 +1863,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                                                          .native_word = execution_native_word,
                                                          .native_scan = execution_scan,
                                                          .native_scan_max_reads = 2};
-    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 208,
+    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 216,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count ||
@@ -1882,6 +1883,8 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     for (unsigned effect = 0; effect < probe->stores; ++effect) {
         const struct hpclang_rpl_code_store *store = &probe->store_records[effect];
         for (unsigned digit = 0; digit < store->nibbles; ++digit) {
+            if (effect == 3 && probe->stores >= 16)
+                continue; /* Store sixteen replaces the earlier saved pointer. */
             if (effect == 4)
                 continue; /* All five digits are replaced by store six. */
             if (effect == 5 && probe->stores >= 14 && digit < 5)
@@ -1946,7 +1949,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 253)
         goto done;
-    uint32_t words[31] = {20,
+    uint32_t words[31] = {21,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,
