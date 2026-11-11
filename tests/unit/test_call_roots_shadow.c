@@ -934,6 +934,56 @@ static void continuation_predicates(void)
         }
 }
 
+static void bitshift_sources(void)
+{
+    for (unsigned mode = 0; mode < 9; ++mode) {
+        fixture();
+        word(11 * 4, 0x08030000);
+        const uint8_t code[] = {8, 1, 9, 6, 0, 8, 1, 9, 6, 0};
+        for (unsigned i = 0; i < sizeof code; ++i) {
+            unsigned at = (0xbc22 + i) & 4095, shift = 4 * (at & 1);
+            ram[0x30000 + at / 2] =
+                (uint8_t)((ram[0x30000 + at / 2] & ~(15u << shift)) | (code[i] << shift));
+        }
+        struct hpclang_rpl_code_values values = {0};
+        values.registers[HPCLANG_RPL_CODE_A] = 0xabcde;
+        const struct hpclang_rpl_reader instructions = {execution_plan_read, &probe};
+        uint32_t tokens[16] = {0};
+        for (unsigned index = 0; index < 2; ++index) {
+            struct hpclang_rpl_code_bitshift_source fact = {0};
+            assert(!hpclang_rpl_code_bitshift_inspect(&instructions, 0xbc22 + 5 * index, 5, &values,
+                                                      &fact.shift));
+            for (unsigned digit = 0; digit < 16; ++digit)
+                fact.origins[digit] = index && digit < 2 ? tokens[digit] : 0x90001 + digit;
+            assert(!execution_bitshift(&probe, &fact, tokens));
+            values.registers[HPCLANG_RPL_CODE_A] = fact.shift.after;
+        }
+        assert(probe.bitshift_count == 2 && tokens[0] == 0xc00011);
+        if (mode == 1)
+            probe.bitshift_limit = 1;
+        if (mode == 2)
+            probe.bitshifts[1].origins[0] = tokens[0]; /* self-cycle */
+        if (mode == 3)
+            probe.bitshifts[0].origins[0] = tokens[0]; /* forward-cycle */
+        if (mode == 4)
+            probe.bitshifts[0].origins[0] = 0;
+        if (mode == 5)
+            probe.bitshifts[0].shift.lost_bit ^= 1;
+        if (mode == 6)
+            ram[0x20000] ^= 1;
+        if (mode == 7)
+            tokens[0] += 2;
+        uint8_t expected = values.registers[HPCLANG_RPL_CODE_A] & 15;
+        assert(!hpclang_rpl_reference_edits_begin(&probe.plan, probe.edits, 128));
+        memcpy(before, ram, sizeof ram);
+        int result = execution_payload(&probe, &probe.plan, tokens[0], expected,
+                                       mode == 8 ? expected ^ 1 : expected);
+        assert(mode ? result < 0 : !result);
+        assert(!memcmp(before, ram, sizeof ram));
+        assert(probe.bitshift_limit == (mode == 1 ? 1u : 2u));
+    }
+}
+
 static void logical_sources(void)
 {
     for (unsigned mode = 0; mode < 12; ++mode) {
@@ -1276,6 +1326,7 @@ int main(void)
     adjacent_stack_store();
     continuation_predicates();
     logical_sources();
+    bitshift_sources();
     dispatch_root_relations();
     sum_source();
     overlapping_store();

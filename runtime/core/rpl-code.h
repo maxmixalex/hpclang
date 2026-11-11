@@ -526,6 +526,29 @@ struct hpclang_rpl_code_logical_source
     struct hpclang_rpl_code_logical logical;
     uint32_t p_origin, p_adjustment, origins[2][16], adjustment[2];
 };
+struct hpclang_rpl_code_bitshift
+{
+    uint64_t before, after;
+    uint32_t instruction, length, reg, first, nibbles, p, lost_bit;
+};
+/* Inspect 81C..81F whole-register and 819fr selected-field one-bit right
+ * shifts (f=0..7/F, r=0..3). Zero-fill only the field's high bit; carry and
+ * decimal mode are unchanged. Execution sets SB when lost_bit is one.
+ * Errors leave output intact; provenance and movement approval are separate. */
+int hpclang_rpl_code_bitshift_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                      uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                      struct hpclang_rpl_code_bitshift *shift);
+struct hpclang_rpl_code_bitshift_source
+{
+    struct hpclang_rpl_code_bitshift shift;
+    uint32_t p_origin, p_adjustment, origins[16], adjustment;
+};
+/* Each result digit may depend on bits from two input digits. Return nonzero
+ * producer tokens for selected digits; no observer leaves them unknown.
+ * As with other observers, discard scratch facts after any step error. */
+typedef int (*hpclang_rpl_code_bitshift_fn)(void *context,
+                                            const struct hpclang_rpl_code_bitshift_source *fact,
+                                            uint32_t tokens[16]);
 /* Retain both operands and field-selection provenance. Supply nonzero producer
  * tokens in selected-digit order; they are relations, not physical cells.
  * Missing observer leaves computed origins unknown. Errors preserve step
@@ -589,6 +612,7 @@ struct hpclang_rpl_code_callbacks
     uint32_t native_scan_max_reads; /* Explicit bound; zero rejects the scan. */
     hpclang_rpl_code_native_word_fn native_word;
     hpclang_rpl_code_logical_fn logical;
+    hpclang_rpl_code_bitshift_fn bitshift;
 };
 /* Unified optional observation callbacks. Missing callbacks retain the legacy
  * rejection/unknown-source behavior; all prior error/discard contracts apply. */

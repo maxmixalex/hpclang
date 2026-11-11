@@ -418,6 +418,74 @@ int hpclang_rpl_code_logical_inspect(const struct hpclang_rpl_reader *reader, ui
     return 0;
 }
 
+int hpclang_rpl_code_bitshift_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                      uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                      struct hpclang_rpl_code_bitshift *shift)
+{
+    if (!reader || !reader->read_nibble || !values || !shift)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000 || !limit || limit > 0x100000 - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(reader, instruction, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode != 8)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (limit < 2)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = read_word(reader, instruction + 1, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode != 1)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (limit < 3)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = read_word(reader, instruction + 2, 1, &opcode);
+    if (result)
+        return result;
+    unsigned field = 7, reg, length = 3;
+    if (opcode >= 12) {
+        reg = opcode - 12;
+    } else if (opcode == 9) {
+        if (limit < 5)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t tail;
+        result = read_word(reader, instruction + 3, 2, &tail);
+        if (result)
+            return result;
+        field = tail & 15;
+        reg = tail >> 4;
+        length = 5;
+        if (reg > 3 || (field > 7 && field != 15))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    } else {
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->carry > 1 || values->decimal > 1)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    static const unsigned firsts[8] = {0, 0, 2, 0, 15, 3, 0, 0};
+    static const unsigned widths[8] = {1, 1, 1, 3, 1, 12, 2, 16};
+    struct hpclang_rpl_code_bitshift next = {.instruction = instruction,
+                                             .length = length,
+                                             .reg = reg,
+                                             .first = field == 15 ? 0
+                                                      : field     ? firsts[field]
+                                                                  : p,
+                                             .nibbles = field == 15  ? 5
+                                                        : field == 1 ? p + 1
+                                                                     : widths[field],
+                                             .p = p,
+                                             .before = values->registers[reg]};
+    uint64_t mask = data_mask(next.nibbles), selected = (next.before >> (4 * next.first)) & mask;
+    next.after =
+        (next.before & ~(mask << (4 * next.first))) | ((selected >> 1) << (4 * next.first));
+    next.lost_bit = selected & 1;
+    *shift = next;
+    return 0;
+}
+
 static void origin_overwrite(struct hpclang_rpl_code_origins *state, unsigned reg, uint32_t digits)
 {
     if (!(digits & 31u))
@@ -959,6 +1027,35 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
             next.control.pc = (pc + 3) & 0xfffff;
             goto done;
         }
+    }
+    if (opcode == 0x18) {
+        struct hpclang_rpl_code_bitshift_source fact = {0};
+        result =
+            hpclang_rpl_code_bitshift_inspect(instructions, pc, limit, &state->values, &fact.shift);
+        if (!result) {
+            unsigned reg = fact.shift.reg, first = fact.shift.first, count = fact.shift.nibbles;
+            fact.p_origin = state->origins.registers[HPCLANG_RPL_CODE_P][0];
+            fact.p_adjustment = state->origins.adjustment[HPCLANG_RPL_CODE_P];
+            fact.adjustment = state->origins.adjustment[reg];
+            for (unsigned i = 0; i < 16; ++i)
+                fact.origins[i] = state->origins.registers[reg][i];
+            uint32_t tokens[16] = {0};
+            hpclang_rpl_code_bitshift_fn observe = callbacks ? callbacks->bitshift : 0;
+            if (observe && (result = observe(context, &fact, tokens)))
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            origin_overwrite(&next.origins, reg, ((1u << count) - 1) << first);
+            for (unsigned i = 0; i < count; ++i) {
+                if (observe && !tokens[i])
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+                next.origins.registers[reg][first + i] = observe ? tokens[i] : 0;
+            }
+            next.values.registers[reg] = fact.shift.after;
+            next.hst |= fact.shift.lost_bit << 1;
+            next.control.pc = (pc + fact.shift.length) & 0xfffff;
+            goto done;
+        }
+        if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+            return result;
     }
     if (opcode == 0x18 && limit >= 3) {
         uint32_t operation;

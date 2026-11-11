@@ -491,6 +491,106 @@ static void constant_plans(void)
     }
 }
 
+static void bitshift_plans(void)
+{
+    const unsigned fields[] = {0, 1, 2, 3, 4, 5, 6, 7, 15, 16};
+    for (unsigned f = 0; f < 10; ++f)
+        for (unsigned reg = 0; reg < 4; ++reg)
+            for (unsigned mode = 0; mode < 18; ++mode) {
+                struct plan_fixture fixture = {.memory = {8, 1, 9, fields[f], reg}};
+                if (f == 9)
+                    fixture.memory[2] = 12 + reg;
+                const struct hpclang_rpl_reader reader = {read_cell, &fixture};
+                struct hpclang_rpl_code_values values = {0};
+                values.registers[reg] = UINT64_C(0x123456789abcdef0);
+                values.registers[HPCLANG_RPL_CODE_P] = fixture.memory[96] = 3;
+                struct hpclang_rpl_code_bitshift_source fact = {.p_origin = 97};
+                assert(!hpclang_rpl_code_bitshift_inspect(&reader, 0, 5, &values, &fact.shift));
+                for (unsigned i = 0; i < 16; ++i) {
+                    fact.origins[i] = 33 + i;
+                    fixture.memory[32 + i] = (fact.shift.before >> (4 * i)) & 15;
+                }
+                unsigned first = fact.shift.first, count = fact.shift.nibbles;
+                uint64_t input = fact.shift.before ^ (UINT64_C(10) << (4 * first));
+                uint64_t mask = count == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * count)) - 1;
+                uint64_t output = (input & ~(mask << (4 * first))) |
+                                  ((((input >> (4 * first)) & mask) >> 1) << (4 * first));
+                if (mode == 1)
+                    fact.origins[first] = 0;
+                if (mode == 2)
+                    input ^= UINT64_C(1) << (4 * first); /* identical result, different SB */
+                if (mode == 3)
+                    output ^= UINT64_C(1) << (4 * first);
+                if (mode == 4)
+                    fact.shift.after ^= 1;
+                if (mode == 5)
+                    fact.shift.lost_bit ^= 1;
+                if (mode == 6)
+                    fact.shift.first ^= 1;
+                if (mode == 7)
+                    fact.shift.nibbles++;
+                if (mode == 8)
+                    fact.shift.reg = 4;
+                if (mode == 9)
+                    fact.shift.length++;
+                if (mode == 10)
+                    fixture.memory[32 + first] ^= 1;
+                if (mode == 11)
+                    fact.p_origin = 0;
+                if (mode == 12)
+                    fact.p_adjustment = 1;
+                if (mode == 13) {
+                    fixture.fail = 2;
+                    fixture.error = -77;
+                }
+                if (mode == 14) {
+                    fixture.fail = 2;
+                    fixture.error = 1;
+                }
+                if (mode == 16)
+                    fact.adjustment = 0x100000;
+                uint8_t saved[128];
+                memcpy(saved, fixture.memory, sizeof saved);
+                struct hpclang_rpl_reference_edit edits[24];
+                struct hpclang_rpl_reference_edit_builder builder;
+                assert(!(mode == 17 ? hpclang_rpl_reference_edits_begin_packed(&builder, edits, 24)
+                                    : hpclang_rpl_reference_edits_begin(&builder, edits,
+                                                                        mode == 15 ? 2 : 24)));
+                int result =
+                    hpclang_rpl_execution_plan_bitshift(&builder, &fact, input, output, &reader,
+                                                        source_token, resolve_cell, NULL, &fixture);
+                assert(!memcmp(saved, fixture.memory, sizeof saved));
+                if (!mode || mode == 17 || (mode == 11 && f >= 2)) {
+                    assert(!result);
+                    unsigned cells = 0;
+                    for (unsigned n = 0; n < builder.count; ++n)
+                        for (unsigned d = 0; d < edits[n].width; ++d) {
+                            unsigned at = edits[n].field + d;
+                            assert(at < 128 && edits[n].mapping == 1 &&
+                                   fixture.memory[at] == ((edits[n].expected >> (4 * d)) & 15));
+                            fixture.memory[at] = (edits[n].value >> (4 * d)) & 15;
+                            ++cells;
+                        }
+                    assert(cells == fact.shift.length + count + (f < 2));
+                    uint64_t actual = 0;
+                    for (unsigned d = 0; d < 16; ++d)
+                        actual |= (uint64_t)fixture.memory[32 + d] << (4 * d);
+                    assert(actual == input);
+                    values.registers[reg] = actual;
+                    struct hpclang_rpl_code_bitshift after;
+                    assert(!hpclang_rpl_code_bitshift_inspect(&reader, 0, 5, &values, &after));
+                    assert(after.after == output && after.lost_bit == fact.shift.lost_bit);
+                } else {
+                    assert(result < 0 && !builder.count && builder.error == result);
+                    unsigned calls = fixture.calls;
+                    assert(hpclang_rpl_execution_plan_bitshift(&builder, &fact, input, output,
+                                                               &reader, source_token, resolve_cell,
+                                                               NULL, &fixture) == result);
+                    assert(fixture.calls == calls);
+                }
+            }
+}
+
 static void logical_plans(void)
 {
     const unsigned pairs[8][2] = {{0, 1}, {1, 2}, {2, 0}, {3, 2}, {1, 0}, {2, 1}, {0, 2}, {2, 3}};
@@ -848,6 +948,7 @@ void test_execution_plans(void)
     native_word_plans();
     sum_plans();
     logical_plans();
+    bitshift_plans();
     selected_unit_plans();
     immediate_unit_plans();
     constant_plans();

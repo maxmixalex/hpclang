@@ -2865,6 +2865,145 @@ static void software_status_bits(void)
         }
 }
 
+struct bitshift_test
+{
+    int error;
+    unsigned missing, calls;
+    struct hpclang_rpl_code_bitshift_source fact;
+};
+static int retain_bitshift(void *context, const struct hpclang_rpl_code_bitshift_source *fact,
+                           uint32_t tokens[16])
+{
+    struct bitshift_test *test = context;
+    test->fact = *fact;
+    ++test->calls;
+    for (unsigned i = 0; i < fact->shift.nibbles; ++i)
+        tokens[i] = i == test->missing ? 0 : 0xc00001 + i;
+    return test->error;
+}
+static void bit_shifts(void)
+{
+    const unsigned fields[] = {0, 1, 2, 3, 4, 5, 6, 7, 15, 16};
+    for (unsigned f = 0; f < 10; ++f)
+        for (unsigned reg = 0; reg < 4; ++reg)
+            for (unsigned p = 0; p < 16; ++p)
+                for (unsigned flags = 0; flags < 8; ++flags) {
+                    struct image code = {
+                        .data = {8, 1, 9, fields[f], reg}, .size = 5, .fail = UINT32_MAX};
+                    if (f == 9) {
+                        code.data[2] = 12 + reg;
+                        code.size = 3;
+                    }
+                    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+                    struct hpclang_rpl_code_execution before = {0};
+                    for (unsigned r = 0; r < 9; ++r)
+                        before.values.registers[r] = UINT64_C(0xfedcba9876543210) ^
+                                                     (UINT64_C(0x1111111111111111) * (r + flags));
+                    before.values.registers[HPCLANG_RPL_CODE_P] = p;
+                    before.values.carry = before.control.carry = flags & 1;
+                    before.values.decimal = (flags >> 1) & 1;
+                    before.hst = flags & 4 ? 0xa5a5000f : 0xa5a5000d;
+                    before.status = 0x5a5a8071;
+                    seed_origins(&before.origins);
+                    before.origins.adjustment[reg] = flags & 4 ? 0xfffff : 0;
+                    unsigned first = f == 0 ? p : f == 2 ? 2 : f == 4 ? 15 : f == 5 ? 3 : 0;
+                    unsigned last = f < 2                        ? p
+                                    : f == 2 || f == 3           ? 2
+                                    : f == 4 || f == 7 || f == 9 ? 15
+                                    : f == 5                     ? 14
+                                    : f == 6                     ? 1
+                                                                 : 4;
+                    uint64_t value = before.values.registers[reg], expected_value = value;
+                    for (unsigned bit = first * 4; bit < (last + 1) * 4; ++bit) {
+                        unsigned v = bit + 1 < (last + 1) * 4 ? (value >> (bit + 1)) & 1 : 0;
+                        expected_value =
+                            (expected_value & ~(UINT64_C(1) << bit)) | ((uint64_t)v << bit);
+                    }
+                    for (unsigned mode = 0; mode < 5; ++mode) {
+                        struct hpclang_rpl_code_execution state = before, expected = before;
+                        struct hpclang_rpl_code_step_uses uses, saved;
+                        memset(&saved, 0xa5, sizeof saved);
+                        uses = saved;
+                        struct bitshift_test test = {.error = mode == 1   ? -77
+                                                              : mode == 2 ? 1
+                                                                          : 0,
+                                                     .missing = mode == 3 ? last - first : 16};
+                        const struct hpclang_rpl_code_callbacks callbacks = {
+                            .bitshift = mode == 4 ? NULL : retain_bitshift};
+                        int result = hpclang_rpl_code_execution_step_observed(
+                            &reader, NULL, code.size, &state, data_token, &callbacks, &test, &uses);
+                        if (mode && mode < 4) {
+                            assert(result == (mode == 1   ? -77
+                                              : mode == 2 ? HPCLANG_RPL_SPAN_MALFORMED
+                                                          : HPCLANG_RPL_SPAN_UNSUPPORTED));
+                            assert(!memcmp(&state, &before, sizeof state) &&
+                                   !memcmp(&uses, &saved, sizeof uses));
+                        } else {
+                            expected.control.pc = code.size;
+                            expected.values.registers[reg] = expected_value;
+                            expected.hst |= ((value >> (4 * first)) & 1) << 1;
+                            if (first < 5) {
+                                if (expected.origins.adjustment[reg])
+                                    for (unsigned i = 0; i < 5; ++i)
+                                        expected.origins.registers[reg][i] = 0;
+                                expected.origins.adjustment[reg] = 0;
+                            }
+                            for (unsigned i = first; i <= last; ++i)
+                                expected.origins.registers[reg][i] =
+                                    mode == 4 ? 0 : 0xc00001 + i - first;
+                            assert(!result && !memcmp(&state, &expected, sizeof state));
+                            assert(!uses.count && !uses.has_branch);
+                        }
+                        assert(test.calls == (mode == 4 ? 0u : 1u));
+                        if (test.calls) {
+                            assert(test.fact.shift.before == value &&
+                                   test.fact.shift.after == expected_value);
+                            assert(test.fact.shift.reg == reg && test.fact.shift.first == first &&
+                                   test.fact.shift.nibbles == last - first + 1);
+                            assert(test.fact.shift.p == p &&
+                                   test.fact.p_origin ==
+                                       before.origins.registers[HPCLANG_RPL_CODE_P][0]);
+                            assert(test.fact.shift.lost_bit == ((value >> (4 * first)) & 1));
+                            assert(test.fact.adjustment == before.origins.adjustment[reg]);
+                            assert(!memcmp(test.fact.origins, before.origins.registers[reg],
+                                           sizeof test.fact.origins));
+                        }
+                    }
+                }
+    for (unsigned mode = 0; mode < 25; ++mode) {
+        struct image code = {.data = {8, 1, 9, 6, 0}, .size = 5, .fail = UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {read_nibble, &code};
+        struct hpclang_rpl_code_execution state = {0};
+        if (mode < 5)
+            code.fail = mode;
+        if (mode >= 5 && mode < 10)
+            code.data[mode - 5] = 16;
+        if (mode >= 10 && mode < 17)
+            code.data[3] = mode - 2;
+        if (mode == 17)
+            code.data[4] = 4;
+        if (mode == 18)
+            state.values.registers[HPCLANG_RPL_CODE_P] = 16;
+        if (mode == 19)
+            state.values.carry = state.control.carry = 2;
+        if (mode == 20)
+            state.values.decimal = 2;
+        unsigned limit = mode >= 21 ? mode - 20 : 5;
+        struct hpclang_rpl_code_bitshift shift, saved;
+        memset(&saved, 0xa5, sizeof saved);
+        shift = saved;
+        assert(hpclang_rpl_code_bitshift_inspect(&reader, 0, limit, &state.values, &shift) < 0);
+        assert(!memcmp(&shift, &saved, sizeof shift));
+        const struct hpclang_rpl_code_execution before = state;
+        struct hpclang_rpl_code_step_uses uses, sentinel;
+        memset(&sentinel, 0xa5, sizeof sentinel);
+        uses = sentinel;
+        assert(hpclang_rpl_code_execution_step(&reader, NULL, limit, &state, data_token, NULL,
+                                               &uses) < 0);
+        assert(!memcmp(&state, &before, sizeof state) && !memcmp(&uses, &sentinel, sizeof uses));
+    }
+}
+
 static void circular_shifts(void)
 {
     for (unsigned operation = 0; operation < 8; ++operation)
@@ -4272,6 +4411,7 @@ int main(void)
     native_scan_bounds();
     software_status_bits();
     circular_shifts();
+    bit_shifts();
     hardware_status_clear();
     native_threaded_next();
     execution_steps();

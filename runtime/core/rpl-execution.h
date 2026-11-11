@@ -214,6 +214,18 @@ int hpclang_rpl_execution_plan_logical(struct hpclang_rpl_reference_edit_builder
                                        hpclang_rpl_code_origin_resolve_fn resolve,
                                        hpclang_rpl_execution_payload_fn derived, void *context);
 
+/* Bind a one-bit right shift to its exact instruction and full proposed result.
+ * Constrain the entire consumed field and P-dependent selection. The discarded
+ * bit must also agree, preserving the SB side effect. No guessed inverse or
+ * constant origin for zero fill; caller bounds derived recursion. */
+int hpclang_rpl_execution_plan_bitshift(struct hpclang_rpl_reference_edit_builder *builder,
+                                        const struct hpclang_rpl_code_bitshift_source *fact,
+                                        uint64_t input, uint64_t output,
+                                        const struct hpclang_rpl_reader *instructions,
+                                        hpclang_rpl_code_token_fn token,
+                                        hpclang_rpl_code_origin_resolve_fn resolve,
+                                        hpclang_rpl_execution_payload_fn derived, void *context);
+
 /* Bind a native full-word arithmetic fact to its exact 81BD/81BE instruction
  * and all eight input digits, including carry/borrow into upper address bits.
  * Both original and proposed words must satisfy the modulo-32-bit equation.
