@@ -6152,3 +6152,21 @@ The preceding 106-step actual-movement replay remains complementary evidence.
 Production Stage1 is still at 0x67d2; the next maintained boundary is 0xb2d7.
 Remote 5d4cb7bd was audited at 11 queued workflows/18 queued jobs; this follow-up
 is local and no CI acceptance is claimed.
+
+
+## 2026-11-12 — Bank-selector write classification
+
+Local `d97a3fd6` adds a side-effect-free write-dispatch classifier. Native word
+0xba0 has priority over the bank window at 0xbb0; the address supplies lower
+selector bits 5..6 and upper selector bits 1..4. Original ROM inspection shows
+that matching words 0xbcc/0xbd0 return before any mapping change. The captured
+0xb2d7 store to 0x7f024 selects the existing pair (1,2), with no SRAM, Flash or
+native CPU change in a complete single-instruction replay on either model.
+
+Sanitizer tests cover all 4,096 window addresses, both changed selectors,
+priority collisions, bounds and unchanged output on error. A 512-case two-ROM
+matrix verifies actual store dispatch to either the early return or map-update
+entry; it does not establish changed-map effects. ARM analysis has no diagnostics.
+Current reports reuse `/work/nov06-sum/io-store-probe`. The execution callback
+remains closed to I/O writes pending dependency guarding/integration; maintained
+Stock stays at 106 steps. No generic device-write permission is added.
