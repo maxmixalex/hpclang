@@ -517,6 +517,65 @@ static void unit_source(void)
     assert(probe.unit_limit == 1 && probe.plan.error < 0 && !probe.plan.count);
 }
 
+static void immediate_unit_source(void)
+{
+    for (unsigned mode = 0; mode < 8; ++mode) {
+        fixture();
+        word(11 * 4, 0x08030000);
+        const uint8_t code[] = {8, 1, 8, 15, 9, 4};
+        for (unsigned i = 0; i < 6; ++i) {
+            unsigned at = 0x347 + i, shift = 4 * (at & 1);
+            ram[0x30000 + at / 2] =
+                (uint8_t)((ram[0x30000 + at / 2] & ~(15u << shift)) | (code[i] << shift));
+        }
+        word(0x20000, 0x90040);
+        assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards, 512));
+        assert(!hpclang_rpl_reference_edits_begin(&probe.plan, probe.edits, 128));
+        probe.move_first = 0x90030;
+        probe.move_end = 0x90080;
+        struct hpclang_rpl_code_unit fact = {.instruction = 0xb347,
+                                             .length = 6,
+                                             .reg = HPCLANG_RPL_CODE_B,
+                                             .nibbles = 5,
+                                             .before = 0x90040,
+                                             .after = 0x9003b,
+                                             .decrement = 1};
+        for (unsigned i = 0; i < 5; ++i)
+            fact.origins[i] = 0x90001 + i;
+        if (mode == 1)
+            fact.origins[0] = 0;
+        if (mode == 2)
+            fact.instruction++;
+        if (mode == 3)
+            fact.reg = HPCLANG_RPL_CODE_C;
+        if (mode == 4)
+            fact.first = 1;
+        if (mode == 5)
+            fact.carry = 1;
+        if (mode == 6)
+            probe.unit_count = 3;
+        if (mode == 7)
+            probe.plan.capacity = 0;
+        memcpy(before, ram, sizeof ram);
+        uint32_t tokens[16] = {0};
+        int result = execution_unit(&probe, &fact, tokens);
+        assert(!memcmp(before, ram, sizeof ram));
+        if (mode) {
+            assert(result < 0 && probe.unit_count == (mode == 6 ? 3u : 0u));
+            continue;
+        }
+        assert(!result && probe.unit_count == 1 && probe.unit_inputs[0] == 0x90050 &&
+               probe.unit_outputs[0] == 0x9004b);
+        for (unsigned i = 0; i < 5; ++i)
+            assert(!execution_payload(&probe, &probe.plan, tokens[i], (0x9003b >> (4 * i)) & 15,
+                                      (0x9004b >> (4 * i)) & 15));
+        assert(execution_payload(&probe, &probe.plan, tokens[1], 3, 3) < 0);
+        probe.units[0].origins[0] = tokens[0];
+        assert(execution_payload(&probe, &probe.plan, tokens[0], 11, 11) < 0);
+        assert(probe.unit_limit == 1 && !memcmp(before, ram, sizeof ram));
+    }
+}
+
 static void sum_source(void)
 {
     fixture();
@@ -730,6 +789,7 @@ int main(void)
     bank_write();
     constant_source();
     unit_source();
+    immediate_unit_source();
     sum_source();
     overlapping_store();
     configuration();
