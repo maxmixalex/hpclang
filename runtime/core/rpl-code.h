@@ -351,6 +351,25 @@ struct hpclang_rpl_code_execution
     uint32_t status; /* Native software status word; 84n/85n clear/set bit n. */
 };
 
+struct hpclang_rpl_code_native_push
+{
+    uint64_t a, d, d1;
+    uint32_t instruction, length, p, stores, store_address, store_value, exception_target;
+};
+/* Decode the qualified HP49g+/HP50g 80B40 service prefix through its first
+ * memory effect. It resets P, sets A.A=0x3ac0 and decrements D.low32. If the
+ * ORIGINAL D.A was zero, it returns native-profile target 0x3a9b without a
+ * store. Otherwise D1-=5 and A.A must be stored there BEFORE threaded-next's
+ * two dependent reads. Fields a/d/d1/p describe this prefix, not final NEXT.
+ * No data access, native writes or origin fabrication. Callers must qualify
+ * the ROM service mapping, constant provenance, store aliases, subsequent
+ * reads/dispatch and error target before execution or relocation. The normal
+ * path requires canonical D1>=5; failure leaves output unchanged. */
+int hpclang_rpl_code_native_push_inspect(const struct hpclang_rpl_reader *instructions,
+                                         uint32_t limit,
+                                         const struct hpclang_rpl_code_execution *state,
+                                         struct hpclang_rpl_code_native_push *effect);
+
 struct hpclang_rpl_code_native_scan
 {
     uint64_t b;

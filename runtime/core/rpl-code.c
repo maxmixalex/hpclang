@@ -8,6 +8,45 @@ static uint64_t data_mask(unsigned nibbles)
     return nibbles == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * nibbles)) - 1;
 }
 
+int hpclang_rpl_code_native_push_inspect(const struct hpclang_rpl_reader *instructions,
+                                         uint32_t limit,
+                                         const struct hpclang_rpl_code_execution *state,
+                                         struct hpclang_rpl_code_native_push *effect)
+{
+    if (!instructions || !instructions->read_nibble || !state || !effect)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    uint32_t pc = state->control.pc;
+    if (pc > 0xffffb || limit < 5 || limit > 0x100000 - pc)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(instructions, pc, 5, &opcode);
+    if (result)
+        return result;
+    if (opcode != 0x04b08)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (state->values.registers[HPCLANG_RPL_CODE_P] > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint64_t d = state->values.registers[HPCLANG_RPL_CODE_D];
+    struct hpclang_rpl_code_native_push next = {
+        .instruction = pc,
+        .length = 5,
+        .a = (state->values.registers[HPCLANG_RPL_CODE_A] & ~UINT64_C(0xfffff)) | 0x3ac0,
+        .d = (d & ~UINT64_C(0xffffffff)) | (uint32_t)((uint32_t)d - 1u),
+        .d1 = state->values.registers[HPCLANG_RPL_CODE_D1]};
+    if (!(d & 0xfffff)) {
+        next.exception_target = 0x3a9b;
+    } else {
+        if (next.d1 < 5 || next.d1 > 0xfffff)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        next.d1 -= 5;
+        next.stores = 1;
+        next.store_address = (uint32_t)next.d1;
+        next.store_value = 0x3ac0;
+    }
+    *effect = next;
+    return 0;
+}
+
 static int scan_word(const struct hpclang_rpl_reader *data, uint32_t address, uint32_t limit,
                      uint32_t *reads, uint32_t *value, uint32_t kind,
                      hpclang_rpl_code_scan_read_fn observe, void *context)
@@ -1691,6 +1730,10 @@ static int instruction_size(struct instruction_cursor *cursor, unsigned *size)
         case 0x26:
         case 0x31:
         case 0x33:
+        /* Native selector 0x04 at table 0x41440: wrapper 0x2f0a8,
+         * prefix through 0x2f084, then store/threaded-next or error 0x3a9b.
+         * The five-nibble frame does not qualify those effects. */
+        case 0x40:
         case 0x41:
         case 0x43:
         case 0x50:

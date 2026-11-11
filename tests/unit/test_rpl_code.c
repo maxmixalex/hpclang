@@ -932,7 +932,7 @@ static void instruction_extents(void)
                                  "80b9887", "80b60",
                                  "80b70",   "80bfe",
                                  "80bff",   "80b82f",
-                                 "80b26"};
+                                 "80b26",   "80b40"};
     for (unsigned c = 0; c < sizeof codes / sizeof codes[0]; ++c) {
         struct image image = {.address = 0x80000, .size = 64, .fail = UINT32_MAX};
         uint32_t expected = (uint32_t)strlen(codes[c]);
@@ -1010,6 +1010,81 @@ static void instruction_extents(void)
     assert(state.count == 2);
     assert(hpclang_rpl_code_visit(NULL, 0, 0, visit_instruction, &state) ==
            HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
+static void native_push_prefix(void)
+{
+    struct image code = {.data = {8, 0, 11, 4, 0}, .size = 5, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+    const uint32_t words[] = {0, 1, 2, 0xfffff, 0x100000, 0xfff00000, 0xffffffff};
+    const uint64_t pointers[] = {0, 4, 5, 6, 0x80000, 0xfffff, 0x100000, UINT64_MAX};
+    for (unsigned p = 0; p < 16; ++p)
+        for (unsigned w = 0; w < sizeof words / sizeof words[0]; ++w)
+            for (unsigned a = 0; a < sizeof pointers / sizeof pointers[0]; ++a) {
+                struct hpclang_rpl_code_execution state = {0};
+                state.values.registers[HPCLANG_RPL_CODE_A] = UINT64_C(0x123456789abcdef0);
+                state.values.registers[HPCLANG_RPL_CODE_D] =
+                    UINT64_C(0xa5a55a5a00000000) | words[w];
+                state.values.registers[HPCLANG_RPL_CODE_D1] = pointers[a];
+                state.values.registers[HPCLANG_RPL_CODE_P] = p;
+                const struct hpclang_rpl_code_execution before = state;
+                struct hpclang_rpl_code_native_push effect, sentinel;
+                memset(&sentinel, 0xa5, sizeof sentinel);
+                effect = sentinel;
+                int result = hpclang_rpl_code_native_push_inspect(&reader, 5, &state, &effect);
+                assert(!memcmp(&state, &before, sizeof state));
+                if ((words[w] & 0xfffff) && (pointers[a] < 5 || pointers[a] > 0xfffff)) {
+                    assert(result < 0 && !memcmp(&effect, &sentinel, sizeof effect));
+                    continue;
+                }
+                assert(!result && effect.length == 5 && !effect.instruction && !effect.p);
+                assert(effect.a == UINT64_C(0x123456789ab03ac0));
+                assert(effect.d == (UINT64_C(0xa5a55a5a00000000) | (uint32_t)(words[w] - 1)));
+                assert(effect.stores == ((words[w] & 0xfffff) != 0));
+                if (effect.stores) {
+                    assert(effect.d1 == pointers[a] - 5 && effect.store_address == pointers[a] - 5);
+                    assert(effect.store_value == 0x3ac0 && !effect.exception_target);
+                } else {
+                    assert(effect.d1 == pointers[a] && !effect.store_address &&
+                           !effect.store_value);
+                    assert(effect.exception_target == 0x3a9b);
+                }
+            }
+    for (unsigned mode = 0; mode < 14; ++mode) {
+        struct hpclang_rpl_code_execution state = {0};
+        struct hpclang_rpl_code_native_push effect, sentinel;
+        memset(&sentinel, 0xa5, sizeof sentinel);
+        effect = sentinel;
+        struct image bad = code;
+        if (mode < 5)
+            bad.fail = mode;
+        if (mode >= 5 && mode < 10)
+            bad.data[mode - 5] = 16;
+        if (mode == 10)
+            bad.data[3] = 5;
+        if (mode == 11)
+            state.values.registers[HPCLANG_RPL_CODE_P] = 16;
+        if (mode == 13)
+            state.control.pc = 0xffffc;
+        const struct hpclang_rpl_reader input = {read_nibble, &bad};
+        assert(hpclang_rpl_code_native_push_inspect(&input, mode == 12 ? 4 : 5, &state, &effect) <
+               0);
+        assert(!memcmp(&effect, &sentinel, sizeof effect));
+    }
+    /* Framing knows the complete service, but execution still requires its effects. */
+    uint32_t length = 0;
+    assert(!hpclang_rpl_code_extent(&reader, 0, 5, &length));
+    assert(length == 5);
+    struct hpclang_rpl_code_execution state = {0};
+    state.values.registers[HPCLANG_RPL_CODE_D] = 1;
+    state.values.registers[HPCLANG_RPL_CODE_D1] = 0x90000;
+    const struct hpclang_rpl_code_execution before = state;
+    struct hpclang_rpl_code_step_uses uses, sentinel;
+    memset(&sentinel, 0xa5, sizeof sentinel);
+    uses = sentinel;
+    assert(hpclang_rpl_code_execution_step(&reader, NULL, 5, &state, data_token, NULL, &uses) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&state, &before, sizeof state) && !memcmp(&uses, &sentinel, sizeof uses));
 }
 
 static void native_service_continuation(void)
@@ -1207,9 +1282,9 @@ static void register_exchanges(void)
         assert(hpclang_rpl_code_exchange_inspect(&reader, image.address, image.size, 16, &value) ==
                HPCLANG_RPL_SPAN_MALFORMED);
     }
-    const char *unknown[] = {"10c", "db",  "81af1c", "81a82c", "125",  "12f", "81af2d",
-                             "140", "130", "131",    "134",    "135",  "138", "139",
-                             "13c", "13d", "80ff",   "fa",     "80b26"};
+    const char *unknown[] = {"10c", "db",  "81af1c", "81a82c", "125",   "12f",  "81af2d",
+                             "140", "130", "131",    "134",    "135",   "138",  "139",
+                             "13c", "13d", "80ff",   "fa",     "80b26", "80b40"};
     for (unsigned i = 0; i < sizeof unknown / sizeof unknown[0]; ++i) {
         struct image image = {
             .address = 0x80000, .size = (uint32_t)strlen(unknown[i]), .fail = UINT32_MAX};
@@ -4599,6 +4674,7 @@ int main(void)
     indirect_transfers();
     instruction_extents();
     native_service_continuation();
+    native_push_prefix();
     register_assignments();
     literal_loads();
     literal_origin_failures();
