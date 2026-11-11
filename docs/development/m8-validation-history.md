@@ -6189,3 +6189,22 @@ stored digits and four zero-write controls per model. Current outputs reuse
 boundary is UNCONFIG at 0xb2da; production Stage1 remains at 0x67d2. Exact-head
 CI for 5d4cb7bd has 8 workflows running/3 queued and 1 successful job/13 running/
 4 queued. These local follow-ups are not submitted or accepted remotely.
+
+
+## 2026-11-12 — UNCONFIG dispatch and initial effects
+
+Local `a84ba592` describes native UNCONFIG precedence and initial effects:
+64-nibble IO block, enabled RAM, enabled ERAM, enabled Port, then bank page.
+The descriptor records resulting flags, a base word to clear, and whether full
+map rebuilding is required. It does not implement or authorize RAM-device map
+rebuilding. The real 0xb2da path only changes flags 7 to 3 and bank window 0x7f
+to UINT32_MAX; a full original instruction replay verifies that on both ROMs.
+
+Each original ROM passes 1,848 cases spanning all 64 normal flag combinations,
+high flag words, six effect kinds, colliding devices and high C bits. Map-rebuild
+branches stop at the actual rebuild entry after verifying initial state changes.
+The IO comparison mask is 0xfffc0, so all addresses in its block match.
+Sanitizer tests cover all 4,096 offsets, precedence, disabled devices and error
+output preservation; ARM analysis passes. Current reports reuse
+`/work/nov06-sum/unconfig-probe`. Execution/Stock integration remains pending;
+the accepted local Stock checkpoint is still 107 steps.
