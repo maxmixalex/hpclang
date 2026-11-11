@@ -219,9 +219,9 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         words = verify_entry(observation, (build / "launchers" / f"{args.model}.bin").read_bytes())
         execution = struct.unpack("<31I", home_string(read, b"EXECOBS"))
         if (
-            execution[0:3] != (22, 1, 229)
-            or execution[3] != 0x291C
-            or execution[4] != 112
+            execution[0:3] != (23, 1, 247)
+            or execution[3] != 0xBC1B
+            or execution[4] != 119
             or not 0 < execution[5] <= 1152
             or not execution[6]
             or not execution[7]
@@ -230,12 +230,12 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             or execution[10] != words[2]
             or execution[11] != 0x45584543
             or execution[12:15] != (3, 0x806F3, 0xFFFF1)
-            or execution[15] != 4
+            or execution[15] != 5
             or execution[16:20] != (3, 1, 0x2900, 7)
-            or execution[20:22] != (112, 432)
+            or execution[20:22] != (119, 452)
             or not 0 < execution[22] <= execution[21]
-            or execution[23:25] != (24, 2)
-            or execution[25:29] != (18, 80, 80, 1)
+            or execution[23:25] != (28, 2)
+            or execution[25:29] != (19, 85, 85, 1)
             or execution[29:31] != (2, 2)
         ):
             raise ValueError("Native execution collection/guard observation is incomplete")

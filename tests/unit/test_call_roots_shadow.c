@@ -827,6 +827,113 @@ static void late_scratch_clear(void)
     }
 }
 
+static void adjacent_stack_store(void)
+{
+    for (unsigned mode = 0; mode < 11; ++mode) {
+        struct hpclang_rpl_code_store store = fixture();
+        probe.stores = 18;
+        probe.stored_sources = 80;
+        probe.native_save_count = 2;
+        probe.dispatch_roots_checked = 1;
+        probe.store_records[15].address.value = 0x80025;
+        for (unsigned i = 0; i < 80; ++i)
+            probe.shadow[i].field = 0x70000 + i;
+        store.instruction = 0x291c;
+        store.address.value = 0x80020;
+        if (mode == 1)
+            ++store.address.value;
+        if (mode == 2)
+            probe.store_records[15].address.value = 4;
+        if (mode == 3)
+            ++probe.store_records[15].address.value;
+        if (mode == 4)
+            probe.shadow[0].field = 0x20020;
+        if (mode == 5)
+            store.origins[0] = 0;
+        if (mode == 6)
+            store.nibbles = 4;
+        if (mode == 7)
+            probe.native_save_count = 1;
+        if (mode == 8)
+            probe.stored_sources = 79;
+        if (mode == 9)
+            probe.dispatch_roots_checked = 0;
+        if (mode == 10)
+            store.adjustment = 1;
+        uint8_t saved[sizeof probe.shadow];
+        memcpy(saved, probe.shadow, sizeof saved);
+        memcpy(before, ram, sizeof ram);
+        int result = execution_store(&probe, &store);
+        assert(!memcmp(before, ram, sizeof ram));
+        if (mode) {
+            assert(result < 0 && probe.stores == 18);
+            assert(!memcmp(saved, probe.shadow, sizeof saved));
+            continue;
+        }
+        assert(!result && probe.stores == 19 && probe.stored_sources == 85);
+        assert(!memcmp(saved, probe.shadow, 80 * sizeof probe.shadow[0]));
+        for (unsigned i = 0; i < 5; ++i) {
+            uint8_t value;
+            uint32_t origin;
+            assert(!execution_shadow_value(&probe, 0xa0020 + i, &value, &origin));
+            assert(value == ((store.value >> (4 * i)) & 15) && origin == store.origins[i]);
+        }
+    }
+}
+
+static void continuation_predicates(void)
+{
+    const uint8_t codes[2][5] = {{8, 10, 8, 7, 5}, {8, 11, 6, 11, 4}};
+    for (unsigned which = 0; which < 2; ++which)
+        for (unsigned mode = 0; mode < 11; ++mode) {
+            fixture();
+            word(11 * 4, 0x08030000);
+            uint32_t pc = which ? 0xbc10 : 0xbc04;
+            for (unsigned i = 0; i < 5; ++i) {
+                unsigned at = (pc + i) & 4095, shift = 4 * (at & 1);
+                ram[0x30000 + at / 2] = (uint8_t)((ram[0x30000 + at / 2] & ~(15u << shift)) |
+                                                  (codes[which][i] << shift));
+            }
+            word(0x20010, 7);
+            struct hpclang_rpl_code_execution state = {0};
+            state.control.pc = pc;
+            state.values.registers[HPCLANG_RPL_CODE_A] = 7;
+            state.values.registers[HPCLANG_RPL_CODE_C] = 0xabcde;
+            for (unsigned i = 0; i < 5; ++i) {
+                state.origins.registers[HPCLANG_RPL_CODE_A][i] = 0x90021 + i;
+                state.origins.registers[HPCLANG_RPL_CODE_C][i] = 0x90001 + i;
+            }
+            const struct hpclang_rpl_reader reader = {execution_plan_read, &probe};
+            struct hpclang_rpl_code_predicate predicate;
+            assert(!hpclang_rpl_code_predicate_inspect(&reader, pc, 5, &state.values, &predicate));
+            probe.predicates = 4 + which;
+            if (mode == 1)
+                ++predicate.instruction;
+            if (mode == 2)
+                predicate.left = HPCLANG_RPL_CODE_B;
+            if (mode == 3)
+                predicate.right = HPCLANG_RPL_CODE_B;
+            if (mode == 4)
+                predicate.nibbles = 4;
+            if (mode == 5)
+                predicate.first = 1;
+            if (mode == 6)
+                state.origins.registers[predicate.left][0] = 0;
+            if (mode == 7)
+                ram[which ? 0x20000 : 0x20010] ^= 1;
+            if (mode == 8)
+                predicate.taken ^= 1;
+            if (mode == 9)
+                predicate.left_value ^= 1;
+            if (mode == 10)
+                probe.predicates = 6;
+            memcpy(before, ram, sizeof ram);
+            int result = execution_predicate(&probe, &predicate, &state);
+            assert(!memcmp(before, ram, sizeof ram));
+            assert(mode ? result < 0 : !result && probe.predicates == 5 + which);
+        }
+}
+
 static void immediate_unit_source(void)
 {
     for (unsigned mode = 0; mode < 8; ++mode) {
@@ -1103,6 +1210,8 @@ int main(void)
     immediate_unit_source();
     late_overlapping_stores();
     late_scratch_clear();
+    adjacent_stack_store();
+    continuation_predicates();
     dispatch_root_relations();
     sum_source();
     overlapping_store();

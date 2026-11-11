@@ -690,12 +690,12 @@ struct execution_probe
     struct hpclang_rpl_reference_edit_builder plan;
     struct hpclang_rpl_code_step_uses first_use;
     uint32_t move_first, move_end, planned_uses, branches, changed_cells, rejected_plans;
-    struct hpclang_rpl_code_store store, store_records[18];
+    struct hpclang_rpl_code_store store, store_records[19];
     uint32_t stores, stored_sources, checked_reads, d0_derived;
     struct
     {
         uint32_t field, value, origin;
-    } shadow[80];
+    } shadow[85];
     uint8_t native_after[0xc60];
     unsigned configurations, unconfigurations, bank_writes, payload_limit, payload_depth;
     struct hpclang_rpl_code_constant constants[7];
@@ -1086,26 +1086,26 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
     if (store->instruction == 0xb2d7 || store->instruction == 0xb37c)
         return execution_bank_write(probe, store);
     const unsigned count = store->nibbles;
-    /* Eighteen effects observed in the original ROM continuation. This finite
+    /* Nineteen effects observed in the original ROM continuation. This finite
      * fixture permits only five proven same-destination overlaps, without granting
      * general store authority. The overlay is published only after validation. */
-    static const uint32_t pcs[18] = {0x2c3c, 0x2a1ba, 0x2a1c1, 0x2a1e0, 0x2da2,  0xb265,
-                                     0xb2ce, 0x2da2,  0x2da2,  0x20476, 0x20482, 0x153eb,
-                                     0x92f0, 0xb35d,  0xb367,  0x291c,  0x8d1f,  0x2da2};
-    static const unsigned widths[18] = {5, 8, 4, 5, 5, 10, 5, 5, 5, 5, 1, 5, 1, 5, 5, 5, 5, 5};
+    static const uint32_t pcs[19] = {0x2c3c, 0x2a1ba, 0x2a1c1, 0x2a1e0, 0x2da2,  0xb265, 0xb2ce,
+                                     0x2da2, 0x2da2,  0x20476, 0x20482, 0x153eb, 0x92f0, 0xb35d,
+                                     0xb367, 0x291c,  0x8d1f,  0x2da2,  0x291c};
+    static const unsigned widths[19] = {5, 8, 4, 5, 5, 10, 5, 5, 5, 5, 1, 5, 1, 5, 5, 5, 5, 5, 5};
     unsigned overlap_effect = probe->stores == 5    ? 4
                               : probe->stores == 13 ? 5
                               : probe->stores == 14 ? 6
                               : probe->stores == 15 ? 3
                               : probe->stores == 17 ? 13
                                                     : UINT32_MAX;
-    if (!count || count > 10 || probe->stores >= 18 || store->instruction != pcs[probe->stores] ||
+    if (!count || count > 10 || probe->stores >= 19 || store->instruction != pcs[probe->stores] ||
         store->first != ((probe->stores == 10 || probe->stores == 12) ? 15u : 0u) ||
         count != widths[probe->stores] || store->address.value > 0x100000 - count ||
         (overlap_effect != UINT32_MAX &&
          store->address.value != probe->store_records[overlap_effect].address.value) ||
         (probe->stores >= 13 && (probe->native_save_count != 2 ||
-                                 probe->stored_sources != (probe->stores == 17 ? 80u : 75u))))
+                                 probe->stored_sources != (probe->stores >= 17 ? 80u : 75u))))
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     if (probe->stores == 16) {
         /* This captured clear writes a fixed OS scratch word, after the native
@@ -1117,6 +1117,10 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
             if (store->origins[digit] != 0x600061 + digit)
                 return HPCLANG_RPL_SPAN_UNSUPPORTED;
     }
+    if (probe->stores == 18 &&
+        (!probe->dispatch_roots_checked || probe->store_records[15].address.value < 5 ||
+         store->address.value != probe->store_records[15].address.value - 5))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
     uint32_t fields[10], origins[10], slots[10];
     unsigned added = 0;
     for (unsigned digit = 0; digit < count; ++digit) {
@@ -1149,7 +1153,9 @@ static int execution_store(void *context, const struct hpclang_rpl_code_store *s
             }
         if ((overlap_effect != UINT32_MAX && digit < 5) != overlap)
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
-        if (!overlap && ++added + probe->stored_sources > (probe->stores == 16 ? 80u : 59u))
+        if (!overlap && ++added + probe->stored_sources > (probe->stores == 18   ? 85u
+                                                           : probe->stores == 16 ? 80u
+                                                                                 : 59u))
             return HPCLANG_RPL_SPAN_BOUNDS;
         origins[digit] = store->origins[store->first + digit];
     }
@@ -1317,16 +1323,18 @@ static int execution_predicate(void *context, const struct hpclang_rpl_code_pred
                                const struct hpclang_rpl_code_execution *before)
 {
     struct execution_probe *probe = context;
-    static const uint32_t pcs[] = {0xb283, 0xb2c2, 0xb2e5, 0xb1e9};
-    if (probe->predicates >= 4 || predicate->instruction != pcs[probe->predicates] ||
-        predicate->left != HPCLANG_RPL_CODE_C ||
-        predicate->right !=
-            (probe->predicates < 2 ? HPCLANG_RPL_CODE_CONSTANT : HPCLANG_RPL_CODE_A) ||
+    static const uint32_t pcs[] = {0xb283, 0xb2c2, 0xb2e5, 0xb1e9, 0xbc04, 0xbc10};
+    if (probe->predicates >= 6 || predicate->instruction != pcs[probe->predicates] ||
+        predicate->left != (probe->predicates == 4 ? HPCLANG_RPL_CODE_A : HPCLANG_RPL_CODE_C) ||
+        predicate->right != ((probe->predicates < 2 || probe->predicates == 4)
+                                 ? HPCLANG_RPL_CODE_CONSTANT
+                                 : HPCLANG_RPL_CODE_A) ||
         predicate->first || predicate->nibbles != (probe->predicates ? 5u : 3u))
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
-    const uint64_t replacements[2] = {
-        before->values.registers[HPCLANG_RPL_CODE_C],
-        probe->predicates < 2 ? 0 : before->values.registers[HPCLANG_RPL_CODE_A]};
+    const uint64_t replacements[2] = {before->values.registers[predicate->left],
+                                      predicate->right == HPCLANG_RPL_CODE_CONSTANT
+                                          ? 0
+                                          : before->values.registers[predicate->right]};
     probe->payload_limit = probe->stores;
     int result = hpclang_rpl_execution_plan_predicate(&probe->plan, predicate, before, replacements,
                                                       execution_source, execution_payload, probe);
@@ -1469,10 +1477,10 @@ static int execution_visit(void *context, uint32_t pc,
             return result;
         probe->dispatch_roots_checked = 1;
     }
-    return state->control.pc == 0x291c && probe->dispatch_roots_checked &&
+    return state->control.pc == 0xbc1b && probe->dispatch_roots_checked &&
            probe->native_word_count == 16 && probe->bank_writes == 2 &&
-           probe->expression_uses == 1 && probe->stores == 18 && probe->configurations == 4 &&
-           probe->unconfigurations == 2 && probe->predicates == 4 && probe->constant_count == 7 &&
+           probe->expression_uses == 1 && probe->stores == 19 && probe->configurations == 4 &&
+           probe->unconfigurations == 2 && probe->predicates == 6 && probe->constant_count == 7 &&
            probe->unit_count == 3 && probe->sum_count == 8 && probe->expression_count == 3 &&
            probe->native_save_count == 2 && probe->scan_reads == 2;
     /* This selected boundary is not a complete relocation certificate. */
@@ -1877,7 +1885,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                                                          .native_word = execution_native_word,
                                                          .native_scan = execution_scan,
                                                          .native_scan_max_reads = 2};
-    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 229,
+    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 247,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count ||
@@ -1890,8 +1898,8 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
             goto done;
         original_status |= (uint32_t)value << (4 * digit);
     }
-    if (probe->state.status != (original_status & ~UINT32_C(2)))
-        goto done; /* The 841 instruction clears only software status bit one. */
+    if (probe->state.status != (original_status & ~UINT32_C(3)))
+        goto done; /* 841 and the later 840 clear software status bits one and zero. */
     /* Validate the final overlay with last-writer-wins semantics. Earlier
      * overwritten payloads remain constrained by their retained producers. */
     for (unsigned effect = 0; effect < probe->stores; ++effect) {
@@ -1969,7 +1977,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 253)
         goto done;
-    uint32_t words[31] = {22,
+    uint32_t words[31] = {23,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,
