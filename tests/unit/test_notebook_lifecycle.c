@@ -39,7 +39,7 @@ static int observed_update(struct notebook *note, const struct hpclang_ui_event 
         if (event->action.type == SAVE) {
             char expected[48];
             if (workflow == 2 && saves == 1)
-                snprintf(expected, sizeof(expected), "Save error %d", ENOSPC);
+                strcpy(expected, "Save: storage full");
             else
                 strcpy(expected, "Saved; exit normally");
             assert(!strcmp(note->text, "1"));

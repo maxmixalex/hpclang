@@ -21,6 +21,12 @@ buttons. Save writes the current note; Reload replaces edits only after a
 successful read. Exit or ON returns normally without saving further edits.
 The displayed clock is sampled on entry and by Refresh clock, not continuously.
 
+Save, Backup, Restore and Export explain common failures such as full storage,
+read-only storage, insufficient memory and unavailable services. Failed operations
+retain the current edit buffer. Resolve the reported condition and retry; an
+unknown failure includes its numeric error code. Export can leave a partial file
+as described below, so inspect it before removing it to retry.
+
 HP39 Stock saves in this Aplet's custom data. Its template persists that value
 when the Aplet exits normally. Classic Stock stores a string named `HPCNOTE` in
 HOME, preserving the current directory. The string has a versioned application
