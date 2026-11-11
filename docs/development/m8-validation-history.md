@@ -6133,3 +6133,22 @@ comparison establishes this transition; it is not equivalent to the first
 flags-only CONFIG. The maintained Stock fixture currently rejects it and remains
 at 101 steps. Its simulated configuration and I/O access qualification must be
 extended before importing the longer path. Production closure remains open.
+
+
+## 2026-11-12 — Maintained 106-step Stock checkpoint
+
+Local `cb800ecd` qualifies both CONFIG operations and the seventh store in the
+maintained fixture. The second configuration preserves ordinary address maps
+and activates I/O window 0x7f; shadow reads and writes into that window reject.
+Original native guards remain original-state observations. Host sanitizer tests
+verify no real SRAM mutation, original guard revalidation, blocked window access
+and rejection of an additional CONFIG. The 40 KiB fixture budget is unchanged.
+
+Both HP49g+ and HP50g pass maintained Stock execution, catalog and return checks
+at 106 steps, 42 address uses, 187 source constraints, ten branches and 37 shadow
+digits. Input hashes remain stable. Six launcher checks, ARM analysis and Ruff
+pass; reports reuse `/work/nov06-sum/config-stock.json` and the existing app build.
+The preceding 106-step actual-movement replay remains complementary evidence.
+Production Stage1 is still at 0x67d2; the next maintained boundary is 0xb2d7.
+Remote 5d4cb7bd was audited at 11 queued workflows/18 queued jobs; this follow-up
+is local and no CI acceptance is claimed.
