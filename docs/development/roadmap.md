@@ -9,7 +9,7 @@ Accepted main: `91c631c8` (#13 native allocation budgets and Stock release, orig
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
-Container housekeeping (2026-11-12): latest measured volume allocation is 35.83 GiB (initial 41.18 GiB). Retired superseded nov04-packed-snapshot/oct30-stack-pointer trees and duplicate generated fonts: 267 MiB from oct24-port-cpp-src (byte-identical), then 261 MiB from oct25-watchdog-src (identical after LF normalization). Each font copy contained 3,719 files matching current tracked sources; no archive was created. Four superseded successful Stock run directories were also removed (35 MiB), without archiving them. Active emulator caches remain. Keep bulky evidence only for active dependencies, unresolved failures or irreplaceable inputs; removal receipts are compact.
+Container housekeeping (2026-11-12): measured volume allocation is 33.42 GiB (initial 41.18 GiB). Replaced 89 byte-identical container font archives with links to the existing tracked archive, reclaiming 2.38 GiB; all replacement paths remain readable. Earlier superseded builds, duplicate generated fonts and successful Stock outputs were removed without archives. Keep only active dependencies, unresolved-failure reproductions and irreplaceable inputs; superseded reproducible artifacts need not be retained.
 
 ## Scope and retained requirements
 
