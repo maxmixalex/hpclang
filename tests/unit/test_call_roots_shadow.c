@@ -186,6 +186,70 @@ static void overlapping_store(void)
     assert(!memcmp(before, ram, sizeof ram));
 }
 
+static void later_stores(void)
+{
+    overlapping_store();
+    struct hpclang_rpl_code_store store = {
+        .instruction = 0xb2ce, .nibbles = 5, .address = {.value = 0x80070}, .value = 0xabcde};
+    for (unsigned i = 0; i < 5; ++i)
+        store.origins[i] = 0x90001 + i;
+    assert(!execution_store(&probe, &store));
+    store.instruction = 0x2da2;
+    store.value += 10;
+    store.adjustment = 10;
+    for (unsigned i = 0; i < 2; ++i) {
+        store.address.value += 0x10;
+        assert(!execution_store(&probe, &store));
+        for (unsigned digit = 0; digit < 5; ++digit) {
+            uint8_t value = 255;
+            uint32_t token = 0;
+            assert(!execution_shadow_value(&probe, store.address.value + digit, &value, &token));
+            assert(value == ((store.value >> (4 * digit)) & 15));
+            assert(token == 0x500001 + 16 * (probe.stores - 1) + digit);
+        }
+    }
+    store.instruction = 0x20476;
+    store.address.value = 0x800a0;
+    store.value = 0xabcde;
+    store.adjustment = 0;
+    assert(!execution_store(&probe, &store));
+    store.instruction = 0x20482;
+    store.address.value = 0x800b0;
+    store.nibbles = 1;
+    store.first = 15;
+    store.value = UINT64_C(4) << 60;
+    memset(store.origins, 0, sizeof store.origins);
+    store.origins[15] = 0x90006;
+    struct hpclang_rpl_code_store invalid = store;
+    invalid.first = 14;
+    assert(execution_store(&probe, &invalid) < 0);
+    assert(probe.stores == 10 && probe.stored_sources == 52);
+    assert(!execution_store(&probe, &store));
+    uint8_t value = 255;
+    uint32_t token = 0;
+    assert(!execution_shadow_value(&probe, store.address.value, &value, &token));
+    assert(value == 4 && token == 0x90006);
+    store.instruction = 0x153eb;
+    store.address.value = 0x800c0;
+    store.first = 0;
+    store.nibbles = 5;
+    store.value = 0xabcde;
+    for (unsigned i = 0; i < 5; ++i)
+        store.origins[i] = 0x90001 + i;
+    assert(!execution_store(&probe, &store));
+    store.instruction = 0x92f0;
+    store.address.value = 0x800d0;
+    store.first = 15;
+    store.nibbles = 1;
+    store.value = UINT64_C(4) << 60;
+    assert(!execution_store(&probe, &store));
+    assert(probe.stores == 13 && probe.stored_sources == 59);
+    assert(!execution_shadow_value(&probe, store.address.value, &value, &token));
+    assert(value == 4 && token == 0x90006);
+    assert(execution_store(&probe, &store) < 0);
+    assert(!memcmp(before, ram, sizeof ram));
+}
+
 static void configuration(void)
 {
     for (unsigned mode = 0; mode < 4; ++mode) {
@@ -530,6 +594,7 @@ static void protected_body(void)
 
 int main(void)
 {
+    later_stores();
     boundary_address();
     unconfiguration();
     bank_write();
