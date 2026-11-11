@@ -963,14 +963,26 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
     result = read_word(instructions, pc, 2, &opcode);
     if (result)
         return result;
-    if ((opcode & 15) == 9 || opcode == 0xa8 || opcode == 0xb8) {
-        if (!predicate)
-            return HPCLANG_RPL_SPAN_UNSUPPORTED;
-        struct hpclang_rpl_code_predicate condition;
-        result =
-            hpclang_rpl_code_predicate_inspect(instructions, pc, limit, &next.values, &condition);
-        if (result)
-            return result;
+    unsigned status_test = opcode == 0x68 || opcode == 0x78;
+    if (status_test || (opcode & 15) == 9 || opcode == 0xa8 || opcode == 0xb8) {
+        struct hpclang_rpl_code_predicate condition = {0};
+        if (status_test) {
+            if (limit < 5)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            uint32_t tail;
+            result = read_word(instructions, pc + 2, 3, &tail);
+            if (result)
+                return result;
+            condition.taken = ((next.status >> (tail & 15)) & 1) == (opcode == 0x78);
+            condition.displacement = tail >> 4;
+        } else {
+            if (!predicate)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            result = hpclang_rpl_code_predicate_inspect(instructions, pc, limit, &next.values,
+                                                        &condition);
+            if (result)
+                return result;
+        }
         next.values.carry = next.control.carry = condition.taken;
         if (condition.displacement) {
             result = hpclang_rpl_code_branch_inspect(instructions, pc, limit, &observed.branch);
@@ -999,9 +1011,11 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
             for (unsigned digit = 0; digit < 5; ++digit)
                 next.control.stack_origins[slot][digit] = 0;
         }
-        result = predicate(context, &condition, state);
-        if (result)
-            return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        if (!status_test) {
+            result = predicate(context, &condition, state);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
         goto done;
     }
     if (opcode == 0x08 && limit >= 3) {

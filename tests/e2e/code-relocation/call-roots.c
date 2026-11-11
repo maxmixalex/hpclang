@@ -1560,7 +1560,7 @@ static int execution_visit(void *context, uint32_t pc,
             return result;
         probe->dispatch_roots_checked = 1;
     }
-    return state->control.pc == 0xbc2c && probe->bitshift_count == 2 && probe->logical_count == 1 &&
+    return state->control.pc == 0xbc3f && probe->bitshift_count == 2 && probe->logical_count == 1 &&
            probe->dispatch_roots_checked && probe->native_word_count == 16 &&
            probe->bank_writes == 2 && probe->expression_uses == 1 && probe->stores == 19 &&
            probe->configurations == 4 && probe->unconfigurations == 2 && probe->predicates == 6 &&
@@ -1970,7 +1970,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                                                          .native_scan_max_reads = 2,
                                                          .logical = execution_logical,
                                                          .bitshift = execution_bitshift};
-    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 251,
+    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 254,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count ||
@@ -2062,7 +2062,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 253)
         goto done;
-    uint32_t words[31] = {26,
+    uint32_t words[31] = {27,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,

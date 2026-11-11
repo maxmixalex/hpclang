@@ -2820,6 +2820,78 @@ static void native_scan_bounds(void)
     assert(!memcmp(&result, &sentinel, sizeof result));
 }
 
+static void software_status_branches(void)
+{
+    struct image code = {.size = 5, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+    const unsigned deltas[] = {0, 1, 127, 128, 255};
+    for (unsigned operation = 6; operation <= 7; ++operation)
+        for (unsigned bit = 0; bit < 16; ++bit)
+            for (unsigned flags = 0; flags < 8; ++flags)
+                for (unsigned d = 0; d < sizeof deltas / sizeof deltas[0]; ++d) {
+                    unsigned delta = deltas[d], taken = (flags & 1) == (operation == 7);
+                    encode(&code, 0, 5, 8 | operation << 4 | bit << 8 | delta << 12);
+                    struct hpclang_rpl_code_execution state = {0};
+                    seed_origins(&state.origins);
+                    state.status = (0xa5a55a5a & ~(1u << bit)) | ((flags & 1) << bit);
+                    state.values.carry = state.control.carry = (flags >> 1) & 1;
+                    state.values.decimal = flags >> 2;
+                    state.hst = 0x1234000f;
+                    state.control.cursor = bit & 7;
+                    unsigned slot = (state.control.cursor + 7) & 7;
+                    state.control.stack[slot] = 0xabcde;
+                    for (unsigned i = 0; i < 5; ++i)
+                        state.control.stack_origins[slot][i] = 0x100 + i;
+                    state.stack_adjustment[slot] = 3;
+                    struct hpclang_rpl_code_execution expected = state;
+                    expected.values.carry = expected.control.carry = taken;
+                    expected.control.pc = !taken ? 5
+                                          : delta
+                                              ? (3 + (delta < 128 ? delta : delta - 256)) & 0xfffff
+                                              : 0xabcde;
+                    if (taken && !delta) {
+                        expected.control.cursor = slot;
+                        expected.control.stack[slot] = expected.stack_adjustment[slot] = 0;
+                        memset(expected.control.stack_origins[slot], 0,
+                               sizeof expected.control.stack_origins[slot]);
+                    }
+                    struct hpclang_rpl_code_step_uses uses = {0};
+                    assert(!hpclang_rpl_code_execution_step(&instructions, NULL, 5, &state,
+                                                            data_token, NULL, &uses));
+                    assert(!memcmp(&state, &expected, sizeof state));
+                    assert(uses.has_branch == (delta != 0));
+                    assert(uses.count == (taken && !delta));
+                    if (uses.count) {
+                        assert(uses.addresses[0].kind == HPCLANG_RPL_CODE_USE_RETURN_TARGET);
+                        assert(uses.addresses[0].value == 0xabcde &&
+                               uses.addresses[0].adjustment == 3);
+                        for (unsigned i = 0; i < 5; ++i)
+                            assert(uses.addresses[0].origins[i] == 0x100 + i);
+                    }
+                }
+    for (unsigned mode = 0; mode < 13; ++mode) {
+        encode(&code, 0, 5, 0x78);
+        code.fail = mode < 5 ? mode : UINT32_MAX;
+        if (mode >= 5 && mode < 10)
+            code.data[mode - 5] = 16;
+        struct hpclang_rpl_code_execution state = {0}, initial;
+        state.status = 1;
+        state.control.stack[7] = mode == 11 ? 0x100000 : 0xabcde;
+        if (mode == 12) {
+            state.control.stack_generated[7] = 1;
+            state.control.stack_origins[7][0] = 1;
+        }
+        initial = state;
+        struct hpclang_rpl_code_step_uses uses, sentinel;
+        memset(&sentinel, 0xa5, sizeof sentinel);
+        uses = sentinel;
+        assert(hpclang_rpl_code_execution_step(&instructions, NULL, mode == 10 ? 4 : 5, &state,
+                                               data_token, NULL, &uses) < 0);
+        assert(!memcmp(&state, &initial, sizeof state));
+        assert(!memcmp(&uses, &sentinel, sizeof uses));
+    }
+}
+
 static void software_status_bits(void)
 {
     struct image code = {.size = 3, .fail = UINT32_MAX};
@@ -4410,6 +4482,7 @@ int main(void)
     native_scan();
     native_scan_bounds();
     software_status_bits();
+    software_status_branches();
     circular_shifts();
     bit_shifts();
     hardware_status_clear();

@@ -614,6 +614,11 @@ struct hpclang_rpl_code_callbacks
     hpclang_rpl_code_logical_fn logical;
     hpclang_rpl_code_bitshift_fn bitshift;
 };
+/* 86n/87n test software status bit n against zero/one, update carry and execute
+ * GOYES/RTNYES. They consume the supplied status, without a register-predicate
+ * callback. Callers must guard its initial snapshot and qualify every preceding
+ * status writer; this does not establish status provenance or movement authority.
+ * Taken returns retain the consumed stack source/generated metadata. */
 /* Unified optional observation callbacks. Missing callbacks retain the legacy
  * rejection/unknown-source behavior; all prior error/discard contracts apply. */
 int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *instructions,
@@ -701,7 +706,7 @@ int hpclang_rpl_code_execution_step_native(
     hpclang_rpl_code_config_fn config, void *context, struct hpclang_rpl_code_step_uses *uses);
 
 /* Native step with explicit opcode-9/8A/8B predicate qualification. The legacy entry
- * points still reject predicates. Accepted comparisons update carry and execute
+ * points still reject those register predicates. Accepted comparisons update carry and execute
  * GOYES/RTNYES, including taken returns with source/generated metadata retained. */
 int hpclang_rpl_code_execution_step_predicates(
     const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
