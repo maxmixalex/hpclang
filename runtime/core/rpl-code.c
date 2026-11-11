@@ -287,6 +287,30 @@ int hpclang_rpl_code_unit_inspect(const struct hpclang_rpl_reader *reader, uint3
     int result = read_word(reader, instruction, 1, &opcode);
     if (result)
         return result;
+    if (!opcode) {
+        if (limit < 2)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(reader, instruction + 1, 1, &opcode);
+        if (result)
+            return result;
+        if (opcode != 12 && opcode != 13)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+        if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->decimal > 1)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        struct hpclang_rpl_code_unit next = {.instruction = instruction,
+                                             .length = 2,
+                                             .reg = HPCLANG_RPL_CODE_P,
+                                             .nibbles = 1,
+                                             .decrement = opcode == 13,
+                                             .decimal = values->decimal,
+                                             .p = p,
+                                             .before = p,
+                                             .after = (p + (opcode == 12 ? 1u : 15u)) & 15,
+                                             .carry = p == (opcode == 12 ? 15u : 0u)};
+        *unit = next;
+        return 0;
+    }
     if (opcode != 8 && opcode != 10 && opcode != 11)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     if (limit < 3)

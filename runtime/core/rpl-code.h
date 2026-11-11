@@ -560,7 +560,8 @@ typedef int (*hpclang_rpl_code_bitshift_fn)(void *context,
 typedef int (*hpclang_rpl_code_logical_fn)(void *context,
                                            const struct hpclang_rpl_code_logical_source *fact,
                                            uint32_t tokens[16]);
-/* Inspect AfC..AfF decrements and Bf4..Bf7 increments, f=0..7, and binary
+/* Inspect 0C/0D binary P increment/decrement (wrap modulo 16, carry on
+ * overflow/underflow), AfC..AfF decrements and Bf4..Bf7 increments, f=0..7, and binary
  * 818frk additions/subtractions of k+1 (r=0..3/8..11, f=0..7 or address field F).
  * The immediate form ignores decimal mode. Other field extensions are unsupported.
  * Selected BCD

@@ -4168,6 +4168,74 @@ static int retain_unit(void *context, const struct hpclang_rpl_code_unit *fact, 
         tokens[i] = test->missing ? 0 : 0x700001 + i;
     return test->error;
 }
+static void p_unit_steps(void)
+{
+    for (unsigned operation = 12; operation <= 13; ++operation)
+        for (unsigned p = 0; p < 16; ++p)
+            for (unsigned flags = 0; flags < 4; ++flags)
+                for (unsigned mode = 0; mode < 5; ++mode) {
+                    struct image code = {.data = {0, operation}, .size = 2, .fail = UINT32_MAX};
+                    const struct hpclang_rpl_reader reader = {read_nibble, &code};
+                    struct hpclang_rpl_code_execution initial = {0};
+                    seed_origins(&initial.origins);
+                    initial.values.registers[HPCLANG_RPL_CODE_P] = p;
+                    initial.values.carry = initial.control.carry = flags & 1;
+                    initial.values.decimal = flags >> 1;
+                    initial.status = 0xa5a58071;
+                    initial.hst = 0x1234000f;
+                    struct hpclang_rpl_code_execution state = initial, expected = initial;
+                    expected.control.pc = 2;
+                    expected.values.registers[HPCLANG_RPL_CODE_P] =
+                        (p + (operation == 12 ? 1 : 15)) & 15;
+                    expected.values.carry = expected.control.carry =
+                        p == (operation == 12 ? 15u : 0u);
+                    expected.origins.registers[HPCLANG_RPL_CODE_P][0] = mode == 4 ? 0 : 0x700001;
+                    struct unit_test test = {.error = mode == 1   ? -74
+                                                      : mode == 2 ? 1
+                                                                  : 0,
+                                             .missing = mode == 3};
+                    const struct hpclang_rpl_code_callbacks callbacks = {
+                        .unit = mode == 4 ? NULL : retain_unit};
+                    struct hpclang_rpl_code_step_uses uses, sentinel;
+                    memset(&sentinel, 0xa5, sizeof sentinel);
+                    uses = sentinel;
+                    int result = hpclang_rpl_code_execution_step_observed(
+                        &reader, NULL, 2, &state, data_token, &callbacks, &test, &uses);
+                    if (mode && mode < 4) {
+                        assert(result < 0 && !memcmp(&state, &initial, sizeof state));
+                        assert(!memcmp(&uses, &sentinel, sizeof uses));
+                    } else {
+                        assert(!result && !memcmp(&state, &expected, sizeof state));
+                        assert(!uses.count && !uses.has_branch);
+                    }
+                    if (mode != 4) {
+                        assert(test.calls == 1 && test.fact.reg == HPCLANG_RPL_CODE_P);
+                        assert(test.fact.before == p &&
+                               test.fact.after == expected.values.registers[HPCLANG_RPL_CODE_P]);
+                        assert(test.fact.origins[0] ==
+                               initial.origins.registers[HPCLANG_RPL_CODE_P][0]);
+                    }
+                }
+    for (unsigned mode = 0; mode < 7; ++mode) {
+        struct image code = {.data = {0, 13}, .size = 2, .fail = mode < 2 ? mode : UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {read_nibble, &code};
+        struct hpclang_rpl_code_values values = {0};
+        if (mode == 2)
+            code.data[1] = 16;
+        if (mode == 3)
+            values.registers[HPCLANG_RPL_CODE_P] = 16;
+        if (mode == 4)
+            values.decimal = 2;
+        if (mode == 6)
+            code.data[1] = 11;
+        struct hpclang_rpl_code_unit fact, sentinel;
+        memset(&sentinel, 0xa5, sizeof sentinel);
+        fact = sentinel;
+        assert(hpclang_rpl_code_unit_inspect(&reader, 0, mode == 5 ? 1 : 2, &values, &fact) < 0);
+        assert(!memcmp(&fact, &sentinel, sizeof fact));
+    }
+}
+
 static void selected_unit_steps(void)
 {
     for (unsigned field = 0; field < 8; ++field)
@@ -4486,6 +4554,7 @@ int main(void)
     logical_steps();
     sum_steps();
     selected_unit_steps();
+    p_unit_steps();
     immediate_unit_steps();
     constant_steps();
     predicate_steps();

@@ -385,7 +385,10 @@ int hpclang_rpl_execution_plan_unit(struct hpclang_rpl_reference_edit_builder *b
     if (builder->error)
         return builder->error;
     if (!unit || !instructions || !instructions->read_nibble || !token || !resolve ||
-        unit->reg > HPCLANG_RPL_CODE_D || unit->instruction >= 0x100000 || unit->p_adjustment)
+        (unit->reg > HPCLANG_RPL_CODE_D && unit->reg != HPCLANG_RPL_CODE_P) ||
+        unit->instruction >= 0x100000 || unit->p_adjustment)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    if (unit->reg == HPCLANG_RPL_CODE_P && (unit->before != unit->p || unit->adjustment))
         return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
     struct hpclang_rpl_code_values values = {.decimal = unit->decimal};
     values.registers[unit->reg] = unit->before;

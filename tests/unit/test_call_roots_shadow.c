@@ -998,6 +998,60 @@ static void bitshift_sources(void)
     }
 }
 
+static void logical_chain_sources(void)
+{
+    for (unsigned mode = 0; mode < 9; ++mode) {
+        fixture();
+        word(11 * 4, 0x08030000);
+        word(0x20010, 7);
+        const uint8_t code[] = {0, 14, 6, 2, 0, 14, 6, 2};
+        for (unsigned i = 0; i < sizeof code; ++i) {
+            unsigned at = (0xbc1b + i) & 4095, shift = 4 * (at & 1);
+            ram[0x30000 + at / 2] =
+                (uint8_t)((ram[0x30000 + at / 2] & ~(15u << shift)) | (code[i] << shift));
+        }
+        struct hpclang_rpl_code_values values = {0};
+        values.registers[HPCLANG_RPL_CODE_C] = 0xabcde;
+        values.registers[HPCLANG_RPL_CODE_A] = 7;
+        const struct hpclang_rpl_reader reader = {execution_plan_read, &probe};
+        uint32_t tokens[16] = {0};
+        for (unsigned index = 0; index < 2; ++index) {
+            struct hpclang_rpl_code_logical_source fact = {0};
+            assert(!hpclang_rpl_code_logical_inspect(&reader, 0xbc1b + 4 * index, 4, &values,
+                                                     &fact.logical));
+            for (unsigned digit = 0; digit < 16; ++digit) {
+                fact.origins[0][digit] = index && digit < 2 ? tokens[digit] : 0x90001 + digit;
+                fact.origins[1][digit] = 0x90021 + digit;
+            }
+            assert(!execution_logical(&probe, &fact, tokens));
+            values.registers[HPCLANG_RPL_CODE_C] = fact.logical.result;
+        }
+        assert(probe.logical_count == 2 && probe.logical_limit == 2 && tokens[0] == 0xb00011);
+        if (mode == 1)
+            probe.logical_limit = 1;
+        if (mode == 2)
+            probe.logicals[1].origins[0][0] = tokens[0];
+        if (mode == 3)
+            probe.logicals[0].origins[0][0] = tokens[0];
+        if (mode == 4)
+            probe.logicals[0].origins[0][0] = 0;
+        if (mode == 5)
+            ram[0x20000] ^= 1;
+        if (mode == 6)
+            tokens[0] += 2;
+        uint8_t expected = values.registers[HPCLANG_RPL_CODE_C] & 15;
+        if (mode == 7)
+            expected ^= 1;
+        assert(!hpclang_rpl_reference_edits_begin(&probe.plan, probe.edits, 128));
+        memcpy(before, ram, sizeof ram);
+        int result = execution_payload(&probe, &probe.plan, tokens[0], expected,
+                                       mode == 8 ? expected ^ 1 : expected);
+        assert(mode ? result < 0 : !result);
+        assert(!memcmp(before, ram, sizeof ram));
+        assert(probe.logical_limit == (mode == 1 ? 1u : 2u));
+    }
+}
+
 static void logical_sources(void)
 {
     for (unsigned mode = 0; mode < 12; ++mode) {
@@ -1043,7 +1097,7 @@ static void logical_sources(void)
         if (mode == 6)
             probe.logical_limit = 0;
         if (mode == 7)
-            probe.logical.origins[0][0] = tokens[0]; /* self-cycle */
+            probe.logicals[0].origins[0][0] = tokens[0]; /* self-cycle */
         if (mode == 8)
             ram[0x20000] ^= 1;
         if (mode == 9)
@@ -1097,7 +1151,7 @@ static void immediate_unit_source(void)
         if (mode == 5)
             fact.carry = 1;
         if (mode == 6)
-            probe.unit_count = 3;
+            probe.unit_count = sizeof probe.units / sizeof probe.units[0];
         if (mode == 7)
             probe.plan.capacity = 0;
         memcpy(before, ram, sizeof ram);
@@ -1105,7 +1159,8 @@ static void immediate_unit_source(void)
         int result = execution_unit(&probe, &fact, tokens);
         assert(!memcmp(before, ram, sizeof ram));
         if (mode) {
-            assert(result < 0 && probe.unit_count == (mode == 6 ? 3u : 0u));
+            assert(result < 0 && probe.unit_count ==
+                                     (mode == 6 ? sizeof probe.units / sizeof probe.units[0] : 0u));
             continue;
         }
         assert(!result && probe.unit_count == 1 && probe.unit_inputs[0] == 0x90050 &&
@@ -1340,6 +1395,7 @@ int main(void)
     adjacent_stack_store();
     continuation_predicates();
     logical_sources();
+    logical_chain_sources();
     bitshift_sources();
     dispatch_root_relations();
     sum_source();
