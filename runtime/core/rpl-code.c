@@ -946,6 +946,56 @@ static int native_word_observe(const struct hpclang_rpl_code_callbacks *callback
     return 0;
 }
 
+static int execution_native_next(const struct hpclang_rpl_reader *data,
+                                 struct hpclang_rpl_code_execution *next,
+                                 hpclang_rpl_code_token_fn token, void *context,
+                                 struct hpclang_rpl_code_step_uses *observed)
+{
+    /* Native-ROM 81B1: A.A=read5(D0), PC=read5(A.A), D0+=5.
+     * The ROM increments the full native D0 word; reject a result
+     * outside the canonical 20-bit state instead of wrapping it. */
+    if (!data || !data->read_nibble)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    uint32_t d0 = (uint32_t)next->values.registers[HPCLANG_RPL_CODE_D0];
+    if (next->values.registers[HPCLANG_RPL_CODE_D0] > 0xffffa)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (next->origins.adjustment[HPCLANG_RPL_CODE_D0] > 0xfffff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t address = d0, sources[5];
+    for (unsigned digit = 0; digit < 5; ++digit)
+        sources[digit] = next->origins.registers[HPCLANG_RPL_CODE_D0][digit];
+    for (unsigned load = 0; load < 2; ++load) {
+        execution_use(observed, HPCLANG_RPL_CODE_USE_LOAD_ADDRESS, address, sources,
+                      load ? 0 : next->origins.adjustment[HPCLANG_RPL_CODE_D0]);
+        if (address > 0xffffb)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t value;
+        int result = read_word(data, address, 5, &value);
+        if (result)
+            return result;
+        for (unsigned digit = 0; digit < 5; ++digit) {
+            result =
+                token(context, 1, address + digit, (value >> (4 * digit)) & 15, &sources[digit]);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
+        if (!load) {
+            next->values.registers[HPCLANG_RPL_CODE_A] =
+                (next->values.registers[HPCLANG_RPL_CODE_A] & ~UINT64_C(0xfffff)) | value;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                next->origins.registers[HPCLANG_RPL_CODE_A][digit] = sources[digit];
+            next->origins.adjustment[HPCLANG_RPL_CODE_A] = 0;
+        }
+        address = value;
+    }
+    execution_use(observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, address, sources, 0);
+    next->values.registers[HPCLANG_RPL_CODE_D0] = d0 + 5;
+    next->origins.adjustment[HPCLANG_RPL_CODE_D0] =
+        (next->origins.adjustment[HPCLANG_RPL_CODE_D0] + 5) & 0xfffff;
+    next->control.pc = address;
+    return 0;
+}
+
 int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *instructions,
                                              const struct hpclang_rpl_reader *data, uint32_t limit,
                                              struct hpclang_rpl_code_execution *state,
@@ -1086,6 +1136,66 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
         result = read_word(instructions, pc + 2, 1, &operation);
         if (result)
             return result;
+        if (operation == 11 && callbacks && callbacks->native_push) {
+            struct hpclang_rpl_code_native_push effect;
+            result = hpclang_rpl_code_native_push_inspect(instructions, limit, state, &effect);
+            if (result)
+                return result;
+            if (next.origins.adjustment[HPCLANG_RPL_CODE_D] > 0xfffff ||
+                (effect.stores && next.origins.adjustment[HPCLANG_RPL_CODE_D1] > 0xfffff))
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            if (effect.stores && !store)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            struct hpclang_rpl_code_push_origins origins = {0};
+            result = callbacks->native_push(context, &effect, state, &origins);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            if (!origins.p)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            for (unsigned digit = 0; digit < 5; ++digit) {
+                if (!origins.a[digit] || (!effect.stores && !origins.target[digit]))
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+                next.origins.registers[HPCLANG_RPL_CODE_A][digit] = origins.a[digit];
+            }
+            for (unsigned digit = 0; digit < 8; ++digit) {
+                if (!origins.d[digit])
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+                next.origins.registers[HPCLANG_RPL_CODE_D][digit] = origins.d[digit];
+            }
+            next.values.registers[HPCLANG_RPL_CODE_A] = effect.a;
+            next.values.registers[HPCLANG_RPL_CODE_D] = effect.d;
+            next.values.registers[HPCLANG_RPL_CODE_P] = effect.p;
+            next.origins.adjustment[HPCLANG_RPL_CODE_A] = 0;
+            next.origins.adjustment[HPCLANG_RPL_CODE_D] = 0;
+            next.origins.adjustment[HPCLANG_RPL_CODE_P] = 0;
+            for (unsigned digit = 0; digit < 16; ++digit)
+                next.origins.registers[HPCLANG_RPL_CODE_P][digit] = digit ? 0 : origins.p;
+            if (!effect.stores) {
+                next.control.pc = effect.exception_target;
+                execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, next.control.pc,
+                              origins.target, 0);
+                goto done;
+            }
+            next.values.registers[HPCLANG_RPL_CODE_D1] = effect.d1;
+            next.origins.adjustment[HPCLANG_RPL_CODE_D1] =
+                (next.origins.adjustment[HPCLANG_RPL_CODE_D1] - 5u) & 0xfffff;
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_STORE_ADDRESS, effect.store_address,
+                          next.origins.registers[HPCLANG_RPL_CODE_D1],
+                          next.origins.adjustment[HPCLANG_RPL_CODE_D1]);
+            struct hpclang_rpl_code_store write = {.instruction = pc,
+                                                   .nibbles = 5,
+                                                   .address = observed.addresses[0],
+                                                   .value = effect.a};
+            for (unsigned digit = 0; digit < 16; ++digit)
+                write.origins[digit] = next.origins.registers[HPCLANG_RPL_CODE_A][digit];
+            result = store(context, &write);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            result = execution_native_next(data, &next, token, context, &observed);
+            if (result)
+                return result;
+            goto done;
+        }
         if (operation == 4 || operation == 5) {
             hpclang_rpl_code_config_fn action = operation == 5 ? config
                                                 : callbacks    ? callbacks->unconfig
@@ -1338,46 +1448,9 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
                 (next.origins.adjustment[HPCLANG_RPL_CODE_A] + 5) & 0xfffff;
         }
         if (extended == 0x1b18 || extended == 0xeb18) {
-            /* Native-ROM 81B1: A.A=read5(D0), PC=read5(A.A), D0+=5.
-             * The ROM increments the full native D0 word; reject a result
-             * outside the canonical 20-bit state instead of wrapping it. */
-            if (!data || !data->read_nibble)
-                return HPCLANG_RPL_SPAN_UNAVAILABLE;
-            uint32_t d0 = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_D0];
-            if (d0 > 0xffffa)
-                return HPCLANG_RPL_SPAN_BOUNDS;
-            uint32_t address = d0, sources[5];
-            for (unsigned digit = 0; digit < 5; ++digit)
-                sources[digit] = next.origins.registers[HPCLANG_RPL_CODE_D0][digit];
-            for (unsigned load = 0; load < 2; ++load) {
-                execution_use(&observed, HPCLANG_RPL_CODE_USE_LOAD_ADDRESS, address, sources,
-                              load ? 0 : next.origins.adjustment[HPCLANG_RPL_CODE_D0]);
-                if (address > 0xffffb)
-                    return HPCLANG_RPL_SPAN_BOUNDS;
-                uint32_t value;
-                result = read_word(data, address, 5, &value);
-                if (result)
-                    return result;
-                for (unsigned digit = 0; digit < 5; ++digit) {
-                    result = token(context, 1, address + digit, (value >> (4 * digit)) & 15,
-                                   &sources[digit]);
-                    if (result)
-                        return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
-                }
-                if (!load) {
-                    next.values.registers[HPCLANG_RPL_CODE_A] =
-                        (next.values.registers[HPCLANG_RPL_CODE_A] & ~UINT64_C(0xfffff)) | value;
-                    for (unsigned digit = 0; digit < 5; ++digit)
-                        next.origins.registers[HPCLANG_RPL_CODE_A][digit] = sources[digit];
-                    next.origins.adjustment[HPCLANG_RPL_CODE_A] = 0;
-                }
-                address = value;
-            }
-            execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, address, sources, 0);
-            next.values.registers[HPCLANG_RPL_CODE_D0] = d0 + 5;
-            next.origins.adjustment[HPCLANG_RPL_CODE_D0] =
-                (next.origins.adjustment[HPCLANG_RPL_CODE_D0] + 5) & 0xfffff;
-            next.control.pc = address;
+            result = execution_native_next(data, &next, token, context, &observed);
+            if (result)
+                return result;
             goto done;
         }
         if (extended == 0xdb18) {

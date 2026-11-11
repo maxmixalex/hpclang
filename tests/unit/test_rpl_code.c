@@ -1071,7 +1071,7 @@ static void native_push_prefix(void)
                0);
         assert(!memcmp(&effect, &sentinel, sizeof effect));
     }
-    /* Framing knows the complete service, but execution still requires its effects. */
+    /* Framing alone never grants execution without the required observer. */
     uint32_t length = 0;
     assert(!hpclang_rpl_code_extent(&reader, 0, 5, &length));
     assert(length == 5);
@@ -1085,6 +1085,247 @@ static void native_push_prefix(void)
     assert(hpclang_rpl_code_execution_step(&reader, NULL, 5, &state, data_token, NULL, &uses) ==
            HPCLANG_RPL_SPAN_UNSUPPORTED);
     assert(!memcmp(&state, &before, sizeof state) && !memcmp(&uses, &sentinel, sizeof uses));
+}
+
+struct push_fixture
+{
+    struct image memory;
+    uint32_t tokens[128];
+    unsigned stores, reads, token_calls, observed, fail_read, fail_token, omit;
+    int observer_error, store_error;
+    const struct hpclang_rpl_code_execution *before;
+};
+
+static uint32_t push_physical(uint32_t address)
+{
+    return address >= 0x200 && address < 0x280 ? address - 0x100 : address;
+}
+
+static int push_read(void *context, uint32_t at, uint8_t *value)
+{
+    struct push_fixture *f = context;
+    assert(f->observed == 1 && f->stores == 1);
+    if (++f->reads == f->fail_read)
+        return 0;
+    at = push_physical(at);
+    if (at >= 0x3ac0 && at < 0x3ac5) {
+        *value = (0x70 >> (4 * (at - 0x3ac0))) & 15;
+        return 1;
+    }
+    return read_nibble(&f->memory, at, value);
+}
+
+static int push_token(void *context, unsigned data, uint32_t at, uint8_t value, uint32_t *token)
+{
+    struct push_fixture *f = context;
+    (void)value;
+    assert(data && f->stores == 1);
+    if (++f->token_calls == f->fail_token)
+        return -73;
+    at = push_physical(at);
+    *token = at >= 0x100 && at < 0x180 ? f->tokens[at - 0x100] : 0x200000 + at;
+    return 0;
+}
+
+static int push_store(void *context, const struct hpclang_rpl_code_store *store)
+{
+    struct push_fixture *f = context;
+    assert(f->observed == 1 && !f->reads && !f->stores);
+    ++f->stores;
+    assert(store->instruction == f->before->control.pc && !store->first && store->nibbles == 5 &&
+           !store->adjustment);
+    assert((store->value & 0xfffff) == 0x3ac0);
+    assert(store->address.value == f->before->values.registers[HPCLANG_RPL_CODE_D1] - 5);
+    assert(store->address.adjustment ==
+           ((f->before->origins.adjustment[HPCLANG_RPL_CODE_D1] - 5u) & 0xfffff));
+    assert(!memcmp(store->address.origins, f->before->origins.registers[HPCLANG_RPL_CODE_D1],
+                   sizeof store->address.origins));
+    if (f->store_error)
+        return f->store_error;
+    uint32_t at = push_physical(store->address.value);
+    assert(at >= 0x100 && at <= 0x17b);
+    for (unsigned i = 0; i < 5; ++i) {
+        assert(store->origins[i] == 0xd00001 + i);
+        f->memory.data[at - 0x100 + i] = (store->value >> (4 * i)) & 15;
+        f->tokens[at - 0x100 + i] = store->origins[i];
+    }
+    return 0;
+}
+
+static int push_observe(void *context, const struct hpclang_rpl_code_native_push *effect,
+                        const struct hpclang_rpl_code_execution *before,
+                        struct hpclang_rpl_code_push_origins *origins)
+{
+    struct push_fixture *f = context;
+    assert(!f->observed && !f->stores && !f->reads);
+    ++f->observed;
+    assert(!memcmp(before, f->before, sizeof *before));
+    assert(effect->instruction == before->control.pc && effect->length == 5 && !effect->p);
+    assert(effect->d == ((before->values.registers[HPCLANG_RPL_CODE_D] & ~UINT64_C(0xffffffff)) |
+                         (uint32_t)(before->values.registers[HPCLANG_RPL_CODE_D] - 1)));
+    if (f->observer_error)
+        return f->observer_error;
+    for (unsigned i = 0; i < 5; ++i) {
+        origins->a[i] = f->omit == i + 1 ? 0 : 0xd00001 + i;
+        origins->target[i] = f->omit == i + 15 ? 0 : 0xd00021 + i;
+    }
+    for (unsigned i = 0; i < 8; ++i)
+        origins->d[i] = f->omit == i + 6 ? 0 : 0xd00011 + i;
+    origins->p = f->omit == 14 ? 0 : 0xd00031;
+    return 0;
+}
+
+static struct push_fixture push_setup(const struct hpclang_rpl_code_execution *initial)
+{
+    struct push_fixture f = {.memory = {.address = 0x100, .size = 128, .fail = UINT32_MAX},
+                             .before = initial};
+    encode(&f.memory, 0x10, 5, 0x120);
+    encode(&f.memory, 0x20, 5, 0x60);
+    for (unsigned i = 0; i < 128; ++i)
+        f.tokens[i] = 0x200100 + i;
+    return f;
+}
+
+static void native_push_execution(void)
+{
+    struct image code = {.data = {8, 0, 11, 4, 0}, .size = 5, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+    const struct hpclang_rpl_code_callbacks callbacks = {.native_push = push_observe,
+                                                         .store = push_store};
+    const uint32_t words[] = {0, 1, 2, 0xfffff, 0x100000, 0xfff00000, 0xffffffff};
+    const uint32_t destinations[] = {0x140, 0x110, 0x120, 0x210};
+    struct hpclang_rpl_code_execution initial = {0}, state, expected;
+    seed_origins(&initial.origins);
+    initial.values.registers[HPCLANG_RPL_CODE_A] = UINT64_C(0x123456789abcdef0);
+    initial.values.registers[HPCLANG_RPL_CODE_D0] = 0x110;
+    initial.origins.adjustment[HPCLANG_RPL_CODE_A] = 9;
+    initial.origins.adjustment[HPCLANG_RPL_CODE_D] = 7;
+    initial.origins.adjustment[HPCLANG_RPL_CODE_D0] = 6;
+    initial.origins.adjustment[HPCLANG_RPL_CODE_D1] = 2;
+    initial.status = 0x9876;
+    initial.hst = 0x1234;
+    initial.control.cursor = 3;
+    initial.control.stack[2] = 0xabcde;
+    struct hpclang_rpl_code_step_uses uses, sentinel;
+    memset(&sentinel, 0xa5, sizeof sentinel);
+    for (unsigned p = 0; p < 16; ++p)
+        for (unsigned w = 0; w < sizeof words / sizeof words[0]; ++w)
+            for (unsigned flags = 0; flags < 4; ++flags)
+                for (unsigned alias = 0; alias < 4; ++alias) {
+                    unsigned normal = (words[w] & 0xfffff) != 0;
+                    initial.values.registers[HPCLANG_RPL_CODE_P] = p;
+                    initial.values.registers[HPCLANG_RPL_CODE_D] =
+                        UINT64_C(0xa5a55a5a00000000) | words[w];
+                    initial.values.registers[HPCLANG_RPL_CODE_D1] = destinations[alias] + 5;
+                    initial.values.carry = initial.control.carry = flags & 1;
+                    initial.values.decimal = flags >> 1;
+                    struct push_fixture f = push_setup(&initial);
+                    const struct hpclang_rpl_reader data = {push_read, &f};
+                    state = expected = initial;
+                    uses = sentinel;
+                    assert(!hpclang_rpl_code_execution_step_observed(
+                        &instructions, &data, 5, &state, push_token, &callbacks, &f, &uses));
+                    unsigned first_alias = alias == 1 || alias == 3;
+                    uint32_t a = normal ? (first_alias ? 0x3ac0 : 0x120) : 0x3ac0;
+                    expected.values.registers[HPCLANG_RPL_CODE_A] =
+                        (initial.values.registers[HPCLANG_RPL_CODE_A] & ~UINT64_C(0xfffff)) | a;
+                    expected.values.registers[HPCLANG_RPL_CODE_D] =
+                        UINT64_C(0xa5a55a5a00000000) | (uint32_t)(words[w] - 1);
+                    expected.values.registers[HPCLANG_RPL_CODE_P] = 0;
+                    expected.control.pc = normal ? (first_alias  ? 0x70
+                                                    : alias == 2 ? 0x3ac0
+                                                                 : 0x60)
+                                                 : 0x3a9b;
+                    expected.origins.adjustment[HPCLANG_RPL_CODE_A] = 0;
+                    expected.origins.adjustment[HPCLANG_RPL_CODE_D] = 0;
+                    expected.origins.adjustment[HPCLANG_RPL_CODE_P] = 0;
+                    for (unsigned i = 0; i < 5; ++i)
+                        expected.origins.registers[HPCLANG_RPL_CODE_A][i] =
+                            !normal || first_alias ? 0xd00001 + i : 0x200110 + i;
+                    for (unsigned i = 0; i < 8; ++i)
+                        expected.origins.registers[HPCLANG_RPL_CODE_D][i] = 0xd00011 + i;
+                    for (unsigned i = 0; i < 16; ++i)
+                        expected.origins.registers[HPCLANG_RPL_CODE_P][i] = i ? 0 : 0xd00031;
+                    if (normal) {
+                        expected.values.registers[HPCLANG_RPL_CODE_D1] -= 5;
+                        expected.values.registers[HPCLANG_RPL_CODE_D0] += 5;
+                        expected.origins.adjustment[HPCLANG_RPL_CODE_D1] = 0xffffd;
+                        expected.origins.adjustment[HPCLANG_RPL_CODE_D0] = 11;
+                    }
+                    assert(!memcmp(&state, &expected, sizeof state));
+                    assert(uses.count == (normal ? 4u : 1u) && !uses.has_branch);
+                    assert(f.observed == 1 && f.stores == normal && f.reads == normal * 10 &&
+                           f.token_calls == normal * 10);
+                    const struct hpclang_rpl_code_address_use *target =
+                        &uses.addresses[uses.count - 1];
+                    assert(target->kind == HPCLANG_RPL_CODE_USE_MEMORY_TARGET &&
+                           target->value == state.control.pc && !target->adjustment);
+                    for (unsigned i = 0; i < 5; ++i)
+                        assert(target->origins[i] == (!normal       ? 0xd00021 + i
+                                                      : first_alias ? 0x203ac0 + i
+                                                      : alias == 2  ? 0xd00001 + i
+                                                                    : 0x200120 + i));
+                }
+    /* A failed observer, store, dependent read or token must not publish state
+     * or uses, even though scratch callbacks may already have recorded effects. */
+    for (unsigned normal = 0; normal < 2; ++normal)
+        for (unsigned fault = 0; fault < 55; ++fault) {
+            initial.values.registers[HPCLANG_RPL_CODE_D] = normal;
+            initial.values.registers[HPCLANG_RPL_CODE_D1] = 0x145;
+            struct push_fixture f = push_setup(&initial);
+            struct hpclang_rpl_code_callbacks actions = callbacks;
+            struct hpclang_rpl_reader data = {push_read, &f};
+            if (fault == 0)
+                actions.native_push = NULL;
+            if (fault == 1)
+                f.observer_error = -73;
+            if (fault == 2)
+                f.observer_error = 73;
+            if (fault >= 3 && fault < 22)
+                f.omit = fault - 2;
+            if (normal && f.omit > 14)
+                continue; /* Error-target origins are unused. */
+            if (!normal && fault >= 22)
+                continue;
+            if (fault == 22)
+                actions.store = NULL;
+            if (fault == 23)
+                f.store_error = -73;
+            if (fault == 24)
+                f.store_error = 73;
+            if (fault >= 25 && fault < 35)
+                f.fail_read = fault - 24;
+            if (fault >= 35 && fault < 45)
+                f.fail_token = fault - 34;
+            state = initial;
+            if (fault == 45)
+                state.values.registers[HPCLANG_RPL_CODE_D0] = 0x100000110;
+            if (fault == 46)
+                state.values.registers[HPCLANG_RPL_CODE_D0] = 0xffffb;
+            if (fault == 47)
+                state.values.registers[HPCLANG_RPL_CODE_D1] = 4;
+            if (fault == 48)
+                state.values.registers[HPCLANG_RPL_CODE_D1] = 0x100000;
+            if (fault == 49)
+                state.values.registers[HPCLANG_RPL_CODE_P] = 16;
+            if (fault == 50)
+                state.origins.adjustment[HPCLANG_RPL_CODE_D] = 0x100000;
+            if (fault == 51)
+                state.origins.adjustment[HPCLANG_RPL_CODE_D1] = 0x100000;
+            if (fault == 52)
+                state.origins.adjustment[HPCLANG_RPL_CODE_D0] = 0x100000;
+            if (fault == 53)
+                data.read_nibble = NULL;
+            if (fault == 54)
+                encode(&f.memory, 0x10, 5, 0xffffc);
+            expected = state;
+            f.before = &expected;
+            uses = sentinel;
+            assert(hpclang_rpl_code_execution_step_observed(&instructions, &data, 5, &state,
+                                                            push_token, &actions, &f, &uses) < 0);
+            assert(!memcmp(&state, &expected, sizeof state));
+            assert(!memcmp(&uses, &sentinel, sizeof uses));
+        }
 }
 
 static void native_service_continuation(void)
@@ -4675,6 +4916,7 @@ int main(void)
     instruction_extents();
     native_service_continuation();
     native_push_prefix();
+    native_push_execution();
     register_assignments();
     literal_loads();
     literal_origin_failures();

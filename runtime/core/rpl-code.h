@@ -620,6 +620,24 @@ typedef int (*hpclang_rpl_code_native_word_fn)(void *context,
                                                const struct hpclang_rpl_code_native_word *word,
                                                uint32_t tokens[8]);
 
+struct hpclang_rpl_code_push_origins
+{
+    uint32_t a[5], d[8], p, target[5];
+};
+/* Qualify the 80B40 native service/profile and retain the fixed A/P producers,
+ * full D.low32 decrement (including incoming adjustment), and original D.A
+ * zero/nonzero decision. Supply nonzero relation tokens for A's five low
+ * digits, all eight D digits and P; on the no-space path also supply the five
+ * fixed error-target tokens. These are producer facts, not Saturn ROM cells.
+ * The callback must constrain relocation to preserve the branch and native
+ * constants. It records scratch facts only; discard them after any later
+ * error. A missing observer rejects execution. Zero accepts, negative errors
+ * propagate, positive errors and missing required tokens are malformed. */
+typedef int (*hpclang_rpl_code_native_push_fn)(void *context,
+                                               const struct hpclang_rpl_code_native_push *effect,
+                                               const struct hpclang_rpl_code_execution *before,
+                                               struct hpclang_rpl_code_push_origins *origins);
+
 struct hpclang_rpl_code_callbacks
 {
     hpclang_rpl_code_derive_fn derive;
@@ -637,12 +655,19 @@ struct hpclang_rpl_code_callbacks
     hpclang_rpl_code_native_word_fn native_word;
     hpclang_rpl_code_logical_fn logical;
     hpclang_rpl_code_bitshift_fn bitshift;
+    hpclang_rpl_code_native_push_fn native_push;
 };
 /* 86n/87n test software status bit n against zero/one, update carry and execute
  * GOYES/RTNYES. They consume the supplied status, without a register-predicate
  * callback. Callers must guard its initial snapshot and qualify every preceding
  * status writer; this does not establish status provenance or movement authority.
  * Taken returns retain the consumed stack source/generated metadata. */
+/* Qualified 80B40 applies its prefix, then either emits the fixed error target
+ * or stores A.A at D1-5 before the same two dependent reads as 81B1. The store
+ * and reads use caller-owned scratch, including physical aliases; no native
+ * writes are authorized. D1 retains its source with adjustment -5. The normal
+ * path requires a store observer and canonical D0 whose increment fits.
+ * P's native cached fields remain the caller's responsibility. */
 /* Unified optional observation callbacks. Missing callbacks retain the legacy
  * rejection/unknown-source behavior; all prior error/discard contracts apply. */
 int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *instructions,
