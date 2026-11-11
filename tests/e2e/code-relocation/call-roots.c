@@ -696,7 +696,7 @@ struct execution_probe
     {
         uint32_t field, value, origin;
     } shadow[37];
-    uint8_t native_before[0xc60], native_after[0xc60];
+    uint8_t native_after[0xc60];
     unsigned configurations, unconfigurations, bank_writes, payload_limit, payload_depth;
     struct hpclang_rpl_code_constant constants[3];
     unsigned constant_count, constant_limit, predicates;
@@ -810,6 +810,27 @@ static int execution_source(void *context, uint32_t token,
 static uint32_t execution_shift(const struct execution_probe *probe, uint32_t value)
 {
     return value >= probe->move_first && value < probe->move_end ? value + 16 : value;
+}
+
+static int execution_address_replacement(const struct execution_probe *probe,
+                                         const struct hpclang_rpl_code_address_use *use,
+                                         uint32_t *replacement)
+{
+    unsigned boundary_digits = 0;
+    for (unsigned digit = 0; digit < 5; ++digit)
+        boundary_digits += use->origins[digit] == 0x806f4 + digit;
+    if (boundary_digits == 5) {
+        /* catalog_prepare advances RSKTOP explicitly. Its one-past endpoint
+         * follows that root even though it is outside the moved byte range.
+         * Equal numeric values with other provenance do not gain this rule. */
+        if (use->generated || use->adjustment > 0xfffff || probe->move_end >= 0xffff0 ||
+            use->value != ((probe->move_end + use->adjustment) & 0xfffff))
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        *replacement = (probe->move_end + 16 + use->adjustment) & 0xfffff;
+    } else {
+        *replacement = execution_shift(probe, use->value);
+    }
+    return 0;
 }
 
 /* Normalize aliases through the guarded original map. Store destinations are
@@ -1207,6 +1228,10 @@ static int execution_visit(void *context, uint32_t pc,
     }
     for (unsigned i = 0; i < uses->count; ++i) {
         const struct hpclang_rpl_code_address_use *use = &uses->addresses[i];
+        uint32_t replacement;
+        int address_result = execution_address_replacement(probe, use, &replacement);
+        if (address_result)
+            return address_result;
         unsigned sum_digits = 0;
         for (unsigned digit = 0; digit < 5; ++digit)
             sum_digits += use->origins[digit] >= 0x800001;
@@ -1218,8 +1243,7 @@ static int execution_visit(void *context, uint32_t pc,
             for (unsigned digit = 0; digit < 5; ++digit)
                 operand.origins[digit] = use->origins[digit];
             int result = hpclang_rpl_execution_plan_payload(
-                &probe->plan, &operand, execution_shift(probe, use->value), execution_source,
-                execution_payload, probe);
+                &probe->plan, &operand, replacement, execution_source, execution_payload, probe);
             if (result)
                 return result;
             ++probe->planned_uses;
@@ -1254,7 +1278,7 @@ static int execution_visit(void *context, uint32_t pc,
             result = hpclang_rpl_execution_plan_subtraction(
                 &probe->plan, &probe->expression,
                 execution_shift(probe, probe->expression.left.value), probe->expression.right.value,
-                execution_shift(probe, use->value), execution_source, probe);
+                replacement, execution_source, probe);
             if (result)
                 return result;
         }
@@ -1262,16 +1286,15 @@ static int execution_visit(void *context, uint32_t pc,
             const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
             const struct hpclang_rpl_reference_mappings mappings = {1, 1, 1};
             struct hpclang_rpl_code_patch patch;
-            int result = hpclang_rpl_code_generated_return_plan(
-                &instructions, use, &mappings, probe->move_first, probe->move_end, 16,
-                execution_shift(probe, use->value), &patch);
+            int result = hpclang_rpl_code_generated_return_plan(&instructions, use, &mappings,
+                                                                probe->move_first, probe->move_end,
+                                                                16, replacement, &patch);
             if (result)
                 return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
             ++probe->generated_uses;
         }
         if (!expression_digits && !use->generated) {
             const struct hpclang_rpl_code_step_uses single = {.count = 1, .addresses = {*use}};
-            uint32_t replacement = execution_shift(probe, use->value);
             int result = hpclang_rpl_execution_plan_uses(&probe->plan, &single, &replacement,
                                                          execution_source, probe);
             if (result)
@@ -1324,31 +1347,41 @@ static int execution_config(void *context, const struct hpclang_rpl_code_configu
                                                     execution_source, execution_payload, probe);
     if (result)
         return result;
-    for (unsigned at = 0; at < sizeof probe->native_before; ++at) {
+    for (unsigned at = 0; at < sizeof probe->native_after; ++at) {
         uint8_t low, high;
         if (!execution_native_read(probe, at * 2, &low) ||
             !execution_native_read(probe, at * 2 + 1, &high))
             return HPCLANG_RPL_SPAN_UNAVAILABLE;
-        probe->native_before[at] = low | (high << 4);
+        probe->native_after[at] = low | (high << 4);
     }
-    if (probe->native_before[0xb9c] != 3)
+    if (probe->native_after[0xb9c] != 3)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     if (probe->configurations)
-        probe->native_before[0xb9c] = 35; /* First CONFIG's qualified flags-only effect. */
-    result = hpclang_rpl_config_predict(probe->native_before, config->value, probe->native_after);
+        probe->native_after[0xb9c] = 35; /* First CONFIG's qualified flags-only effect. */
+    /* The predictor permits exact input/output aliasing. Original bytes remain
+     * guarded in native memory, so a second full snapshot is unnecessary. */
+    result = hpclang_rpl_config_predict(probe->native_after, config->value, probe->native_after);
     if (result)
         return result;
     if (probe->native_after[0xb9c] != (probe->configurations ? 7 : 35))
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     if (probe->configurations)
         for (unsigned i = 0; i < 4; ++i)
-            if (probe->native_before[0xbb0 + i] != 255 ||
-                probe->native_after[0xbb0 + i] != (i ? 0 : 0x7f))
+            if (probe->native_after[0xbb0 + i] != (i ? 0 : 0x7f))
                 return HPCLANG_RPL_SPAN_UNSUPPORTED;
-    for (unsigned at = 0; at < sizeof probe->native_before; ++at)
-        if (at != 0xb9c && !(probe->configurations && at >= 0xbb0 && at < 0xbb4) &&
-            probe->native_before[at] != probe->native_after[at])
+    for (unsigned at = 0; at < sizeof probe->native_after; ++at) {
+        uint8_t low, high;
+        if (!execution_native_read(probe, at * 2, &low) ||
+            !execution_native_read(probe, at * 2 + 1, &high))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        uint8_t original = low | (high << 4);
+        if (probe->configurations && at >= 0xbb0 && at < 0xbb4) {
+            if (original != 255)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        } else if (at != 0xb9c && original != probe->native_after[at]) {
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        }
+    }
     ++probe->configurations;
     return 0;
 }

@@ -209,7 +209,7 @@ static void configuration(void)
         }
         assert(!result && probe.configurations == 1);
         assert(probe.builder.count > 1200 && probe.builder.count <= 1536);
-        assert(probe.native_before[0xb9c] == 3 && probe.native_after[0xb9c] == 35);
+        assert(ram[0xb9c] == 3 && probe.native_after[0xb9c] == 35);
         const struct hpclang_rpl_reference_reader guards = {execution_guard_read, &probe};
         assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));
         ram[0x123] ^= 1;
@@ -227,7 +227,7 @@ static void configuration(void)
         memcpy(before, ram, sizeof ram);
         assert(!execution_config(&probe, &config) && probe.configurations == 2);
         assert(!memcmp(before, ram, sizeof ram));
-        assert(probe.native_before[0xb9c] == 35 && probe.native_after[0xb9c] == 7);
+        assert(ram[0xb9c] == 3 && probe.native_after[0xb9c] == 7);
         assert(probe.native_after[0xbb0] == 0x7f && !probe.native_after[0xbb1]);
         uint8_t value = 17;
         uint32_t token = 123;
@@ -238,6 +238,49 @@ static void configuration(void)
         assert(execution_write_cell(&probe, 0x7ffff, &cell) == HPCLANG_RPL_SPAN_UNSUPPORTED);
         assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));
         assert(execution_config(&probe, &config) < 0);
+    }
+}
+
+static void boundary_address(void)
+{
+    fixture();
+    probe.move_first = 0x86120;
+    probe.move_end = 0x88dad;
+    struct hpclang_rpl_code_address_use use = {.value = probe.move_end};
+    uint32_t replacement = 123;
+    assert(!execution_address_replacement(&probe, &use, &replacement));
+    assert(replacement == probe.move_end); /* Numeric equality is insufficient. */
+    for (unsigned digit = 0; digit < 5; ++digit)
+        use.origins[digit] = 0x806f4 + digit;
+    const uint32_t adjustments[] = {0, 5, 0xffffb, 0xffff6, 0xfffec};
+    for (unsigned i = 0; i < sizeof adjustments / sizeof adjustments[0]; ++i) {
+        use.adjustment = adjustments[i];
+        use.value = (probe.move_end + use.adjustment) & 0xfffff;
+        assert(!execution_address_replacement(&probe, &use, &replacement));
+        assert(replacement == ((probe.move_end + 16 + use.adjustment) & 0xfffff));
+    }
+    use.adjustment = 0;
+    use.value = probe.move_end;
+    for (unsigned digit = 0; digit < 5; ++digit) {
+        uint32_t saved = use.origins[digit];
+        use.origins[digit] = 0;
+        assert(!execution_address_replacement(&probe, &use, &replacement));
+        assert(replacement == probe.move_end);
+        use.origins[digit] = saved;
+    }
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        struct hpclang_rpl_code_address_use invalid = use;
+        replacement = 123;
+        if (mode == 0)
+            invalid.value++;
+        if (mode == 1)
+            invalid.generated = 1;
+        if (mode == 2)
+            invalid.adjustment = 0x100000;
+        if (mode == 3)
+            probe.move_end = invalid.value = 0xffff1;
+        assert(execution_address_replacement(&probe, &invalid, &replacement) < 0);
+        assert(replacement == 123);
     }
 }
 
@@ -487,6 +530,7 @@ static void protected_body(void)
 
 int main(void)
 {
+    boundary_address();
     unconfiguration();
     bank_write();
     constant_source();
