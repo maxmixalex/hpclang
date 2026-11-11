@@ -50,6 +50,32 @@ def check_migration_tool(package, work, env):
         raise AssertionError(f"Unexpected migration findings: {report}")
     if source.read_text() != original:
         raise AssertionError("Migration checker modified its input")
+    legacy = work / "legacy input.cpp"
+    legacy_bytes = "// caf\u00e9\ngets(buffer);\n".encode("cp1252")
+    legacy.write_bytes(legacy_bytes)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(package / "tools/check-migration.py"),
+            "--json",
+            "--check",
+            "--encoding",
+            "cp1252",
+            str(legacy),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 1:
+        raise AssertionError(f"Installed checker rejected legacy source: {result.stderr}")
+    report = json.loads(result.stdout)
+    if report["errors"] or [(r["rule"], r["line"], r["column"]) for r in report["findings"]] != [
+        ("HP002", 2, 1)
+    ]:
+        raise AssertionError(f"Unexpected legacy-source findings: {report}")
+    if legacy.read_bytes() != legacy_bytes:
+        raise AssertionError("Migration checker modified legacy source bytes")
     print("Installed SDK: standalone migration checker PASS")
 
 

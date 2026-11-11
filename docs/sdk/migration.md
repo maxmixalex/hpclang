@@ -23,7 +23,13 @@ raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units an
 application `errno` declarations and legacy decimal settings. Comments and string/character literals are
 ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
 `build`, `.cache` and `third_party`; explicitly named files are always checked.
-Inputs must be UTF-8 (an optional BOM is accepted). It never changes source files.
+Inputs default to UTF-8 (an optional BOM is accepted). For an older Windows
+project, select its known encoding explicitly, for example
+`--encoding cp1252` or `--encoding gbk`. The setting applies to all input files
+in that invocation; run separate commands for projects with mixed encodings.
+Decoding errors remain errors; the checker never guesses an encoding, replaces
+undecodable bytes or changes source files. Diagnostic columns count decoded
+characters, not encoded bytes.
 
 Normal mode returns zero even when review findings exist. `--check` returns one
 for findings; unreadable/missing inputs return two in either mode. JSON output

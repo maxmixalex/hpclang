@@ -94,6 +94,39 @@ char c = '\\'';
             self.assertEqual(len(report["findings"]), 1)
             self.assertEqual(source.read_bytes(), original)
 
+    def test_legacy_encoding_is_explicit_and_preserves_bytes_and_locations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "legacy.c"
+            original = "// caf\u00e9\r\nvoid f() { gets(buffer); }\r\n".encode("cp1252")
+            source.write_bytes(original)
+            command = [sys.executable, str(TOOL), "--json", "--check", str(source)]
+            default = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(default.returncode, 2)
+            self.assertTrue(json.loads(default.stdout)["errors"])
+            selected = subprocess.run(
+                command + ["--encoding", "cp1252"], capture_output=True, text=True
+            )
+            self.assertEqual(selected.returncode, 1)
+            report = json.loads(selected.stdout)
+            self.assertEqual(report["errors"], [])
+            self.assertEqual(
+                [(r["rule"], r["line"], r["column"]) for r in report["findings"]],
+                [("HP002", 2, 12)],
+            )
+            self.assertEqual(source.read_bytes(), original)
+
+    def test_invalid_or_nontext_encoding_is_an_argument_error(self):
+        for encoding in ("not-an-encoding", "base64_codec", "rot_13"):
+            result = subprocess.run(
+                [sys.executable, str(TOOL), "--encoding", encoding, str(TOOL)],
+                capture_output=True,
+                text=True,
+            )
+            with self.subTest(encoding=encoding):
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("unsupported source encoding", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+
     def test_io_errors_are_not_clean_results(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "bad.c"

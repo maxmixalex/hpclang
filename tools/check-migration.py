@@ -3,6 +3,7 @@
 
 import argparse
 import bisect
+import codecs
 import json
 import re
 import sys
@@ -108,11 +109,28 @@ def scan(source, path):
     return sorted(findings, key=lambda item: (item["line"], item["column"], item["rule"]))
 
 
+def source_encoding(value):
+    try:
+        # Reject unknown and non-text codecs at argument parsing, including
+        # transformations such as base64 that str.decode cannot consume.
+        if not isinstance(codecs.decode(b"", value), str):
+            raise TypeError("not a text encoding")
+    except (LookupError, TypeError) as error:
+        raise argparse.ArgumentTypeError(f"unsupported source encoding: {value}") from error
+    return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", type=Path, help="C/C++ files or source directories")
     parser.add_argument("--json", action="store_true", help="emit a versioned JSON report")
     parser.add_argument("--check", action="store_true", help="exit 1 when review findings exist")
+    parser.add_argument(
+        "--encoding",
+        type=source_encoding,
+        default="utf-8-sig",
+        help="source text encoding (default: UTF-8 with optional BOM); never rewrites files",
+    )
     args = parser.parse_args(argv)
     files, errors, findings = set(), [], []
     for path in args.paths:
@@ -130,7 +148,7 @@ def main(argv=None):
             errors.append(f"{path}: path does not exist")
     for path in sorted(files):
         try:
-            findings.extend(scan(path.read_text(encoding="utf-8-sig"), path))
+            findings.extend(scan(path.read_text(encoding=args.encoding), path))
         except (OSError, UnicodeError) as error:
             errors.append(f"{path}: {error}")
     report = dict(
