@@ -3378,6 +3378,7 @@ static void constant_steps(void)
 struct predicate_test
 {
     unsigned calls;
+    unsigned nibbles;
     int error;
     struct hpclang_rpl_code_execution before;
 };
@@ -3387,69 +3388,80 @@ static int accept_predicate(void *context, const struct hpclang_rpl_code_predica
     struct predicate_test *test = context;
     ++test->calls;
     assert(!memcmp(before, &test->before, sizeof *before));
-    assert(predicate->left == HPCLANG_RPL_CODE_C && predicate->nibbles == 3);
+    assert(predicate->left == HPCLANG_RPL_CODE_C && predicate->nibbles == test->nibbles);
     return test->error;
 }
 static void predicate_steps(void)
 {
-    for (unsigned cursor = 0; cursor < 8; ++cursor)
-        for (unsigned taken = 0; taken < 2; ++taken)
-            for (unsigned mode = 0; mode < 6; ++mode) {
-                struct image image = {
-                    .data = {9, 3, 10, 0, 0}, .address = 0x100, .size = 5, .fail = UINT32_MAX};
-                unsigned displacement = mode == 1 ? 6 : mode == 2 ? 250 : 0;
-                encode(&image, 3, 2, displacement);
-                const struct hpclang_rpl_reader reader = {read_nibble, &image};
-                struct hpclang_rpl_code_execution state = {0};
-                state.control.pc = 0x100;
-                state.control.cursor = cursor;
-                state.values.registers[HPCLANG_RPL_CODE_C] = taken ? 0 : 1;
-                unsigned slot = (cursor + 7) & 7;
-                state.control.stack[slot] = 0x23456;
-                if (mode == 5)
-                    state.control.stack_generated[slot] = 0x123;
-                else {
-                    state.stack_adjustment[slot] = 5;
-                    for (unsigned i = 0; i < 5; ++i)
-                        state.control.stack_origins[slot][i] = 40 + i;
-                }
-                struct predicate_test test = {.before = state,
-                                              .error = mode == 3   ? -71
-                                                       : mode == 4 ? 71
-                                                                   : 0};
-                struct hpclang_rpl_code_step_uses uses, saved;
-                memset(&uses, 0x77, sizeof uses);
-                saved = uses;
-                assert(hpclang_rpl_code_execution_step_native(
-                           &reader, &reader, 5, &state, data_token, NULL, NULL, NULL, &test,
-                           &uses) == HPCLANG_RPL_SPAN_UNSUPPORTED);
-                assert(!memcmp(&state, &test.before, sizeof state) &&
-                       !memcmp(&uses, &saved, sizeof uses));
-                int result = hpclang_rpl_code_execution_step_predicates(
-                    &reader, &reader, 5, &state, data_token, NULL, NULL, NULL, accept_predicate,
-                    &test, &uses);
-                assert(test.calls == 1);
-                if (test.error) {
-                    assert(result == (test.error < 0 ? test.error : HPCLANG_RPL_SPAN_MALFORMED));
+    for (unsigned fixed = 0; fixed < 3; ++fixed)
+        for (unsigned cursor = 0; cursor < 8; ++cursor)
+            for (unsigned taken = 0; taken < 2; ++taken)
+                for (unsigned mode = 0; mode < 6; ++mode) {
+                    struct image image = {
+                        .data = {9, 3, 10, 0, 0}, .address = 0x100, .size = 5, .fail = UINT32_MAX};
+                    if (fixed) {
+                        image.data[0] = 8;
+                        image.data[1] = fixed == 1 ? 10 : 11;
+                    }
+                    unsigned displacement = mode == 1 ? 6 : mode == 2 ? 250 : 0;
+                    encode(&image, 3, 2, displacement);
+                    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+                    struct hpclang_rpl_code_execution state = {0};
+                    state.control.pc = 0x100;
+                    state.control.cursor = cursor;
+                    state.values.registers[HPCLANG_RPL_CODE_C] = taken ? 0 : 1;
+                    if (fixed == 2) {
+                        state.values.registers[HPCLANG_RPL_CODE_A] = 1;
+                        state.values.registers[HPCLANG_RPL_CODE_C] = taken ? 1 : 0;
+                    }
+                    unsigned slot = (cursor + 7) & 7;
+                    state.control.stack[slot] = 0x23456;
+                    if (mode == 5)
+                        state.control.stack_generated[slot] = 0x123;
+                    else {
+                        state.stack_adjustment[slot] = 5;
+                        for (unsigned i = 0; i < 5; ++i)
+                            state.control.stack_origins[slot][i] = 40 + i;
+                    }
+                    struct predicate_test test = {.before = state,
+                                                  .nibbles = fixed ? 5 : 3,
+                                                  .error = mode == 3   ? -71
+                                                           : mode == 4 ? 71
+                                                                       : 0};
+                    struct hpclang_rpl_code_step_uses uses, saved;
+                    memset(&uses, 0x77, sizeof uses);
+                    saved = uses;
+                    assert(hpclang_rpl_code_execution_step_native(
+                               &reader, &reader, 5, &state, data_token, NULL, NULL, NULL, &test,
+                               &uses) == HPCLANG_RPL_SPAN_UNSUPPORTED);
                     assert(!memcmp(&state, &test.before, sizeof state) &&
                            !memcmp(&uses, &saved, sizeof uses));
-                    continue;
+                    int result = hpclang_rpl_code_execution_step_predicates(
+                        &reader, &reader, 5, &state, data_token, NULL, NULL, NULL, accept_predicate,
+                        &test, &uses);
+                    assert(test.calls == 1);
+                    if (test.error) {
+                        assert(result ==
+                               (test.error < 0 ? test.error : HPCLANG_RPL_SPAN_MALFORMED));
+                        assert(!memcmp(&state, &test.before, sizeof state) &&
+                               !memcmp(&uses, &saved, sizeof uses));
+                        continue;
+                    }
+                    assert(!result && state.values.carry == taken && state.control.carry == taken);
+                    if (taken && !displacement) {
+                        assert(state.control.pc == 0x23456 && state.control.cursor == slot);
+                        assert(!state.control.stack[slot] && !state.stack_adjustment[slot]);
+                        assert(uses.count == 1 && uses.addresses[0].value == 0x23456);
+                        assert(uses.addresses[0].generated == (mode == 5 ? 0x123u : 0));
+                        assert(uses.addresses[0].adjustment == (mode == 5 ? 0 : 5));
+                        if (mode != 5)
+                            assert(uses.addresses[0].origins[4] == 44);
+                    } else {
+                        assert(state.control.pc == (taken ? mode == 1 ? 0x109u : 0xfdu : 0x105u));
+                        assert(state.control.cursor == cursor && !uses.count);
+                    }
+                    assert(uses.has_branch == (displacement != 0));
                 }
-                assert(!result && state.values.carry == taken && state.control.carry == taken);
-                if (taken && !displacement) {
-                    assert(state.control.pc == 0x23456 && state.control.cursor == slot);
-                    assert(!state.control.stack[slot] && !state.stack_adjustment[slot]);
-                    assert(uses.count == 1 && uses.addresses[0].value == 0x23456);
-                    assert(uses.addresses[0].generated == (mode == 5 ? 0x123u : 0));
-                    assert(uses.addresses[0].adjustment == (mode == 5 ? 0 : 5));
-                    if (mode != 5)
-                        assert(uses.addresses[0].origins[4] == 44);
-                } else {
-                    assert(state.control.pc == (taken ? mode == 1 ? 0x109u : 0xfdu : 0x105u));
-                    assert(state.control.cursor == cursor && !uses.count);
-                }
-                assert(uses.has_branch == (displacement != 0));
-            }
 }
 
 static void numeric_predicates(void)

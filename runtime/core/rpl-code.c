@@ -21,8 +21,18 @@ int hpclang_rpl_code_predicate_inspect(const struct hpclang_rpl_reader *reader,
     int result = read_word(reader, instruction, 1, &opcode);
     if (result)
         return result;
-    if (opcode != 9)
+    if (opcode != 9 && opcode != 8)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (opcode == 8) {
+        if (limit < 2)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t kind;
+        result = read_word(reader, instruction + 1, 1, &kind);
+        if (result)
+            return result;
+        if (kind != 10 && kind != 11)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
     if (limit < 5)
         return HPCLANG_RPL_SPAN_BOUNDS;
     uint32_t encoded;
@@ -37,12 +47,16 @@ int hpclang_rpl_code_predicate_inspect(const struct hpclang_rpl_reader *reader,
     static const unsigned widths[8] = {1, 1, 1, 3, 1, 12, 2, 16};
     static const unsigned lefts[4] = {0, 1, 2, 3}, rights[4] = {1, 2, 0, 2};
     struct hpclang_rpl_code_predicate next = {.instruction = instruction,
-                                              .first = field ? firsts[field] : p,
-                                              .nibbles = field == 1 ? p + 1 : widths[field],
+                                              .first = opcode == 8 ? 0
+                                                       : field     ? firsts[field]
+                                                                   : p,
+                                              .nibbles = opcode == 8  ? 5
+                                                         : field == 1 ? p + 1
+                                                                      : widths[field],
                                               .left = lefts[operation & 3],
                                               .right = rights[operation & 3],
                                               .displacement = encoded >> 8};
-    if (encoded & 8)
+    if (opcode == 8 ? (encoded & 15) == 11 : (encoded & 8) != 0)
         next.relation = HPCLANG_RPL_CODE_GREATER + operation / 4;
     else {
         next.relation = (operation & 4) ? HPCLANG_RPL_CODE_UNEQUAL : HPCLANG_RPL_CODE_EQUAL;
@@ -618,7 +632,7 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
     result = read_word(instructions, pc, 2, &opcode);
     if (result)
         return result;
-    if ((opcode & 15) == 9) {
+    if ((opcode & 15) == 9 || opcode == 0xa8 || opcode == 0xb8) {
         if (!predicate)
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
         struct hpclang_rpl_code_predicate condition;
