@@ -2949,7 +2949,7 @@ static int retain_bitshift(void *context, const struct hpclang_rpl_code_bitshift
     struct bitshift_test *test = context;
     test->fact = *fact;
     ++test->calls;
-    for (unsigned i = 0; i < fact->shift.nibbles; ++i)
+    for (unsigned i = 0; i < 16; ++i)
         tokens[i] = i == test->missing ? 0 : 0xc00001 + i;
     return test->error;
 }
@@ -2999,7 +2999,7 @@ static void bit_shifts(void)
                         struct bitshift_test test = {.error = mode == 1   ? -77
                                                               : mode == 2 ? 1
                                                                           : 0,
-                                                     .missing = mode == 3 ? last - first : 16};
+                                                     .missing = mode == 3 ? last : 16};
                         const struct hpclang_rpl_code_callbacks callbacks = {
                             .bitshift = mode == 4 ? NULL : retain_bitshift};
                         int result = hpclang_rpl_code_execution_step_observed(
@@ -3020,9 +3020,11 @@ static void bit_shifts(void)
                                         expected.origins.registers[reg][i] = 0;
                                 expected.origins.adjustment[reg] = 0;
                             }
-                            for (unsigned i = first; i <= last; ++i)
-                                expected.origins.registers[reg][i] =
-                                    mode == 4 ? 0 : 0xc00001 + i - first;
+                            for (unsigned i = 0; i < 16; ++i)
+                                if ((i >= first && i <= last) ||
+                                    (first < 5 && before.origins.adjustment[reg] && i < 5))
+                                    expected.origins.registers[reg][i] =
+                                        mode == 4 ? 0 : 0xc00001 + i;
                             assert(!result && !memcmp(&state, &expected, sizeof state));
                             assert(!uses.count && !uses.has_branch);
                         }
@@ -3042,6 +3044,26 @@ static void bit_shifts(void)
                         }
                     }
                 }
+    /* A missing preserved digit is as unsafe as a missing shifted digit. */
+    for (unsigned missing = 0; missing < 5; ++missing) {
+        struct image code = {.data = {8, 1, 9, 6, 0}, .size = 5, .fail = UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {read_nibble, &code};
+        struct hpclang_rpl_code_execution state = {0};
+        state.values.registers[HPCLANG_RPL_CODE_A] = 0xabcde;
+        seed_origins(&state.origins);
+        state.origins.adjustment[HPCLANG_RPL_CODE_A] = 0xfffff;
+        const struct hpclang_rpl_code_execution before = state;
+        struct bitshift_test test = {.missing = missing};
+        const struct hpclang_rpl_code_callbacks callbacks = {.bitshift = retain_bitshift};
+        struct hpclang_rpl_code_step_uses uses, sentinel;
+        memset(&sentinel, 0xa5, sizeof sentinel);
+        uses = sentinel;
+        assert(hpclang_rpl_code_execution_step_observed(&reader, NULL, 5, &state, data_token,
+                                                        &callbacks, &test,
+                                                        &uses) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!memcmp(&state, &before, sizeof state));
+        assert(!memcmp(&uses, &sentinel, sizeof uses));
+    }
     for (unsigned mode = 0; mode < 25; ++mode) {
         struct image code = {.data = {8, 1, 9, 6, 0}, .size = 5, .fail = UINT32_MAX};
         const struct hpclang_rpl_reader reader = {read_nibble, &code};

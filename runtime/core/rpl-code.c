@@ -1057,11 +1057,16 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
             hpclang_rpl_code_bitshift_fn observe = callbacks ? callbacks->bitshift : 0;
             if (observe && (result = observe(context, &fact, tokens)))
                 return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
-            origin_overwrite(&next.origins, reg, ((1u << count) - 1) << first);
-            for (unsigned i = 0; i < count; ++i) {
+            uint32_t affected = ((1u << count) - 1) << first;
+            if (fact.adjustment && first < 5)
+                affected |= 31u;
+            origin_overwrite(&next.origins, reg, affected);
+            for (unsigned i = 0; i < 16; ++i) {
+                if (!(affected & (1u << i)))
+                    continue;
                 if (observe && !tokens[i])
                     return HPCLANG_RPL_SPAN_UNSUPPORTED;
-                next.origins.registers[reg][first + i] = observe ? tokens[i] : 0;
+                next.origins.registers[reg][i] = observe ? tokens[i] : 0;
             }
             next.values.registers[reg] = fact.shift.after;
             next.hst |= fact.shift.lost_bit << 1;

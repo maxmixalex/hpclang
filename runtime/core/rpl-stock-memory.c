@@ -7,6 +7,30 @@
 #include "launch-services.h"
 #include "rpl-code.h"
 
+int hpclang_rpl_stock_p_predict(uint8_t *snapshot, uint32_t size, unsigned p)
+{
+    if (!snapshot)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (size < 0xc60 || p > 15)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint64_t selected = UINT64_C(15) << (4 * p);
+    uint64_t through = UINT64_MAX >> (4 * (15 - p));
+    const uint32_t offsets[] = {0x95c, 0x960, 0x964, 0x99c, 0x9a0, 0x9a4, 0x9a8, 0xa9c, 0xb20};
+    const uint32_t values[] = {p,
+                               4 * p,
+                               4 * p - 32u,
+                               (uint32_t)selected,
+                               (uint32_t)(selected >> 32),
+                               (uint32_t)through,
+                               (uint32_t)(through >> 32),
+                               p,
+                               p + 1};
+    for (unsigned i = 0; i < sizeof offsets / sizeof offsets[0]; ++i)
+        for (unsigned byte = 0; byte < 4; ++byte)
+            snapshot[offsets[i] + byte] = (uint8_t)(values[i] >> (8 * byte));
+    return 0;
+}
+
 static int state_word(const struct hpclang_rpl_reader *state, uint32_t at, unsigned width,
                       uint32_t *word, hpclang_rpl_reference_dependency_fn dependency, void *context)
 {

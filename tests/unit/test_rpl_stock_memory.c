@@ -752,8 +752,37 @@ static void test_bank_window_select(void)
     assert(previous[0] == 0x1e0000 && previous[63] == 0x1ff800);
 }
 
+static void p_field_prediction(void)
+{
+    uint8_t bytes[0xc68], expected[sizeof bytes];
+    for (unsigned p = 0; p < 16; ++p) {
+        memset(bytes, 0xa5, sizeof bytes);
+        memcpy(expected, bytes, sizeof bytes);
+        const unsigned offsets[] = {0x95c, 0x960, 0x964, 0xa9c, 0xb20};
+        const uint32_t values[] = {p, p * 4, p * 4 - 32u, p, p + 1};
+        for (unsigned i = 0; i < 5; ++i)
+            for (unsigned b = 0; b < 4; ++b)
+                expected[offsets[i] + b] = (uint8_t)(values[i] >> (b * 8));
+        memset(expected + 0x99c, 0, 16);
+        for (unsigned digit = 0; digit < 16; ++digit) {
+            if (digit == p)
+                expected[0x99c + digit / 2] |= 15 << (4 * (digit & 1));
+            if (digit <= p)
+                expected[0x9a4 + digit / 2] |= 15 << (4 * (digit & 1));
+        }
+        assert(!hpclang_rpl_stock_p_predict(bytes, sizeof bytes, p));
+        assert(!memcmp(bytes, expected, sizeof bytes));
+        assert(hpclang_rpl_stock_p_predict(bytes, 0xc5f, p) < 0);
+        assert(!memcmp(bytes, expected, sizeof bytes));
+        assert(hpclang_rpl_stock_p_predict(bytes, sizeof bytes, 16 + p) < 0);
+        assert(!memcmp(bytes, expected, sizeof bytes));
+    }
+    assert(hpclang_rpl_stock_p_predict(NULL, sizeof bytes, 0) < 0);
+}
+
 int main(void)
 {
+    p_field_prediction();
     test_execution_capture();
     test_execution_edits();
     test_bank_route();

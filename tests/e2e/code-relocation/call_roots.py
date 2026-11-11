@@ -219,8 +219,8 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         words = verify_entry(observation, (build / "launchers" / f"{args.model}.bin").read_bytes())
         execution = struct.unpack("<31I", home_string(read, b"EXECOBS"))
         if (
-            execution[0:3] != (27, 1, 254)
-            or execution[3] != 0xBC3F
+            execution[0:3] != (28, 1, 258)
+            or execution[3] != 0xBC4B
             or execution[4] != 119
             or not 0 < execution[5] <= 1152
             or not execution[6]
@@ -232,7 +232,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             or execution[12:15] != (3, 0x806F3, 0xFFFF1)
             or execution[15] != 5
             or execution[16:20] != (3, 1, 0x2900, 7)
-            or execution[20:22] != (119, 468)
+            or execution[20:22] != (119, 475)
             or not 0 < execution[22] <= execution[21]
             or execution[23:25] != (29, 2)
             or execution[25:29] != (19, 85, 85, 1)

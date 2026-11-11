@@ -936,8 +936,14 @@ static void continuation_predicates(void)
 
 static void bitshift_sources(void)
 {
-    for (unsigned mode = 0; mode < 9; ++mode) {
+    for (unsigned variant = 0; variant < 18; ++variant) {
+        unsigned mode = variant % 9, adjusted = variant / 9;
         fixture();
+        if (adjusted) {
+            word(0x20000, 0xabcdf);
+            assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards, 512));
+            assert(!hpclang_rpl_reference_edits_begin(&probe.plan, probe.edits, 128));
+        }
         word(11 * 4, 0x08030000);
         const uint8_t code[] = {8, 1, 9, 6, 0, 8, 1, 9, 6, 0};
         for (unsigned i = 0; i < sizeof code; ++i) {
@@ -954,8 +960,16 @@ static void bitshift_sources(void)
             assert(!hpclang_rpl_code_bitshift_inspect(&instructions, 0xbc22 + 5 * index, 5, &values,
                                                       &fact.shift));
             for (unsigned digit = 0; digit < 16; ++digit)
-                fact.origins[digit] = index && digit < 2 ? tokens[digit] : 0x90001 + digit;
+                fact.origins[digit] =
+                    index && digit < (adjusted ? 5u : 2u) ? tokens[digit] : 0x90001 + digit;
+            fact.adjustment = !index && adjusted ? 0xfffff : 0;
             assert(!execution_bitshift(&probe, &fact, tokens));
+            if (!index && adjusted)
+                for (unsigned digit = 2; digit < 5; ++digit) {
+                    uint8_t value = (fact.shift.after >> (4 * digit)) & 15;
+                    assert(tokens[digit] == 0xc00001 + digit);
+                    assert(!execution_payload(&probe, &probe.plan, tokens[digit], value, value));
+                }
             values.registers[HPCLANG_RPL_CODE_A] = fact.shift.after;
         }
         assert(probe.bitshift_count == 2 && tokens[0] == 0xc00011);

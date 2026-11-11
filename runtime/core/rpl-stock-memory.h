@@ -65,6 +65,13 @@ int hpclang_rpl_stock_execution_capture(const struct hpclang_rpl_reader *state, 
                                         hpclang_rpl_reference_dependency_fn dependency,
                                         void *context);
 
+/* Predict P and its native field caches in a caller-owned HP49g+/50g snapshot.
+ * snapshot names at least size writable bytes; size must cover 0xc60 bytes.
+ * Only P, its shift offsets, P/WP masks and field bounds change. No native
+ * access or relocation authority: do not pass live interpreter storage.
+ * p must be 0..15. Invalid arguments leave the snapshot unchanged. */
+int hpclang_rpl_stock_p_predict(uint8_t *snapshot, uint32_t size, unsigned p);
+
 struct hpclang_rpl_stock_rom_bank
 {
     const volatile uint8_t *bytes;

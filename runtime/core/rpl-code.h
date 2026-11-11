@@ -544,7 +544,11 @@ struct hpclang_rpl_code_bitshift_source
     uint32_t p_origin, p_adjustment, origins[16], adjustment;
 };
 /* Each result digit may depend on bits from two input digits. Return nonzero
- * producer tokens for selected digits; no observer leaves them unknown.
+ * producer tokens indexed by absolute register digit for the selected field.
+ * If a nonzero low-five adjustment is invalidated (first < 5), also supply
+ * tokens for all five low digits, including preserved digits outside the field.
+ * Those digits retain their numerical values but need the adjusted input's
+ * complete carry dependencies. No observer leaves affected origins unknown.
  * As with other observers, discard scratch facts after any step error. */
 typedef int (*hpclang_rpl_code_bitshift_fn)(void *context,
                                             const struct hpclang_rpl_code_bitshift_source *fact,
