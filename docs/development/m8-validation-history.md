@@ -5841,3 +5841,23 @@ are /work/nov11-work-cleanup-summary.json and /work/nov11-work-cleanup-audit.jso
 Rebuildable checks should reuse build directories; retain independent input trees
 only when required for sealed validation, and retire intermediates afterward.
 No M8 milestone acceptance changed, and no functional build was restarted for cleanup.
+
+## 2026-11-12 - Retire superseded evidence instead of preserving every experiment
+
+Per the user's correction, a historical documentation link is not a permanent
+retention requirement. Keep full local artifacts only for active dependencies,
+unresolved failures or irreplaceable inputs. Once a change and its regression
+coverage are in main, retain a concise result/commit reference and retire obsolete
+source copies, builds and execution snapshots. Local /work artifacts are not
+implicitly destined for the public repository.
+
+Verified 23a49bbc/c4058b46 and accepted UI delivery cdd6bd86 are ancestors of main
+d47dcf50. Final local reports are complete, and no external symlinks target the
+retired trees. Removed /work/nov04-packed-snapshot (816,168,960 allocated bytes)
+and /work/oct30-stack-pointer (610,836,480 bytes), not archived elsewhere.
+Their prior detailed evidence paths in this historical document are now retired;
+implementation/regression history and concise receipt remain available.
+Receipt: /work/nov12-retired-evidence.json. Volume allocation is now
+38,917,435,392 bytes (36.24 GiB), approximately 4.93 GiB below the initial scan.
+The oct25-watchdog-src cache remains an actual dependency of the active combined
+UI runner, so it was not deleted with these retired experiments.
