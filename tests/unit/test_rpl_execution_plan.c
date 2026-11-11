@@ -491,6 +491,148 @@ static void constant_plans(void)
     }
 }
 
+static void logical_plans(void)
+{
+    const unsigned pairs[8][2] = {{0, 1}, {1, 2}, {2, 0}, {3, 2}, {1, 0}, {2, 1}, {0, 2}, {2, 3}};
+    for (unsigned field = 0; field < 16; ++field) {
+        if (field > 7 && field != 15)
+            continue;
+        for (unsigned op = 0; op < 16; ++op)
+            for (unsigned packed = 0; packed < 2; ++packed) {
+                struct plan_fixture f = {.memory = {0, 14, field, op}};
+                const struct hpclang_rpl_reader reader = {read_cell, &f};
+                struct hpclang_rpl_code_values values = {0};
+                values.registers[pairs[op & 7][0]] = UINT64_C(0x123456789abcdef0);
+                values.registers[pairs[op & 7][1]] = UINT64_C(0xfedcba9876543210);
+                values.registers[HPCLANG_RPL_CODE_P] = f.memory[96] = 3;
+                struct hpclang_rpl_code_logical_source fact = {.p_origin = 97};
+                assert(!hpclang_rpl_code_logical_inspect(&reader, 0, 4, &values, &fact.logical));
+                uint64_t inputs[2] = {fact.logical.left_value, fact.logical.right_value};
+                uint64_t output = inputs[0];
+                for (unsigned i = 0; i < 16; ++i) {
+                    for (unsigned side = 0; side < 2; ++side) {
+                        unsigned at = 32 + 16 * side + i;
+                        fact.origins[side][i] = at + 1;
+                        f.memory[at] = (inputs[side] >> (4 * i)) & 15;
+                    }
+                    if (i < fact.logical.first || i >= fact.logical.first + fact.logical.nibbles)
+                        continue;
+                    for (unsigned side = 0; side < 2; ++side)
+                        inputs[side] ^= (uint64_t)(side ? 5 : 10) << (4 * i);
+                    unsigned a = (inputs[0] >> (4 * i)) & 15;
+                    unsigned b = (inputs[1] >> (4 * i)) & 15;
+                    output = (output & ~(UINT64_C(15) << (4 * i))) |
+                             ((uint64_t)(op < 8 ? a & b : a | b) << (4 * i));
+                }
+                uint8_t saved[128];
+                memcpy(saved, f.memory, sizeof saved);
+                struct hpclang_rpl_reference_edit edits[40];
+                struct hpclang_rpl_reference_edit_builder builder;
+                assert(!(packed ? hpclang_rpl_reference_edits_begin_packed(&builder, edits, 40)
+                                : hpclang_rpl_reference_edits_begin(&builder, edits, 40)));
+                assert(!hpclang_rpl_execution_plan_logical(&builder, &fact, inputs, output, &reader,
+                                                           source_token, resolve_cell, NULL, &f));
+                assert(!memcmp(saved, f.memory, sizeof saved));
+                unsigned cells = 0;
+                for (unsigned n = 0; n < builder.count; ++n) {
+                    assert(edits[n].mapping == 1);
+                    for (unsigned digit = 0; digit < edits[n].width; ++digit) {
+                        unsigned at = edits[n].field + digit;
+                        assert(at < 128 && saved[at] == ((edits[n].expected >> (4 * digit)) & 15));
+                        f.memory[at] = (edits[n].value >> (4 * digit)) & 15;
+                        ++cells;
+                    }
+                }
+                assert(cells == 4 + 2 * fact.logical.nibbles + (field < 2));
+                for (unsigned side = 0; side < 2; ++side) {
+                    uint64_t actual = 0;
+                    for (unsigned digit = 0; digit < 16; ++digit)
+                        actual |= (uint64_t)f.memory[32 + 16 * side + digit] << (4 * digit);
+                    assert(actual == inputs[side]);
+                    values.registers[pairs[op & 7][side]] = actual;
+                }
+                struct hpclang_rpl_code_logical after;
+                assert(!hpclang_rpl_code_logical_inspect(&reader, 0, 4, &values, &after));
+                assert(after.result == output);
+            }
+    }
+    for (unsigned mode = 0; mode < 22; ++mode) {
+        struct plan_fixture f = {.memory = {0, 14, 0, 2}};
+        const struct hpclang_rpl_reader reader = {read_cell, &f};
+        struct hpclang_rpl_code_values values = {0};
+        values.registers[HPCLANG_RPL_CODE_C] = 0; /* AND masks every right input bit. */
+        values.registers[HPCLANG_RPL_CODE_A] = 0xfffff;
+        put(&f, 48, 0xfffff);
+        struct hpclang_rpl_code_logical_source fact = {.p_origin = 97};
+        assert(!hpclang_rpl_code_logical_inspect(&reader, 0, 4, &values, &fact.logical));
+        for (unsigned i = 0; i < 16; ++i) {
+            fact.origins[0][i] = 33 + i;
+            fact.origins[1][i] = 49 + i;
+        }
+        uint64_t inputs[2] = {1, 0xffffe}, output = 0;
+        if (mode == 1)
+            fact.origins[0][0] = 0;
+        if (mode == 2)
+            fact.origins[1][0] = 0;
+        if (mode == 3)
+            fact.p_origin = 0;
+        if (mode == 4)
+            output = 1;
+        if (mode == 5)
+            fact.logical.result = 1;
+        if (mode == 6)
+            fact.logical.disjunction = 1;
+        if (mode == 7)
+            fact.logical.first = 1;
+        if (mode == 8)
+            fact.logical.nibbles = 2;
+        if (mode == 9)
+            fact.logical.length = 3;
+        if (mode == 10)
+            fact.logical.right = 2;
+        if (mode == 11)
+            f.memory[48] = 14;
+        if (mode == 12)
+            fact.p_adjustment = 1;
+        if (mode == 13)
+            fact.logical.p = 16;
+        if (mode == 14)
+            fact.logical.instruction = 0x100000;
+        if (mode == 15)
+            f.memory[3] = 10;
+        if (mode == 16)
+            fact.origins[1][0] = 33; /* physical alias with contradictory value */
+        if (mode == 17 || mode == 18) {
+            f.fail = 6;
+            f.error = mode == 17 ? -77 : 1;
+        }
+        if (mode == 19) {
+            fact.adjustment[1] = 1;
+            put(&f, 48, 0xffffe);
+        }
+        if (mode == 21)
+            fact.adjustment[1] = 0x100000;
+        uint8_t saved[128];
+        memcpy(saved, f.memory, sizeof saved);
+        struct hpclang_rpl_reference_edit edits[20];
+        struct hpclang_rpl_reference_edit_builder builder;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, mode == 20 ? 5 : 20));
+        int result = hpclang_rpl_execution_plan_logical(&builder, &fact, inputs, output, &reader,
+                                                        source_token, resolve_cell, NULL, &f);
+        assert(!memcmp(saved, f.memory, sizeof saved));
+        if (!mode || mode == 19) {
+            assert(!result && builder.count == (mode == 19 ? 11 : 7));
+        } else {
+            assert(result < 0 && !builder.count && builder.error == result);
+            unsigned calls = f.calls;
+            assert(hpclang_rpl_execution_plan_logical(&builder, &fact, inputs, output, &reader,
+                                                      source_token, resolve_cell, NULL,
+                                                      &f) == result);
+            assert(f.calls == calls);
+        }
+    }
+}
+
 static void sum_plans(void)
 {
     for (unsigned mode = 0; mode < 11; ++mode) {
@@ -705,6 +847,7 @@ void test_execution_plans(void)
 {
     native_word_plans();
     sum_plans();
+    logical_plans();
     selected_unit_plans();
     immediate_unit_plans();
     constant_plans();

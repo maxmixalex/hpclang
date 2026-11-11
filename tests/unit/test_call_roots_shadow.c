@@ -934,6 +934,69 @@ static void continuation_predicates(void)
         }
 }
 
+static void logical_sources(void)
+{
+    for (unsigned mode = 0; mode < 12; ++mode) {
+        fixture();
+        word(11 * 4, 0x08030000);
+        const uint8_t code[] = {0, 14, 6, 2};
+        for (unsigned i = 0; i < 4; ++i) {
+            unsigned at = (0xbc1b + i) & 4095, shift = 4 * (at & 1);
+            ram[0x30000 + at / 2] =
+                (uint8_t)((ram[0x30000 + at / 2] & ~(15u << shift)) | (code[i] << shift));
+        }
+        word(0x20010, 7);
+        struct hpclang_rpl_code_values values = {0};
+        values.registers[HPCLANG_RPL_CODE_C] = 0xabcde;
+        values.registers[HPCLANG_RPL_CODE_A] = 7;
+        const struct hpclang_rpl_reader instructions = {execution_plan_read, &probe};
+        struct hpclang_rpl_code_logical_source fact = {0};
+        assert(!hpclang_rpl_code_logical_inspect(&instructions, 0xbc1b, 4, &values, &fact.logical));
+        for (unsigned i = 0; i < 16; ++i) {
+            fact.origins[0][i] = 0x90001 + i;
+            fact.origins[1][i] = 0x90021 + i;
+        }
+        if (mode == 1)
+            fact.logical.instruction++;
+        if (mode == 2)
+            fact.origins[0][0] = 0;
+        if (mode == 3)
+            fact.origins[1][0] = 0;
+        if (mode == 4)
+            fact.logical.result ^= 1;
+        if (mode == 5)
+            fact.logical.disjunction = 1;
+        uint32_t tokens[16] = {0};
+        memcpy(before, ram, sizeof ram);
+        int result = execution_logical(&probe, &fact, tokens);
+        assert(!memcmp(before, ram, sizeof ram));
+        if (mode && mode <= 5) {
+            assert(result < 0 && !probe.logical_count && !tokens[0]);
+            continue;
+        }
+        assert(!result && probe.logical_count == 1 && tokens[0] == 0xb00001 &&
+               tokens[1] == 0xb00002);
+        if (mode == 6)
+            probe.logical_limit = 0;
+        if (mode == 7)
+            probe.logical.origins[0][0] = tokens[0]; /* self-cycle */
+        if (mode == 8)
+            ram[0x20000] ^= 1;
+        if (mode == 9)
+            tokens[0] += 2;
+        uint8_t expected = fact.logical.result & 15;
+        if (mode == 10)
+            expected ^= 1;
+        assert(!hpclang_rpl_reference_edits_begin(&probe.plan, probe.edits, 128));
+        memcpy(before, ram, sizeof ram);
+        result = execution_payload(&probe, &probe.plan, tokens[0], expected,
+                                   mode == 11 ? expected ^ 1 : expected);
+        assert(!memcmp(before, ram, sizeof ram));
+        assert(mode ? result < 0 : !result);
+        assert(probe.logical_limit == (mode == 6 ? 0u : 1u));
+    }
+}
+
 static void immediate_unit_source(void)
 {
     for (unsigned mode = 0; mode < 8; ++mode) {
@@ -1212,6 +1275,7 @@ int main(void)
     late_scratch_clear();
     adjacent_stack_store();
     continuation_predicates();
+    logical_sources();
     dispatch_root_relations();
     sum_source();
     overlapping_store();

@@ -705,6 +705,8 @@ struct execution_probe
     unsigned unit_count, unit_limit;
     struct hpclang_rpl_code_sum_source sums[8];
     unsigned sum_count, sum_limit;
+    struct hpclang_rpl_code_logical_source logical;
+    unsigned logical_count, logical_limit;
     struct hpclang_rpl_code_native_word native_words[16];
     unsigned native_word_count, native_word_limit, dispatch_roots_checked;
     struct hpclang_rpl_code_store native_saves[2];
@@ -923,6 +925,23 @@ static int execution_payload(void *context, struct hpclang_rpl_reference_edit_bu
                              uint32_t token, uint8_t expected, uint8_t replacement)
 {
     struct execution_probe *probe = context;
+    if (token >= 0xb00001) {
+        unsigned digit = token - 0xb00001;
+        const struct hpclang_rpl_code_logical_source *fact = &probe->logical;
+        if (probe->logical_count != 1 || probe->logical_limit != 1 ||
+            digit >= fact->logical.nibbles || replacement != expected)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (((fact->logical.result >> (4 * (fact->logical.first + digit))) & 15) != expected)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        probe->logical_limit = 0;
+        const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
+        const uint64_t inputs[2] = {fact->logical.left_value, fact->logical.right_value};
+        int result = hpclang_rpl_execution_plan_logical(builder, fact, inputs, fact->logical.result,
+                                                        &instructions, execution_token,
+                                                        execution_source, execution_payload, probe);
+        probe->logical_limit = 1;
+        return result;
+    }
     if (token >= 0xa00001) {
         unsigned index = (token - 0xa00001) / 16, digit = (token - 0xa00001) % 16;
         if (index >= probe->native_word_count || index >= probe->native_word_limit || digit >= 8)
@@ -1304,6 +1323,28 @@ static int execution_sum(void *context, const struct hpclang_rpl_code_sum_source
     return 0;
 }
 
+static int execution_logical(void *context, const struct hpclang_rpl_code_logical_source *fact,
+                             uint32_t tokens[16])
+{
+    struct execution_probe *probe = context;
+    if (probe->logical_count || fact->logical.instruction != 0xbc1b ||
+        fact->logical.left != HPCLANG_RPL_CODE_C || fact->logical.right != HPCLANG_RPL_CODE_A ||
+        fact->logical.first || fact->logical.nibbles != 2 || fact->logical.disjunction)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
+    const uint64_t inputs[2] = {fact->logical.left_value, fact->logical.right_value};
+    int result = hpclang_rpl_execution_plan_logical(
+        &probe->plan, fact, inputs, fact->logical.result, &instructions, execution_token,
+        execution_source, execution_payload, probe);
+    if (result)
+        return result;
+    probe->logical = *fact;
+    for (unsigned i = 0; i < fact->logical.nibbles; ++i)
+        tokens[i] = 0xb00001 + i;
+    probe->logical_count = probe->logical_limit = 1;
+    return 0;
+}
+
 static int execution_native_word(void *context, const struct hpclang_rpl_code_native_word *fact,
                                  uint32_t tokens[8])
 {
@@ -1477,12 +1518,12 @@ static int execution_visit(void *context, uint32_t pc,
             return result;
         probe->dispatch_roots_checked = 1;
     }
-    return state->control.pc == 0xbc1b && probe->dispatch_roots_checked &&
-           probe->native_word_count == 16 && probe->bank_writes == 2 &&
-           probe->expression_uses == 1 && probe->stores == 19 && probe->configurations == 4 &&
-           probe->unconfigurations == 2 && probe->predicates == 6 && probe->constant_count == 7 &&
-           probe->unit_count == 3 && probe->sum_count == 8 && probe->expression_count == 3 &&
-           probe->native_save_count == 2 && probe->scan_reads == 2;
+    return state->control.pc == 0xbc1f && probe->logical_count == 1 &&
+           probe->dispatch_roots_checked && probe->native_word_count == 16 &&
+           probe->bank_writes == 2 && probe->expression_uses == 1 && probe->stores == 19 &&
+           probe->configurations == 4 && probe->unconfigurations == 2 && probe->predicates == 6 &&
+           probe->constant_count == 7 && probe->unit_count == 3 && probe->sum_count == 8 &&
+           probe->expression_count == 3 && probe->native_save_count == 2 && probe->scan_reads == 2;
     /* This selected boundary is not a complete relocation certificate. */
 }
 
@@ -1884,8 +1925,9 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                                                          .unconfig = execution_unconfig,
                                                          .native_word = execution_native_word,
                                                          .native_scan = execution_scan,
-                                                         .native_scan_max_reads = 2};
-    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 247,
+                                                         .native_scan_max_reads = 2,
+                                                         .logical = execution_logical};
+    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 248,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count ||
@@ -1977,7 +2019,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 253)
         goto done;
-    uint32_t words[31] = {23,
+    uint32_t words[31] = {24,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,
