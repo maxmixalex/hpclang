@@ -287,7 +287,7 @@ int hpclang_rpl_code_unit_inspect(const struct hpclang_rpl_reader *reader, uint3
     int result = read_word(reader, instruction, 1, &opcode);
     if (result)
         return result;
-    if (opcode != 10 && opcode != 11)
+    if (opcode != 8 && opcode != 10 && opcode != 11)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     if (limit < 3)
         return HPCLANG_RPL_SPAN_BOUNDS;
@@ -296,24 +296,49 @@ int hpclang_rpl_code_unit_inspect(const struct hpclang_rpl_reader *reader, uint3
     if (result)
         return result;
     unsigned field = fields & 15, operation = fields >> 4, decrement = opcode == 10;
-    if (field >= 8 || (decrement ? operation < 12 : operation < 4 || operation > 7))
-        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned length = 3, amount = 1, reg;
+    if (opcode == 8) {
+        if (fields != 0x81)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (limit < 6)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(reader, instruction + 3, 3, &fields);
+        if (result)
+            return result;
+        field = fields & 15;
+        operation = (fields >> 4) & 15;
+        if ((field >= 8 && field != 15) || (operation & 7) > 3)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        decrement = operation >> 3;
+        reg = operation & 3;
+        amount = (fields >> 8) + 1;
+        length = 6;
+    } else {
+        if (field >= 8 || (decrement ? operation < 12 : operation < 4 || operation > 7))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        reg = operation - (decrement ? 12 : 4);
+    }
     if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->decimal > 1)
         return HPCLANG_RPL_SPAN_MALFORMED;
     static const unsigned firsts[8] = {0, 0, 2, 0, 15, 3, 0, 0},
                           widths[8] = {1, 1, 1, 3, 1, 12, 2, 16};
     unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
     struct hpclang_rpl_code_unit next = {.instruction = instruction,
-                                         .length = 3,
-                                         .reg = operation - (decrement ? 12 : 4),
-                                         .first = field ? firsts[field] : p,
-                                         .nibbles = field == 1 ? p + 1 : widths[field],
+                                         .length = length,
+                                         .reg = reg,
+                                         .first = field == 15 ? 0
+                                                  : field     ? firsts[field]
+                                                              : p,
+                                         .nibbles = field == 15  ? 5
+                                                    : field == 1 ? p + 1
+                                                                 : widths[field],
                                          .decrement = decrement,
                                          .decimal = values->decimal,
-                                         .carry = 1,
+                                         .carry = amount,
                                          .p = p};
     next.before = next.after = values->registers[next.reg];
-    unsigned radix = next.decimal ? 10 : 16;
+    /* 818frk uses binary arithmetic even when Saturn decimal mode is set. */
+    unsigned radix = opcode != 8 && next.decimal ? 10 : 16;
     for (unsigned i = next.first; i < next.first + next.nibbles; ++i) {
         unsigned digit = (next.before >> (4 * i)) & 15;
         if (digit >= radix)
@@ -327,7 +352,7 @@ int hpclang_rpl_code_unit_inspect(const struct hpclang_rpl_reader *reader, uint3
             digit += next.carry;
             next.carry = digit >= radix;
             if (next.carry)
-                digit = 0;
+                digit -= radix;
         }
         next.after = (next.after & ~(UINT64_C(15) << (4 * i))) | ((uint64_t)digit << (4 * i));
     }

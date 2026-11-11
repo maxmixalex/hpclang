@@ -546,6 +546,45 @@ static void selected_unit_plans(void)
     }
 }
 
+static void immediate_unit_plans(void)
+{
+    for (unsigned mode = 0; mode < 7; ++mode) {
+        struct plan_fixture f = {0};
+        const uint8_t code[] = {8, 1, 8, 15, 9, 4};
+        memcpy(f.memory, code, sizeof code);
+        put(&f, 32, 10);
+        const struct hpclang_rpl_reader reader = {read_cell, &f};
+        struct hpclang_rpl_code_values values = {.decimal = 1};
+        values.registers[HPCLANG_RPL_CODE_B] = 10;
+        struct hpclang_rpl_code_unit fact;
+        assert(!hpclang_rpl_code_unit_inspect(&reader, 0, 6, &values, &fact));
+        for (unsigned i = 0; i < 5; ++i)
+            fact.origins[i] = 33 + i;
+        uint64_t input = 11, output = 6;
+        if (mode == 1)
+            ++output;
+        if (mode == 2)
+            fact.origins[0] = 0;
+        if (mode == 3)
+            ++f.memory[5];
+        if (mode == 5)
+            fact.carry = 1;
+        if (mode == 6) {
+            input = 4;
+            output = 0xfffff;
+        }
+        struct hpclang_rpl_reference_edit edits[16];
+        struct hpclang_rpl_reference_edit_builder builder;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, mode == 4 ? 10 : 16));
+        int result = hpclang_rpl_execution_plan_unit(&builder, &fact, input, output, &reader,
+                                                     source_token, resolve_cell, NULL, &f);
+        if (mode)
+            assert(result < 0 && !builder.count && builder.error == result);
+        else
+            assert(!result && builder.count == 11);
+    }
+}
+
 static void native_word_plans(void)
 {
     const uint32_t values[] = {0, 0xfffff, 0x100000, UINT32_MAX};
@@ -617,6 +656,7 @@ void test_execution_plans(void)
     native_word_plans();
     sum_plans();
     selected_unit_plans();
+    immediate_unit_plans();
     constant_plans();
     predicate_plans();
     subtraction_plans();

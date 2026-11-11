@@ -510,7 +510,10 @@ struct hpclang_rpl_code_unit
     uint32_t instruction, length, reg, first, nibbles, decrement, decimal, carry;
     uint32_t p, p_origin, p_adjustment, origins[16], adjustment;
 };
-/* Inspect AfC..AfF decrements and Bf4..Bf7 increments, f=0..7. Selected BCD
+/* Inspect AfC..AfF decrements and Bf4..Bf7 increments, f=0..7, and binary
+ * 818frk additions/subtractions of k+1 (r=0..3/8..11, f=0..7 or address field F).
+ * The immediate form ignores decimal mode. Other field extensions are unsupported.
+ * Selected BCD
  * digits must be canonical. carry is normalized truth (native ROM may encode
  * a true carry as a nonzero mask); the numerical result preserves other digits.
  * Origin fields are zero here; the execution observer fills captured provenance.

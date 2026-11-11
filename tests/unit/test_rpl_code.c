@@ -3798,6 +3798,66 @@ static void selected_unit_steps(void)
             }
 }
 
+static void immediate_unit_steps(void)
+{
+    static const unsigned fields[] = {0, 1, 2, 3, 4, 5, 6, 7, 15};
+    static const unsigned firsts[] = {0, 0, 2, 0, 15, 3, 0, 0};
+    static const unsigned widths[] = {1, 1, 1, 3, 1, 12, 2, 16};
+    for (unsigned f = 0; f < 9; ++f)
+        for (unsigned p = 0; p < 16; p += 15)
+            for (unsigned operation = 0; operation < 16; ++operation) {
+                if ((operation & 7) > 3)
+                    continue;
+                for (unsigned amount = 1; amount <= 16; ++amount)
+                    for (unsigned decimal = 0; decimal < 2; ++decimal)
+                        for (unsigned edge = 0; edge < 2; ++edge) {
+                            unsigned field = fields[f], reg = operation & 3;
+                            unsigned first = field == 15 ? 0 : field ? firsts[field] : p;
+                            unsigned width = field == 15 ? 5 : field == 1 ? p + 1 : widths[field];
+                            uint64_t mask =
+                                width == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * width)) - 1;
+                            uint64_t value = edge ? UINT64_MAX : 0,
+                                     operand = (value >> (4 * first)) & mask;
+                            unsigned decrement = operation >> 3;
+                            unsigned carry = decrement ? operand < amount
+                                                       : amount > mask || operand > mask - amount;
+                            uint64_t result =
+                                (decrement ? operand - amount : operand + amount) & mask;
+                            result = (value & ~(mask << (4 * first))) | (result << (4 * first));
+                            struct image image = {.data = {8, 1, 8, field, operation, amount - 1},
+                                                  .size = 6,
+                                                  .fail = UINT32_MAX};
+                            const struct hpclang_rpl_reader reader = {read_nibble, &image};
+                            struct hpclang_rpl_code_execution state = {0};
+                            state.values.registers[reg] = value;
+                            state.values.registers[HPCLANG_RPL_CODE_P] = p;
+                            state.values.decimal = decimal;
+                            seed_origins(&state.origins);
+                            struct unit_test test = {0};
+                            const struct hpclang_rpl_code_callbacks callbacks = {.unit =
+                                                                                     retain_unit};
+                            struct hpclang_rpl_code_step_uses uses;
+                            assert(!hpclang_rpl_code_execution_step_observed(
+                                &reader, &reader, 6, &state, data_token, &callbacks, &test, &uses));
+                            assert(test.calls == 1 && test.fact.length == 6 &&
+                                   test.fact.first == first && test.fact.nibbles == width);
+                            assert(state.values.registers[reg] == result && state.control.pc == 6 &&
+                                   state.control.carry == carry);
+                            for (unsigned i = first; i < first + width; ++i)
+                                assert(state.origins.registers[reg][i] == 0x700001 + i - first);
+                            struct hpclang_rpl_code_unit fact, saved;
+                            memset(&fact, 0x77, sizeof fact);
+                            saved = fact;
+                            for (unsigned i = 0; i < 6; ++i) {
+                                image.fail = i;
+                                assert(hpclang_rpl_code_unit_inspect(&reader, 0, 6, &state.values,
+                                                                     &fact) < 0);
+                                assert(!memcmp(&fact, &saved, sizeof fact));
+                            }
+                        }
+            }
+}
+
 struct constant_test
 {
     unsigned calls, missing;
@@ -3990,6 +4050,7 @@ int main(void)
     sum_inspection();
     sum_steps();
     selected_unit_steps();
+    immediate_unit_steps();
     constant_steps();
     predicate_steps();
     numeric_predicates();
