@@ -5861,3 +5861,22 @@ Receipt: /work/nov12-retired-evidence.json. Volume allocation is now
 38,917,435,392 bytes (36.24 GiB), approximately 4.93 GiB below the initial scan.
 The oct25-watchdog-src cache remains an actual dependency of the active combined
 UI runner, so it was not deleted with these retired experiments.
+
+
+## 2026-11-12 — Sum provenance integrated; allocation delivery accepted
+
+Local commit `52b0b6ee` adds sum-source callbacks and repair planning, including
+aliased operands, carry/P constraints and bounded recursive source resolution.
+The maintained HP49g+/HP50g Stock fixture now reaches 101 steps (`0xb2c2`),
+with 41 address uses and 177 source constraints. Both models pass execution,
+catalog and return checks with unchanged sealed inputs. Fourteen sanitizer
+targets, six launcher payload checks, ARM analysis, Ruff and strict docs pass.
+The existing 41,472-case ROM matrix and two-model movement replay also pass.
+Current local reports are in `/work/nov06-sum`; they are active validation
+artifacts, not permanent archival requirements. Production Stage1 remains
+at `0x67d2`; this does not complete production reference coverage or M8.0.
+
+PR #13 (`30cdca4f`) is merged as `91c631c8`, after all 12 exact-head workflows
+passed (390 successful jobs and two intentional publisher skips). It accepts
+native allocation budgets and Stock release checks, not all M8.2/M8.3 gates.
+The sum-source batch is local only; PR #31's earlier USB failure remains open.
