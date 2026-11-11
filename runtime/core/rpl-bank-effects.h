@@ -26,6 +26,21 @@ struct hpclang_rpl_bank_effects
  * frame. This is a prediction primitive, not execution/mutation authority. */
 int hpclang_rpl_config_predict(const uint8_t state[0xc60], uint32_t c, uint8_t output[0xc60]);
 
+struct hpclang_rpl_bank_write
+{
+    uint32_t lower, upper, unchanged;
+};
+/* Classify the reviewed native memory-write dispatch using a stable full CPU
+ * snapshot. The higher-priority IO window at 0xba0 must not match; the bank
+ * window at 0xbb0 must match. The address, not the written data, selects banks.
+ * unchanged means the native selector handler returns before touching maps.
+ * Otherwise use the separately qualified bank-effects model; this function
+ * neither predicts those maps nor grants device/mutation authority. Caller
+ * guards ROM identity and native words 0xba0, 0xbb0, 0xbcc and 0xbd0. Errors
+ * preserve output. No reads through native pointers, writes or allocation. */
+int hpclang_rpl_bank_write_inspect(const uint8_t state[0xc60], uint32_t address,
+                                   struct hpclang_rpl_bank_write *output);
+
 struct hpclang_rpl_bank_cpu_effects
 {
     /* Native-state byte slice [0x90c,0x99c): A..R4, D0/D1/P, flags,

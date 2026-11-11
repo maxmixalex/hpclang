@@ -12,6 +12,22 @@ static void cpu_put(uint8_t *bytes, uint32_t value)
         bytes[i] = (uint8_t)(value >> (8u * i));
 }
 
+int hpclang_rpl_bank_write_inspect(const uint8_t state[0xc60], uint32_t address,
+                                   struct hpclang_rpl_bank_write *output)
+{
+    if (!state || !output)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address > 0xfffff)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (cpu_word(state + 0xba0) == address >> 6 || cpu_word(state + 0xbb0) != address >> 12)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_bank_write next = {.lower = (address >> 5) & 3,
+                                          .upper = (address >> 1) & 15};
+    next.unchanged = cpu_word(state + 0xbcc) == next.lower && cpu_word(state + 0xbd0) == next.upper;
+    *output = next;
+    return 0;
+}
+
 int hpclang_rpl_config_predict(const uint8_t state[0xc60], uint32_t c, uint8_t output[0xc60])
 {
     if (!state || !output)

@@ -248,8 +248,43 @@ static void test_config(void)
     assert(hpclang_rpl_config_predict(f.bytes, 0, NULL) == HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+static void test_bank_write(void)
+{
+    struct fixture f = {0};
+    set_word(&f, 0xba0, UINT32_MAX);
+    set_word(&f, 0xbb0, 0x7f);
+    for (unsigned offset = 0; offset < 4096; ++offset) {
+        unsigned lower = (offset >> 5) & 3, upper = (offset >> 1) & 15;
+        set_word(&f, 0xbcc, lower);
+        set_word(&f, 0xbd0, upper);
+        struct hpclang_rpl_bank_write result;
+        assert(!hpclang_rpl_bank_write_inspect(f.bytes, 0x7f000 + offset, &result));
+        assert(result.lower == lower && result.upper == upper && result.unchanged);
+        set_word(&f, 0xbd0, upper ^ 1);
+        assert(!hpclang_rpl_bank_write_inspect(f.bytes, 0x7f000 + offset, &result));
+        assert(!result.unchanged);
+        set_word(&f, 0xbd0, upper);
+        set_word(&f, 0xbcc, lower ^ 1);
+        assert(!hpclang_rpl_bank_write_inspect(f.bytes, 0x7f000 + offset, &result));
+        assert(!result.unchanged);
+    }
+    const struct hpclang_rpl_bank_write saved = {91, 92, 93};
+    struct hpclang_rpl_bank_write result = saved;
+    set_word(&f, 0xba0, 0x7f024 >> 6);
+    assert(hpclang_rpl_bank_write_inspect(f.bytes, 0x7f024, &result) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&saved, &result, sizeof result));
+    set_word(&f, 0xba0, UINT32_MAX);
+    assert(hpclang_rpl_bank_write_inspect(f.bytes, 0x80000, &result) < 0);
+    assert(hpclang_rpl_bank_write_inspect(f.bytes, 0x100000, &result) < 0);
+    assert(hpclang_rpl_bank_write_inspect(NULL, 0x7f024, &result) < 0);
+    assert(hpclang_rpl_bank_write_inspect(f.bytes, 0x7f024, NULL) < 0);
+    assert(!memcmp(&saved, &result, sizeof result));
+}
+
 int main(void)
 {
+    test_bank_write();
     test_config();
     test_cpu_capture();
     test_cpu();
