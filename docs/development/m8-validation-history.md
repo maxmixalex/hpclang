@@ -6115,3 +6115,21 @@ repair-plan or Stock qualification for the extended path; maintained Stock
 remains at 101 steps. Current reports reuse `/work/nov06-sum/fixed-predicates`
 and `/work/nov06-sum/fixed-continuation`. PR #31 head `5d4cb7bd` was submitted
 in the preceding turn; this local follow-up has not been pushed.
+
+
+## 2026-11-12 — Seventh store and second CONFIG replay
+
+Both fixed-predicate continuations pass a common 187-cell repair plan for all
+42 consumed addresses. Actual catalog movement then replays all 106 original-ROM
+transitions and verifies 37 final stored digits, unchanged Flash, matching native
+configuration and four zero-write rejection controls per model. Current reports:
+`/work/nov06-sum/fixed-plan/plan.json` and `fixed-writeback/writeback.json`.
+The retained computed-copy negative controls explicitly target the sixth store;
+the seventh store adds five ordinary physical-source digits.
+
+The second CONFIG at `0xb2d1` changes flags 35 to 7 and the native I/O dispatch
+window at offset `0xbb0` from `0xffffffff` to `0x7f`. Original-ROM full-state
+comparison establishes this transition; it is not equivalent to the first
+flags-only CONFIG. The maintained Stock fixture currently rejects it and remains
+at 101 steps. Its simulated configuration and I/O access qualification must be
+extended before importing the longer path. Production closure remains open.
