@@ -5817,3 +5817,27 @@ unselected digits. ARM analysis passes; the sum inspector's individual frame is
 120 bytes, not an aggregate stack guarantee. Evidence: /work/nov06-binary/{unit.log,
 code-analysis.json}. The prior 92-step relocation and maintained Stock checkpoint
 remains the accepted local bound; dual-operand provenance and repair are next.
+
+## 2026-11-12 - Container volume cleanup
+
+The existing container had exited 137 three days before inspection; it was restarted
+only after confirming no previous validation process remained live. Volume
+hpclang-usb-dev-work is mounted at /work. Initial internal allocation was 44,211,208,192
+bytes; cleanup leaves 40,343,937,024 bytes, freeing 3,867,271,168 bytes (3.60 GiB).
+This is volume allocation, not Windows virtual-disk compaction or a Docker size limit.
+
+Removed 52,184 dated-workspace CMake intermediate object/dependency files after
+checking their enclosing CMakeCache and recording hashes/rebuild paths (959 MiB).
+Compressed 541 historical October kermit.log files, verifying decompression against
+the original SHA-256 before removal (1.93 GiB). Restore an individual original with
+`gzip -dk /work/.../kermit.log.gz` before using a reader that requires its old path.
+Released allocated all-zero blocks from 4,882 snapshot/media files using fallocate
+--dig-holes, checking unchanged file size and SHA-256 (777 MiB). These snapshots
+retain their original paths and byte contents. Font sources, ROM evidence,
+toolchains, final applications, uncommitted host changes and reports are retained.
+
+The per-file journal is /work/nov11-work-cleanup.jsonl; summary and independent audit
+are /work/nov11-work-cleanup-summary.json and /work/nov11-work-cleanup-audit.json.
+Rebuildable checks should reuse build directories; retain independent input trees
+only when required for sealed validation, and retire intermediates afterward.
+No M8 milestone acceptance changed, and no functional build was restarted for cleanup.

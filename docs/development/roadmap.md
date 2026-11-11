@@ -9,7 +9,7 @@ Accepted main: `d47dcf50` (original HPGCC filesystem gates #19, native execution
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
-Container housekeeping: removed 16,962 inactive CMake object files (313 MiB allocated blocks); sources, final artifacts, saved-state evidence and active validations retained. Manifest: `/work/nov04-old-object-cleanup.json`.
+Container housekeeping (2026-11-12): internal cleanup reduced volume allocation from 41.18 GiB to 37.57 GiB (3.60 GiB freed). Removed 52,184 rebuildable CMake intermediates, compressed 541 historical Kermit logs, and released zero blocks in 4,882 snapshots without changing their bytes. Sources, toolchains and final evidence retained. Manifest: `/work/nov11-work-cleanup.jsonl`.
 
 ## Scope and retained requirements
 
