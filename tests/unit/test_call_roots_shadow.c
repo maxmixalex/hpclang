@@ -420,6 +420,79 @@ static void unconfiguration(void)
     }
 }
 
+static void reconfiguration_cycle(void)
+{
+    for (unsigned mode = 0; mode < 9; ++mode) {
+        struct hpclang_rpl_code_store source = fixture();
+        word(0xb9c, 3);
+        word(0xbcc, 1);
+        word(0xbd0, 2);
+        word(0x7f * 4, 0x08010000);
+        word(0x404 + 0x7f * 4, 0x08010000);
+        word(0x20008, 0x7f024);
+        assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards, 1152));
+        struct hpclang_rpl_code_configuration config = {.instruction = 0xb247,
+                                                        .value = (uint32_t)source.value};
+        memcpy(config.origins, source.origins, sizeof config.origins);
+        assert(!execution_config(&probe, &config));
+        config.instruction = 0xb2d1;
+        config.value = 0x7f024;
+        for (unsigned i = 0; i < 5; ++i)
+            config.origins[i] = 0x90011 + i;
+        assert(!execution_config(&probe, &config));
+        struct hpclang_rpl_code_store bank = {
+            .instruction = 0xb2d7, .nibbles = 2, .address = {.value = config.value}};
+        memcpy(bank.address.origins, config.origins, sizeof config.origins);
+        assert(!execution_bank_write(&probe, &bank));
+        config.instruction = 0xb2da;
+        assert(!execution_unconfig(&probe, &config));
+        probe.stores = 15;
+        config.instruction = 0xb371;
+        if (mode == 1)
+            probe.unconfigurations = 0;
+        if (mode == 2)
+            probe.stores = 14;
+        if (mode == 3)
+            probe.bank_writes = 0;
+        if (mode == 4)
+            config.instruction++;
+        if (mode == 5)
+            config.origins[0] = 0;
+        if (mode == 6)
+            probe.native_after[0x123] ^= 1;
+        if (mode == 7)
+            probe.native_after[0xb9c] = 7;
+        if (mode == 8)
+            probe.builder.capacity = 0;
+        memcpy(before, ram, sizeof ram);
+        int result = execution_config(&probe, &config);
+        assert(!memcmp(before, ram, sizeof ram));
+        if (mode) {
+            assert(result < 0 && probe.configurations == 2);
+            continue;
+        }
+        assert(!result && probe.configurations == 3 && probe.native_after[0xb9c] == 35);
+        config.instruction = 0xb376;
+        assert(!execution_config(&probe, &config) && probe.configurations == 4);
+        uint8_t value;
+        uint32_t token;
+        struct hpclang_rpl_code_origin_cell cell;
+        assert(execution_shadow_value(&probe, 0x7f000, &value, &token) < 0);
+        assert(execution_write_cell(&probe, 0x7f000, &cell) < 0);
+        bank.instruction = 0xb37c;
+        assert(!execution_bank_write(&probe, &bank) && probe.bank_writes == 2);
+        assert(execution_bank_write(&probe, &bank) < 0);
+        config.instruction = 0xb37f;
+        assert(!execution_unconfig(&probe, &config) && probe.unconfigurations == 2);
+        assert(!memcmp(probe.native_after, ram, sizeof probe.native_after));
+        assert(!execution_shadow_value(&probe, 0x7f000, &value, &token));
+        assert(!execution_write_cell(&probe, 0x7f000, &cell));
+        assert(execution_unconfig(&probe, &config) < 0);
+        assert(execution_config(&probe, &config) < 0);
+        assert(!memcmp(before, ram, sizeof ram));
+    }
+}
+
 static void bank_write(void)
 {
     for (unsigned mode = 0; mode < 6; ++mode) {
@@ -856,6 +929,7 @@ int main(void)
     later_stores();
     boundary_address();
     unconfiguration();
+    reconfiguration_cycle();
     bank_write();
     constant_source();
     unit_source();

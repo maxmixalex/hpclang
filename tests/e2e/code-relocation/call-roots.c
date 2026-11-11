@@ -850,7 +850,8 @@ static int execution_shadow_value(void *context, uint32_t at, uint8_t *value, ui
     struct execution_probe *probe = context;
     /* The second qualified CONFIG activates this I/O window. Its contents
      * cannot be read through the original ordinary-memory mapping. */
-    if (probe->configurations == 2 && !probe->unconfigurations && (at >> 12) == 0x7f)
+    if ((probe->configurations == 2 * (probe->unconfigurations + 1)) && probe->configurations &&
+        (at >> 12) == 0x7f)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     if (at >= 0x100000)
         return HPCLANG_RPL_SPAN_BOUNDS;
@@ -893,7 +894,8 @@ static int execution_collect_observe(void *context, unsigned space, uint32_t at,
 static int execution_write_cell(struct execution_probe *probe, uint32_t at,
                                 struct hpclang_rpl_code_origin_cell *cell)
 {
-    if (probe->configurations == 2 && !probe->unconfigurations && (at >> 12) == 0x7f)
+    if ((probe->configurations == 2 * (probe->unconfigurations + 1)) && probe->configurations &&
+        (at >> 12) == 0x7f)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     uint32_t words[3] = {0};
     const uint32_t offsets[3] = {0x404 + 4 * (at >> 12), 0xba0, 0xbb0};
@@ -1051,9 +1053,10 @@ static int execution_payload(void *context, struct hpclang_rpl_reference_edit_bu
 static int execution_bank_write(struct execution_probe *probe,
                                 const struct hpclang_rpl_code_store *store)
 {
-    if (probe->bank_writes || probe->configurations != 2 || store->instruction != 0xb2d7 ||
-        store->first || store->nibbles != 2 ||
-        execution_shift(probe, store->address.value) != store->address.value)
+    if (probe->bank_writes >= 2 || probe->configurations != 2 * (probe->bank_writes + 1) ||
+        probe->unconfigurations != probe->bank_writes ||
+        store->instruction != (probe->bank_writes ? 0xb37cu : 0xb2d7u) || store->first ||
+        store->nibbles != 2 || execution_shift(probe, store->address.value) != store->address.value)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     const uint32_t offsets[] = {0xba0, 0xbb0, 0xbcc, 0xbd0};
     for (unsigned word = 0; word < 4; ++word)
@@ -1079,7 +1082,7 @@ static int execution_bank_write(struct execution_probe *probe,
 static int execution_store(void *context, const struct hpclang_rpl_code_store *store)
 {
     struct execution_probe *probe = context;
-    if (store->instruction == 0xb2d7)
+    if (store->instruction == 0xb2d7 || store->instruction == 0xb37c)
         return execution_bank_write(probe, store);
     const unsigned count = store->nibbles;
     /* Fifteen effects observed in the original ROM continuation. This finite
@@ -1444,8 +1447,8 @@ static int execution_visit(void *context, uint32_t pc,
         probe->derived_source = first - 1;
         probe->adjustment = use->adjustment;
     }
-    return state->control.pc == 0xb371 && probe->bank_writes == 1 && probe->expression_uses == 1 &&
-           probe->stores == 15 && probe->configurations == 2 && probe->unconfigurations == 1 &&
+    return state->control.pc == 0x3130 && probe->bank_writes == 2 && probe->expression_uses == 1 &&
+           probe->stores == 15 && probe->configurations == 4 && probe->unconfigurations == 2 &&
            probe->predicates == 4 && probe->constant_count == 6 && probe->unit_count == 3 &&
            probe->sum_count == 8 && probe->expression_count == 3 && probe->native_save_count == 2 &&
            probe->scan_reads == 2;
@@ -1458,9 +1461,12 @@ static int execution_visit(void *context, uint32_t pc,
 static int execution_config(void *context, const struct hpclang_rpl_code_configuration *config)
 {
     struct execution_probe *probe = context;
-    if (probe->configurations >= 2 ||
-        config->instruction != (probe->configurations ? 0xb2d1u : 0xb247u))
+    static const uint32_t pcs[] = {0xb247, 0xb2d1, 0xb371, 0xb376};
+    if (probe->configurations >= 4 || config->instruction != pcs[probe->configurations] ||
+        probe->unconfigurations != probe->configurations / 2 ||
+        (probe->configurations >= 2 && (probe->bank_writes != 1 || probe->stores != 15)))
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned phase = probe->configurations & 1;
     const struct hpclang_rpl_code_store source = {
         .nibbles = 5, .value = config->value, .adjustment = config->adjustment};
     struct hpclang_rpl_code_store input = source;
@@ -1475,20 +1481,25 @@ static int execution_config(void *context, const struct hpclang_rpl_code_configu
         if (!execution_native_read(probe, at * 2, &low) ||
             !execution_native_read(probe, at * 2 + 1, &high))
             return HPCLANG_RPL_SPAN_UNAVAILABLE;
-        probe->native_after[at] = low | (high << 4);
+        uint8_t original = low | (high << 4);
+        if (at == 0xb9c && original != 3)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (probe->configurations &&
+            probe->native_after[at] != (at == 0xb9c && phase ? 35 : original))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (!probe->configurations)
+            probe->native_after[at] = original;
     }
-    if (probe->native_after[0xb9c] != 3)
+    if (probe->native_after[0xb9c] != (phase ? 35 : 3))
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
-    if (probe->configurations)
-        probe->native_after[0xb9c] = 35; /* First CONFIG's qualified flags-only effect. */
     /* The predictor permits exact input/output aliasing. Original bytes remain
      * guarded in native memory, so a second full snapshot is unnecessary. */
     result = hpclang_rpl_config_predict(probe->native_after, config->value, probe->native_after);
     if (result)
         return result;
-    if (probe->native_after[0xb9c] != (probe->configurations ? 7 : 35))
+    if (probe->native_after[0xb9c] != (phase ? 7 : 35))
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
-    if (probe->configurations)
+    if (phase)
         for (unsigned i = 0; i < 4; ++i)
             if (probe->native_after[0xbb0 + i] != (i ? 0 : 0x7f))
                 return HPCLANG_RPL_SPAN_UNSUPPORTED;
@@ -1498,7 +1509,7 @@ static int execution_config(void *context, const struct hpclang_rpl_code_configu
             !execution_native_read(probe, at * 2 + 1, &high))
             return HPCLANG_RPL_SPAN_UNAVAILABLE;
         uint8_t original = low | (high << 4);
-        if (probe->configurations && at >= 0xbb0 && at < 0xbb4) {
+        if (phase && at >= 0xbb0 && at < 0xbb4) {
             if (original != 255)
                 return HPCLANG_RPL_SPAN_UNSUPPORTED;
         } else if (at != 0xb9c && original != probe->native_after[at]) {
@@ -1514,8 +1525,11 @@ static int execution_config(void *context, const struct hpclang_rpl_code_configu
 static int execution_unconfig(void *context, const struct hpclang_rpl_code_configuration *config)
 {
     struct execution_probe *probe = context;
-    if (probe->configurations != 2 || probe->bank_writes != 1 || probe->unconfigurations ||
-        config->instruction != 0xb2da || probe->native_after[0xb9c] != 7)
+    if (probe->unconfigurations >= 2 ||
+        probe->configurations != 2 * (probe->unconfigurations + 1) ||
+        probe->bank_writes != probe->unconfigurations + 1 ||
+        config->instruction != (probe->unconfigurations ? 0xb37fu : 0xb2dau) ||
+        probe->native_after[0xb9c] != 7)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     struct hpclang_rpl_unconfig effect;
     int result = hpclang_rpl_unconfig_inspect(probe->native_after, config->value, &effect);
@@ -1770,7 +1784,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                                                          .native_word = execution_native_word,
                                                          .native_scan = execution_scan,
                                                          .native_scan_max_reads = 2};
-    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 183,
+    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 194,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count ||
@@ -1854,7 +1868,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 253)
         goto done;
-    uint32_t words[31] = {17,
+    uint32_t words[31] = {18,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,
