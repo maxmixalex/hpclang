@@ -686,7 +686,7 @@ struct execution_probe
     uint32_t generated_uses;
     struct hpclang_rpl_execution_subtraction expression, payload_expression, stack_expression;
     uint32_t expression_count, expression_uses, expression_pc, expression_sources;
-    struct hpclang_rpl_reference_edit edits[384];
+    struct hpclang_rpl_reference_edit edits[416];
     struct hpclang_rpl_reference_edit_builder plan;
     struct hpclang_rpl_code_step_uses first_use;
     uint32_t move_first, move_end, planned_uses, branches, changed_cells, rejected_plans;
@@ -705,8 +705,8 @@ struct execution_probe
     unsigned unit_count, unit_limit;
     struct hpclang_rpl_code_sum_source sums[8];
     unsigned sum_count, sum_limit;
-    struct hpclang_rpl_code_native_word native_words[13];
-    unsigned native_word_count, native_word_limit;
+    struct hpclang_rpl_code_native_word native_words[15];
+    unsigned native_word_count, native_word_limit, dispatch_roots_checked;
     struct hpclang_rpl_code_store native_saves[2];
     uint32_t native_save_values[2], native_save_count, scan_reads;
 };
@@ -715,6 +715,7 @@ _Static_assert(sizeof(struct execution_probe) <= 40 * 1024, "execution fixture h
 
 static int execution_shadow_value(void *context, uint32_t at, uint8_t *value, uint32_t *token);
 static int execution_shadow_read(void *context, uint32_t at, uint8_t *value);
+static int execution_dispatch_roots(struct execution_probe *probe);
 
 static int execution_observe(void *context, unsigned space, uint32_t at, uint8_t value)
 {
@@ -1286,7 +1287,7 @@ static int execution_native_word(void *context, const struct hpclang_rpl_code_na
                                  uint32_t tokens[8])
 {
     struct execution_probe *probe = context;
-    if (probe->native_word_count >= 13 ||
+    if (probe->native_word_count >= 15 ||
         (fact->instruction != 0x3130 && fact->instruction != 0x2da2))
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     unsigned index = probe->native_word_count;
@@ -1447,11 +1448,18 @@ static int execution_visit(void *context, uint32_t pc,
         probe->derived_source = first - 1;
         probe->adjustment = use->adjustment;
     }
-    return state->control.pc == 0x3130 && probe->bank_writes == 2 && probe->expression_uses == 1 &&
-           probe->stores == 15 && probe->configurations == 4 && probe->unconfigurations == 2 &&
-           probe->predicates == 4 && probe->constant_count == 6 && probe->unit_count == 3 &&
-           probe->sum_count == 8 && probe->expression_count == 3 && probe->native_save_count == 2 &&
-           probe->scan_reads == 2;
+    if (state->control.pc == 0x3130 && probe->bank_writes == 2 && !probe->dispatch_roots_checked) {
+        int result = execution_dispatch_roots(probe);
+        if (result)
+            return result;
+        probe->dispatch_roots_checked = 1;
+    }
+    return state->control.pc == 0x291c && probe->dispatch_roots_checked &&
+           probe->native_word_count == 15 && probe->bank_writes == 2 &&
+           probe->expression_uses == 1 && probe->stores == 15 && probe->configurations == 4 &&
+           probe->unconfigurations == 2 && probe->predicates == 4 && probe->constant_count == 6 &&
+           probe->unit_count == 3 && probe->sum_count == 8 && probe->expression_count == 3 &&
+           probe->native_save_count == 2 && probe->scan_reads == 2;
     /* This selected boundary is not a complete relocation certificate. */
 }
 
@@ -1816,7 +1824,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     probe->pc = hpclang_launch_execution_pc(boot);
     if (!probe->pc || hpclang_rpl_stock_view_reader(&probe->view) ||
         hpclang_rpl_reference_guards_begin(&probe->builder, probe->guards, 1152) ||
-        hpclang_rpl_reference_edits_begin(&probe->plan, probe->edits, 384))
+        hpclang_rpl_reference_edits_begin(&probe->plan, probe->edits, 416))
         goto done;
     uint32_t catalog_count;
     if (probe_read_word(io, io->library_table, 3, &catalog_count) ||
@@ -1854,11 +1862,11 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                                                          .native_word = execution_native_word,
                                                          .native_scan = execution_scan,
                                                          .native_scan_max_reads = 2};
-    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 194,
+    int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 208,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count ||
-        probe->native_word_count != 13 || execution_dispatch_roots(probe))
+        probe->native_word_count != 15 || !probe->dispatch_roots_checked)
         goto done;
     uint32_t original_status = 0;
     for (unsigned digit = 0; digit < 8; ++digit) {
@@ -1938,7 +1946,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 253)
         goto done;
-    uint32_t words[31] = {19,
+    uint32_t words[31] = {20,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,
