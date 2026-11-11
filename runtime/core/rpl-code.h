@@ -473,6 +473,9 @@ struct hpclang_rpl_code_callbacks
     hpclang_rpl_code_constant_fn constant;
     hpclang_rpl_code_unit_fn unit;
     hpclang_rpl_code_sum_fn sum;
+    /* Separate from CONFIG: caller qualifies cancellation and any map rebuild.
+     * A missing callback rejects UNCONFIG without changing execution state. */
+    hpclang_rpl_code_config_fn unconfig;
 };
 /* Unified optional observation callbacks. Missing callbacks retain the legacy
  * rejection/unknown-source behavior; all prior error/discard contracts apply. */

@@ -678,8 +678,11 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
         result = read_word(instructions, pc + 2, 1, &operation);
         if (result)
             return result;
-        if (operation == 5) {
-            if (!config)
+        if (operation == 4 || operation == 5) {
+            hpclang_rpl_code_config_fn action = operation == 5 ? config
+                                                : callbacks    ? callbacks->unconfig
+                                                               : 0;
+            if (!action)
                 return HPCLANG_RPL_SPAN_UNSUPPORTED;
             struct hpclang_rpl_code_configuration effect = {
                 .instruction = pc,
@@ -687,7 +690,7 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
                 .adjustment = next.origins.adjustment[HPCLANG_RPL_CODE_C]};
             for (unsigned digit = 0; digit < 5; ++digit)
                 effect.origins[digit] = next.origins.registers[HPCLANG_RPL_CODE_C][digit];
-            result = config(context, &effect);
+            result = action(context, &effect);
             if (result)
                 return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
             next.control.pc = (pc + 3) & 0xfffff;
@@ -2248,7 +2251,8 @@ int hpclang_rpl_code_execution_step_predicates(
     hpclang_rpl_code_config_fn config, hpclang_rpl_code_predicate_fn predicate, void *context,
     struct hpclang_rpl_code_step_uses *uses)
 {
-    const struct hpclang_rpl_code_callbacks callbacks = {derive, store, config, predicate, 0, 0, 0};
+    const struct hpclang_rpl_code_callbacks callbacks = {
+        .derive = derive, .store = store, .config = config, .predicate = predicate};
     return hpclang_rpl_code_execution_step_observed(instructions, data, limit, state, token,
                                                     &callbacks, context, uses);
 }

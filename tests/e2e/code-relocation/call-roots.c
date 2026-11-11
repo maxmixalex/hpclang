@@ -1406,7 +1406,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     uint32_t steps;
     const struct hpclang_rpl_code_callbacks callbacks = {
         execution_derive,   execution_store, execution_config, execution_predicate,
-        execution_constant, execution_unit,  execution_sum};
+        execution_constant, execution_unit,  execution_sum,    NULL};
     int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 107,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||

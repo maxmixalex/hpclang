@@ -2444,16 +2444,19 @@ static int configuration_effect(void *context, const struct hpclang_rpl_code_con
     ++f->calls;
     return f->error;
 }
-static void configuration_step(void)
+static void configuration_step(unsigned unconfig)
 {
     struct image code = {.size = 3, .fail = UINT32_MAX};
-    encode(&code, 0, 3, 0x508);
+    encode(&code, 0, 3, unconfig ? 0x408 : 0x508);
     const struct hpclang_rpl_reader reader = {read_nibble, &code};
     struct hpclang_rpl_code_execution initial = {0}, state;
     seed_origins(&initial.origins);
     initial.values.registers[HPCLANG_RPL_CODE_C] = UINT64_C(0xfedcba98765abcde);
     initial.origins.adjustment[HPCLANG_RPL_CODE_C] = 5;
     struct configuration_fixture f = {0};
+    const struct hpclang_rpl_code_callbacks callbacks = {
+        .config = unconfig ? NULL : configuration_effect,
+        .unconfig = unconfig ? configuration_effect : NULL};
     struct hpclang_rpl_code_step_uses uses, sentinel;
     memset(&sentinel, 0xa5, sizeof sentinel);
     for (unsigned flags = 0; flags < 4; ++flags) {
@@ -2461,8 +2464,8 @@ static void configuration_step(void)
         initial.values.decimal = flags >> 1;
         state = initial;
         f.calls = 0;
-        assert(!hpclang_rpl_code_execution_step_native(&reader, NULL, 3, &state, data_token, NULL,
-                                                       NULL, configuration_effect, &f, &uses));
+        assert(!hpclang_rpl_code_execution_step_observed(&reader, NULL, 3, &state, data_token,
+                                                         &callbacks, &f, &uses));
         assert(f.calls == 1 && f.seen.instruction == 0 && f.seen.value == 0xabcde &&
                f.seen.adjustment == 5);
         assert(!memcmp(f.seen.origins, initial.origins.registers[HPCLANG_RPL_CODE_C],
@@ -2479,9 +2482,8 @@ static void configuration_step(void)
         f.error = mode == 4 ? -73 : mode == 5 ? 73 : 0;
         if (mode == 6)
             code.data[2] = 16;
-        int result = hpclang_rpl_code_execution_step_native(&reader, NULL, mode == 3 ? 2 : 3,
-                                                            &state, data_token, NULL, NULL,
-                                                            configuration_effect, &f, &uses);
+        int result = hpclang_rpl_code_execution_step_observed(
+            &reader, NULL, mode == 3 ? 2 : 3, &state, data_token, &callbacks, &f, &uses);
         assert(result < 0 && f.calls == (mode == 4 || mode == 5));
         if (mode == 4)
             assert(result == -73);
@@ -2489,12 +2491,19 @@ static void configuration_step(void)
             assert(result == HPCLANG_RPL_SPAN_MALFORMED);
         assert(!memcmp(&state, &initial, sizeof state) && !memcmp(&uses, &sentinel, sizeof uses));
     }
-    encode(&code, 0, 3, 0x508);
+    encode(&code, 0, 3, unconfig ? 0x408 : 0x508);
     code.fail = UINT32_MAX;
     state = initial;
     assert(hpclang_rpl_code_execution_step_effects(&reader, NULL, 3, &state, data_token, NULL, NULL,
                                                    NULL, &uses) == HPCLANG_RPL_SPAN_UNSUPPORTED);
     assert(!memcmp(&state, &initial, sizeof state));
+    if (unconfig) {
+        f.calls = 0;
+        assert(hpclang_rpl_code_execution_step_native(&reader, NULL, 3, &state, data_token, NULL,
+                                                      NULL, configuration_effect, &f,
+                                                      &uses) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!f.calls && !memcmp(&state, &initial, sizeof state));
+    }
 }
 
 static void hardware_status_clear(void)
@@ -3515,7 +3524,8 @@ int main(void)
     native_threaded_exit();
     native_threaded_store_next();
     adjusted_stack_roundtrip();
-    configuration_step();
+    configuration_step(0);
+    configuration_step(1);
     hardware_status_clear();
     native_threaded_next();
     execution_steps();
