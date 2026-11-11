@@ -441,6 +441,61 @@ static void constant_plans(void)
     }
 }
 
+static void sum_plans(void)
+{
+    for (unsigned mode = 0; mode < 11; ++mode) {
+        struct plan_fixture f = {0};
+        f.memory[0] = 10;
+        f.memory[1] = 0;
+        f.memory[2] = mode == 9 ? 6 : 2;
+        put(&f, 32, 1);
+        put(&f, 48, 2);
+        const struct hpclang_rpl_reader reader = {read_cell, &f};
+        struct hpclang_rpl_code_values values = {0};
+        values.registers[2] = 1;
+        values.registers[0] = 2;
+        struct hpclang_rpl_code_sum_source fact = {0};
+        assert(!hpclang_rpl_code_sum_inspect(&reader, 0, 3, &values, &fact.sum));
+        fact.p_origin = 100;
+        for (unsigned i = 0; i < 16; ++i) {
+            fact.origins[0][i] = 33 + i;
+            fact.origins[1][i] = (mode == 9 ? 33 : 49) + i;
+        }
+        uint64_t inputs[2] = {2, 3}, output = 5;
+        if (mode == 1)
+            fact.origins[0][0] = 0;
+        if (mode == 2)
+            fact.origins[1][0] = 0;
+        if (mode == 3)
+            fact.p_origin = 0;
+        if (mode == 4)
+            output = 6;
+        if (mode == 5) {
+            inputs[0] = 15;
+            output = 2;
+        }
+        if (mode == 6)
+            fact.sum.result ^= 1;
+        if (mode == 7) {
+            fact.adjustment[0] = 1;
+            put(&f, 32, 0);
+        }
+        if (mode == 10) {
+            fact.sum.decimal = 1;
+            inputs[1] = 15;
+        }
+        struct hpclang_rpl_reference_edit edits[16];
+        struct hpclang_rpl_reference_edit_builder builder;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, edits, mode == 8 ? 5 : 16));
+        int result = hpclang_rpl_execution_plan_sum(&builder, &fact, inputs, output, &reader,
+                                                    source_token, resolve_cell, NULL, &f);
+        if (mode && mode != 7)
+            assert(result < 0 && !builder.count && builder.error == result);
+        else
+            assert(!result && builder.count == (mode == 7 ? 10 : 6));
+    }
+}
+
 static void selected_unit_plans(void)
 {
     for (unsigned mode = 0; mode < 9; ++mode) {
@@ -493,6 +548,7 @@ static void selected_unit_plans(void)
 
 void test_execution_plans(void)
 {
+    sum_plans();
     selected_unit_plans();
     constant_plans();
     predicate_plans();

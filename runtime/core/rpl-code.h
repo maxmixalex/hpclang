@@ -455,6 +455,15 @@ int hpclang_rpl_code_unit_inspect(const struct hpclang_rpl_reader *reader, uint3
 typedef int (*hpclang_rpl_code_unit_fn)(void *context, const struct hpclang_rpl_code_unit *unit,
                                         uint32_t tokens[16]);
 
+struct hpclang_rpl_code_sum_source
+{
+    struct hpclang_rpl_code_sum sum;
+    uint32_t p_origin, p_adjustment, origins[2][16], adjustment[2];
+};
+typedef int (*hpclang_rpl_code_sum_fn)(void *context,
+                                       const struct hpclang_rpl_code_sum_source *fact,
+                                       uint32_t tokens[16]);
+
 struct hpclang_rpl_code_callbacks
 {
     hpclang_rpl_code_derive_fn derive;
@@ -463,6 +472,7 @@ struct hpclang_rpl_code_callbacks
     hpclang_rpl_code_predicate_fn predicate;
     hpclang_rpl_code_constant_fn constant;
     hpclang_rpl_code_unit_fn unit;
+    hpclang_rpl_code_sum_fn sum;
 };
 /* Unified optional observation callbacks. Missing callbacks retain the legacy
  * rejection/unknown-source behavior; all prior error/discard contracts apply. */

@@ -3176,6 +3176,62 @@ static void sum_inspection(void)
            HPCLANG_RPL_SPAN_MALFORMED);
 }
 
+struct sum_test
+{
+    int error;
+    unsigned missing, calls;
+    struct hpclang_rpl_code_sum_source fact;
+};
+static int retain_sum(void *context, const struct hpclang_rpl_code_sum_source *fact,
+                      uint32_t tokens[16])
+{
+    struct sum_test *test = context;
+    test->fact = *fact;
+    ++test->calls;
+    for (unsigned i = 0; i < fact->sum.nibbles; ++i)
+        tokens[i] = test->missing ? 0 : 0x800001 + i;
+    return test->error;
+}
+static void sum_steps(void)
+{
+    struct image image = {.data = {12, 2}, .size = 2, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    struct hpclang_rpl_code_execution before = {0};
+    before.values.registers[0] = 2;
+    before.values.registers[2] = 1;
+    seed_origins(&before.origins);
+    before.origins.adjustment[0] = 2;
+    before.origins.adjustment[2] = 1;
+    for (unsigned mode = 0; mode < 5; ++mode) {
+        struct hpclang_rpl_code_execution state = before;
+        struct hpclang_rpl_code_step_uses uses, saved;
+        memset(&saved, 0x5a, sizeof saved);
+        uses = saved;
+        struct sum_test test = {.error = mode == 1 ? -77 : mode == 2 ? 1 : 0, .missing = mode == 3};
+        const struct hpclang_rpl_code_callbacks callbacks = {.sum = mode == 4 ? NULL : retain_sum};
+        int result = hpclang_rpl_code_execution_step_observed(&reader, &reader, 2, &state,
+                                                              data_token, &callbacks, &test, &uses);
+        if (mode > 0 && mode < 4) {
+            assert(result < 0 && !memcmp(&state, &before, sizeof state));
+            assert(!memcmp(&uses, &saved, sizeof uses));
+        } else {
+            assert(!result && state.control.pc == 2 && state.values.registers[2] == 3);
+            assert(!state.values.carry && !state.origins.adjustment[2]);
+            for (unsigned i = 0; i < 16; ++i)
+                assert(state.origins.registers[2][i] ==
+                       (i < 5 ? (mode == 4 ? 0 : 0x800001 + i) : before.origins.registers[2][i]));
+            if (!mode) {
+                assert(test.calls == 1 && test.fact.adjustment[0] == 1 &&
+                       test.fact.adjustment[1] == 2);
+                assert(!memcmp(test.fact.origins[0], before.origins.registers[2],
+                               sizeof test.fact.origins[0]));
+                assert(!memcmp(test.fact.origins[1], before.origins.registers[0],
+                               sizeof test.fact.origins[1]));
+            }
+        }
+    }
+}
+
 struct unit_test
 {
     int error;
@@ -3434,6 +3490,7 @@ static void numeric_predicates(void)
 int main(void)
 {
     sum_inspection();
+    sum_steps();
     selected_unit_steps();
     constant_steps();
     predicate_steps();

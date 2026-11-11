@@ -398,3 +398,87 @@ int hpclang_rpl_execution_plan_unit(struct hpclang_rpl_reference_edit_builder *b
         operand.origins[i] = unit->origins[i];
     return hpclang_rpl_execution_plan_payload(builder, &operand, input, resolve, derived, context);
 }
+
+int hpclang_rpl_execution_plan_sum(struct hpclang_rpl_reference_edit_builder *builder,
+                                   const struct hpclang_rpl_code_sum_source *fact,
+                                   const uint64_t inputs[2], uint64_t output,
+                                   const struct hpclang_rpl_reader *instructions,
+                                   hpclang_rpl_code_token_fn token,
+                                   hpclang_rpl_code_origin_resolve_fn resolve,
+                                   hpclang_rpl_execution_payload_fn derived, void *context)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (builder->error)
+        return builder->error;
+    if (!fact || !inputs || !instructions || !instructions->read_nibble || !token || !resolve)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    const struct hpclang_rpl_code_sum *sum = &fact->sum;
+    if (sum->left > HPCLANG_RPL_CODE_D || sum->right > HPCLANG_RPL_CODE_D ||
+        sum->instruction >= 0x100000 || fact->p_adjustment ||
+        (sum->left == sum->right &&
+         (sum->left_value != sum->right_value || inputs[0] != inputs[1])))
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    struct hpclang_rpl_code_values values = {.decimal = sum->decimal};
+    values.registers[sum->left] = sum->left_value;
+    values.registers[sum->right] = sum->right_value;
+    values.registers[HPCLANG_RPL_CODE_P] = sum->p;
+    struct hpclang_rpl_code_sum original, next, alternate;
+    int result = hpclang_rpl_code_sum_inspect(instructions, sum->instruction,
+                                              0x100000 - sum->instruction, &values, &original);
+    if (result)
+        return reject(builder, result);
+    if (original.left != sum->left || original.right != sum->right ||
+        original.destination != sum->destination || original.first != sum->first ||
+        original.nibbles != sum->nibbles || original.length != sum->length ||
+        original.result != sum->result || original.carry != sum->carry)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    values.registers[sum->left] = inputs[0];
+    values.registers[sum->right] = inputs[1];
+    result = hpclang_rpl_code_sum_inspect(instructions, sum->instruction,
+                                          0x100000 - sum->instruction, &values, &next);
+    if (result)
+        return reject(builder, result);
+    if (next.result != output)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    if (next.carry != original.carry)
+        return reject(builder, HPCLANG_RPL_SPAN_UNSUPPORTED);
+    values.registers[sum->left] = values.registers[sum->right] = 0;
+    values.registers[HPCLANG_RPL_CODE_P] ^= 1;
+    result = hpclang_rpl_code_sum_inspect(instructions, sum->instruction,
+                                          0x100000 - sum->instruction, &values, &alternate);
+    if (result)
+        return reject(builder, result);
+    if (alternate.first != original.first || alternate.nibbles != original.nibbles) {
+        result = payload_digit(builder, fact->p_origin, sum->p, sum->p, resolve, derived, context);
+        if (result)
+            return reject(builder, result);
+    }
+    for (unsigned i = 0; i < sum->length; ++i) {
+        uint8_t nibble;
+        uint32_t origin;
+        if (!instructions->read_nibble(instructions->context, sum->instruction + i, &nibble))
+            return reject(builder, HPCLANG_RPL_SPAN_UNAVAILABLE);
+        if (nibble > 15)
+            return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+        result = token(context, 0, sum->instruction + i, nibble, &origin);
+        if (result)
+            return reject(builder, result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED);
+        result = payload_digit(builder, origin, nibble, nibble, resolve, derived, context);
+        if (result)
+            return reject(builder, result);
+    }
+    for (unsigned side = 0; side < 2; ++side) {
+        struct hpclang_rpl_code_store operand = {.first = sum->first,
+                                                 .nibbles = sum->nibbles,
+                                                 .value = side ? sum->right_value : sum->left_value,
+                                                 .adjustment = fact->adjustment[side]};
+        for (unsigned i = 0; i < 16; ++i)
+            operand.origins[i] = fact->origins[side][i];
+        result = hpclang_rpl_execution_plan_payload(builder, &operand, inputs[side], resolve,
+                                                    derived, context);
+        if (result)
+            return reject(builder, result);
+    }
+    return 0;
+}

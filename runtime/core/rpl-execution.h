@@ -186,6 +186,19 @@ int hpclang_rpl_execution_plan_constant(struct hpclang_rpl_reference_edit_builde
                                         hpclang_rpl_code_origin_resolve_fn resolve,
                                         hpclang_rpl_execution_payload_fn derived, void *context);
 
+/* Re-decode a retained sum and both proposed full operands. Require the exact
+ * proposed output and unchanged logical carry; constrain both consumed fields,
+ * instruction cells and P-dependent selection. Aliased operands must agree.
+ * Caller bounds derived-source recursion and guards mappings/modes. Any error
+ * invalidates the shared edit batch; no target memory is written. */
+int hpclang_rpl_execution_plan_sum(struct hpclang_rpl_reference_edit_builder *builder,
+                                   const struct hpclang_rpl_code_sum_source *fact,
+                                   const uint64_t inputs[2], uint64_t output,
+                                   const struct hpclang_rpl_reader *instructions,
+                                   hpclang_rpl_code_token_fn token,
+                                   hpclang_rpl_code_origin_resolve_fn resolve,
+                                   hpclang_rpl_execution_payload_fn derived, void *context);
+
 /* Validate a retained selected-field unit arithmetic fact and proposed full
  * input/output. Preserve normalized carry, all producer instruction cells and
  * P-dependent field selection; constrain the entire consumed input field through

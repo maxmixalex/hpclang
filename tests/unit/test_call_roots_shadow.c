@@ -268,6 +268,35 @@ static void unit_source(void)
     assert(probe.unit_limit == 1 && probe.plan.error < 0 && !probe.plan.count);
 }
 
+static void sum_source(void)
+{
+    fixture();
+    ram[0x20018] = 0x0a;
+    ram[0x20019] = 0x42;
+    ram[0x20020] = 0x0a;
+    ram[0x20021] = 0x46;
+    ram[0x20008] = 0x40;
+    const struct hpclang_rpl_reader reader = {execution_plan_read, &probe};
+    struct hpclang_rpl_code_values values = {0};
+    values.registers[0] = values.registers[2] = 4;
+    struct hpclang_rpl_code_sum_source fact = {.p_origin = 0x90011};
+    assert(!hpclang_rpl_code_sum_inspect(&reader, 0x90030, 3, &values, &fact.sum));
+    fact.origins[0][0] = fact.origins[1][0] = 0x90012;
+    uint32_t tokens[16];
+    assert(!execution_sum(&probe, &fact, tokens) && tokens[0] == 0x800001);
+    values.registers[2] = 8;
+    assert(!hpclang_rpl_code_sum_inspect(&reader, 0x90040, 3, &values, &fact.sum));
+    fact.origins[0][0] = fact.origins[1][0] = tokens[0];
+    assert(!execution_sum(&probe, &fact, tokens) && tokens[0] == 0x800011);
+    assert(!execution_payload(&probe, &probe.plan, tokens[0], 0, 0));
+    assert(probe.sum_limit == 2);
+    assert(execution_payload(&probe, &probe.plan, tokens[0], 0, 1) < 0);
+    assert(execution_payload(&probe, &probe.plan, 0x800021, 0, 0) < 0);
+    probe.sums[0].origins[0][0] = tokens[0];
+    assert(execution_payload(&probe, &probe.plan, tokens[0], 0, 0) < 0);
+    assert(probe.sum_limit == 2 && probe.plan.error < 0 && !probe.plan.count);
+}
+
 struct body_test_memory
 {
     uint8_t data[32];
@@ -318,6 +347,7 @@ int main(void)
 {
     constant_source();
     unit_source();
+    sum_source();
     overlapping_store();
     configuration();
     protected_body();
