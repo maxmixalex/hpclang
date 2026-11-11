@@ -6208,3 +6208,24 @@ Sanitizer tests cover all 4,096 offsets, precedence, disabled devices and error
 output preservation; ARM analysis passes. Current reports reuse
 `/work/nov06-sum/unconfig-probe`. Execution/Stock integration remains pending;
 the accepted local Stock checkpoint is still 107 steps.
+
+
+## 2026-11-12 — Explicit UNCONFIG observation and extended trace
+
+Local `a6e5c8ec` adds a separate eighth observation callback for UNCONFIG, carrying
+the C.A value, source tokens and adjustment. Missing callbacks reject; legacy
+CONFIG callbacks cannot accidentally approve cancellation. Read failures, short
+instructions and negative/positive callback errors preserve execution and output
+observations. Fourteen sanitizer targets pass with unchanged sealed inputs; ARM
+analysis has no diagnostics. The maintained Stock fixture explicitly leaves the
+new callback absent and remains at its accepted 107-step checkpoint.
+
+The independent collector uses the qualified cancellation descriptor for the
+bank window and compares every complete numeric state against both original-ROM
+traces. Both reach 168 steps at 0x3019 with 78 address uses, 13 SRAM stores,
+59 shadow digits, four predicates, six constants, two unit operations, eight sums
+and three subtraction expressions. No consumed address has an unknown origin.
+RAM-device rebuild effects remain rejected. These extended numeric traces are
+not yet common-repair-plan, actual-movement or maintained-Stock qualification.
+Current outputs reuse `/work/nov06-sum/unconfig-continuation`; future ctypes
+observed-callback clients must use the new eight-slot internal layout.
