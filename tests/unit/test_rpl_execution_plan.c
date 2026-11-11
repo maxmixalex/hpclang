@@ -546,8 +546,75 @@ static void selected_unit_plans(void)
     }
 }
 
+static void native_word_plans(void)
+{
+    const uint32_t values[] = {0, 0xfffff, 0x100000, UINT32_MAX};
+    for (unsigned operation = 0; operation < 3; ++operation)
+        for (unsigned pattern = 0; pattern < 4; ++pattern)
+            for (unsigned adjusted = 0; adjusted < 2; ++adjusted) {
+                struct plan_fixture f = {0};
+                struct hpclang_rpl_code_native_word word = {
+                    .reg = operation == 2 ? HPCLANG_RPL_CODE_D : HPCLANG_RPL_CODE_B,
+                    .before = values[pattern],
+                    .adjustment = adjusted ? 0xffffb : 0,
+                    .delta = operation == 2 ? 1
+                             : operation    ? 5
+                                            : -5};
+                word.after = word.before + (uint32_t)word.delta;
+                uint32_t opcode = operation == 1 ? 0xeb18 : 0xdb18;
+                for (unsigned i = 0; i < 4; ++i)
+                    f.memory[i] = (opcode >> (4 * i)) & 15;
+                uint32_t source =
+                    (word.before & 0xfff00000) | ((word.before - word.adjustment) & 0xfffff);
+                for (unsigned i = 0; i < 8; ++i) {
+                    word.origins[i] = 17 + i;
+                    f.memory[16 + i] = (source >> (4 * i)) & 15;
+                }
+                struct hpclang_rpl_reference_edit edits[12];
+                struct hpclang_rpl_reference_edit_builder builder;
+                const struct hpclang_rpl_reader reader = {read_cell, &f};
+                uint32_t input = word.before + 16, output = input + (uint32_t)word.delta;
+                assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 12));
+                assert(!hpclang_rpl_execution_plan_native_word(
+                    &builder, &word, input, output, &reader, source_token, resolve_cell, NULL, &f));
+                assert(builder.count == 12);
+                uint32_t proposed = (input & 0xfff00000) | ((input - word.adjustment) & 0xfffff);
+                for (unsigned i = 0; i < 8; ++i) {
+                    assert(edits[4 + i].field == 16 + i);
+                    assert(edits[4 + i].expected == ((source >> (4 * i)) & 15));
+                    assert(edits[4 + i].value == ((proposed >> (4 * i)) & 15));
+                }
+                for (unsigned fault = 0; fault < 16; ++fault) {
+                    struct hpclang_rpl_code_native_word bad = word;
+                    unsigned at = fault < 4 ? fault : 16 + fault - 4;
+                    if (fault < 12)
+                        f.memory[at] ^= 1;
+                    if (fault == 12)
+                        ++bad.after;
+                    if (fault == 13)
+                        bad.origins[7] = 0;
+                    if (fault == 14)
+                        bad.delta = 2;
+                    assert(
+                        !hpclang_rpl_reference_edits_begin(&builder, edits, fault == 15 ? 11 : 12));
+                    assert(hpclang_rpl_execution_plan_native_word(&builder, &bad, input, output,
+                                                                  &reader, source_token,
+                                                                  resolve_cell, NULL, &f) < 0);
+                    assert(!builder.count && builder.error);
+                    if (fault < 12)
+                        f.memory[at] ^= 1;
+                }
+                assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 12));
+                assert(hpclang_rpl_execution_plan_native_word(&builder, &word, input, output ^ 1,
+                                                              &reader, source_token, resolve_cell,
+                                                              NULL, &f) < 0 &&
+                       !builder.count);
+            }
+}
+
 void test_execution_plans(void)
 {
+    native_word_plans();
     sum_plans();
     selected_unit_plans();
     constant_plans();

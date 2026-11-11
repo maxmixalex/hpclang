@@ -592,8 +592,44 @@ static void protected_body(void)
     assert(!body_guard_write(&guard, 32, 0) && guard.rejected == 17);
 }
 
+static void native_word_payload(void)
+{
+    for (unsigned mode = 0; mode < 6; ++mode) {
+        (void)fixture();
+        word(3 * 4, 0x08020000);
+        ram[0x20098] = 0x18;
+        ram[0x20099] = 0xdb;
+        struct hpclang_rpl_code_native_word fact = {.instruction = 0x3130,
+                                                    .reg = HPCLANG_RPL_CODE_B,
+                                                    .before = 0x444abcde,
+                                                    .after = 0x444abcd9,
+                                                    .delta = -5};
+        for (unsigned i = 0; i < 8; ++i)
+            fact.origins[i] = 0x90001 + i;
+        if (mode == 2)
+            fact.origins[0] = 0;
+        uint32_t tokens[8] = {0};
+        assert(!execution_native_word(&probe, &fact, tokens));
+        assert(probe.native_word_count == 1 && tokens[5] == 0xa00006);
+        if (mode == 1)
+            ram[0x20003] ^= 0x10;
+        if (mode == 3)
+            ram[0x20099] = 0xeb;
+        if (mode == 5)
+            probe.native_word_limit = 0;
+        memcpy(before, ram, sizeof ram);
+        int result = execution_payload(&probe, &probe.plan, tokens[5], 4, mode == 4 ? 5 : 4);
+        assert(!memcmp(before, ram, sizeof ram));
+        if (!mode)
+            assert(!result && probe.plan.count == 12);
+        else
+            assert(result < 0);
+    }
+}
+
 int main(void)
 {
+    native_word_payload();
     later_stores();
     boundary_address();
     unconfiguration();

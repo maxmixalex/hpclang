@@ -326,6 +326,52 @@ int hpclang_rpl_execution_plan_constant(struct hpclang_rpl_reference_edit_builde
     return 0;
 }
 
+int hpclang_rpl_execution_plan_native_word(struct hpclang_rpl_reference_edit_builder *builder,
+                                           const struct hpclang_rpl_code_native_word *word,
+                                           uint32_t input, uint32_t output,
+                                           const struct hpclang_rpl_reader *instructions,
+                                           hpclang_rpl_code_token_fn token,
+                                           hpclang_rpl_code_origin_resolve_fn resolve,
+                                           hpclang_rpl_execution_payload_fn derived, void *context)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (builder->error)
+        return builder->error;
+    if (!word || !instructions || !instructions->read_nibble || !token || !resolve ||
+        word->instruction > 0xffffc || word->adjustment > 0xfffff ||
+        word->after != word->before + (uint32_t)word->delta ||
+        output != input + (uint32_t)word->delta)
+        return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    uint32_t opcode;
+    if (word->reg == HPCLANG_RPL_CODE_B && word->delta == 5)
+        opcode = 0xeb18;
+    else if ((word->reg == HPCLANG_RPL_CODE_B && word->delta == -5) ||
+             (word->reg == HPCLANG_RPL_CODE_D && word->delta == 1))
+        opcode = 0xdb18;
+    else
+        return reject(builder, HPCLANG_RPL_SPAN_UNSUPPORTED);
+    for (unsigned digit = 0; digit < 4; ++digit) {
+        uint8_t value;
+        uint32_t origin;
+        if (!instructions->read_nibble(instructions->context, word->instruction + digit, &value))
+            return reject(builder, HPCLANG_RPL_SPAN_UNAVAILABLE);
+        if (value != ((opcode >> (4 * digit)) & 15))
+            return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
+        int result = token(context, 0, word->instruction + digit, value, &origin);
+        if (result)
+            return reject(builder, result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED);
+        result = payload_digit(builder, origin, value, value, resolve, derived, context);
+        if (result)
+            return reject(builder, result);
+    }
+    struct hpclang_rpl_code_store operand = {
+        .nibbles = 8, .value = word->before, .adjustment = word->adjustment};
+    for (unsigned digit = 0; digit < 8; ++digit)
+        operand.origins[digit] = word->origins[digit];
+    return hpclang_rpl_execution_plan_payload(builder, &operand, input, resolve, derived, context);
+}
+
 int hpclang_rpl_execution_plan_unit(struct hpclang_rpl_reference_edit_builder *builder,
                                     const struct hpclang_rpl_code_unit *unit, uint64_t input,
                                     uint64_t output, const struct hpclang_rpl_reader *instructions,

@@ -704,6 +704,8 @@ struct execution_probe
     unsigned unit_count, unit_limit;
     struct hpclang_rpl_code_sum_source sums[8];
     unsigned sum_count, sum_limit;
+    struct hpclang_rpl_code_native_word native_words[13];
+    unsigned native_word_count, native_word_limit;
 };
 
 _Static_assert(sizeof(struct execution_probe) <= 40 * 1024, "execution fixture heap budget");
@@ -915,6 +917,37 @@ static int execution_payload(void *context, struct hpclang_rpl_reference_edit_bu
                              uint32_t token, uint8_t expected, uint8_t replacement)
 {
     struct execution_probe *probe = context;
+    if (token >= 0xa00001) {
+        unsigned index = (token - 0xa00001) / 16, digit = (token - 0xa00001) % 16;
+        if (index >= probe->native_word_count || index >= probe->native_word_limit || digit >= 8)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        const struct hpclang_rpl_code_native_word *fact = &probe->native_words[index];
+        if ((fact->reg == HPCLANG_RPL_CODE_B && digit < 5) ||
+            ((fact->after >> (4 * digit)) & 15) != expected)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        uint32_t input = fact->before;
+        if (fact->reg == HPCLANG_RPL_CODE_B) {
+            struct hpclang_rpl_code_address_use use = {.value = input & 0xfffff,
+                                                       .adjustment = fact->adjustment};
+            memcpy(use.origins, fact->origins, sizeof use.origins);
+            uint32_t address;
+            int result = execution_address_replacement(probe, &use, &address);
+            if (result)
+                return result;
+            input = (input & 0xfff00000) | address;
+        }
+        uint32_t output = input + (uint32_t)fact->delta;
+        if (((output >> (4 * digit)) & 15) != replacement)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        unsigned limit = probe->native_word_limit;
+        probe->native_word_limit = index;
+        const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
+        int result = hpclang_rpl_execution_plan_native_word(
+            builder, fact, input, output, &instructions, execution_token, execution_source,
+            execution_payload, probe);
+        probe->native_word_limit = limit;
+        return result;
+    }
     if (token >= 0x800001) {
         unsigned index = (token - 0x800001) / 16, digit = (token - 0x800001) % 16;
         if (index >= probe->sum_count || index >= probe->sum_limit || replacement != expected)
@@ -1185,6 +1218,21 @@ static int execution_sum(void *context, const struct hpclang_rpl_code_sum_source
     for (unsigned i = 0; i < fact->sum.nibbles; ++i)
         tokens[i] = 0x800001 + 16 * index + i;
     probe->sum_limit = ++probe->sum_count;
+    return 0;
+}
+
+static int execution_native_word(void *context, const struct hpclang_rpl_code_native_word *fact,
+                                 uint32_t tokens[8])
+{
+    struct execution_probe *probe = context;
+    if (probe->native_word_count >= 13 ||
+        (fact->instruction != 0x3130 && fact->instruction != 0x2da2))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned index = probe->native_word_count;
+    probe->native_words[index] = *fact;
+    for (unsigned digit = fact->reg == HPCLANG_RPL_CODE_B ? 5 : 0; digit < 8; ++digit)
+        tokens[digit] = 0xa00001 + 16 * index + digit;
+    probe->native_word_limit = ++probe->native_word_count;
     return 0;
 }
 
@@ -1491,11 +1539,13 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                                                          .constant = execution_constant,
                                                          .unit = execution_unit,
                                                          .sum = execution_sum,
-                                                         .unconfig = execution_unconfig};
+                                                         .unconfig = execution_unconfig,
+                                                         .native_word = execution_native_word};
     int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 169,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
-        probe->planned_uses != probe->uses || !probe->first_use.count)
+        probe->planned_uses != probe->uses || !probe->first_use.count ||
+        probe->native_word_count != 13)
         goto done;
     uint32_t original_status = 0;
     for (unsigned digit = 0; digit < 8; ++digit) {

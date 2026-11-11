@@ -530,6 +530,23 @@ typedef int (*hpclang_rpl_code_sum_fn)(void *context,
                                        const struct hpclang_rpl_code_sum_source *fact,
                                        uint32_t tokens[16]);
 
+struct hpclang_rpl_code_native_word
+{
+    uint32_t instruction, reg, before, after, origins[8], adjustment;
+    int32_t delta;
+};
+/* 81BD/81BE use binary 32-bit arithmetic even in Saturn decimal mode. Retain
+ * the complete input word, including its low-address adjustment, and return
+ * producer tokens for the high three B digits or all eight D digits. B's low
+ * five digits keep their existing affine relation. Missing callback preserves
+ * unknown computed origins. Qualify carry/borrow under any proposed relocation;
+ * a zero observed high digit is not proof that it is a constant. This callback
+ * only records facts in scratch. Discard all facts on any later error. Zero
+ * accepts; negative propagates; positive and missing required tokens reject. */
+typedef int (*hpclang_rpl_code_native_word_fn)(void *context,
+                                               const struct hpclang_rpl_code_native_word *word,
+                                               uint32_t tokens[8]);
+
 struct hpclang_rpl_code_callbacks
 {
     hpclang_rpl_code_derive_fn derive;
@@ -544,6 +561,7 @@ struct hpclang_rpl_code_callbacks
     hpclang_rpl_code_config_fn unconfig;
     hpclang_rpl_code_scan_fn native_scan;
     uint32_t native_scan_max_reads; /* Explicit bound; zero rejects the scan. */
+    hpclang_rpl_code_native_word_fn native_word;
 };
 /* Unified optional observation callbacks. Missing callbacks retain the legacy
  * rejection/unknown-source behavior; all prior error/discard contracts apply. */

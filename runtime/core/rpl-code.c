@@ -676,6 +676,34 @@ static void execution_use(struct hpclang_rpl_code_step_uses *uses, unsigned kind
         use->origins[i] = origins[i];
 }
 
+static int native_word_observe(const struct hpclang_rpl_code_callbacks *callbacks, void *context,
+                               const struct hpclang_rpl_code_execution *before,
+                               struct hpclang_rpl_code_execution *next, uint32_t reg, int32_t delta)
+{
+    if (!callbacks || !callbacks->native_word)
+        return 0;
+    struct hpclang_rpl_code_native_word word = {.instruction = before->control.pc,
+                                                .reg = reg,
+                                                .before = (uint32_t)before->values.registers[reg],
+                                                .after = (uint32_t)next->values.registers[reg],
+                                                .adjustment = before->origins.adjustment[reg],
+                                                .delta = delta};
+    if (word.adjustment > 0xfffff || word.after != word.before + (uint32_t)delta)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned digit = 0; digit < 8; ++digit)
+        word.origins[digit] = before->origins.registers[reg][digit];
+    uint32_t tokens[8] = {0};
+    int result = callbacks->native_word(context, &word, tokens);
+    if (result)
+        return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned digit = reg == HPCLANG_RPL_CODE_B ? 5 : 0; digit < 8; ++digit) {
+        if (!tokens[digit])
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        next->origins.registers[reg][digit] = tokens[digit];
+    }
+    return 0;
+}
+
 int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *instructions,
                                              const struct hpclang_rpl_reader *data, uint32_t limit,
                                              struct hpclang_rpl_code_execution *state,
@@ -981,6 +1009,9 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
                 (next.origins.adjustment[HPCLANG_RPL_CODE_B] + 5) & 0xfffff;
             for (unsigned digit = 5; digit < 8; ++digit)
                 next.origins.registers[HPCLANG_RPL_CODE_B][digit] = 0;
+            result = native_word_observe(callbacks, context, state, &next, HPCLANG_RPL_CODE_B, 5);
+            if (result)
+                return result;
             next.values.registers[HPCLANG_RPL_CODE_D0] = d0;
             for (unsigned digit = 0; digit < 5; ++digit)
                 next.origins.registers[HPCLANG_RPL_CODE_D0][digit] =
@@ -1087,6 +1118,12 @@ int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *in
                     next.origins.registers[HPCLANG_RPL_CODE_B][digit] = 0;
                 next.origins.registers[HPCLANG_RPL_CODE_D][digit] = 0;
             }
+            result = native_word_observe(callbacks, context, state, &next, HPCLANG_RPL_CODE_B, -5);
+            if (!result)
+                result =
+                    native_word_observe(callbacks, context, state, &next, HPCLANG_RPL_CODE_D, 1);
+            if (result)
+                return result;
             for (unsigned digit = 0; digit < 5; ++digit)
                 next.origins.registers[HPCLANG_RPL_CODE_D0][digit] = pointer_sources[digit];
             next.control.pc = address;

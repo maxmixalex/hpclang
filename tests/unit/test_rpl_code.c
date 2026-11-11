@@ -2998,6 +2998,124 @@ static void native_threaded_next(void)
     }
 }
 
+struct native_word_fixture
+{
+    uint32_t fail_token, first, calls, fail_call, omit, store_calls;
+    int error;
+    unsigned enter;
+    const struct hpclang_rpl_code_execution *before;
+};
+
+static int native_word_read(void *context, uint32_t at, uint8_t *value)
+{
+    struct native_word_fixture *f = context;
+    uint32_t address[] = {f->first, 0x120, 0x130};
+    uint32_t words[] = {0x120, 0x130, 0x60};
+    for (unsigned i = 0; i < 3; ++i)
+        if (at >= address[i] && at - address[i] < 5) {
+            *value = (words[i] >> (4 * (at - address[i]))) & 15;
+            return 1;
+        }
+    return 0;
+}
+
+static int native_word_store(void *context, const struct hpclang_rpl_code_store *store)
+{
+    struct native_word_fixture *f = context;
+    ++f->store_calls;
+    assert(f->enter &&
+           store->address.value == (f->before->values.registers[HPCLANG_RPL_CODE_B] & 0xfffff));
+    /* Fixture destinations never alias a following read. */
+    for (unsigned i = 0; i < 5; ++i) {
+        uint8_t value;
+        assert(!native_word_read(f, store->address.value + i, &value));
+    }
+    return 0;
+}
+
+static int retain_native_word(void *context, const struct hpclang_rpl_code_native_word *word,
+                              uint32_t tokens[8])
+{
+    struct native_word_fixture *f = context;
+    unsigned reg = f->calls ? HPCLANG_RPL_CODE_D : HPCLANG_RPL_CODE_B;
+    ++f->calls;
+    assert(word->reg == reg && word->instruction == f->before->control.pc);
+    assert(word->before == (uint32_t)f->before->values.registers[reg]);
+    assert(word->delta == (reg == HPCLANG_RPL_CODE_D ? 1 : f->enter ? 5 : -5));
+    assert(word->after == word->before + (uint32_t)word->delta);
+    assert(word->adjustment == f->before->origins.adjustment[reg]);
+    assert(!memcmp(word->origins, f->before->origins.registers[reg], sizeof word->origins));
+    if (f->calls == f->fail_call && f->error)
+        return f->error;
+    for (unsigned digit = reg == HPCLANG_RPL_CODE_B ? 5 : 0; digit < 8; ++digit)
+        if (!(f->calls == f->fail_call && f->omit == digit + 1))
+            tokens[digit] = 0xa000 + reg * 16 + digit;
+    return 0;
+}
+
+static void native_word_provenance(void)
+{
+    const uint32_t inputs[2][4] = {{0x115, 0x100000, 0, 0xfff00115},
+                                   {0x170, 0xffffb, 0xfffffffb, 0xabc00170}};
+    for (unsigned enter = 0; enter < 2; ++enter)
+        for (unsigned pattern = 0; pattern < 4; ++pattern)
+            for (unsigned decimal = 0; decimal < 2; ++decimal) {
+                struct image code = {.size = 4, .fail = UINT32_MAX};
+                encode(&code, 0, 4, enter ? 0xeb18 : 0xdb18);
+                const struct hpclang_rpl_reader instructions = {read_nibble, &code};
+                struct hpclang_rpl_code_execution initial = {0}, state, expected;
+                seed_origins(&initial.origins);
+                initial.values.registers[HPCLANG_RPL_CODE_A] = 0x10b;
+                initial.values.registers[HPCLANG_RPL_CODE_B] =
+                    UINT64_C(0x1234567800000000) | inputs[enter][pattern];
+                initial.values.registers[HPCLANG_RPL_CODE_D] = UINT64_C(0x87654321ffffffff);
+                initial.values.registers[HPCLANG_RPL_CODE_D0] = 0x150;
+                initial.values.decimal = decimal;
+                initial.origins.adjustment[HPCLANG_RPL_CODE_B] = 0xffffe;
+                struct native_word_fixture f = {
+                    .fail_token = UINT32_MAX,
+                    .enter = enter,
+                    .before = &initial,
+                    .first = enter ? 0x110 : (inputs[enter][pattern] - 5) & 0xfffff};
+                const struct hpclang_rpl_reader data = {native_word_read, &f};
+                struct hpclang_rpl_code_callbacks callbacks = {.store = native_word_store};
+                struct hpclang_rpl_code_step_uses uses, baseline, sentinel;
+                memset(&sentinel, 0xa5, sizeof sentinel);
+                expected = initial;
+                assert(!hpclang_rpl_code_execution_step_observed(
+                    &instructions, &data, 4, &expected, data_token, &callbacks, &f, &baseline));
+                callbacks.native_word = retain_native_word;
+                state = initial;
+                assert(!hpclang_rpl_code_execution_step_observed(
+                    &instructions, &data, 4, &state, data_token, &callbacks, &f, &uses));
+                assert(f.calls == (enter ? 1u : 2u));
+                assert(!memcmp(&uses, &baseline, sizeof uses));
+                for (unsigned reg = 0; reg < 13; ++reg)
+                    for (unsigned digit = 0; digit < 16; ++digit) {
+                        unsigned produced =
+                            digit < 8 && ((reg == HPCLANG_RPL_CODE_B && digit >= 5) ||
+                                          (!enter && reg == HPCLANG_RPL_CODE_D));
+                        if (produced)
+                            expected.origins.registers[reg][digit] = 0xa000 + reg * 16 + digit;
+                    }
+                assert(!memcmp(&state, &expected, sizeof state));
+                for (unsigned call = 1; call <= (enter ? 1u : 2u); ++call)
+                    for (unsigned fault = 0; fault < (call == 1 ? 5u : 10u); ++fault) {
+                        f.calls = 0;
+                        f.fail_call = call;
+                        f.error = fault == 0 ? -73 : fault == 1 ? 73 : 0;
+                        f.omit = fault < 2 ? 0 : fault - 1 + (call == 1 ? 5 : 0);
+                        state = initial;
+                        uses = sentinel;
+                        int result = hpclang_rpl_code_execution_step_observed(
+                            &instructions, &data, 4, &state, data_token, &callbacks, &f, &uses);
+                        assert(result == (fault == 0 ? -73 : HPCLANG_RPL_SPAN_MALFORMED));
+                        assert(f.calls == call && !memcmp(&state, &initial, sizeof state));
+                        assert(!memcmp(&uses, &sentinel, sizeof uses));
+                    }
+            }
+}
+
 static void native_threaded_exit(void)
 {
     struct image code = {.size = 4, .fail = UINT32_MAX};
@@ -3881,6 +3999,7 @@ int main(void)
     generated_return_plans();
     computed_origin_transfers();
     native_threaded_exit();
+    native_word_provenance();
     native_threaded_store_next();
     adjusted_stack_roundtrip();
     configuration_step(0);
