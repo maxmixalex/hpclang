@@ -1736,6 +1736,76 @@ static int execution_guard_read(void *context, uint32_t mapping, uint32_t at, ui
     return 0;
 }
 
+/* These are the two live relations at this captured dispatcher boundary, not
+ * a certificate for arbitrary interpreter continuations. Preserve lineage as
+ * well as values: a coincidentally equal scalar is not an address/free-count root. */
+static int execution_dispatch_roots(struct execution_probe *probe)
+{
+    if (probe->state.control.pc != 0x3130 || probe->unit_count != 3 ||
+        probe->native_word_count != 13)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    const uint32_t anchors[] = {0x806f3, 0x80e9b};
+    uint32_t values[2] = {0};
+    for (unsigned anchor = 0; anchor < 2; ++anchor)
+        for (unsigned digit = 0; digit < 5; ++digit) {
+            uint8_t value;
+            uint32_t token, at = anchors[anchor] + digit;
+            if (!execution_shadow_read(probe, at, &value))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            int result = execution_token(probe, 1, at, value, &token);
+            if (result)
+                return result;
+            if (token != at + 1)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            values[anchor] |= (uint32_t)value << (4 * digit);
+        }
+    uint32_t rstk = values[0], available = values[1];
+    if (rstk < 10 || rstk > 0xfffef || available > 0xffffd || probe->move_end != rstk)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    const struct hpclang_rpl_code_unit *unit = &probe->units[2];
+    if (unit->instruction != 0xb347 || unit->length != 6 || unit->reg != HPCLANG_RPL_CODE_B ||
+        unit->first || unit->nibbles != 5 || unit->decrement != 1 || unit->carry ||
+        unit->adjustment != 0xffffb || (unit->before & 0xfffff) != rstk - 5 ||
+        unit->after != unit->before - 5 ||
+        probe->state.values.registers[HPCLANG_RPL_CODE_B] != unit->after ||
+        probe->state.origins.adjustment[HPCLANG_RPL_CODE_B] ||
+        probe->unit_inputs[2] != unit->before + 16 || probe->unit_outputs[2] != unit->after + 16)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    for (unsigned digit = 0; digit < 5; ++digit)
+        if (unit->origins[digit] != 0x806f4 + digit ||
+            probe->state.origins.registers[HPCLANG_RPL_CODE_B][digit] != 0x700021 + digit)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t value = (uint32_t)probe->state.values.registers[HPCLANG_RPL_CODE_D];
+    uint32_t adjustment = probe->state.origins.adjustment[HPCLANG_RPL_CODE_D];
+    const uint32_t *origins = probe->state.origins.registers[HPCLANG_RPL_CODE_D];
+    if (value != available + 2)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned limit = probe->native_word_count;
+    while (origins[0] >= 0xa00001) {
+        unsigned index = (origins[0] - 0xa00001) / 16;
+        if (index >= limit || adjustment > 0xfffff)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        for (unsigned digit = 0; digit < 5; ++digit)
+            if (origins[digit] != 0xa00001 + 16 * index + digit)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        const struct hpclang_rpl_code_native_word *word = &probe->native_words[index];
+        if (word->reg != HPCLANG_RPL_CODE_D || word->instruction != 0x3130 || word->delta != 1 ||
+            word->before >= 0xfffff || word->after != word->before + 1 ||
+            value != ((word->after + adjustment) & 0xfffff))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        value = word->before;
+        adjustment = word->adjustment;
+        origins = word->origins;
+        limit = index;
+    }
+    if (adjustment > 0xfffff || value != ((available + adjustment) & 0xfffff))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    for (unsigned digit = 0; digit < 5; ++digit)
+        if (origins[digit] != 0x80e9c + digit)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    return 0;
+}
+
 static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
 {
     struct execution_probe *probe = calloc(1, sizeof(*probe));
@@ -1788,7 +1858,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
         probe->planned_uses != probe->uses || !probe->first_use.count ||
-        probe->native_word_count != 13)
+        probe->native_word_count != 13 || execution_dispatch_roots(probe))
         goto done;
     uint32_t original_status = 0;
     for (unsigned digit = 0; digit < 8; ++digit) {
@@ -1868,7 +1938,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
         entry.prologue != 0x2a2c || probe_read_word(io, entry.object_address + 5, 5, &length) ||
         length != 253)
         goto done;
-    uint32_t words[31] = {18,
+    uint32_t words[31] = {19,
                           (uint32_t)stop,
                           steps,
                           probe->state.control.pc,

@@ -219,7 +219,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         words = verify_entry(observation, (build / "launchers" / f"{args.model}.bin").read_bytes())
         execution = struct.unpack("<31I", home_string(read, b"EXECOBS"))
         if (
-            execution[0:3] != (18, 1, 194)
+            execution[0:3] != (19, 1, 194)
             or execution[3] != 0x3130
             or execution[4] != 93
             or not 0 < execution[5] <= 1152

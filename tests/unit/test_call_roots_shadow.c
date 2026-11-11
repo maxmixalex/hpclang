@@ -590,6 +590,92 @@ static void unit_source(void)
     assert(probe.unit_limit == 1 && probe.plan.error < 0 && !probe.plan.count);
 }
 
+static void dispatch_root_relations(void)
+{
+    static const unsigned chain[] = {1, 3, 5, 10, 12};
+    static const int offsets[] = {1, 2, 2, -1, 0};
+    static const uint32_t adjustments[] = {1, 0, 0xfffff, 0xffffc, 0};
+    for (unsigned mode = 0; mode < 15; ++mode)
+        for (unsigned link = 0; link < 5; ++link) {
+            fixture();
+            uint32_t rstk = 0x90080, available = 100;
+            const uint32_t anchors[] = {0x806f3, 0x80e9b};
+            const uint32_t values[] = {rstk, available + (mode == 5)};
+            for (unsigned a = 0; a < 2; ++a)
+                for (unsigned i = 0; i < 5; ++i) {
+                    unsigned at = (anchors[a] + i) & 4095, shift = 4 * (at & 1);
+                    ram[0x10000 + at / 2] = (uint8_t)((ram[0x10000 + at / 2] & ~(15u << shift)) |
+                                                      (((values[a] >> (4 * i)) & 15) << shift));
+                }
+            probe.state.control.pc = 0x3130;
+            probe.move_end = rstk;
+            probe.unit_count = 3;
+            probe.native_word_count = 13;
+            struct hpclang_rpl_code_unit *unit = &probe.units[2];
+            *unit = (struct hpclang_rpl_code_unit){.instruction = 0xb347,
+                                                   .length = 6,
+                                                   .reg = HPCLANG_RPL_CODE_B,
+                                                   .nibbles = 5,
+                                                   .decrement = 1,
+                                                   .before = rstk - 5,
+                                                   .after = rstk - 10,
+                                                   .adjustment = 0xffffb};
+            probe.unit_inputs[2] = unit->before + 16;
+            probe.unit_outputs[2] = unit->after + 16;
+            probe.state.values.registers[HPCLANG_RPL_CODE_B] = unit->after;
+            probe.state.values.registers[HPCLANG_RPL_CODE_D] = available + 2;
+            probe.state.origins.adjustment[HPCLANG_RPL_CODE_D] = 1;
+            for (unsigned digit = 0; digit < 5; ++digit) {
+                unit->origins[digit] = 0x806f4 + digit;
+                probe.state.origins.registers[HPCLANG_RPL_CODE_B][digit] = 0x700021 + digit;
+                probe.state.origins.registers[HPCLANG_RPL_CODE_D][digit] = 0xa000c1 + digit;
+            }
+            for (unsigned i = 0; i < 5; ++i) {
+                struct hpclang_rpl_code_native_word *word = &probe.native_words[chain[i]];
+                *word = (struct hpclang_rpl_code_native_word){
+                    .instruction = 0x3130,
+                    .reg = HPCLANG_RPL_CODE_D,
+                    .before = (uint32_t)((int)available + offsets[i]),
+                    .adjustment = adjustments[i],
+                    .delta = 1};
+                word->after = word->before + 1;
+                for (unsigned digit = 0; digit < 5; ++digit)
+                    word->origins[digit] = (i ? 0xa00001 + 16 * chain[i - 1] : 0x80e9c) + digit;
+            }
+            struct hpclang_rpl_code_native_word *word = &probe.native_words[chain[link]];
+            if (mode == 1)
+                unit->origins[0]++;
+            if (mode == 2)
+                probe.native_words[1].origins[0]++;
+            if (mode == 3)
+                word->origins[0] = 0xa00001 + 16 * chain[link];
+            if (mode == 4)
+                word->origins[1] = 0;
+            if (mode == 6)
+                probe.state.values.registers[HPCLANG_RPL_CODE_D]++;
+            if (mode == 7)
+                word->adjustment ^= 1;
+            if (mode == 8)
+                probe.unit_inputs[2]++;
+            if (mode == 9)
+                probe.state.control.pc++;
+            if (mode == 10)
+                probe.move_end--;
+            if (mode == 11)
+                word->delta = 2;
+            if (mode == 12)
+                unit->decrement = 2;
+            if (mode == 13)
+                word->reg = HPCLANG_RPL_CODE_B;
+            if (mode == 14)
+                probe.state.values.registers[HPCLANG_RPL_CODE_B]--;
+            memcpy(before, ram, sizeof ram);
+            int result = execution_dispatch_roots(&probe);
+            assert(mode ? result < 0 : result == 0);
+            assert(!memcmp(before, ram, sizeof ram));
+        }
+}
+
 static void late_overlapping_stores(void)
 {
     for (unsigned effect = 13; effect <= 14; ++effect)
@@ -935,6 +1021,7 @@ int main(void)
     unit_source();
     immediate_unit_source();
     late_overlapping_stores();
+    dispatch_root_relations();
     sum_source();
     overlapping_store();
     configuration();
