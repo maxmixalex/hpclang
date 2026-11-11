@@ -26,6 +26,30 @@ struct hpclang_rpl_bank_effects
  * frame. This is a prediction primitive, not execution/mutation authority. */
 int hpclang_rpl_config_predict(const uint8_t state[0xc60], uint32_t c, uint8_t output[0xc60]);
 
+enum hpclang_rpl_unconfig_kind
+{
+    HPCLANG_RPL_UNCONFIG_NONE,
+    HPCLANG_RPL_UNCONFIG_IO,
+    HPCLANG_RPL_UNCONFIG_RAM,
+    HPCLANG_RPL_UNCONFIG_ERAM,
+    HPCLANG_RPL_UNCONFIG_PORT,
+    HPCLANG_RPL_UNCONFIG_BANK
+};
+struct hpclang_rpl_unconfig
+{
+    uint32_t kind, flags, clear_field, rebuild;
+};
+/* Inspect native UNCONFIG dispatch from a stable, ROM-qualified full snapshot.
+ * c contributes its low 20 bits. IO matches its containing 64-nibble block; enabled
+ * RAM/ERAM/Port then match the page, followed by the bank window. flags is the
+ * resulting full word. Nonzero clear_field becomes UINT32_MAX; zero means no
+ * base-word change. rebuild requires the native map-rebuild effects in addition
+ * to flags; this descriptor does NOT model or authorize that rebuild. Caller
+ * guards input state/ROM and applies effects to scratch, never live CPU state.
+ * No allocation or native-pointer access; errors leave output unchanged. */
+int hpclang_rpl_unconfig_inspect(const uint8_t state[0xc60], uint32_t c,
+                                 struct hpclang_rpl_unconfig *output);
+
 struct hpclang_rpl_bank_write
 {
     uint32_t lower, upper, unchanged;

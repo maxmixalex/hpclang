@@ -28,6 +28,38 @@ int hpclang_rpl_bank_write_inspect(const uint8_t state[0xc60], uint32_t address,
     return 0;
 }
 
+int hpclang_rpl_unconfig_inspect(const uint8_t state[0xc60], uint32_t c,
+                                 struct hpclang_rpl_unconfig *output)
+{
+    if (!state || !output)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    c &= 0xfffff;
+    struct hpclang_rpl_unconfig next = {.flags = cpu_word(state + 0xb9c)};
+    if ((c & 0xfffc0) == (cpu_word(state + 0xba0) << 6)) {
+        next.kind = HPCLANG_RPL_UNCONFIG_IO;
+        next.flags &= 0x1e;
+        next.clear_field = 0xba0;
+    } else if ((next.flags & 2) && cpu_word(state + 0xba8) == c >> 12) {
+        next.kind = HPCLANG_RPL_UNCONFIG_RAM;
+        next.flags &= 0x1d;
+        next.rebuild = 1;
+    } else if ((next.flags & 8) && cpu_word(state + 0xbb8) == c >> 12) {
+        next.kind = HPCLANG_RPL_UNCONFIG_ERAM;
+        next.flags &= 0x17;
+        next.rebuild = 1;
+    } else if ((next.flags & 16) && cpu_word(state + 0xbc4) == c >> 12) {
+        next.kind = HPCLANG_RPL_UNCONFIG_PORT;
+        next.flags &= 0xf;
+        next.rebuild = 1;
+    } else if (cpu_word(state + 0xbb0) == c >> 12) {
+        next.kind = HPCLANG_RPL_UNCONFIG_BANK;
+        next.flags &= 0x1b;
+        next.clear_field = 0xbb0;
+    }
+    *output = next;
+    return 0;
+}
+
 int hpclang_rpl_config_predict(const uint8_t state[0xc60], uint32_t c, uint8_t output[0xc60])
 {
     if (!state || !output)

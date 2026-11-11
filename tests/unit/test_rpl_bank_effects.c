@@ -282,9 +282,42 @@ static void test_bank_write(void)
     assert(!memcmp(&saved, &result, sizeof result));
 }
 
+static void test_unconfig(void)
+{
+    struct fixture f = {0};
+    set_word(&f, 0xba0, 0x7f000 >> 6);
+    for (unsigned offset = 0; offset < 4096; ++offset) {
+        set_word(&f, 0xba8, 0x7f);
+        set_word(&f, 0xbb8, 0x7f);
+        set_word(&f, 0xbc4, 0x7f);
+        set_word(&f, 0xbb0, 0x7f);
+        const unsigned flags[] = {31, 29, 21, 5, 0xffffffff};
+        const unsigned kinds[] = {HPCLANG_RPL_UNCONFIG_RAM, HPCLANG_RPL_UNCONFIG_ERAM,
+                                  HPCLANG_RPL_UNCONFIG_PORT, HPCLANG_RPL_UNCONFIG_BANK,
+                                  HPCLANG_RPL_UNCONFIG_RAM};
+        for (unsigned i = 0; i < 5; ++i) {
+            set_word(&f, 0xb9c, flags[i]);
+            struct hpclang_rpl_unconfig effect;
+            assert(!hpclang_rpl_unconfig_inspect(f.bytes, 0xabf7f000 + offset, &effect));
+            assert(effect.kind == (offset >= 64 ? kinds[i] : HPCLANG_RPL_UNCONFIG_IO));
+            assert(effect.rebuild == (offset >= 64 && i != 3));
+            assert(effect.clear_field == (offset >= 64 ? i == 3 ? 0xbb0u : 0u : 0xba0u));
+        }
+    }
+    set_word(&f, 0xb9c, 0xffffffc0);
+    struct hpclang_rpl_unconfig effect;
+    assert(!hpclang_rpl_unconfig_inspect(f.bytes, 0x80000, &effect));
+    assert(!effect.kind && effect.flags == 0xffffffc0 && !effect.clear_field && !effect.rebuild);
+    struct hpclang_rpl_unconfig saved = effect;
+    assert(hpclang_rpl_unconfig_inspect(NULL, 0, &effect) < 0);
+    assert(!memcmp(&effect, &saved, sizeof effect));
+    assert(hpclang_rpl_unconfig_inspect(f.bytes, 0, NULL) < 0);
+}
+
 int main(void)
 {
     test_bank_write();
+    test_unconfig();
     test_config();
     test_cpu_capture();
     test_cpu();
