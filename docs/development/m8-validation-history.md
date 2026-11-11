@@ -1241,6 +1241,84 @@ in `/work/oct29-resource-integration-quality` and `/work/oct29-resource-docs-che
 The merged version requires fresh CI; neither parent CI nor this integration
 completes M8.2/M8.3 or proves unsampled peak capacity.
 
+### 2026-10-30 — Native allocation parent reconciled with accepted main
+
+Local parent #13 merge `19e19700` integrates accepted `3b77453a`, retaining
+the later Aplet identity and Kermit retry-pacing fixes absent from the current
+Port C++ branch. Conflict resolutions match the tested combined UI verifier,
+workflow arguments and emulator capture-header set; the CLI regression requires
+both image-budget and native-release checks. Eighteen host tests, Ruff and strict
+docs pass. A fresh UI build reproduces fifteen delivery files exactly, including
+the application, result address, memory layout and six raw/wrapped launchers.
+Core runtime, platform, UI and emulator harness source identity also matches the
+currently tested C++ integration. The Kermit patch/build/regression files match
+PR #29. Six actual HP39 Aplet identities and six mixed-application negatives pass.
+Evidence: `/work/oct30-allocation-main-integration/{verified,aplet-verified}.json`.
+
+The first integration audit was stopped before checks to correct its artifact
+list and avoid re-reading unrelated generated font assets. Subsequent attempts
+identified inherited Python formatting and an incorrect audit-only stage1 path;
+those logs are retained as `format-failure.log` and `audit-path-failure.log`.
+The final audit passes; temporary builds are removed. No failed attempt counts
+as acceptance. Parent #13 remains local/unpushed, and C++ still needs its ancestry
+integrated. Fresh combined UI gates pass HP48gII, HP49g+ and HP50g; HP39 runs
+remain active. Neither the parent nor M8.5 is remotely accepted.
+
+### 2026-10-30 — C++ parent ancestry integrated
+
+Local C++ merge `ed93a9bd` includes parent `19e19700`. Git confirms the parent
+is an ancestor and no changes from tested `3ab04c07` in runtime, platform,
+public headers, CMake, examples, Object Basics/UI sources or their build and
+emulator preparation tools. The only non-document additions are the parent's
+Aplet preflight and Kermit patch/regression/build files. Their sources match
+the validated parent. Eighteen host tests, LF-normalized Ruff checks and strict
+docs pass (`/work/oct30-cpp-parent-merge.log`); Windows checkout CRLF caused an
+initial format-only diagnostic, with no source formatting change required.
+
+Fresh combined UI verification now also passes HP39g+. HP39gs remains live;
+HP40gs is pending. `oct30-cpp-ui-final-audit.py` is prepared to independently
+recompute all six budgets, native-release checks and lifecycle reports once
+the actual runner finishes; it has not yet passed. Parent #13 and C++ #14
+remain unpushed. Previous #14 CI retains 319 successes, one skip and fourteen
+cancellations; cancelled gates are not accepted. #26 remains queued.
+
+### 2026-10-30 — Preserve pending evidence publishers
+
+GitHub check annotation for job 121289451878 (run 40208342087, parent head
+`4a4b36bd`) states that a higher-priority waiting request for
+`ci-evidence-publisher` cancelled it. The job had no runner or executed steps.
+The retained API evidence is `research/oct30-publisher-cancellation.json`.
+
+Parent commit `700be00e`, merged into C++ as `80fdda5f`, adds `queue: max` to
+both Runtime and Font Gallery publisher concurrency groups, retaining
+`cancel-in-progress: false` and single-writer serialization. Parsed YAML checks
+both groups exactly. [GitHub's concurrency documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+specifies up to 100 pending jobs instead of the default replacement of the
+single pending job. Queue overflow can still cancel additional jobs; this
+does not repair old cancellations or prove remote behavior before CI. No
+application code changes. Fresh combined UI gates now pass HP39gs as well;
+HP40gs remains active. Both delivery heads remain local and unpushed.
+
+### 2026-10-30 — Complete combined UI matrix and delivery audit
+
+The resumed UI runner finishes all six models. Independent audit
+`oct30-cpp-ui-final-audit.py` recomputes 79 lifecycle snapshots, six linked
+image budgets and native-release outcomes, including actual SRAM/Flash hashes
+when an optional native block is present. Application and emulator hashes still
+match the original run manifest. `/work/oct30-port-cpp-ui/independent-verified.json`
+contains the final model reports. The first three-model reports survive the
+local-wrapper corrections; neither invalid setup attempt is counted as a pass.
+
+The Port C++ application/runtime/launcher/owner implementation remains identical
+to tested `3ab04c07`; later ancestry and queue commits change transport checks,
+publisher policy and documentation. Object Basics six Direct/six Stock, the
+517-output installed SDK gate, sanitizer tests and ARM analysis retain their
+recorded scope. Independent parent UI reproduction covers fifteen delivery files.
+Before delivery, exact remote heads were inspected: #13 `4a4b36bd` has 371
+successful, two skipped and one cancelled publisher job; #14 `492926e1` has
+319 successful, one skipped and fourteen cancelled jobs. No cancelled gate is
+accepted. New-head remote validation remains required, and M8 is incomplete.
+
 ## Shared bank-switch body inventory — local, 2026-10-29
 
 The bounded 0x22fec..0x23077 shared-body inventory decodes 31 instructions on
@@ -4205,6 +4283,37 @@ seven UI memory tests, plus strict documentation and whitespace checks.
 The merged runtime workflow retains UI capture and adds the accepted publisher
 queue setting. No new emulator matrix is claimed; merged-version CI is required.
 
+### 2026-11-05 — Allocation/UI integration candidate
+
+PR13 head 5bc78efd passes 9 workflows, 199 jobs and one intentional skip after
+publisher retry. Merging accepted UI main cdd6bd86 reveals four conflicts.
+The isolated m8-allocation-ui-integration worktree preserves both allocation
+and SP capture environment variables, all verifier flags, both regression
+test groups and both history branches; the roadmap uses current reconciled
+status. An added CLI test requires application-stack, launcher-stack and native
+release gates in the combined invocation. All 11 test_ui_memory tests pass on
+the Windows host; Ruff lint/format and diff whitespace checks pass.
+The installed host Actionlint rejects the already accepted queue:max syntax;
+that configuration is retained. Docker still returns HTTP 500; combined
+emulator validation and modern workflow lint remain pending. No push or PR
+acceptance is claimed, and existing dirty worktrees remain untouched.
+
+## 2026-11-05 — Integrated documentation gates on host
+
+The uncommitted migration/UI-main integration and allocation/UI-main integration
+both pass `zensical build --clean --strict` with no issues, using an isolated
+Windows Python virtual environment and Zensical 0.0.74. Logs are retained in
+`research/nov05-m8-migration-check-docs.log` and
+`research/nov05-m8-allocation-ui-integration-docs.log`. This proves documentation
+buildability only; it does not replace container runtime or emulator acceptance.
+Both candidates remain unpushed and unaccepted. Docker API observation still
+returns HTTP 500; no existing runtime job was restarted.
+
+PR #26 exact-head audit (`a0a31cb4`) finds nine successful workflows and one
+running, 370 successful jobs, one intentional skip and two running jobs. The
+toolchain-download retry job 126957988835 completed successfully; the branch
+still awaits all gates. Full audit: `research/nov05-current-native-ci-26.json`.
+
 ## 2026-11-05 — Native delivery integration with accepted UI main
 
 Prior exact head a0a31cb4 passes all ten workflows: 372 successful jobs and
@@ -4217,6 +4326,76 @@ both helper symbols: /work/nov05-native-integration/verified.txt.
 Runtime, platform, public headers and code-relocation test sources are unchanged
 from a0a31cb4. This is integration validation, not new runtime coverage or
 completion of the production memory-origin collector. Fresh CI remains required.
+
+## 2026-11-05 — Notebook six-model resource audit complete; allocation integration running
+
+The resumed Notebook matrix completes HP40gs and exits successfully. Independent
+audit reports complete=true for all six models and eighteen launches, checking
+sealed inputs, retained artifacts, content/pixels, settled return and budgets.
+HP48gII stack usage is 7744/5904/3656 bytes; HP49g+/HP50g each use
+7752/5912/3664; HP39g+/HP39gs/HP40gs each use 2504/2504/2224, all within 8192.
+HP39g+ retains the explicit post-restart artifact-hash qualification; the other
+five models retain pre-execution seals. Evidence:
+/work/nov05-backup-frame-resources/independent-persistence-audit.json.
+Four earlier SD-export launches retain separate independent validation under
+/work/nov05-export-frame-resources. Strict Notebook docs, Ruff and formatting
+pass. These instrumented app/store/UI checks do not complete release or hardware
+acceptance. The current remote USB-transfer failure remains unresolved.
+
+Allocation/UI integration now includes accepted native main 26140e1d, with only
+history/roadmap conflicts resolved in this latest merge. All 37 combined verifier
+tests pass, and a fresh emulator plus universal UI application build succeeds.
+The unchanged candidate is sealed for six Direct/six Stock cases, including
+native allocation/release, application/launcher stacks and resource snapshots.
+The matrix is running at /work/nov05-allocation-ui-combined; no completion claim.
+PR #31 is observed queued/running, with no completed failure yet; not accepted.
+
+## 2026-11-05 — CI packet deadline and local ROM fixture diagnosis
+
+PR #31 job 127210261348 fails inside test-kermit-server.py, not native
+storage execution. Its debug timer records a 50 ms select pause lasting
+4.719 s, so the peer's 3 s packet deadline expires before the retransmit.
+The local fix gives packet arrival 10 s of scheduling slack; explicit 30 ms
+turnaround, 15 s backoff, byte/CRC and sequence checks remain unchanged.
+The full bundled-Kermit PTY test passes in /work/nov05-kermit-scheduling;
+a separate 4.719 s delayed-packet check exceeds the previous deadline and
+then passes exact payload/CRC checks. This is not a fix for the unresolved
+HP40gs calculator USB failures. Change remains unpushed.
+
+Allocation/UI combined validation proves HP48gII Direct and Stock, including
+6164 native block bytes returned and fourteen lifecycle snapshots. Its
+terminal HP49g+ Direct failure occurred before application entry: the fresh
+emulator had no firmware, because the local orchestration omitted the CI
+firmware preparation step. Ran the same bootloaders/official make targets;
+resume preserves completed case hashes, source/artifact seals, failed log
+and state, and adds firmware hashes. Remaining matrix is running under
+/work/nov05-allocation-ui-combined; no full-matrix completion claimed.
+
+## 2026-11-05 — Combined UI twelve-case audit complete; HP40gs CI failure reproduced
+
+Allocation/UI candidate 0d43fe6f completes all six Direct and six Stock cases.
+The independent audit rechecks original source/application/emulator/firmware
+seals, saved UI/theme/font/canvas pixels, application and launcher stack budgets,
+native allocation release and lifecycle free-list/return-capacity snapshots.
+It recomputes reports in disposable copies, preserving original evidence, and
+publishes complete=true at
+/work/nov05-allocation-ui-combined/independent-audit.json.
+The earlier local missing-firmware failure and corrected setup remain archived.
+All 37 combined verifier tests, three Aplet identity tests and strict candidate
+documentation pass. The previous exact remote head 5bc78efd is independently
+audited: nine successful workflows, 199 successful jobs, one intentional skip.
+These workload observations do not establish hardware behavior, all native/
+exception stack reservations or complete M8.2/M8.3/M8.5 acceptance.
+
+The exact PR #27 failing-run replay terminates with exit 1, host-gate-failed,
+PC 0x8158 before application entry, and unchanged sealed inputs. Its payload
+stalls at send sequence 14, with three NAKs/four resends and no ACK progress for
+90 seconds; the original CI failure was at sequence 0. Event accounting checks
+1011 host-to-device OUT packets (41293 bytes): every packet reaches its final
+FIFO read, with no observed unread clear/discard. Intermediate byte values are
+not individually logged, and this does not prove successful delivery to the
+firmware Kermit parser. Evidence: /work/nov05-pr27-usb-replay/replay.json,
+run.log and usb-out-accounting.json. No transport fix or CI acceptance claimed.
 
 ## 2026-11-05 — Local runtime environment branch integration
 
@@ -4279,6 +4458,52 @@ USB event logging is enabled. The diagnostic is running; no transport fix or
 successful replay is inferred. Inputs and results live at
 /work/nov05-pr27-usb-replay/replay.json.
 
+## 2026-11-06 — Two-operand source repair constraints
+
+Implementation 4a78bb52 adds hpclang_rpl_execution_plan_subtraction. It verifies
+the original result/borrow from recorded operands and the proposed result from
+both replacements. A borrow change rejects, preserving carry-dependent flow.
+All five left digits and only participating right digits enter the same
+normalized edit builder as other consumed values. Unchanged dependencies remain
+constraints; aliases merge only when expectations/replacements agree. Left
+modular offsets are inverted; adjusted right operands remain unsupported.
+The caller still captures the original operands, guards instruction/P/mode and
+proves the relation supplies the consumed value. No automatic expression
+retention/propagation or complete mutation permission is claimed.
+
+Twelve final sanitizer targets pass (/work/nov06-expression-final/retest.log,
+retest-inputs.json). Tests execute original and repaired operands through the
+C evaluator, cover decimal/hex borrow, source offsets, stale/unknown operands,
+capacity, aliases and unchanged dependencies. An intermediate assertion wrongly
+required a conflict on unused right high digits after dependency narrowing;
+the corrected case conflicts on a participating digit and separately proves
+unused high-digit alias changes are harmless. The original failed log is kept
+in unit.log; final retest passes all twelve targets.
+
+Both captured C paths retain pre-subtraction operands from the verified ROM
+trace. The actual result 0x2907 depends on five A-source digits at Saturn
+0xffec4..0xffec8 (SRAM) and two C-literal digits at 0x28fe..0x28ff (Flash).
+The proof resolves physical aliases and requires exactly these seven sources.
+Every stale-source control rejects. An earlier consumed value shares A's source;
+a locally valid change to 0x3907 is rejected when that earlier use stays fixed.
+No native/Flash writes occur. Proof: /work/nov06-expression-plan/source-proof.json;
+captured operands and 30-step comparisons: /work/nov06-expression-operands/.
+This closes a relation-planning gap, not collection/full-mutation integration.
+
+ARM analysis has zero diagnostics. Own frames for ordinary-use planning,
+subtraction planning and its arithmetic helper are 208/272/40 bytes, not total
+call-chain bounds. Formatting and diff checks pass. Existing execution paths
+and the prior maintained Stock gate are unchanged; no fresh Stock claim is
+made for this new caller-driven planning API.
+
+During the concrete mainline sanitizer wait, #13 integrates accepted main as
+46a4cc74. Only roadmap/history conflict; both histories are preserved. Runtime,
+headers, platform, E2E, tools, CMake and workflow trees equal green e8ad129f.
+37 verifier tests, three Aplet identity tests and strict docs pass. Earlier
+all-six Direct/Stock resource evidence is retained, not rerun or newly claimed.
+Its new integration still requires CI; #18 is also queued/running. #14's two
+pre-entry USB failures remain unresolved. M8 is incomplete.
+
 
 ## 2026-11-06 — Environment integration after filesystem acceptance
 
@@ -4288,3 +4513,18 @@ regression test blobs are byte-identical to previously green 1b24a09f. All
 four unittest cases, Ruff, normalized-shell ShellCheck, strict docs and diff
 checks pass. Previous exact-head CI passed twelve workflows, 390 jobs and
 two intentional skips. The new integration must pass fresh CI before merge.
+
+## 2026-11-06 - Allocation integration after green parent CI
+
+PR #13 exact head ab7842f255ab0a1d4c899b214920ae45aa3a1dd9 passes all seven
+workflows, 195 successful jobs and two intentional publisher skips. It could
+not merge because accepted main d47dcf50 caused documentation conflicts.
+Integration 7cf08668 preserves both validation histories and the current compact
+roadmap. Executable/test input comparison against the green head finds exactly
+two changes: tests/e2e/harness/setup-runtime.sh and tests/unit/test_setup_runtime.py,
+both byte-equivalent after newline normalization to accepted main. Other runtime,
+headers, platforms, tools, build settings, E2E and workflow inputs are unchanged.
+Four fresh setup-runtime tests and strict docs pass. Existing six-model Direct
+and Stock evidence is retained; no redundant application rebuild is claimed.
+Identity audit: research/nov06-allocation-main-identity.json. The integration
+requires new exact-head CI; this is not broader M8.2/M8.3/M8.5 completion.
