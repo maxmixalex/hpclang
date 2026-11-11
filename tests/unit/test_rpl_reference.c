@@ -2050,7 +2050,7 @@ static void flashptr_guard_composition(unsigned special)
             for (unsigned at = 0; at < 160; ++at) {
                 int observed = mapping == 2 ? at < 12
                                : mapping    ? ((!special && at < 4) || (at >= 29 && at < 34) ||
-                                            (at >= 39 && at < 44))
+                                               (at >= 39 && at < 44))
                                             : ((at >= 5 && at < 10) || at >= 80);
                 fixture.data[mapping][at] ^= 1;
                 int status = hpclang_rpl_reference_guards_validate(&validation, guards,
