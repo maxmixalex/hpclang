@@ -241,6 +241,78 @@ static void configuration(void)
     }
 }
 
+static void unconfiguration(void)
+{
+    for (unsigned mode = 0; mode < 8; ++mode) {
+        struct hpclang_rpl_code_store store = fixture();
+        assert(!hpclang_rpl_reference_guards_begin(&probe.builder, probe.guards, 1536));
+        word(0xb9c, 3);
+        word(0xbcc, 1);
+        word(0xbd0, 2);
+        word(0x7f * 4, 0x08010000);
+        word(0x404 + 0x7f * 4, 0x08010000);
+        struct hpclang_rpl_code_configuration config = {.instruction = 0xb247,
+                                                        .value = (uint32_t)store.value};
+        memcpy(config.origins, store.origins, sizeof config.origins);
+        assert(!execution_config(&probe, &config));
+        ram[0x20008] = 0x24;
+        ram[0x20009] = 0xf0;
+        ram[0x2000a] = 0x47;
+        config.instruction = 0xb2d1;
+        config.value = 0x7f024;
+        for (unsigned i = 0; i < 5; ++i)
+            config.origins[i] = 0x90011 + i;
+        assert(!execution_config(&probe, &config));
+        struct hpclang_rpl_code_store bank = {
+            .instruction = 0xb2d7, .nibbles = 2, .address = {.value = config.value}};
+        memcpy(bank.address.origins, config.origins, sizeof config.origins);
+        assert(!execution_bank_write(&probe, &bank));
+        config.instruction = 0xb2da;
+        if (mode == 1)
+            config.instruction++;
+        if (mode == 2)
+            probe.bank_writes = 0;
+        if (mode == 3)
+            probe.configurations = 1;
+        if (mode == 4)
+            config.origins[0] = 0;
+        if (mode == 5)
+            config.value = 0x80000;
+        if (mode == 6) {
+            /* RAM takes precedence and requires an unqualified map rebuild. */
+            memset(probe.native_after + 0xba8, 0, 4);
+            probe.native_after[0xba8] = 0x7f;
+        }
+        if (mode == 7)
+            probe.native_after[0xb9c] = 3;
+        uint8_t simulated[sizeof probe.native_after];
+        memcpy(simulated, probe.native_after, sizeof simulated);
+        memcpy(before, ram, sizeof ram);
+        int result = execution_unconfig(&probe, &config);
+        assert(!memcmp(before, ram, sizeof ram));
+        if (mode) {
+            assert(result < 0 && !probe.unconfigurations);
+            assert(!memcmp(simulated, probe.native_after, sizeof simulated));
+            continue;
+        }
+        assert(!result && probe.unconfigurations == 1);
+        simulated[0xb9c] = 3;
+        memset(simulated + 0xbb0, 255, 4);
+        assert(!memcmp(simulated, probe.native_after, sizeof simulated));
+        uint8_t value;
+        uint32_t token;
+        struct hpclang_rpl_code_origin_cell cell;
+        assert(!execution_shadow_value(&probe, 0x7f000, &value, &token));
+        assert(!execution_write_cell(&probe, 0x7f000, &cell));
+        const struct hpclang_rpl_reference_reader guards = {execution_guard_read, &probe};
+        assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));
+        ram[0xbb0] ^= 1;
+        assert(hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count) <
+               0);
+        assert(execution_unconfig(&probe, &config) < 0);
+    }
+}
+
 static void bank_write(void)
 {
     for (unsigned mode = 0; mode < 6; ++mode) {
@@ -303,7 +375,7 @@ static void constant_source(void)
                                                             .nibbles = 1},
                                              .p = 7,
                                              .p_origin = 0x90011};
-    uint32_t tokens[16];
+    uint32_t tokens[16] = {0};
     assert(!execution_constant(&probe, &fact, tokens) && tokens[0] == 0x600001);
     assert(!execution_payload(&probe, &probe.plan, tokens[0], 0, 0));
     assert(probe.constant_limit == 1);
@@ -327,7 +399,7 @@ static void unit_source(void)
                                          .after = 5,
                                          .p_origin = 0x90011};
     fact.origins[0] = 0x90012;
-    uint32_t tokens[16];
+    uint32_t tokens[16] = {0};
     assert(!execution_unit(&probe, &fact, tokens) && tokens[0] == 0x700001);
     assert(!execution_payload(&probe, &probe.plan, tokens[0], 5, 5));
     assert(probe.unit_limit == 1);
@@ -352,7 +424,7 @@ static void sum_source(void)
     struct hpclang_rpl_code_sum_source fact = {.p_origin = 0x90011};
     assert(!hpclang_rpl_code_sum_inspect(&reader, 0x90030, 3, &values, &fact.sum));
     fact.origins[0][0] = fact.origins[1][0] = 0x90012;
-    uint32_t tokens[16];
+    uint32_t tokens[16] = {0};
     assert(!execution_sum(&probe, &fact, tokens) && tokens[0] == 0x800001);
     values.registers[2] = 8;
     assert(!hpclang_rpl_code_sum_inspect(&reader, 0x90040, 3, &values, &fact.sum));
@@ -415,6 +487,7 @@ static void protected_body(void)
 
 int main(void)
 {
+    unconfiguration();
     bank_write();
     constant_source();
     unit_source();

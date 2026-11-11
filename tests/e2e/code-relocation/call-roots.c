@@ -697,7 +697,7 @@ struct execution_probe
         uint32_t field, value, origin;
     } shadow[37];
     uint8_t native_before[0xc60], native_after[0xc60];
-    unsigned configurations, bank_writes, payload_limit, payload_depth;
+    unsigned configurations, unconfigurations, bank_writes, payload_limit, payload_depth;
     struct hpclang_rpl_code_constant constants[3];
     unsigned constant_count, constant_limit, predicates;
     struct hpclang_rpl_code_unit units[1];
@@ -820,7 +820,7 @@ static int execution_shadow_value(void *context, uint32_t at, uint8_t *value, ui
     struct execution_probe *probe = context;
     /* The second qualified CONFIG activates this I/O window. Its contents
      * cannot be read through the original ordinary-memory mapping. */
-    if (probe->configurations == 2 && (at >> 12) == 0x7f)
+    if (probe->configurations == 2 && !probe->unconfigurations && (at >> 12) == 0x7f)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     if (at >= 0x100000)
         return HPCLANG_RPL_SPAN_BOUNDS;
@@ -863,7 +863,7 @@ static int execution_collect_observe(void *context, unsigned space, uint32_t at,
 static int execution_write_cell(struct execution_probe *probe, uint32_t at,
                                 struct hpclang_rpl_code_origin_cell *cell)
 {
-    if (probe->configurations == 2 && (at >> 12) == 0x7f)
+    if (probe->configurations == 2 && !probe->unconfigurations && (at >> 12) == 0x7f)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     uint32_t words[3] = {0};
     const uint32_t offsets[3] = {0x404 + 4 * (at >> 12), 0xba0, 0xbb0};
@@ -1353,6 +1353,37 @@ static int execution_config(void *context, const struct hpclang_rpl_code_configu
     return 0;
 }
 
+/* This path cancels only the bank-selector window. RAM unconfiguration needs
+ * a separately qualified map rebuild and cannot reuse this flags-only effect. */
+static int execution_unconfig(void *context, const struct hpclang_rpl_code_configuration *config)
+{
+    struct execution_probe *probe = context;
+    if (probe->configurations != 2 || probe->bank_writes != 1 || probe->unconfigurations ||
+        config->instruction != 0xb2da || probe->native_after[0xb9c] != 7)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_unconfig effect;
+    int result = hpclang_rpl_unconfig_inspect(probe->native_after, config->value, &effect);
+    if (result)
+        return result;
+    if (effect.kind != HPCLANG_RPL_UNCONFIG_BANK || effect.rebuild || effect.flags != 3 ||
+        effect.clear_field != 0xbb0)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_code_store input = {
+        .nibbles = 5, .value = config->value, .adjustment = config->adjustment};
+    memcpy(input.origins, config->origins, sizeof config->origins);
+    probe->payload_limit = probe->stores;
+    result = hpclang_rpl_execution_plan_payload(&probe->plan, &input, input.value, execution_source,
+                                                execution_payload, probe);
+    if (result)
+        return result;
+    /* Both CONFIG callbacks captured the entire original native state. Keep
+     * those original guards; only advance the private simulation here. */
+    probe->native_after[0xb9c] = 3;
+    memset(probe->native_after + 0xbb0, 255, 4);
+    ++probe->unconfigurations;
+    return 0;
+}
+
 static int execution_guard_read(void *context, uint32_t mapping, uint32_t at, uint8_t *value)
 {
     struct execution_probe *probe = context;
@@ -1406,7 +1437,7 @@ static int capture_execution(struct hpclang_rpl_mutation_io *io, uint32_t home)
     uint32_t steps;
     const struct hpclang_rpl_code_callbacks callbacks = {
         execution_derive,   execution_store, execution_config, execution_predicate,
-        execution_constant, execution_unit,  execution_sum,    NULL};
+        execution_constant, execution_unit,  execution_sum,    execution_unconfig};
     int stop = hpclang_rpl_execution_collect_observed(boot, &execution, 0x200000, 107,
                                                       &probe->state, &steps, &callbacks);
     if (stop != HPCLANG_RPL_EXECUTION_BOUNDARY || !probe->plan.count ||
