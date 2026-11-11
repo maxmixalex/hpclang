@@ -272,7 +272,7 @@ static void configuration(void)
             continue;
         }
         assert(!result && probe.configurations == 1);
-        assert(probe.builder.count > 1200 && probe.builder.count <= 1536);
+        assert(probe.builder.count >= 792 && probe.builder.count <= 1536);
         assert(ram[0xb9c] == 3 && probe.native_after[0xb9c] == 35);
         const struct hpclang_rpl_reference_reader guards = {execution_guard_read, &probe};
         assert(!hpclang_rpl_reference_guards_validate(&guards, probe.guards, probe.builder.count));

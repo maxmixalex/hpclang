@@ -1105,8 +1105,8 @@ static int catalog_resize_repaired(const struct hpclang_rpl_mutation_io *io, uin
     for (uint32_t i = 0; repairs && i < repairs->guard_count; ++i) {
         const struct hpclang_rpl_reference_guard *guard = &repairs->guards[i];
         uint32_t value;
-        if (!guard->width || guard->width > 5 || guard->field > 0x100000u - guard->width ||
-            guard->expected >> (4 * guard->width)) {
+        if (!guard->width || guard->width > 8 || guard->field > 0x100000u - guard->width ||
+            (guard->width < 8 && guard->expected >> (4 * guard->width))) {
             result = HPCLANG_RPL_MUTATION_MALFORMED;
             goto done;
         }

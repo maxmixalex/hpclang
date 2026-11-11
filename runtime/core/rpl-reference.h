@@ -358,7 +358,7 @@ struct hpclang_rpl_reference_reader
 };
 
 /* Read-only dependencies of a relocation plan, including short native count,
- * ID and flag fields. Width is 1..5 nibbles. Overlap is allowed: guards do not
+ * ID and flag fields. Width is 1..8 nibbles. Overlap is allowed: guards do not
  * write. Validate alongside edits while retaining exclusive ownership through
  * commit; neither validation supplies synchronization or discovers omissions. */
 struct hpclang_rpl_reference_guard
@@ -374,7 +374,7 @@ struct hpclang_rpl_reference_guard_builder
 };
 
 /* Bounded accumulation of observed nibbles into sorted, nonoverlapping guards.
- * Merge adjacent observations up to five nibbles; never include an unobserved
+ * Merge adjacent observations up to eight nibbles; never include an unobserved
  * cell. Repeated identical observations use no extra space. Conflicting values,
  * invalid input or insufficient capacity latch an error and invalidate count.
  * Start a new stream with begin after any failure. Only successful complete

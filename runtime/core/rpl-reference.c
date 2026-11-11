@@ -252,13 +252,13 @@ int hpclang_rpl_reference_guards_observe(struct hpclang_rpl_reference_guard_buil
             return guard_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
         return 0;
     }
-    if (index && guards[index - 1].mapping == mapping && guards[index - 1].width < 5 &&
+    if (index && guards[index - 1].mapping == mapping && guards[index - 1].width < 8 &&
         guards[index - 1].field + guards[index - 1].width == address) {
         --index;
         guards[index].expected |= (uint32_t)value << (4 * guards[index].width);
         ++guards[index].width;
     } else if (index < builder->count && guards[index].mapping == mapping &&
-               guards[index].field == address + 1 && guards[index].width < 5) {
+               guards[index].field == address + 1 && guards[index].width < 8) {
         --guards[index].field;
         guards[index].expected = (guards[index].expected << 4) | value;
         ++guards[index].width;
@@ -272,7 +272,7 @@ int hpclang_rpl_reference_guards_observe(struct hpclang_rpl_reference_guard_buil
     }
     if (index + 1 < builder->count && guards[index].mapping == guards[index + 1].mapping &&
         guards[index].field + guards[index].width == guards[index + 1].field &&
-        guards[index].width + guards[index + 1].width <= 5) {
+        guards[index].width + guards[index + 1].width <= 8) {
         guards[index].expected |= guards[index + 1].expected << (4 * guards[index].width);
         guards[index].width += guards[index + 1].width;
         for (uint32_t i = index + 1; i + 1 < builder->count; ++i)
@@ -292,10 +292,10 @@ int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_rea
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     for (uint32_t i = 0; i < count; ++i) {
         const struct hpclang_rpl_reference_guard *guard = &guards[i];
-        if (!guard->width || guard->width > 5)
+        if (!guard->width || guard->width > 8)
             return HPCLANG_RPL_SPAN_MALFORMED;
         if (guard->field > 0x100000u - guard->width ||
-            guard->expected >= (1u << (4 * guard->width)))
+            (guard->width < 8 && guard->expected >= (1u << (4 * guard->width))))
             return HPCLANG_RPL_SPAN_BOUNDS;
     }
     for (uint32_t i = 0; i < count; ++i) {
