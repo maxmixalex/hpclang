@@ -3118,6 +3118,123 @@ removed by the maintained harness after its count check and montage creation.
 This local result supports delivery of the pacing correction, not acceptance
 of #26 or proof that it explains every original packet-loss event.
 
+### Historical PR18 transport/environment delivery
+
+The following records precede accepted #29; its retransmission fix is now on main. The remaining environment-entry change still requires current CI.
+
+Pacing-branch CI follow-up (local): failed job 121168675610 at fb7dd394
+reports Direct HP39gs watchdog result 0x46417b03. Its saved log and artifact
+12600331275 retain the failure; that compound assertion alone does not prove
+a unique cause. Commit 6074ccaf carries the existing deadline-aware wait and
+first-failure diagnostics from c5b88cab. Runtime and Kermit code are unchanged.
+All 18 Direct normal/exit/_Exit and six Stock immediate-exit cases pass on all
+six models; queue 55984 exits zero. Independent replay checks all 24 unique
+saved results, exact summary identity, settled return and payload hashes.
+Evidence: /work/oct26-kermit-watchdog/final-audit.json. The reused build mirror
+matches all 4031 audited inputs, including the materialized font archive's LFS
+SHA-256. Pinned formatting passes. This is local validation, not remote acceptance.
+Before this follow-up push, previous #21 has four queued checks; #18 retains
+the same failed job alongside incomplete jobs. #13/#14/#15/#17/#20 remain
+incomplete; #19's two checks pass but its base conflicts. Review:
+research/oct26-conditional-prepush-ci.json. Do not poll newly triggered CI;
+M8 remains open.
+
+M8 transfer reliability delivery (local acceptance): Kermit retransmissions now
+honor configured SEND PAUSE before sampling the RTT timestamp. A real PTY
+regression rejects the previous bundled server and passes with the patch,
+including repeated NAK turnaround, byte/CRC identity and the existing timeout,
+dropped/delayed ACK, Init-Info and subsequent-file checks. Local setup-runtime
+also accepts -- command to inherit bundled tools/libraries; four regressions,
+Ruff, ShellCheck and strict docs pass. Existing CI exports remain unchanged.
+
+Using the exact failed CI 40175276034 notebook payload and matching emulator,
+explicitly patched Kermit passes HP39gs transfer, three Stock launches, settled
+return and independent notebook pixels (queue 35554 exits zero). Evidence:
+/work/oct26-notebook-paced/report.json and server-sha256.txt. System-Kermit
+control also passes; this proves local acceptance, not elimination of every
+intermittent CI stall. Remote transport acceptance and broader M8 remain open.
+
+
+### 2026-11-04 PR18 remaining environment-entry delivery
+
+Submitted 0390e023 integrates accepted main into PR18. The remaining functional
+diff is setup-runtime.sh command execution with the portable PATH/library
+environment; runtime, watchdog and Kermit retry-pacing sources match main.
+Four real subprocess tests verify literal arguments/status, CI exports, missing
+bundled tool rejection and invalid syntax. Ruff, normalized-shell ShellCheck,
+strict docs and diff checks pass. The prior-head remote API returns no runs
+(research/nov04-pr18-previous-ci-unavailable.json); historical failed jobs remain
+unresolved evidence. New-head CI was not polled during submission.
+
+### Original filesystem gate historical delivery notes
+
+The following records precede the accepted merge of #15; its dependency is now satisfied. PR #19 itself remains unaccepted.
+
+Filesystem gate parent synchronization: PR #19 now includes parent #15 at
+ca1baf2b. The only conflicts were competing documentation additions; both
+filesystem and accepted HPGCC3 graphics evidence are retained. All runtime
+files match #15 and all four filesystem gate sources match the previously
+Quality-passed 74da9cf3. The merge remains dependent on #15 and its own CI;
+older local/submission checkpoints below are historical. M8 stays open.
+
+Original HPGCC2 filesystem delivery (local): pinned example2/example3 sources
+build through one relocated installed SDK, with explicit migration diffs and
+all-six-model launcher packaging. HP49g+/HP50g Direct and Stock runs pass file
+operations, real blocking input, settled return and independent raw FAT checks.
+Stock five-frame and Direct six-frame ROM/package-derived console pixel checks
+pass on both models, with nine corruption/missing/font negatives rejected.
+This gate depends on the protected SD Reset boundary in PR #15 (179b6c23).
+Other models have packaging evidence only; multiple volumes and physical-device
+acceptance remain open. Caller-supplied original archives/ROMs are not shipped.
+Evidence: /work/oct26-fsystem-fixed{,-runs} and oct26-fsystem-console-*.json.
+
+Before submission, reviewed previous #18: checks queued; #13/#14 pending, #15
+incomplete. #17 has newly failed system-services Direct jobs: retained result
+artifacts show 0x46417b03 on HP40gs/HP48gII/HP49g+ and 0x46417b8e on HP50g.
+Those match old fixture failure paths but do not independently prove the root
+cause; #17 lacks the deadline/diagnostic correction submitted in #13/#14.
+Logs and JSON are retained under research/oct26-format-ci-failures and
+research/oct26-ci-121*.log. Remote acceptance of these branches remains open.
+
+
+### 2026-11-04 Current filesystem SDK and Direct validation
+
+PR19 6a905dfa passes a fresh source-SDK installation, both pinned original
+HPGCC2 applications and all six launcher packages. The temporary SDK was
+removed after building. Inputs/build report: /work/nov04-fsystem-current-sdk.
+Three application HPC payloads match earlier native evidence; launcher binaries
+differ, so current runtime checks are required. Both HP49g+/HP50g Direct cases
+pass settled return and independent packaged-font console pixels. Current Stock
+cases are running in /work/nov04-fsystem-native (session 8642); no full current
+acceptance. The first private driver selected the wrong Direct font; after its
+terminal verifier failure, the correct newrpl_font6_menus.S was used to replay
+retained pixels without rerunning the completed application.
+
+Notebook resource matrix now independently verifies HP39g+/HP39gs/HP40gs
+(touched stack 1544, reserved heap peak 9460 bytes each) and HP48gII
+(touched stack 1904, reserved heap peak 9924 bytes). Two models remain. This
+is the startup/ON workload only; the existing independent-resource-audit.json
+records artifact identities and each actual RW/heap capacity.
+
+
+### 2026-11-04 Notebook resources and original filesystem matrices complete locally
+
+Notebook startup/ON resource/pixel/settled-return gates pass all six Stock models.
+Independent audit: /work/nov04-notebook-resources-matrix/independent-resource-audit.json.
+Touched-stack/allocator-reserved heap peaks are 1544/9460 bytes on HP39 models,
+1904/9924 on HP48gII, and 1912/13660 on HP49g+/HP50g. Observations include
+test instrumentation; save/export peaks, untouched stack reservations, native
+firmware and launcher RAM remain outside this workload. Verifier formatting
+after the sealed run preserves its Python AST; original verifier and both hashes
+are retained in research/nov04-notebook-{validated-verifier.py,format-equivalence.json}.
+Resource verifier negatives, ARM static analysis and source format/lint pass.
+
+PR19 current installed SDK passes both original source builds and six-model
+packaging. Both HP49g+/HP50g Direct and Stock executions pass, with independent
+22-frame console checks, settled returns and raw Stock FAT inspection. Audit:
+/work/nov04-fsystem-native/independent-audit.json; script
+research/nov04-fsystem-final-audit.py. Current-head CI remains pending; these
+results do not complete M8.4 or establish physical-device behavior.
 Retry-pacing delivery: `fce14d73` pushed in draft PR #29 after auditing and
 investigating preceding CI failures. New-head CI was not polled this turn.
 
@@ -5061,3 +5178,134 @@ Sanitizer/ARM compile/analysis pass; C-evaluated single-seed paths still match
 21 instructions per model, now also comparing decimal mode. Python organizes
 the loop and token ownership; production integration remains open. Evidence:
 /work/nov05-data-step/arithmetic-mode.json and c-evaluated-path.json.
+## 2026-11-05 — Local runtime environment branch integration
+
+PR #18 previous exact head 0390e023 has 389 successful jobs, two skips and
+one cancelled Font Gallery evidence publisher; Runtime publishing succeeds.
+PR #19 has the complementary unresolved Runtime publisher cancellation, with
+Gallery publishing successful. Neither cancellation counts as acceptance.
+Audits: research/nov05-pending-ci-18.json and nov05-pending-ci-19.json.
+
+PR #18 now integrates accepted main 26140e1d as 1b24a09f. Only roadmap/history
+conflicted; history uses a union merge and the current roadmap is retained.
+Relative to accepted main, functional changes remain limited to the local
+setup-runtime command entry, its four tests and transport documentation.
+All four tests, Ruff, normalized ShellCheck and strict docs pass. The result
+was pushed after the previous-head audit; new CI was not inspected that turn.
+No milestone or original hardware/transfer failure is declared complete.
+
+The allocation/UI matrix additionally completes HP50g Stock and HP39g+ Direct,
+bringing saved passing cases to seven of twelve. The HP39g+ Stock process is
+confirmed live. Independent saved-artifact revalidation passes all seven completed cases, including source/artifact hashes, saved pixels, stack budgets, native release and lifecycle free lists. The partial report /work/nov05-allocation-ui-combined/independent-partial-audit.json explicitly has complete=false; full twelve-case acceptance remains pending.
+## 2026-11-05 — Original HPGCC application integration and fresh SDK
+
+PR #19 local candidate 113e1a8f integrates accepted main 26140e1d. Only the
+roadmap/history required manual conflict resolution; union history preserves
+both sides. Functional differences from main remain the four original-application
+compatibility gate sources and documentation. Ruff and strict docs pass.
+
+A fresh temporary installed SDK builds both original HPGCC 2.0 SP2 filesystem
+applications, all six model packages, and the native observation fixture.
+The archive and current implementation inputs are hashed; report and logs live
+under /work/nov05-fsystem-integrated-sdk. Temporary SDK storage is removed by
+the completed build runner. Four new HP49g+/HP50g Direct/Stock executions are
+started under /work/nov05-fsystem-integrated-native using the current sealed
+emulator and firmware. Current-source/artifact, independent console/FAT and
+settled-return checks remain required; no new runtime completion or push claimed.
+
+The independent allocation/UI matrix now has nine saved passing cases, adding
+HP39g+ Stock and HP39gs Direct. The first seven have a separate passing partial
+audit; this does not imply that the latest two have already been re-audited.
+HP39gs Stock is confirmed running, followed by HP40gs Direct/Stock.
+
+## 2026-11-05 — Integrated original filesystem application acceptance
+
+Local PR #19 candidate 113e1a8f passes all four fresh HP49g+/HP50g Direct/Stock
+executions. The final independent audit checks current source/artifact hashes,
+all 22 saved console frames, settled return and raw FAT create/rename/delete/
+retained-file contents. Fresh installed SDK packaging already passed both
+original programs and all six model packages. Evidence:
+/work/nov05-fsystem-integrated-native/independent-audit.json and
+/work/nov05-fsystem-integrated-sdk/inputs.json. Ruff and strict docs pass.
+The pre-push audit of 6a905dfa retains 389 successful jobs, two skips and the
+cancelled Runtime publisher; it does not count cancellation as acceptance.
+These results do not prove physical hardware, all models' filesystem execution
+or completion of M8.4.
+
+The separate PR #27 HP40gs transfer failure now has a diagnostic local replay
+with exact failing-run artifacts (run 41942700281, job 126971037182), matching
+HPC payload/memory report and the original bundled emulator/tools. Only existing
+USB event logging is enabled. The diagnostic is running; no transport fix or
+successful replay is inferred. Inputs and results live at
+/work/nov05-pr27-usb-replay/replay.json.
+
+## 2026-11-06 — Two-operand source repair constraints
+
+Implementation 4a78bb52 adds hpclang_rpl_execution_plan_subtraction. It verifies
+the original result/borrow from recorded operands and the proposed result from
+both replacements. A borrow change rejects, preserving carry-dependent flow.
+All five left digits and only participating right digits enter the same
+normalized edit builder as other consumed values. Unchanged dependencies remain
+constraints; aliases merge only when expectations/replacements agree. Left
+modular offsets are inverted; adjusted right operands remain unsupported.
+The caller still captures the original operands, guards instruction/P/mode and
+proves the relation supplies the consumed value. No automatic expression
+retention/propagation or complete mutation permission is claimed.
+
+Twelve final sanitizer targets pass (/work/nov06-expression-final/retest.log,
+retest-inputs.json). Tests execute original and repaired operands through the
+C evaluator, cover decimal/hex borrow, source offsets, stale/unknown operands,
+capacity, aliases and unchanged dependencies. An intermediate assertion wrongly
+required a conflict on unused right high digits after dependency narrowing;
+the corrected case conflicts on a participating digit and separately proves
+unused high-digit alias changes are harmless. The original failed log is kept
+in unit.log; final retest passes all twelve targets.
+
+Both captured C paths retain pre-subtraction operands from the verified ROM
+trace. The actual result 0x2907 depends on five A-source digits at Saturn
+0xffec4..0xffec8 (SRAM) and two C-literal digits at 0x28fe..0x28ff (Flash).
+The proof resolves physical aliases and requires exactly these seven sources.
+Every stale-source control rejects. An earlier consumed value shares A's source;
+a locally valid change to 0x3907 is rejected when that earlier use stays fixed.
+No native/Flash writes occur. Proof: /work/nov06-expression-plan/source-proof.json;
+captured operands and 30-step comparisons: /work/nov06-expression-operands/.
+This closes a relation-planning gap, not collection/full-mutation integration.
+
+ARM analysis has zero diagnostics. Own frames for ordinary-use planning,
+subtraction planning and its arithmetic helper are 208/272/40 bytes, not total
+call-chain bounds. Formatting and diff checks pass. Existing execution paths
+and the prior maintained Stock gate are unchanged; no fresh Stock claim is
+made for this new caller-driven planning API.
+
+During the concrete mainline sanitizer wait, #13 integrates accepted main as
+46a4cc74. Only roadmap/history conflict; both histories are preserved. Runtime,
+headers, platform, E2E, tools, CMake and workflow trees equal green e8ad129f.
+37 verifier tests, three Aplet identity tests and strict docs pass. Earlier
+all-six Direct/Stock resource evidence is retained, not rerun or newly claimed.
+Its new integration still requires CI; #18 is also queued/running. #14's two
+pre-entry USB failures remain unresolved. M8 is incomplete.
+
+
+## 2026-11-06 — Environment integration after filesystem acceptance
+
+Integration 8956de50 includes accepted main 89fe4a44. Only roadmap/history
+conflicted; both historical additions are retained. Runtime setup and its
+regression test blobs are byte-identical to previously green 1b24a09f. All
+four unittest cases, Ruff, normalized-shell ShellCheck, strict docs and diff
+checks pass. Previous exact-head CI passed twelve workflows, 390 jobs and
+two intentional skips. The new integration must pass fresh CI before merge.
+
+## 2026-11-06 - Allocation integration after green parent CI
+
+PR #13 exact head ab7842f255ab0a1d4c899b214920ae45aa3a1dd9 passes all seven
+workflows, 195 successful jobs and two intentional publisher skips. It could
+not merge because accepted main d47dcf50 caused documentation conflicts.
+Integration 7cf08668 preserves both validation histories and the current compact
+roadmap. Executable/test input comparison against the green head finds exactly
+two changes: tests/e2e/harness/setup-runtime.sh and tests/unit/test_setup_runtime.py,
+both byte-equivalent after newline normalization to accepted main. Other runtime,
+headers, platforms, tools, build settings, E2E and workflow inputs are unchanged.
+Four fresh setup-runtime tests and strict docs pass. Existing six-model Direct
+and Stock evidence is retained; no redundant application rebuild is claimed.
+Identity audit: research/nov06-allocation-main-identity.json. The integration
+requires new exact-head CI; this is not broader M8.2/M8.3/M8.5 completion.

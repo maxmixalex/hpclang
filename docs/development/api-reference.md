@@ -452,6 +452,13 @@ accept a numeric prefix. The clean text-input parsers remain the interface for
 whole-line validation and separate status/output. Including `hpstdio.h` alone
 does not select a default console; calling the input adapters does.
 
+The HPGCC 2.0 `_scanf`, `_sscanf` and `_vsscanf` entry points are also
+available from `hpstdio.h`. String scanning delegates to standard `vsscanf`;
+`_scanf` edits one bounded line (at most 1023 calculator bytes) before parsing.
+Use explicit conversion widths for destination arrays. Standard C scanning
+names remain unchanged; see the [formatted-input contract](hpgcc-compat.md#historical-formatted-input-entry-points)
+for cancellation, input errors and compatibility limits.
+
 `hpclang/hpgcc-format.h` supplies decimal digit/separator settings and eight
 named `hpclang_hpgcc_*printf` functions, including bounded and `va_list` forms.
 Define `HPCLANG_HPGCC_LEGACY_FORMAT=1` before the first compatibility include
@@ -850,7 +857,7 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | owned directory iteration | ✅ independent iterators, UTF-8 LFN, preserved stored case |
 | unsupported stream access on HP39/40 and HP48 | ✅ clean `ENOSYS` |
 | HPGCC2/3 `FS*` adapter | ✅ bounded useful subset over clean FatFs core |
-| HPGCC `hpstdio.h` adapter | Standard libc, `fdelete()`, and bounded `readint/readuint/readhex/readlonglong/readulonglong/readdouble`; explicit-opt-in decimal settings/printf adapters implemented locally, remote acceptance pending |
+| HPGCC `hpstdio.h` adapter | Standard libc, `fdelete()`, bounded numeric input, explicit-opt-in decimal settings/printf (#17), and `_scanf/_sscanf/_vsscanf` (#32) accepted; see the contracts above for limits |
 | HPGCC `fsystem.h` useful subset | ✅ implemented and exercised in Storage #53 |
 | public raw KOS file API | ✕; raw KOS stays Migration/Internal, while real KOS remains host coordination only |
 
