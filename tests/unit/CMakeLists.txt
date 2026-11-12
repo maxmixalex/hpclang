@@ -397,6 +397,11 @@ hpclang_unit(notebook_ui test_notebook_ui.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
 target_include_directories(test_notebook_ui PRIVATE "${HPCLANG_ROOT}/include")
 
 if(UNIX)
+    hpclang_unit(ui_demo_lifecycle test_ui_demo_lifecycle.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
+        "${HPCLANG_ROOT}/examples/declarative-ui/app.c")
+    target_include_directories(test_ui_demo_lifecycle PRIVATE "${HPCLANG_ROOT}/include")
+    target_compile_definitions(test_ui_demo_lifecycle PRIVATE HPCLANG_DEMO_NATIVE_FONT=0 HPCLANG_DEMO_INVERTED=0)
+    target_link_options(test_ui_demo_lifecycle PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
     hpclang_unit(ui_surface_alloc test_ui_surface_alloc.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
     target_include_directories(test_ui_surface_alloc PRIVATE "${HPCLANG_ROOT}/include")
     target_link_options(test_ui_surface_alloc PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
