@@ -333,6 +333,30 @@ inverted theme. Six-model execution and low-memory acceptance pass, with the UI
 Runtime CI jobs accepted on `a18302a3`. Broader memory/update budgets remain
 part of the renderer milestone's outstanding acceptance work.
 
+The maintained UI workload's resource checks are CI-accepted in
+[PR #33's Runtime run](https://github.com/maxmixalex/hpclang/actions/runs/43130132986)
+at `236e792b` (merged as `ddcdaa38`). All six Direct and six Stock cases pass
+the 36 KiB RW limit, independent geometry/theme/font/canvas and pressure-recovery
+pixel checks, stack/heap checks and processing ceilings. Stock additionally
+checks settled return and native free-capacity recovery. Each case measures
+nine frame updates and 34 input edges. The historical measurements below remain
+useful context; their earlier "local" status does not supersede this acceptance.
+
+| CI observation across all twelve cases | Measured maximum / reserved limit |
+| --- | ---: |
+| Application stack watermark | 2,432 / 8,192 bytes |
+| Ordinary heap extent (includes renderer and LCD backing) | 20,076 / 22,880 bytes |
+| Frame processing | 16,351 / 100,000 microseconds |
+| Input processing | 2,441 / 5,000 microseconds |
+
+On HP39g+, Direct/Stock frame maxima are 13,370/13,301 microseconds and input
+maxima are 614/489 microseconds; both use 18,892 bytes of heap and 2,424 bytes
+of touched application stack. These are measurements of the scripted emulator
+workload. They do not establish hardware deadlines, native exception-stack
+reservations or whole-system transient memory bounds; those retained acceptance
+items remain open. Host tests separately cover every renderer allocation failure
+and the shipped application's cleanup/restart paths.
+
 The device-manager example budgets 48 nodes, 512 text bytes and one asynchronous
 task for its complete eight-device view (46 live nodes). Its ARM declaration pool
 is 13,692 bytes after compact-storage changes;
@@ -395,7 +419,8 @@ arena and 22,976-byte heap capacity; ordinary peak heap extents are 18,892 and
 pixel checkpoints and normal system return pass. This is an application mapping
 budget: the legacy launcher still reserves its original Stock page pool, and
 the observation does not measure peak stack use or prove an installation-space
-minimum. CI acceptance of this follow-up is pending.
+minimum. CI acceptance of this bounded application workload is recorded above;
+whole-system admission remains open.
 
 The maintained UI E2E target declares that 36 KiB ceiling in CMake. Its ordinary
 repository build consumes the same generated launcher arguments as SDK builds,
