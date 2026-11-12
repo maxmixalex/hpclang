@@ -22,6 +22,16 @@ TOKENS = re.compile(
 )
 RULES = (
     (
+        "HP009",
+        r"\b(?:FSOpen|FSCreate|FSOpenDir)\s*\(",
+        "Review SD filesystem availability: query hpclang_device_capability(HPCLANG_CAPABILITY_STREAM_STORAGE). This backend is supported on HP49g+/HP50g, not HP39/HP40 or HP48gII; supported does not guarantee media presence or operation success. Check the FS result.",
+    ),
+    (
+        "HP010",
+        r"\b(?:sat_dir_open|sat_dir_chdir|sat_dir_getobject|sat_dir_rclobject|sat_dir_searchobject|sat_dir_getreal|sat_dir_rclreal|_sat_dir_fetchreal)\s*\(",
+        "Review native RPL directory availability: query hpclang_device_capability(HPCLANG_CAPABILITY_RPL_OBJECT_STORE). Distinguish unsupported models from context-unavailable launches; this is not HP39 Aplet storage. Check each adapter's error contract even when supported.",
+    ),
+    (
         "HP008",
         r"\b(?:ints|uints|sys_bcd2str)\s*\(",
         "Review borrowed formatting storage: do not free or adopt the returned pointer. Copy text before another call reuses its buffer; use a caller-owned buffer for retained results.",

@@ -16,6 +16,42 @@ SPEC.loader.exec_module(CHECK)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_capability_hints_cover_storage_entry_points(self):
+        source = (
+            "FSOpen /* path */ (name, mode, &file); FSCreate(name, 0, &file);\n"
+            "FSOpenDir(name, &dir);\n"
+            "sat_dir_open(); sat_dir_chdir(path); sat_dir_getobject(path);\n"
+            "sat_dir_rclobject(path); sat_dir_searchobject(name, &paths);\n"
+            "sat_dir_getreal(path, 0); sat_dir_rclreal(path, 0);\n"
+            '_sat_dir_fetchreal(path, 0, "g");\n'
+            '// FSOpen(name);\nconst char *s = "sat_dir_open()";\n'
+            'auto text = R"tag(FSCreate(name); sat_dir_chdir(path);)tag";\n'
+            "myFSOpen(name); FSOpenExtra(name); my_sat_dir_open();\n"
+        )
+        rows = CHECK.scan(source, "storage.cpp")
+        self.assertEqual(
+            [(r["rule"], r["line"]) for r in rows],
+            [("HP009", 1), ("HP009", 1), ("HP009", 2)]
+            + [("HP010", 3)] * 3
+            + [("HP010", 4)] * 2
+            + [("HP010", 5)] * 2
+            + [("HP010", 6)],
+        )
+        self.assertIn("HPCLANG_CAPABILITY_STREAM_STORAGE", rows[0]["message"])
+        self.assertIn("HPCLANG_CAPABILITY_RPL_OBJECT_STORE", rows[-1]["message"])
+
+    def test_capability_hint_does_not_claim_to_validate_guards(self):
+        source = (
+            "if (hpclang_device_capability(HPCLANG_CAPABILITY_STREAM_STORAGE) == 1)\n"
+            "  FSOpen(name, mode, &file);\n"
+            "#if 0\n  sat_dir_\\\nopen();\n#endif\n"
+        )
+        rows = CHECK.scan(source, "guarded.c")
+        self.assertEqual(
+            [(r["rule"], r["line"], r["column"]) for r in rows],
+            [("HP009", 2, 3), ("HP010", 4, 3)],
+        )
+
     def test_borrowed_buffers_report_calls_without_claiming_a_lifetime_proof(self):
         source = (
             "auto *a = ints /* base */ (12, 10);\n"

@@ -20,7 +20,8 @@ python3 /path/to/sdk/share/hpclang/tools/check-migration.py --json --check /path
 
 It reports source locations and concrete advice for legacy umbrella includes,
 raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units and
-application `errno` declarations and legacy decimal settings. Comments and string/character literals are
+application `errno` declarations, legacy decimal settings, borrowed formatting
+buffers and storage capability checks. Comments and string/character literals are
 ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
 `build`, `.cache` and `third_party`; explicitly named files are always checked.
 Inputs default to UTF-8 (an optional BOM is accepted). For an older Windows
@@ -199,6 +200,18 @@ NUL. Check cancellation/error and partial text. Do not replace the bounded
 editor with an unbounded read to preserve a historical spelling.
 
 ## Validate the actual launch context
+
+The checker flags `FSOpen`, `FSCreate` and `FSOpenDir` as `HP009`: their SD
+backend requires `HPCLANG_CAPABILITY_STREAM_STORAGE`, currently supported on
+HP49g+/HP50g rather than HP39/HP40 or HP48gII. It flags native RPL directory
+entry/read calls (`sat_dir_open`, `sat_dir_chdir`, object lookup/search and
+real-value helpers) as `HP010`, pointing to `HPCLANG_CAPABILITY_RPL_OBJECT_STORE`.
+These adapters do not access HP39 Aplet storage. Include `hpclang/device.h`
+for capability queries and keep each adapter's own result/error checks.
+
+These hints remain inside capability guards and inactive preprocessor branches:
+the checker cannot prove a guard's control flow, launch context or error handling.
+They cover these named entry points, not every storage API or indirect call.
 
 Use `hpclang_device_capability` from `hpclang/device.h` to distinguish supported,
 unsupported and context-unavailable services. A supported capability still
