@@ -1278,9 +1278,14 @@ static void native_word_payload(void)
         memcpy(before, ram, sizeof ram);
         int result = execution_payload(&probe, &probe.plan, tokens[5], 4, mode == 4 ? 5 : 4);
         assert(!memcmp(before, ram, sizeof ram));
-        if (!mode)
+        if (!mode) {
             assert(!result && probe.plan.count == 12);
-        else
+            assert(!probe.memo_depth);
+            /* A later top-level request must re-read changed instructions. */
+            ram[0x20099] = 0xeb;
+            assert(execution_payload(&probe, &probe.plan, tokens[5], 4, 4) < 0);
+            assert(!probe.memo_depth);
+        } else
             assert(result < 0);
     }
 }

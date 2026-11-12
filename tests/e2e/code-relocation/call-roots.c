@@ -714,6 +714,16 @@ struct execution_probe
     unsigned bitshift_count, bitshift_limit;
     struct hpclang_rpl_code_native_word native_words[16];
     unsigned native_word_count, native_word_limit, dispatch_roots_checked;
+    /* Repeated digits can request the same whole-word proof recursively. Reuse
+     * only successful constraints within one top-level payload expansion, with
+     * the same builder, proposed values and dependency limits. Sources/shadow
+     * are read-only during that expansion; subsequent requests start fresh. */
+    unsigned memo_depth;
+    struct
+    {
+        unsigned valid, limits[9];
+        uint32_t input, output;
+    } word_memo[16];
     const struct hpclang_rpl_rom_profile *push_profile;
     struct hpclang_rpl_code_native_word pushes[2];
     unsigned push_count, push_limit;
@@ -997,8 +1007,21 @@ static int execution_free_replacement(struct execution_probe *probe, uint32_t va
     return 0;
 }
 
+static int execution_payload_impl(void *context, struct hpclang_rpl_reference_edit_builder *builder,
+                                  uint32_t token, uint8_t expected, uint8_t replacement);
 static int execution_payload(void *context, struct hpclang_rpl_reference_edit_builder *builder,
                              uint32_t token, uint8_t expected, uint8_t replacement)
+{
+    struct execution_probe *probe = context;
+    if (!probe->memo_depth)
+        memset(probe->word_memo, 0, sizeof probe->word_memo);
+    ++probe->memo_depth;
+    int result = execution_payload_impl(context, builder, token, expected, replacement);
+    --probe->memo_depth;
+    return result;
+}
+static int execution_payload_impl(void *context, struct hpclang_rpl_reference_edit_builder *builder,
+                                  uint32_t token, uint8_t expected, uint8_t replacement)
 {
     struct execution_probe *probe = context;
     if (token >= 0xd00001) {
@@ -1104,6 +1127,17 @@ static int execution_payload(void *context, struct hpclang_rpl_reference_edit_bu
         uint32_t output = input + (uint32_t)fact->delta;
         if (((output >> (4 * digit)) & 15) != replacement)
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        const unsigned limits[9] = {
+            probe->push_limit,    probe->bitshift_limit, probe->logical_limit,
+            probe->sum_limit,     probe->unit_limit,     probe->constant_limit,
+            probe->payload_limit, probe->payload_depth,  probe->native_save_count};
+        /* Keep token, digit, lineage and proposed-value checks above the hit.
+         * The recursive word limit becomes index on either path; other limits
+         * must match so reuse cannot bypass a narrower dependency context. */
+        if (builder == &probe->plan && !builder->error && probe->word_memo[index].valid &&
+            probe->word_memo[index].input == input && probe->word_memo[index].output == output &&
+            !memcmp(probe->word_memo[index].limits, limits, sizeof limits))
+            return 0;
         unsigned limit = probe->native_word_limit;
         probe->native_word_limit = index;
         const struct hpclang_rpl_reader instructions = {execution_plan_read, probe};
@@ -1111,6 +1145,12 @@ static int execution_payload(void *context, struct hpclang_rpl_reference_edit_bu
             builder, fact, input, output, &instructions, execution_token, execution_source,
             execution_payload, probe);
         probe->native_word_limit = limit;
+        if (!result && builder == &probe->plan) {
+            probe->word_memo[index].valid = 1;
+            probe->word_memo[index].input = input;
+            probe->word_memo[index].output = output;
+            memcpy(probe->word_memo[index].limits, limits, sizeof limits);
+        }
         return result;
     }
     if (token >= 0x900001) {
