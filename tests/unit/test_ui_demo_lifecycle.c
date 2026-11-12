@@ -79,7 +79,9 @@ enum fault
     BEGIN,
     PRESENT,
     TIMEOUT,
-    KEYBOARD
+    KEYBOARD,
+    ASYNC_ERROR,
+    ASYNC_READY
 };
 static enum fault fault;
 const struct hpclang_boot_info *hpclang_boot_info(void)
@@ -97,6 +99,9 @@ static void observed_init(struct demo_app *app, struct hpclang_ui *ui)
     active = app;
     struct hpclang_ui_event event = {.kind = HPCLANG_UI_ACTIVATE, .action = {DEMO_CONNECT, 0}};
     assert(demo_update(app, &event) == 1);
+    /* The provider fails the first request and succeeds on subsequent attempts. */
+    if (fault == ASYNC_READY)
+        app->attempts = 1;
     event.action.type = DEMO_SCAN;
     assert(demo_update(app, &event) == 1);
     assert(app->request && app->model.scan == DEMO_LOADING);
@@ -108,7 +113,12 @@ static int observed_shutdown(struct hpclang_ui *ui)
     assert(result == 0);
     if (active) {
         assert(active->cleanups == 1);
-        assert(active->polls < 20);
+        if (fault == ASYNC_ERROR || fault == ASYNC_READY) {
+            assert(active->polls == 20 && !active->request);
+            assert(active->model.scan == (fault == ASYNC_READY ? DEMO_READY : DEMO_ERROR));
+            assert(active->model.count == (fault == ASYNC_READY ? 3u : 0u));
+        } else
+            assert(active->polls < 20);
         assert(hpclang_ui_shutdown(ui) == 0 && active->cleanups == 1);
         active = NULL;
     }
@@ -156,7 +166,8 @@ void hpclang_keyboard_events_reset(void)
 }
 int hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
 {
-    assert(screen && ++polls <= 3);
+    unsigned exit_poll = fault == ASYNC_ERROR || fault == ASYNC_READY ? 25 : 3;
+    assert(screen && ++polls <= exit_poll);
     if (polls == 1)
         idle_attempts = attempts;
     else
@@ -165,7 +176,7 @@ int hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
         errno = EIO;
         return -1;
     }
-    if (polls < 3)
+    if (polls < exit_poll)
         return 0;
     *event =
         (struct hpclang_keyboard_event){.key = HPCLANG_KEY_ON, .type = HPCLANG_KEYBOARD_EVENT_DOWN};
@@ -186,9 +197,10 @@ static int run(int fail_after, enum fault injected)
     assert(!live && !screen && !active && begins == ends);
     assert(shutdowns <= 1);
     if (!result) {
-        assert(begins == 1 && polls == 3 && shutdowns == 1);
-        if (fault == TIMEOUT)
-            assert(presents >= 2);
+        unsigned exit_poll = fault == ASYNC_ERROR || fault == ASYNC_READY ? 25 : 3;
+        assert(begins == 1 && polls == exit_poll && shutdowns == 1);
+        /* One initial publication; one more only for completion or timeout retry. */
+        assert(presents == (fault == NONE ? 1u : 2u));
     }
     return result;
 }
@@ -207,6 +219,8 @@ int main(void)
         assert(run(-1, PRESENT) == 1);
         assert(run(-1, KEYBOARD) == 1);
         assert(run(-1, TIMEOUT) == 0);
+        assert(run(-1, ASYNC_ERROR) == 0);
+        assert(run(-1, ASYNC_READY) == 0);
         assert(run(-1, NONE) == 0);
     }
     return 0;
