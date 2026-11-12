@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <hpclang/bootstrap.h>
 
 #include "object-snapshot.h"
 #include "rpl-mutation.h"
@@ -11,6 +12,7 @@
 #include "rpl-port-mutation.h"
 #include "rpl-port.h"
 #include "rpl-backup.h"
+#include "rpl-stock-memory.h"
 #include "stage-stack.h"
 
 enum
@@ -35,6 +37,11 @@ static uint32_t writes;
 static uint32_t watched_field, watched_writes;
 static uint32_t rejected_write, rejected_commit_read;
 static uint32_t write_trace[8192];
+
+const struct hpclang_boot_info *hpclang_boot_info(void)
+{
+    return NULL;
+}
 
 #ifdef HPCLANG_TEST_WRAP_ALLOC
 void *__real_malloc(size_t size);
@@ -1889,6 +1896,101 @@ struct port1_guard_fixture
     int result;
 };
 
+/* One explicitly supplied reference, not production root discovery. Exercise
+ * the real edit guard with predicted page mappings and physical alias checks. */
+struct port1_mapped_reference
+{
+    uint32_t map[256], port_map[256], target, span, calls;
+    uint8_t owners[64];
+    struct hpclang_rpl_rom_bank bank;
+};
+
+static int check_port1_mapped_reference(void *context, uint32_t start, uint32_t end)
+{
+    struct port1_mapped_reference *reference = context;
+    ++reference->calls;
+    uint32_t selected[256];
+    memcpy(selected, reference->map, sizeof selected);
+    int result = hpclang_rpl_stock_bank_window_select(reference->map + 64, reference->owners,
+                                                      &reference->bank, selected + 64);
+    if (result)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+    result = hpclang_rpl_stock_spans_overlap(selected, reference->target, reference->span,
+                                             reference->port_map, start, end - start);
+    return result < 0 ? HPCLANG_RPL_MUTATION_MALFORMED
+           : result   ? HPCLANG_RPL_MUTATION_BUSY
+                      : HPCLANG_RPL_MUTATION_OK;
+}
+
+static void test_port1_mapping_guard(void)
+{
+    for (unsigned remove = 0; remove < 2; ++remove)
+        for (unsigned mode = 0; mode < 6; ++mode) {
+            struct hpclang_rpl_mutation_io io = setup(1);
+            const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+            put_word(0x82000, 5, 0x029bf);
+            put_word(0x82005, 2, 'A');
+            uint8_t *packed = NULL;
+            uint32_t span;
+            assert(!hpclang_rpl_backup_encode(&reader, 0x82000, 7, (const uint8_t *)"DATA", 4,
+                                              &packed, &span));
+            assert(!hpclang_rpl_port1_create_backup(&io, 256, packed, span));
+            free(packed);
+            put_word(0x82005, 2, 'B');
+            assert(!hpclang_rpl_backup_encode(&reader, 0x82000, 7, (const uint8_t *)"DATA", 4,
+                                              &packed, &span));
+            struct port1_mapped_reference reference = {
+                .target = 0x40000, .span = 1, .bank = {0x48000, 0x18000}};
+            for (unsigned i = 0; i < 256; ++i) {
+                reference.map[i] = i * 0x800u;
+                reference.port_map[i] = 0x08000000u + i * 0x800u;
+            }
+            for (unsigned i = 0; i < 64; ++i) {
+                reference.map[64 + i] = 0x08020000u + i * 0x800u;
+                reference.port_map[i] = 0x08020000u + i * 0x800u;
+            }
+            int expected = HPCLANG_RPL_MUTATION_BUSY;
+            if (mode == 0) {
+                /* Same logical address, physically disjoint after selection. */
+                expected = HPCLANG_RPL_MUTATION_OK;
+            } else if (mode == 1) {
+                reference.owners[0] = 2; /* ERAM survives Flash selection. */
+            } else if (mode == 2) {
+                reference.target = 0x80000;
+                reference.map[128] = 0x08020000; /* A differently addressed alias. */
+            } else if (mode == 3) {
+                reference.target = 0x40fff;
+                reference.span = 2;
+                reference.owners[1] = 2;
+                reference.map[65] = 0x08020000; /* Mixed span's second page aliases. */
+            } else if (mode == 4) {
+                reference.owners[0] = reference.owners[63] = 2;
+                reference.map[127] = 1; /* Late invalid input cannot hide behind a hit. */
+                expected = HPCLANG_RPL_MUTATION_UNSUPPORTED;
+            } else {
+                reference.target = 0xfffff;
+                reference.span = 2;
+                expected = HPCLANG_RPL_MUTATION_MALFORMED;
+            }
+            const struct hpclang_rpl_port1_guard guard = {check_port1_mapped_reference, &reference};
+            uint8_t before[256];
+            memcpy(before, memory, sizeof before);
+            uint32_t before_writes = writes;
+            int result = remove ? hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA",
+                                                                  4, &guard)
+                                : hpclang_rpl_port1_replace_backup(&io, 256, packed, span, &guard);
+            assert(result == expected && reference.calls == 1);
+            if (expected) {
+                assert(writes == before_writes);
+                assert(!memcmp(before, memory, sizeof before));
+            } else {
+                assert(writes > before_writes);
+                assert(memcmp(before, memory, sizeof before));
+            }
+            free(packed);
+        }
+}
+
 static int check_port1_fixture(void *context, uint32_t start, uint32_t end)
 {
     struct port1_guard_fixture *fixture = context;
@@ -2651,7 +2753,24 @@ static void check_guarded_temp(const struct hpclang_rpl_mutation_io *io)
             assert(root_dependencies[fields[i] + n]);
     /* No allocation payload was interpreted as a dependency. */
     assert(!root_dependencies[0x83006] && !root_dependencies[0x83013]);
+    state = (struct guarded_temp_state){0};
+    uint32_t extent = UINT32_MAX;
+    memset(root_reads, 0, sizeof root_reads);
+    memset(root_dependencies, 0, sizeof root_dependencies);
+    assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83013, &extent, visit_temp_dependency,
+                                                  &state) == 0);
+    assert(extent == 11 && state.calls == 35 && !writes);
+    assert(!memcmp(root_reads, root_dependencies, sizeof root_reads));
+    extent = UINT32_MAX;
+    state = (struct guarded_temp_state){0};
+    assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83014, &extent, visit_temp_dependency,
+                                                  &state) == HPCLANG_RPL_MUTATION_NOT_FOUND);
+    assert(extent == UINT32_MAX && state.calls == 35 && !writes);
     for (unsigned stop = 1; stop <= 35; ++stop) {
+        state = (struct guarded_temp_state){.stop_at = stop};
+        assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83013, &extent,
+                                                      visit_temp_dependency, &state) == 83);
+        assert(extent == UINT32_MAX && state.calls == stop && !writes);
         state = (struct guarded_temp_state){.stop_at = stop};
         assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp, visit_temp_dependency,
                                                        &state) == 83);
@@ -2665,6 +2784,11 @@ static void check_guarded_temp(const struct hpclang_rpl_mutation_io *io)
         for (unsigned n = 0; n < 5; ++n) {
             rejected_read = fields[i] + n;
             state = (struct guarded_temp_state){0};
+            assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83013, &extent,
+                                                          visit_temp_dependency,
+                                                          &state) == HPCLANG_RPL_MUTATION_IO);
+            assert(extent == UINT32_MAX && !writes);
+            state = (struct guarded_temp_state){0};
             assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp,
                                                            visit_temp_dependency,
                                                            &state) == HPCLANG_RPL_MUTATION_IO);
@@ -2672,6 +2796,10 @@ static void check_guarded_temp(const struct hpclang_rpl_mutation_io *io)
         }
     rejected_read = UINT32_MAX;
     put_word(0x8300d, 5, 10);
+    state = (struct guarded_temp_state){0};
+    assert(hpclang_rpl_mutation_find_guarded_temp(&tracked, 0x83013, &extent, visit_temp_dependency,
+                                                  &state) == HPCLANG_RPL_MUTATION_MALFORMED);
+    assert(extent == UINT32_MAX && !writes);
     state = (struct guarded_temp_state){0};
     assert(hpclang_rpl_mutation_visit_guarded_temp(&tracked, visit_temp, visit_temp_dependency,
                                                    &state) == HPCLANG_RPL_MUTATION_MALFORMED);
@@ -2696,6 +2824,19 @@ static void test_temp_allocation_visit(void)
     struct temp_visit_state state = {0};
     assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 0);
     assert(state.count == 2 && writes == 0);
+    for (uint32_t address = 0x83000; address <= 0x83023; ++address) {
+        uint32_t extent = UINT32_MAX;
+        int expected =
+            address == 0x83006 || address == 0x83013 ? 0 : HPCLANG_RPL_MUTATION_NOT_FOUND;
+        assert(hpclang_rpl_mutation_find_temp(&io, address, &extent) == expected);
+        assert(extent == (address == 0x83006 ? 7u : address == 0x83013 ? 11u : UINT32_MAX));
+        assert(writes == 0);
+    }
+    uint32_t extent = UINT32_MAX;
+    assert(hpclang_rpl_mutation_find_temp(NULL, 0x83013, &extent) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    assert(extent == UINT32_MAX);
+    assert(hpclang_rpl_mutation_find_temp(&io, 0x83013, NULL) == HPCLANG_RPL_MUTATION_UNAVAILABLE);
     state = (struct temp_visit_state){.stop = 81};
     assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 81);
     assert(state.count == 1 && writes == 0);
@@ -2706,13 +2847,21 @@ static void test_temp_allocation_visit(void)
         assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) ==
                HPCLANG_RPL_MUTATION_MALFORMED);
         assert(state.count == 0 && writes == 0);
+        /* Even a matching newer allocation cannot hide a broken older footer. */
+        assert(hpclang_rpl_mutation_find_temp(&io, 0x83013, &extent) ==
+               HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(extent == UINT32_MAX && writes == 0);
     }
     put_word(0x8300d, 5, 13);
     rejected_read = 0x8300d;
+    assert(hpclang_rpl_mutation_find_temp(&io, 0x83013, &extent) != 0);
+    assert(extent == UINT32_MAX && writes == 0);
     assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) != 0);
     assert(state.count == 0 && writes == 0);
     rejected_read = UINT32_MAX;
     put_word(TEMPTOP, 5, 0x83005);
+    assert(hpclang_rpl_mutation_find_temp(&io, 0x83006, &extent) == HPCLANG_RPL_MUTATION_NOT_FOUND);
+    assert(extent == UINT32_MAX && writes == 0);
     assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 0);
     assert(state.count == 0);
     put_word(0x83000, 5, 1);
@@ -4123,8 +4272,111 @@ static void test_boolean_return_formats(void)
     }
 }
 
+struct masked_visit_state
+{
+    uint32_t expected, calls;
+};
+
+static int visit_masked_root(void *context, enum hpclang_rpl_root_source source, uint32_t slot,
+                             uint32_t value)
+{
+    struct masked_visit_state *state = context;
+    if (source == HPCLANG_RPL_ROOT_NATIVE) {
+        assert(slot == 0 && value == state->expected);
+        ++state->calls;
+    }
+    return 0;
+}
+
+static void test_masked_root_visit_and_removal(void)
+{
+    uint8_t *before = malloc(sizeof memory);
+    assert(before);
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t root = 0xabc82500, *roots[] = {&root, &root};
+        uint32_t masks[] = {mode == 1 ? UINT32_MAX : 0xfffff, 0xfffff};
+        masks[1] = mode == 3 ? UINT32_MAX : masks[0];
+        io.native_roots = roots;
+        io.native_root_count = 2;
+        io.native_root_masks = mode ? masks : NULL;
+        struct masked_visit_state visit = {.expected = mode >= 2 ? 0x82500 : root};
+        memcpy(before, memory, sizeof memory);
+        int result = hpclang_rpl_mutation_visit_root_sources(&io, visit_masked_root, &visit);
+        assert(result == (mode == 3 ? HPCLANG_RPL_MUTATION_MALFORMED : 0));
+        assert(visit.calls == (mode == 3 ? 0u : 1u));
+        assert(!writes && root == 0xabc82500 && !memcmp(before, memory, sizeof memory));
+    }
+    /* Both ends of the deleted cell and every interior nibble are live uses;
+     * adjacent addresses are legal, and only the following one moves. */
+    for (uint32_t at = 0x82012; at <= 0x82023; ++at) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t root = 0xabc00000u | at, *roots[] = {&root};
+        const uint32_t masks[] = {0xfffff};
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        io.native_root_masks = masks;
+        memcpy(before, memory, sizeof memory);
+        int result = hpclang_rpl_mutation_catalog_shrink_repaired(&io, 0x82013, NULL);
+        if (at >= 0x82013 && at < 0x82023) {
+            assert(result == HPCLANG_RPL_MUTATION_BUSY && !writes);
+            assert(root == (0xabc00000u | at) && !memcmp(before, memory, sizeof memory));
+        } else {
+            assert(!result && root == (0xabc00000u | (at == 0x82023 ? at - 16u : at)));
+        }
+    }
+    free(before);
+}
+
+static void test_native_address_masks(void)
+{
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        struct hpclang_rpl_mutation_io io = setup(1);
+        struct named_pair pair = prepare_two_named_chars();
+        uint32_t first = 0xabc00000u | pair.object_b;
+        uint32_t second = first;
+        uint32_t *roots[] = {&first, &second, &first};
+        uint32_t masks[] = {0xfffff, 0xfffff, 0xfffff};
+        io.native_roots = roots;
+        io.native_root_count = 3;
+        io.native_root_masks = mode ? masks : NULL;
+        if (mode == 2)
+            masks[2] = UINT32_MAX;
+        if (mode == 3)
+            masks[1] = 0xffff;
+        if (mode >= 2) {
+            assert(hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, 5) ==
+                   HPCLANG_RPL_MUTATION_MALFORMED);
+            assert(!writes && first == second && first == (0xabc00000u | pair.object_b));
+            continue;
+        }
+        assert(!hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, 5));
+        assert(first == (0xabc00000u | (pair.object_b - (mode ? 5u : 0u))));
+        assert(first == second);
+        assert(!hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, -5));
+        assert(first == (0xabc00000u | pair.object_b) && second == first);
+    }
+    for (unsigned mode = 0; mode < 3; ++mode) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t root = 0xabc82500, *roots[] = {&root, &root};
+        uint32_t masks[] = {0xfffff, mode == 2 ? UINT32_MAX : 0xfffff};
+        io.native_roots = roots;
+        io.native_root_count = 2;
+        io.native_root_masks = mode ? masks : NULL;
+        int result = hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, NULL);
+        if (mode == 2) {
+            assert(result == HPCLANG_RPL_MUTATION_MALFORMED && !writes);
+            assert(root == 0xabc82500);
+        } else {
+            assert(!result && root == (mode ? 0xabc82510u : 0xabc82500u));
+        }
+    }
+}
+
 int main(void)
 {
+    test_masked_root_visit_and_removal();
+    test_native_address_masks();
     test_boolean_return_formats();
     test_jump_return_relocation();
     test_call_return_relocation();
@@ -4157,6 +4409,7 @@ int main(void)
     test_port1_library_append();
     test_port1_append_publication_failures();
     test_port1_edit_owned_suffix();
+    test_port1_mapping_guard();
     test_port0_commit_failures();
     test_port0_create_library();
     test_library_table_reference_preservation();

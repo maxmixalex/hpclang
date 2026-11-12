@@ -327,8 +327,34 @@ static void test_boolean_exchange(void)
     assert(hpclang_stack_pop_boolean(&value) == -1 && errno == ENOSYS);
 }
 
+static void test_versioned_native_root_masks(void)
+{
+    struct hpclang_rpl_memory_bounds saved = fake_bounds;
+    const uint32_t versions[] = {HPCLANG_RPL_BOUNDS_MAGIC_V2, HPCLANG_RPL_BOUNDS_MAGIC,
+                                 HPCLANG_RPL_BOUNDS_MAGIC_V4};
+    for (unsigned v = 0; v < 3; ++v) {
+        prepare_one_real();
+        uint32_t root = 0xabc84010, *roots[] = {&root};
+        const uint32_t masks[] = {0xfffff};
+        fake_bounds.magic = versions[v];
+        fake_bounds.native_roots = roots;
+        fake_bounds.native_root_count = 1;
+        fake_bounds.native_root_masks = masks;
+        struct hpclang_object *object = NULL;
+        assert(!hpclang_object_create_character('M', &object));
+        assert(!hpclang_stack_push(object));
+        /* Seven object nibbles and six allocation-footer nibbles shift the
+         * return-stack interval. Old descriptors retain full-word semantics. */
+        assert(get_word5(TEMPTOP) == 0x8400d);
+        assert(root == (v == 2 ? 0xabc8401du : 0xabc84010u));
+        hpclang_object_release(object);
+        fake_bounds = saved;
+    }
+}
+
 int main(void)
 {
+    test_versioned_native_root_masks();
     test_public_stack_reorder();
     test_boolean_exchange();
     test_public_read_only_stack();

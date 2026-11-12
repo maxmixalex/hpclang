@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import struct
 
 
 # Processing ceilings for the maintained device-manager workload, not a
@@ -53,7 +54,7 @@ def verify_memory(prefix: Path) -> tuple[int, int, int, int]:
     return final_peak, stack_limit, heap_peak, heap_limit
 
 
-def verify_stack_pointer(prefix: Path) -> dict:
+def verify_stack_pointer(prefix: Path, artifact: Path | None = None) -> dict:
     """Check the shared User/System SP bank against the application stack arena."""
     output = Path(f"{prefix}-stack-pointer-budget.json")
     output.unlink(missing_ok=True)
@@ -95,6 +96,60 @@ def verify_stack_pointer(prefix: Path) -> dict:
         memory_sha256=hashlib.sha256(Path(f"{prefix}-memory-1.json").read_bytes()).hexdigest(),
         scope="Executed application SP writes in the shared User/System bank; excludes native firmware instructions, exception bank switches and unexecuted paths.",
     )
+    if artifact is not None:
+        payload = (artifact / "e2e.hpc").read_bytes()
+        assert payload[:4] == b"HPC1" and len(payload) >= 16
+        assert int.from_bytes(payload[4:8], "little") == len(payload) - 16
+        # Exact ARM supervisor body from runtime/bootstrap/sync.S. Matching the
+        # whole bounded helper ties the minimum-PC observation to the tested
+        # image, rather than attributing arbitrary SVC activity by address alone.
+        helper = struct.pack(
+            "<14I",
+            0xE5824000,
+            0xE92D4007,
+            0xE1500003,
+            0x2A000002,
+            0xEE070F3A,
+            0xE2800020,
+            0xEAFFFFFA,
+            0xE3A00000,
+            0xEE070F9A,
+            0xEE070F15,
+            0xE1A00000,
+            0xE1A00000,
+            0xE8BD4007,
+            0xE1B0F00E,
+        )
+        borrowed = []
+        for mode, row in modes.items():
+            if mode in (16, 31):
+                continue
+            assert mode == 19, f"{prefix}: unattributed exception-mode stack"
+            offset = 16 + row["minimum_pc"] - 0x01220000 - 4
+            assert offset >= 16 and payload[offset : offset + len(helper)] == helper, (
+                f"{prefix}: borrowed stack does not match cache-clean supervisor body"
+            )
+            assert row["maximum"] - row["minimum"] == 16, (
+                f"{prefix}: borrowed stack span differs from helper frame"
+            )
+            borrowed.append(
+                dict(
+                    mode=mode,
+                    helper="hpclang_cache_clean supervisor",
+                    frame_bytes=16,
+                    minimum=row["minimum"],
+                    maximum=row["maximum"],
+                    minimum_pc=row["minimum_pc"],
+                    writes=row["writes"],
+                )
+            )
+        report["borrowed_stacks"] = borrowed
+        report["payload_sha256"] = hashlib.sha256(payload).hexdigest()
+        report["borrowed_scope"] = (
+            "Application-PC exception-stack extrema attributed to the linked helper; "
+            "not the native stack reservation, total native peak, or unseen paths. "
+            "Do not add borrowed bytes to the application arena."
+        )
     output.write_text(json.dumps(report, indent=2) + "\n")
     print(f"PASS: {prefix}: observed SP usage {used}/{limit}, touched {touched}")
     return report
@@ -228,6 +283,156 @@ def verify_pool(prefix: Path, model: int) -> int:
     return count
 
 
+def verify_allocation(prefix: Path, model: int) -> int:
+    """Cross-check the block and pool; return their union, not total native RAM."""
+    pool_pages = verify_pool(prefix, model)
+    reports = []
+    fields = {
+        "version",
+        "id",
+        "model",
+        "pointer",
+        "usable_bytes",
+        "flags",
+        "next",
+        "previous",
+        "metadata_bytes",
+        "mapped_pages",
+        "unmapped_usable_bytes",
+    }
+    begin, end = 0x08000000, 0x08040000 if model == 4 else 0x08080000
+    for checkpoint in (1, 2):
+        report = json.loads(Path(f"{prefix}-allocation-{checkpoint}.json").read_text())
+        pool = json.loads(Path(f"{prefix}-pool-{checkpoint}.json").read_text())
+        assert set(report) == fields, f"{prefix}: allocation report schema"
+        assert all(type(value) is int and 0 <= value <= 0xFFFFFFFF for value in report.values())
+        assert report["version"] == 1 and report.pop("id") == checkpoint
+        assert report["model"] == model
+        pointer, usable = report["pointer"], report["usable_bytes"]
+        assert pointer == pool["native_os_block"], f"{prefix}: allocation/pool pointer mismatch"
+        assert all(begin <= page <= end - 4096 for page in pool["physical_pages"])
+        if not pointer:
+            assert not any(report[key] for key in fields - {"version", "id", "model"})
+        else:
+            assert pointer % 4 == usable % 4 == 0
+            assert begin + 16 <= pointer <= end - 4 and usable <= end - pointer - 4
+            assert report["metadata_bytes"] == 20 and report["flags"] & 0xF000 in (0x1000, 0x2000)
+            for key in ("next", "previous"):
+                link = report[key]
+                assert not link or (
+                    link % 4 == 0 and begin <= link <= end - 16 and link != pointer - 16
+                )
+            mapped = 0
+            for page in pool["physical_pages"]:
+                if page < pointer + usable + 4 and page + 4096 > pointer - 16:
+                    assert pointer <= page and page + 4096 <= pointer + usable
+                    mapped += 1
+            assert report["mapped_pages"] == mapped
+            assert report["unmapped_usable_bytes"] == usable - mapped * 4096
+        reports.append(report)
+    assert reports[0] == reports[1], f"{prefix}: allocation changed across cleanup"
+    total = pool_pages * 4096 + reports[0]["unmapped_usable_bytes"] + reports[0]["metadata_bytes"]
+    print(f"PASS: {prefix}: pool/block union {total} bytes (other native allocations excluded)")
+    return total
+
+
+def free_list_covers(
+    read32, head: int, begin: int, end: int, heap: int, low: int, high: int
+) -> bool:
+    """Require a valid complete free list, including a block covering the released extent."""
+    assert begin <= low < high <= end and heap in (0x100, 0x200)
+    seen, spans = set(), []
+    previous = 0
+    while head:
+        assert head not in seen and head % 4 == 0 and begin <= head <= end - 20
+        seen.add(head)
+        size, flags, following, backlink = (read32(head + i) for i in range(0, 16, 4))
+        assert size % 4 == 0 and size <= end - head - 20
+        assert flags & 0xF000 == 0 and flags & 0x300 == heap
+        assert backlink == previous and read32(head + 16 + size) == size
+        spans.append((head, head + size + 20))
+        previous, head = head, following
+    spans.sort()
+    assert all(left[1] <= right[0] for left, right in zip(spans, spans[1:]))
+    return any(start <= low and high <= stop for start, stop in spans)
+
+
+def verify_native_release(prefix: Path, model: int, state: Path, proof: Path | None = None) -> int:
+    verify_allocation(prefix, model)
+    status_path = state.parent / f"{state.name.removesuffix('-state')}-stock.json"
+    status = json.loads(status_path.read_text())
+    assert (
+        status["status"] == "pass"
+        and status["returned"] is True
+        and status["return_settled"] is True
+    )
+    report = json.loads(Path(f"{prefix}-allocation-2.json").read_text())
+    pointer = report["pointer"]
+    if not pointer:
+        if proof:
+            proof.write_text(
+                json.dumps({"version": 1, "model": model, "pointer": 0, "released_bytes": 0})
+                + "\n",
+                encoding="utf-8",
+            )
+        print(f"PASS: {prefix}: no optional native block to release")
+        return 0
+    rom, ram = (state / "flash").read_bytes(), (state / "sram").read_bytes()
+    begin = 0x08000000
+    extent = 0x40000 if model == 4 else 0x80000
+    assert len(ram) == extent
+    end = begin + extent
+    pattern = struct.pack("<3I", 0xE2810003, 0xE3C05003, 0xE2854014)
+    assert rom.count(pattern) == 1, "unrecognized allocator layout"
+    function = rom.index(pattern) - 0x4C
+    assert function >= 0
+    fingerprint = hashlib.sha256(rom[function : function + 0x158]).hexdigest()
+    expected = (
+        "b34c84fce1a31f720682ee404ee5b7dca5572ee9199008a6b33c1e4f298a9a12"
+        if model == 2
+        else "2b15eda432b4983009cd537704439d7c1159e28ae04b3a6a09bd220497166e54"
+    )
+    assert fingerprint == expected, "unreviewed allocator code"
+    instruction = struct.unpack_from("<I", rom, function + 0x58)[0]
+    assert instruction & 0xFFFFF000 == 0xE59F6000
+    literal = function + 0x60 + (instruction & 0xFFF)
+    assert literal <= len(rom) - 4
+    roots = struct.unpack_from("<I", rom, literal)[0]
+
+    def read32(address):
+        assert address % 4 == 0 and begin <= address <= end - 4
+        return struct.unpack_from("<I", ram, address - begin)[0]
+
+    heap = report["flags"] & 0x300
+    assert heap in (0x100, 0x200)
+    head = read32(roots + ((heap >> 8) - 1) * 16)
+    released = report["usable_bytes"] + 20
+    assert free_list_covers(
+        read32, head, begin, end, heap, pointer - 16, pointer + released - 16
+    ), f"{prefix}: native allocation not covered by the post-return free list"
+    if proof:
+        proof.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "model": model,
+                    "pointer": pointer,
+                    "released_bytes": released,
+                    "allocator_code_sha256": fingerprint,
+                    "flash_sha256": hashlib.sha256(rom).hexdigest(),
+                    "sram_sha256": hashlib.sha256(ram).hexdigest(),
+                    "free_list_roots": roots,
+                    "free_list_head": head,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    print(f"PASS: {prefix}: {released} native block bytes returned to validated free list")
+    return released
+
+
 def verify_budget(prefix: Path, model: str, artifact: Path) -> dict:
     """Reconcile the observed pool and RW watermarks with this linked image."""
     output = Path(f"{prefix}-budget.json")
@@ -347,6 +552,12 @@ def main() -> None:
         "--pool", action="store_true", help="require Stock native-pool observations"
     )
     parser.add_argument(
+        "--allocation", action="store_true", help="also require validated native-block observations"
+    )
+    parser.add_argument(
+        "--native-release", action="store_true", help="check post-return native free list"
+    )
+    parser.add_argument(
         "--artifact", type=Path, help="reconcile pool/RW with the linked UI artifact"
     )
     parser.add_argument("--stack-pointer", action="store_true", help="require application SP trace")
@@ -356,6 +567,11 @@ def main() -> None:
     args = parser.parse_args()
     if args.pool and args.mode != "stock":
         parser.error("--pool requires Stock mode")
+    if args.allocation and not args.pool:
+        parser.error("--allocation requires --pool")
+    if args.native_release and not args.allocation:
+        parser.error("--native-release requires --allocation")
+
     if args.artifact and not args.pool:
         parser.error("--artifact requires --pool")
     if args.stage_stack and not args.artifact:
@@ -369,14 +585,23 @@ def main() -> None:
             args.mode == "stock",
         )
         if args.stack_pointer:
-            verify_stack_pointer(Path(f"build/{target}-frame"))
+            verify_stack_pointer(Path(f"build/{target}-frame"), args.artifact)
         if args.stage_stack:
             verify_stage_stack(Path(f"build/{target}-frame"), target, args.artifact)
         elif args.artifact:
             verify_budget(Path(f"build/{target}-frame"), target, args.artifact)
-        elif args.pool:
+        if args.pool:
             models = ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g")
-            verify_pool(Path(f"build/{target}-frame"), models.index(target) + 1)
+            if args.native_release:
+                verify_native_release(
+                    Path(f"build/{target}-frame"),
+                    models.index(target) + 1,
+                    Path(f"build/{target}-state"),
+                    Path(f"build/{target}-native-release.json"),
+                )
+            else:
+                check = verify_allocation if args.allocation else verify_pool
+                check(Path(f"build/{target}-frame"), models.index(target) + 1)
 
 
 if __name__ == "__main__":

@@ -26,6 +26,8 @@ hpclang_unit(watchdog_model test_watchdog_model.c)
 target_include_directories(test_watchdog_model PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
 hpclang_unit(memory_checkpoint test_memory_checkpoint.c)
+hpclang_unit(native_allocation test_native_allocation.c)
+target_include_directories(test_native_allocation PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 target_include_directories(test_memory_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
 if(UNIX)
@@ -231,6 +233,16 @@ target_include_directories(test_rpl_flash_plan PRIVATE "${HPCLANG_ROOT}/runtime/
 hpclang_unit(stage_stack test_stage_stack.c "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c")
 target_include_directories(test_stage_stack PRIVATE "${HPCLANG_ROOT}/platform/armtoolbox")
 
+hpclang_unit(stage_register test_stage_register.c "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c")
+target_include_directories(test_stage_register PRIVATE "${HPCLANG_ROOT}/platform/armtoolbox")
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    hpclang_unit(port1_bounds test_port1_bounds.c "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
+    target_include_directories(test_port1_bounds PRIVATE
+        "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+endif()
+
+
 add_executable(stage_image_driver stage_image_driver.c
     "${HPCLANG_ROOT}/platform/armtoolbox/stage-image.c"
     "${HPCLANG_ROOT}/third_party/tinf/tinflate.c")
@@ -254,6 +266,9 @@ target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(hpgcc_string test_hpgcc_string.c "${HPCLANG_ROOT}/runtime/core/hpgcc-string.c")
 target_include_directories(test_hpgcc_string PRIVATE "${HPCLANG_ROOT}/include")
+
+hpclang_unit(hpgcc_scan test_hpgcc_scan.c "${HPCLANG_ROOT}/runtime/core/hpgcc-scan.c")
+target_include_directories(test_hpgcc_scan PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(hpgcc_number test_hpgcc_number.c "${HPCLANG_ROOT}/runtime/core/hpgcc-number.c")
 target_include_directories(test_hpgcc_number PRIVATE "${HPCLANG_ROOT}/include")
@@ -385,6 +400,11 @@ hpclang_unit(notebook_ui test_notebook_ui.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
 target_include_directories(test_notebook_ui PRIVATE "${HPCLANG_ROOT}/include")
 
 if(UNIX)
+    hpclang_unit(ui_demo_lifecycle test_ui_demo_lifecycle.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
+        "${HPCLANG_ROOT}/examples/declarative-ui/app.c")
+    target_include_directories(test_ui_demo_lifecycle PRIVATE "${HPCLANG_ROOT}/include")
+    target_compile_definitions(test_ui_demo_lifecycle PRIVATE HPCLANG_DEMO_NATIVE_FONT=0 HPCLANG_DEMO_INVERTED=0)
+    target_link_options(test_ui_demo_lifecycle PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
     hpclang_unit(ui_surface_alloc test_ui_surface_alloc.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
     target_include_directories(test_ui_surface_alloc PRIVATE "${HPCLANG_ROOT}/include")
     target_link_options(test_ui_surface_alloc PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
@@ -751,6 +771,7 @@ target_include_directories(test_object PRIVATE
 
 hpclang_unit(rpl_mutation
     test_rpl_mutation.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-recovery-reservation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
@@ -960,3 +981,33 @@ hpclang_unit(win_box_reference "${HPCLANG_ROOT}/tests/compat/win-box.c" ${win_ad
     "${HPCLANG_ROOT}/runtime/core/hpgcc-box.c" "${HPCLANG_ROOT}/runtime/core/win-box-axis.c"
     "${HPCLANG_ROOT}/runtime/core/hpgcc-softmenu.c")
 target_include_directories(test_win_box_reference PRIVATE "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/include")
+
+hpclang_unit(rpl_rom_profile test_rpl_rom_profile.c "${HPCLANG_ROOT}/runtime/core/rpl-rom-profile.c")
+target_include_directories(test_rpl_rom_profile PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rpl_stock_rom test_rpl_stock_rom.c "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c")
+target_include_directories(test_rpl_stock_rom PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rpl_bank_effects test_rpl_bank_effects.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-bank-effects.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
+target_include_directories(test_rpl_bank_effects PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rpl_stock_view test_rpl_stock_view.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-view.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c")
+target_include_directories(test_rpl_stock_view PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rpl_bank_target test_rpl_bank_target.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-bank-target.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-flash-data.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-view.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-rom.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_bank_target PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rpl_execution_map test_rpl_execution_map.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-code.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-execution-map.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
+target_include_directories(test_rpl_execution_map PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
