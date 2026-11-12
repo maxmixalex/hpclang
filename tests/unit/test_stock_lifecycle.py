@@ -96,7 +96,11 @@ class StockLifecycleTests(unittest.TestCase):
             command = [
                 "bash",
                 "-c",
-                'set -eu; source "$ROOT/tests/e2e/harness/stock-lifecycle-env.sh"; '
+                # Normalize checkout line endings before passing shell source to Bash.
+                # Keep the real environment, parser and fail-fast shell behavior.
+                "set -eu\n"
+                + (ROOT / "tests/e2e/harness/stock-lifecycle-env.sh").read_text(encoding="utf-8")
+                + "\n"
                 'test -z "$LIFECYCLE"; test -z "${HPCLANG_STOCK_REQUIRE_OBJECT_PHASE:-}"',
             ]
             result = subprocess.run(command, env=env, capture_output=True, text=True)
