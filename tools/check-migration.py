@@ -22,6 +22,11 @@ TOKENS = re.compile(
 )
 RULES = (
     (
+        "HP008",
+        r"\b(?:ints|uints|sys_bcd2str)\s*\(",
+        "Review borrowed formatting storage: do not free or adopt the returned pointer. Copy text before another call reuses its buffer; use a caller-owned buffer for retained results.",
+    ),
+    (
         "HP001",
         r"\b(?:sat_peek\w*|sat_poke\w*)\s*\(",
         "Review raw Saturn access; use object snapshots/logical object-store handles and port services.",

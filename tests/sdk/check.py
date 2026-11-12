@@ -24,6 +24,7 @@ def check_migration_tool(package, work, env):
         "#include <hpgcc49.h>\n"
         "void f(void) { gets(buffer); set_decimal_digits(2); }\n"
         "void g() { auto a = 1'000; gets(buffer); auto b = 2'000; }\n"
+        "void h() { copy(ints(12, 10)); uints(34, 10); sys_bcd2str(0x1234); }\n"
     )
     source.write_text(original)
     result = subprocess.run(
@@ -46,6 +47,9 @@ def check_migration_tool(package, work, env):
         "HP002",
         "HP007",
         "HP002",
+        "HP008",
+        "HP008",
+        "HP008",
     ]:
         raise AssertionError(f"Unexpected migration findings: {report}")
     if source.read_text() != original:

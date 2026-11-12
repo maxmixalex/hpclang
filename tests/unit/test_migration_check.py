@@ -16,6 +16,23 @@ SPEC.loader.exec_module(CHECK)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_borrowed_buffers_report_calls_without_claiming_a_lifetime_proof(self):
+        source = (
+            "auto *a = ints /* base */ (12, 10);\n"
+            "auto *b = uints(34, 10);\n"
+            "auto *c = sys_bcd2str(0x1234);\n"
+            '// ints(1, 10);\nconst char *s = "uints(2, 10)";\n'
+            'auto text = R"tag(sys_bcd2str(0);)tag";\n'
+            "myints(1, 10); uints_extra(2, 10);\n"
+            "copy(ints(5, 10));\n"
+        )
+        rows = CHECK.scan(source, "owners.cpp")
+        self.assertEqual(
+            [(r["rule"], r["line"], r["column"]) for r in rows],
+            [("HP008", 1, 11), ("HP008", 2, 11), ("HP008", 3, 11), ("HP008", 8, 6)],
+        )
+        self.assertTrue(all("do not free or adopt" in row["message"] for row in rows))
+
     def test_digit_separators_do_not_hide_calls(self):
         source = (
             "auto a = 1'000; gets(buffer); auto b = 2'000;\n"

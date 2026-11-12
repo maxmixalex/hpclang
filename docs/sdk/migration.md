@@ -158,6 +158,13 @@ snapshot, by contrast, is independently owned and must be released with
 `hpclang_object_release`. Closing a directory handle does not release separately
 owned snapshots or metadata iterators.
 
+The migration checker reports these formatting calls as `HP008`. It cannot
+prove whether a result escapes or has already been copied, so a call nested
+inside a copy operation still receives a review hint. Never adopt these
+pointers into a freeing C++ owner. For example, copy into application storage
+before formatting the next value; retaining two returned pointers does not
+create two independent strings.
+
 In C++, use `owned_object` from `hpclang/object.hpp` and the directory/iterator
 owners from `hpclang/object-store.hpp`. Move to transfer ownership; borrow with
 `get()`. Use a temporary owner and swap after a successful replacement, or
