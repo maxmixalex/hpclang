@@ -2158,5 +2158,9 @@ conversion widths for destination arrays, as with standard C scanning.
 Local sanitizer tests cover the original date/time conversion, `va_list`,
 field widths, suppression, scansets, `%n`, partial conversion and input failure.
 ARMv4T compilation and analysis pass; `_scanf` has a 1056-byte own frame,
-excluding nested editor/libc stack use. Installed-SDK and native execution
-acceptance of these new entry points remain open.
+excluding nested editor/libc stack use. The installed-SDK gate compiles and
+links `tests/sdk/formatted-input.c` as both C and C++ after relocating the SDK
+to a path containing spaces. It validates their HPC1 images and six-model
+launchers alongside the existing SDK examples. Two clean builds produce 257
+byte-identical release outputs. This validates distribution and linking;
+native execution/return acceptance of these new entry points remains open.
