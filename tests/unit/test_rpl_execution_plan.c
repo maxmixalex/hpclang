@@ -1005,8 +1005,53 @@ static void native_word_plans(void)
             }
 }
 
+static void native_push_word_plans(void)
+{
+    const uint32_t values[] = {0, 1, 2, 0xfffff, 0x100000, 0xfff00000, UINT32_MAX};
+    for (unsigned old = 0; old < sizeof values / sizeof *values; ++old)
+        for (unsigned next = 0; next < sizeof values / sizeof *values; ++next) {
+            struct plan_fixture f = {0};
+            put(&f, 0, 0x04b08);
+            struct hpclang_rpl_code_native_word word = {.reg = HPCLANG_RPL_CODE_D,
+                                                        .before = values[old],
+                                                        .after = values[old] - 1,
+                                                        .delta = -1};
+            for (unsigned i = 0; i < 8; ++i) {
+                word.origins[i] = 17 + i;
+                f.memory[16 + i] = (word.before >> (4 * i)) & 15;
+            }
+            struct hpclang_rpl_reference_edit edits[13];
+            struct hpclang_rpl_reference_edit_builder builder;
+            const struct hpclang_rpl_reader reader = {read_cell, &f};
+            assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 13));
+            int result = hpclang_rpl_execution_plan_native_word(
+                &builder, &word, values[next], values[next] - 1, &reader, source_token,
+                resolve_cell, NULL, &f);
+            if (((values[old] & 0xfffff) != 0) != ((values[next] & 0xfffff) != 0)) {
+                assert(result == HPCLANG_RPL_SPAN_UNSUPPORTED && !builder.count);
+                continue;
+            }
+            assert(!result && builder.count == 13);
+            for (unsigned i = 0; i < 8; ++i) {
+                assert(edits[5 + i].field == 16 + i);
+                assert(edits[5 + i].value == ((values[next] >> (4 * i)) & 15));
+            }
+            /* Every selector digit is constrained, including the fifth digit. */
+            for (unsigned digit = 0; digit < 5; ++digit) {
+                f.memory[digit] ^= 1;
+                assert(!hpclang_rpl_reference_edits_begin(&builder, edits, 13));
+                assert(hpclang_rpl_execution_plan_native_word(
+                           &builder, &word, values[next], values[next] - 1, &reader, source_token,
+                           resolve_cell, NULL, &f) < 0);
+                assert(!builder.count && builder.error);
+                f.memory[digit] ^= 1;
+            }
+        }
+}
+
 void test_execution_plans(void)
 {
+    native_push_word_plans();
     native_word_plans();
     sum_plans();
     logical_plans();

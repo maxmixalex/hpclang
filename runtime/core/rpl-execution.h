@@ -226,9 +226,12 @@ int hpclang_rpl_execution_plan_bitshift(struct hpclang_rpl_reference_edit_builde
                                         hpclang_rpl_code_origin_resolve_fn resolve,
                                         hpclang_rpl_execution_payload_fn derived, void *context);
 
-/* Bind a native full-word arithmetic fact to its exact 81BD/81BE instruction
+/* Bind a native full-word arithmetic fact to its exact 81BD/81BE/80B40 instruction
  * and all eight input digits, including carry/borrow into upper address bits.
  * Both original and proposed words must satisfy the modulo-32-bit equation.
+ * 80B40 also preserves the original D.A zero/nonzero decision. This constrains
+ * D only: the caller separately qualifies the immutable ROM service/profile,
+ * fixed A/P/error-target producers and destination aliases before execution.
  * Errors invalidate the entire builder; no writes or execution authority. */
 int hpclang_rpl_execution_plan_native_word(struct hpclang_rpl_reference_edit_builder *builder,
                                            const struct hpclang_rpl_code_native_word *word,

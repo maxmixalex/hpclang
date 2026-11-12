@@ -344,15 +344,23 @@ int hpclang_rpl_execution_plan_native_word(struct hpclang_rpl_reference_edit_bui
         word->after != word->before + (uint32_t)word->delta ||
         output != input + (uint32_t)word->delta)
         return reject(builder, HPCLANG_RPL_SPAN_MALFORMED);
-    uint32_t opcode;
+    uint32_t opcode, length = 4;
     if (word->reg == HPCLANG_RPL_CODE_B && word->delta == 5)
         opcode = 0xeb18;
     else if ((word->reg == HPCLANG_RPL_CODE_B && word->delta == -5) ||
              (word->reg == HPCLANG_RPL_CODE_D && word->delta == 1))
         opcode = 0xdb18;
-    else
+    else if (word->reg == HPCLANG_RPL_CODE_D && word->delta == -1) {
+        opcode = 0x04b08;
+        length = 5;
+        /* The native service tests ORIGINAL D.A before the full-word decrement. */
+        if (((word->before & 0xfffff) != 0) != ((input & 0xfffff) != 0))
+            return reject(builder, HPCLANG_RPL_SPAN_UNSUPPORTED);
+    } else
         return reject(builder, HPCLANG_RPL_SPAN_UNSUPPORTED);
-    for (unsigned digit = 0; digit < 4; ++digit) {
+    if (word->instruction > 0x100000 - length)
+        return reject(builder, HPCLANG_RPL_SPAN_BOUNDS);
+    for (unsigned digit = 0; digit < length; ++digit) {
         uint8_t value;
         uint32_t origin;
         if (!instructions->read_nibble(instructions->context, word->instruction + digit, &value))

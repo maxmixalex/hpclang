@@ -1378,8 +1378,74 @@ static void native_scan_saves(void)
     }
 }
 
+static void root_word(uint32_t at, uint32_t value)
+{
+    for (unsigned digit = 0; digit < 5; ++digit) {
+        unsigned offset = 0x10000 + ((at + digit) & 0xfff) / 2;
+        unsigned shift = 4 * ((at + digit) & 1);
+        ram[offset] =
+            (uint8_t)((ram[offset] & ~(15u << shift)) | (((value >> (4 * digit)) & 15) << shift));
+    }
+}
+static void free_count_tests(void)
+{
+    for (unsigned residue = 0; residue < 5; ++residue) {
+        fixture();
+        probe.move_end = 0x90000;
+        root_word(0x806f3, probe.move_end);
+        root_word(0x806f8, probe.move_end + 100 + residue);
+        root_word(0x80e9b, 100);
+        uint32_t origins[8] = {0};
+        for (unsigned i = 0; i < 5; ++i)
+            origins[i] = 0x80e9c + i;
+        uint32_t replacement = 0;
+        unsigned cost = (100 + residue) / 5 - (84 + residue) / 5;
+        assert(!execution_free_replacement(&probe, 102, origins, 2, 0, &replacement));
+        assert(replacement == 102 - cost);
+        for (unsigned i = 0; i < 2; ++i) {
+            struct hpclang_rpl_code_native_word *word = &probe.native_words[i];
+            *word = (struct hpclang_rpl_code_native_word){.instruction = 0x3130,
+                                                          .reg = HPCLANG_RPL_CODE_D,
+                                                          .before = 100 + 2 * i,
+                                                          .after = 101 + 2 * i,
+                                                          .adjustment = i,
+                                                          .delta = 1};
+            memcpy(word->origins, origins, sizeof origins);
+            for (unsigned digit = 0; digit < 8; ++digit)
+                origins[digit] = 0xa00001 + 16 * i + digit;
+        }
+        probe.native_word_count = 2;
+        assert(!execution_free_replacement(&probe, 105, origins, 2, 2, &replacement));
+        assert(replacement == 105 - cost);
+        struct execution_probe *checkpoint = malloc(sizeof probe);
+        assert(checkpoint);
+        *checkpoint = probe;
+        memcpy(before, ram, sizeof ram);
+        for (unsigned fault = 0; fault < 4; ++fault) {
+            probe = *checkpoint;
+            memcpy(ram, before, sizeof ram);
+            uint32_t saved = probe.native_words[0].origins[0];
+            if (fault == 0)
+                probe.native_words[0].origins[0] = 0x80e9d;
+            if (fault == 1)
+                probe.native_words[0].delta = -1;
+            if (fault == 2)
+                root_word(0x806f8, probe.move_end + 15);
+            replacement = UINT32_MAX;
+            assert(execution_free_replacement(&probe, 105, origins, 2, fault == 3 ? 1 : 2,
+                                              &replacement) < 0);
+            assert(replacement == UINT32_MAX);
+            probe.native_words[0].origins[0] = saved;
+            probe.native_words[0].delta = 1;
+            root_word(0x806f8, probe.move_end + 100 + residue);
+        }
+        free(checkpoint);
+    }
+}
+
 int main(void)
 {
+    free_count_tests();
     native_scan_saves();
     native_word_payload();
     later_stores();
