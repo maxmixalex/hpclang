@@ -2162,5 +2162,9 @@ excluding nested editor/libc stack use. The installed-SDK gate compiles and
 links `tests/sdk/formatted-input.c` as both C and C++ after relocating the SDK
 to a path containing spaces. It validates their HPC1 images and six-model
 launchers alongside the existing SDK examples. Two clean builds produce 257
-byte-identical release outputs. This validates distribution and linking;
-native execution/return acceptance of these new entry points remains open.
+byte-identical release outputs. All six Direct and all six Stock executions
+of the installed C/C++ fixture subsequently pass independent source/artifact,
+result and settled-return audits. PR #32 is accepted and merged as `2f60c739`;
+its exact-head CI passes seven workflows and 203 jobs, with one intentional
+evidence-publisher skip. These results cover the formatted-input entry points,
+not physical-hardware qualification or completion of the whole M8.4 stage.
