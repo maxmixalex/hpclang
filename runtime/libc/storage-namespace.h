@@ -22,6 +22,11 @@ extern "C"
     int hpclang_namespace_owned_card_identity(uint8_t cid[16]);
     int hpclang_namespace_open(const char *path, int flags);
     int hpclang_namespace_close(int fd);
+    /* Adapter lookup needs the FAT short alias as well as the displayed name.
+     * short_name points to at least 13 bytes; NULL omits it. */
+    int hpclang_namespace_directory_read(struct hpclang_stream_directory *directory,
+                                         struct hpclang_stream_directory_entry *entry,
+                                         char *short_name);
     /* HPGCC adapter-only access-mode transition. Caller checks the file's
      * read-only attribute. Preserve identity/position and flush before dropping
      * write access. Requires the pinned FatFs configuration with no share locks. */

@@ -85,6 +85,27 @@ static unsigned compat_mounted;
 static uint8_t compat_cid[16];
 static FS_FILE *compat_files;
 static int compat_exit_registered;
+static int compat_case_mode = FSCASE_SENSHP;
+
+void FSSetCaseMode(int casemode)
+{
+    if (casemode >= FSCASE_SENS && casemode <= FSCASE_SENSHPTRUE)
+        compat_case_mode = casemode;
+}
+
+static void strip_path_semicolons(char *path)
+{
+    char *out = path;
+    for (char *in = path; *in; ++in) {
+        if (*in == '/' || *in == '\\')
+            while (out > path && out[-1] == ';')
+                --out;
+        *out++ = *in;
+    }
+    while (out > path && out[-1] == ';')
+        --out;
+    *out = '\0';
+}
 
 static void compat_shutdown_at_exit(void)
 {
@@ -123,6 +144,7 @@ int FSInit(void)
     memcpy(compat_cid, identity.cid, sizeof compat_cid);
     compat_volume = first;
     compat_mounted = mounted;
+    compat_case_mode = FSCASE_SENSHP;
     return FS_OK;
 }
 
@@ -261,7 +283,85 @@ static int append_component(char *path, size_t *length, size_t capacity, const c
     return 0;
 }
 
-static int normalize_path(const char *source, char *dest, size_t capacity)
+static int resolve_case_path(char *path, size_t capacity, int create)
+{
+    char request[HPCLANG_STREAM_NAME_CAPACITY];
+    size_t length = strlen(path);
+    if (length >= sizeof(request)) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    memcpy(request, path, length + 1u);
+    size_t prefix = request[1] == ':' ? 3u : 1u;
+    path[prefix] = '\0';
+    char *part = request + prefix;
+    while (*part) {
+        char *next = strchr(part, '/');
+        if (next)
+            *next = '\0';
+        struct hpclang_stream_directory *dir = hpclang_stream_directory_open(path);
+        if (!dir)
+            return -1;
+        struct hpclang_stream_directory_entry entry;
+        char alias[13];
+        int found = 0, status;
+        while ((status = hpclang_namespace_directory_read(dir, &entry, alias)) > 0) {
+            if (FSNameCompare(entry.name, part, compat_case_mode) ||
+                (alias[0] && FSNameCompare(alias, part, compat_case_mode))) {
+                found = 1;
+                break;
+            }
+        }
+        int error = errno;
+        int closed = hpclang_stream_directory_close(dir);
+        if (status < 0) {
+            errno = error;
+            return -1;
+        }
+        if (closed)
+            return -1;
+        size_t used = strlen(path);
+        if (found) {
+            if (append_component(path, &used, capacity, entry.name, strlen(entry.name)))
+                return -1;
+        } else {
+            if (next || !create) {
+                errno = ENOENT;
+                return -1;
+            }
+            if (compat_case_mode == FSCASE_SENSHP || compat_case_mode == FSCASE_SENSHPTRUE)
+                FSStripSemi(part);
+            if (!*part) {
+                errno = EINVAL;
+                return -1;
+            }
+            if (append_component(path, &used, capacity, part, strlen(part)))
+                return -1;
+            /* HP modes encode FAT case collisions using trailing semicolons. */
+            struct hpclang_stream_path_info info;
+            for (;;) {
+                if (hpclang_stream_path_query(path, &info))
+                    return errno == ENOENT ? 0 : -1;
+                if (compat_case_mode == FSCASE_SENS || compat_case_mode == FSCASE_INSENS) {
+                    errno = EEXIST;
+                    return -1;
+                }
+                if (used + 1u >= capacity) {
+                    errno = ENAMETOOLONG;
+                    return -1;
+                }
+                path[used++] = ';';
+                path[used] = '\0';
+            }
+        }
+        if (!next)
+            break;
+        part = next + 1;
+    }
+    return 0;
+}
+
+static int normalize_path_mode(const char *source, char *dest, size_t capacity, int create)
 {
     if (source == NULL || dest == NULL || capacity < 2u) {
         errno = EINVAL;
@@ -350,7 +450,12 @@ static int normalize_path(const char *source, char *dest, size_t capacity)
         dest[0] = (char)('0' + volume.index);
         dest[1] = ':';
     }
-    return 0;
+    return resolve_case_path(dest, capacity, create);
+}
+
+static int normalize_path(const char *source, char *dest, size_t capacity)
+{
+    return normalize_path_mode(source, dest, capacity, 0);
 }
 
 static unsigned compat_attrs(uint32_t type, uint32_t attributes)
@@ -420,7 +525,7 @@ static void compat_extra_times(FS_FILE *file, const struct hpclang_stream_civil_
 
 static const char *metadata_path(const FS_FILE *file)
 {
-    return file->_hpclang_kind == HPCLANG_HPGCC_FS_ENTRY ? file->_hpclang_entry_path : file->Name;
+    return file->_hpclang_entry_path ? file->_hpclang_entry_path : file->Name;
 }
 
 static int refresh_file_metadata(FS_FILE *file)
@@ -455,6 +560,18 @@ static FS_FILE *alloc_file(const char *name, unsigned mode)
         return NULL;
     }
 
+    if (compat_case_mode == FSCASE_SENSHP) {
+        strip_path_semicolons(file->Name);
+        if (strcmp(file->Name, name)) {
+            file->_hpclang_entry_path = compat_strdup(name);
+            if (!file->_hpclang_entry_path) {
+                free(file->Name);
+                free(file);
+                return NULL;
+            }
+        }
+    }
+
     file->Volume = info.partition ? info.partition - 1u : 0u;
     /* Keep historical first-free, per-volume numbering independently of the
      * namespace descriptor and of insertion order in the ownership list. */
@@ -467,6 +584,7 @@ static FS_FILE *alloc_file(const char *name, unsigned mode)
             break;
         }
         if (handle == INT_MAX) {
+            free(file->_hpclang_entry_path);
             free(file->Name);
             free(file);
             errno = EMFILE;
@@ -506,7 +624,7 @@ int FSOpen(char *name, int mode, FS_FILE **fileptr)
     *fileptr = NULL;
 
     char path[HPCLANG_STREAM_NAME_CAPACITY];
-    if (normalize_path(name, path, sizeof(path)) != 0)
+    if (normalize_path_mode(name, path, sizeof(path), (open_flags(mode) & O_CREAT) != 0) != 0)
         return compat_error();
 
     FS_FILE *file = alloc_file(path, (unsigned)mode);
@@ -516,6 +634,7 @@ int FSOpen(char *name, int mode, FS_FILE **fileptr)
     int fd = open(path, open_flags(mode), 0666);
     if (fd < 0) {
         int error = compat_error();
+        free(file->_hpclang_entry_path);
         free(file->Name);
         free(file);
         return error;
@@ -526,6 +645,7 @@ int FSOpen(char *name, int mode, FS_FILE **fileptr)
     int metadata_error = refresh_file_metadata(file);
     if (metadata_error != FS_OK) {
         (void)close(fd);
+        free(file->_hpclang_entry_path);
         free(file->Name);
         free(file);
         return metadata_error;
@@ -570,7 +690,7 @@ int FSCreate(char *name, int attr, FS_FILE **fileptr)
         return FS_CANTWRITE;
 
     char path[HPCLANG_STREAM_NAME_CAPACITY];
-    if (normalize_path(name, path, sizeof(path)) != 0)
+    if (normalize_path_mode(name, path, sizeof(path), 1) != 0)
         return compat_error();
 
     FS_FILE *file = alloc_file(path, FSMODE_WRITE);
@@ -580,6 +700,7 @@ int FSCreate(char *name, int attr, FS_FILE **fileptr)
     int fd = open(path, O_RDWR | O_CREAT | O_EXCL, 0666);
     if (fd < 0) {
         int error = compat_error();
+        free(file->_hpclang_entry_path);
         free(file->Name);
         free(file);
         return error;
@@ -590,6 +711,7 @@ int FSCreate(char *name, int attr, FS_FILE **fileptr)
     int result = FSChAttr(file, attr);
     if (result != FS_OK) {
         (void)close(fd);
+        free(file->_hpclang_entry_path);
         free(file->Name);
         free(file);
         return result;
@@ -644,6 +766,7 @@ int FSClose(FS_FILE *file)
         link = &(*link)->_hpclang_next;
     if (*link)
         *link = file->_hpclang_next;
+    free(file->_hpclang_entry_path);
     free(file->Name);
     file->Name = NULL;
     free(file);
@@ -656,10 +779,11 @@ int FSCloseAndDelete(FS_FILE *file)
         return FS_INVHANDLE;
 
     char path[HPCLANG_STREAM_NAME_CAPACITY];
-    size_t length = strlen(file->Name);
+    const char *actual = metadata_path(file);
+    size_t length = strlen(actual);
     if (length >= sizeof(path))
         return FS_BADNAME;
-    memcpy(path, file->Name, length + 1u);
+    memcpy(path, actual, length + 1u);
 
     int closed = FSClose(file);
     if (closed != FS_OK)
@@ -795,7 +919,7 @@ int FSRename(char *oldname, char *newname)
     char old_path[HPCLANG_STREAM_NAME_CAPACITY];
     char new_path[HPCLANG_STREAM_NAME_CAPACITY];
     if (normalize_path(oldname, old_path, sizeof(old_path)) != 0 ||
-        normalize_path(newname, new_path, sizeof(new_path)) != 0)
+        normalize_path_mode(newname, new_path, sizeof(new_path), 1) != 0)
         return compat_error();
     return rename(old_path, new_path) == 0 ? FS_OK : compat_error();
 }
@@ -803,7 +927,7 @@ int FSRename(char *oldname, char *newname)
 int FSMkdir(char *name)
 {
     char path[HPCLANG_STREAM_NAME_CAPACITY];
-    if (normalize_path(name, path, sizeof(path)) != 0)
+    if (normalize_path_mode(name, path, sizeof(path), 1) != 0)
         return compat_error();
     return mkdir(path, 0777) == 0 ? FS_OK : compat_error();
 }
@@ -854,6 +978,8 @@ char *FSGetcwd(int volume)
     for (size_t i = 0u; i < length; ++i)
         result[i] = compat_cwd[volume][i] == '/' ? '\\' : compat_cwd[volume][i];
     result[length] = '\0';
+    if (compat_case_mode == FSCASE_SENSHP)
+        strip_path_semicolons(result);
     return result;
 }
 
@@ -914,14 +1040,16 @@ int FSGetNextEntry(FS_FILE *entry, FS_FILE *dir)
     if (entry->Name == NULL)
         return FS_MAXFILES;
 
-    size_t path_size = strlen(dir->Name) + strlen(raw.name) + 2u;
+    if (compat_case_mode == FSCASE_SENSHP)
+        FSStripSemi(entry->Name);
+    size_t path_size = strlen(metadata_path(dir)) + strlen(raw.name) + 2u;
     entry->_hpclang_entry_path = malloc(path_size);
     if (entry->_hpclang_entry_path == NULL) {
         free(entry->Name);
         entry->Name = NULL;
         return FS_MAXFILES;
     }
-    (void)snprintf(entry->_hpclang_entry_path, path_size, "%s/%s", dir->Name, raw.name);
+    (void)snprintf(entry->_hpclang_entry_path, path_size, "%s/%s", metadata_path(dir), raw.name);
     entry->Volume = dir->Volume;
     entry->Mode = FSMODE_READ;
     entry->Attr = compat_attrs(raw.type, raw.attributes);
@@ -1218,7 +1346,7 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
     if (file == NULL || file->Name == NULL || file->Name[0] == '\0')
         return NULL;
 
-    const char *source = file->Name;
+    const char *source = metadata_path(file);
     if (file->Volume >= 4)
         return NULL;
     unsigned selected = file->Volume;
@@ -1277,6 +1405,8 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
         relative[out++] = '/';
 
     relative[out] = '\0';
+    if (file->_hpclang_entry_path && strcmp(file->Name, file->_hpclang_entry_path))
+        strip_path_semicolons(relative);
     return compat_strdup(relative);
 }
 

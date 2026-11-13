@@ -956,8 +956,8 @@ struct hpclang_stream_directory *hpclang_stream_directory_open(const char *path)
     return directory;
 }
 
-int hpclang_stream_directory_read(struct hpclang_stream_directory *directory,
-                                  struct hpclang_stream_directory_entry *entry)
+int hpclang_namespace_directory_read(struct hpclang_stream_directory *directory,
+                                     struct hpclang_stream_directory_entry *entry, char *short_name)
 {
     if (directory == NULL || entry == NULL) {
         errno = EFAULT;
@@ -994,7 +994,15 @@ int hpclang_stream_directory_read(struct hpclang_stream_directory *directory,
     entry->last_accessed = metadata.last_accessed;
     entry->time_validity = metadata.time_validity;
     memcpy(entry->name, info.fname, name_length + 1u);
+    if (short_name)
+        memcpy(short_name, info.altname, sizeof(info.altname));
     return 1;
+}
+
+int hpclang_stream_directory_read(struct hpclang_stream_directory *directory,
+                                  struct hpclang_stream_directory_entry *entry)
+{
+    return hpclang_namespace_directory_read(directory, entry, NULL);
 }
 
 int hpclang_stream_directory_close(struct hpclang_stream_directory *directory)

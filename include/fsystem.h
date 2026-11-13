@@ -111,6 +111,9 @@ extern "C"
     int FSInit(void);
     int FSShutdown(void);
     int FSRestart(void);
+    /* Modes 0..3 follow FSCASE_*; invalid values are ignored. FSInit defaults
+     * to FSCASE_SENSHP. HP modes encode FAT case collisions with semicolons. */
+    void FSSetCaseMode(int casemode);
     int FSVolumeMounted(int volume);
     /* Compare against the card mounted by FSInit, including a non-FAT
      * replacement. FS_CHANGED persists until FSRestart or the original card

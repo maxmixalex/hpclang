@@ -346,6 +346,71 @@ int main(void)
     protected_media = 0;
     CHECK(hpclang_namespace_write(fresh, "new", 3) == 3);
     CHECK(hpclang_namespace_close(fresh) == 0);
+    // Exercise the legacy case policy against the production FAT namespace.
+    CHECK(FSInit() == FS_OK);
+    FS_FILE *case_file = NULL;
+    CHECK(FSCreate("Case.txt", 0, &case_file) == FS_OK);
+    CHECK(FSWrite("A", 1, case_file) == 1 && FSClose(case_file) == FS_OK);
+    FSSetCaseMode(FSCASE_SENS);
+    CHECK(FSOpen("case.txt", FSMODE_READ, &case_file) == FS_NOTFOUND);
+    CHECK(FSCreate("case.txt", 0, &case_file) == FS_EXIST);
+    FSSetCaseMode(FSCASE_SENSHP);
+    CHECK(FSCreate("case.txt", 0, &case_file) == FS_OK);
+    CHECK(strcmp(case_file->Name, "/case.txt") == 0);
+    CHECK(FSWrite("B", 1, case_file) == 1 && FSClose(case_file) == FS_OK);
+    struct hpclang_stream_path_info case_info;
+    CHECK(hpclang_namespace_path_query("case.txt;", &case_info) == 0);
+    CHECK(FSOpen("case.txt;;;", FSMODE_READ, &case_file) == FS_OK);
+    char case_byte = 0;
+    CHECK(FSRead(&case_byte, 1, case_file) == 1 && case_byte == 'B');
+    CHECK(FSClose(case_file) == FS_OK);
+    FSSetCaseMode(FSCASE_INSENS);
+    CHECK(FSOpen("CASE.TXT", FSMODE_READ, &case_file) == FS_OK);
+    CHECK(FSRead(&case_byte, 1, case_file) == 1 && case_byte == 'A');
+    CHECK(FSClose(case_file) == FS_OK);
+    FSSetCaseMode(FSCASE_SENSHPTRUE);
+    FSSetCaseMode(-1);
+    FSSetCaseMode(4);
+    CHECK(FSOpen("case.txt", FSMODE_READ, &case_file) == FS_OK);
+    CHECK(strcmp(case_file->Name, "/case.txt;") == 0);
+    CHECK(FSClose(case_file) == FS_OK);
+    // Directory display follows the mode without losing the physical path.
+    for (int mode = FSCASE_SENSHP; mode <= FSCASE_SENSHPTRUE; mode += 2) {
+        FSSetCaseMode(mode);
+        FS_FILE *case_dir;
+        CHECK(FSOpenDir("/", &case_dir) == FS_OK);
+        FS_FILE case_entry;
+        int case_status, saw_case = 0;
+        while ((case_status = FSGetNextEntry(&case_entry, case_dir)) == FS_OK) {
+            const char *wanted = mode == FSCASE_SENSHP ? "case.txt" : "case.txt;";
+            if (strcmp(case_entry.Name, wanted) == 0)
+                saw_case = 1;
+            FSReleaseEntry(&case_entry);
+        }
+        CHECK(case_status == FS_EOF && saw_case);
+        CHECK(FSClose(case_dir) == FS_OK);
+    }
+    FSSetCaseMode(FSCASE_SENS);
+    CHECK(FSOpen("case.txt;", FSMODE_READ, &case_file) == FS_OK);
+    CHECK(FSClose(case_file) == FS_OK);
+    CHECK(FSOpen("Case.txt;", FSMODE_READ, &case_file) == FS_NOTFOUND);
+    FSSetCaseMode(FSCASE_INSENS);
+    CHECK(FSRestart() == FS_OK);
+    CHECK(FSOpen("cAsE.TxT", FSMODE_READ, &case_file) == FS_NOTFOUND);
+    FSSetCaseMode(FSCASE_SENSHP);
+    CHECK(FSMkdir("Folder") == FS_OK && FSMkdir("folder") == FS_OK);
+    CHECK(FSChdir("folder") == FS_OK);
+    CHECK(FSCreate("Child", 0, &case_file) == FS_OK);
+    char *case_name = FSGetFileName(case_file, FSNAME_HASPATH);
+    CHECK(case_name && strcmp(case_name, "Child") == 0);
+    free(case_name);
+    CHECK(FSCloseAndDelete(case_file) == FS_OK);
+    CHECK(FSChdir("/") == FS_OK);
+    CHECK(FSRmdir("folder") == FS_OK && FSRmdir("Folder") == FS_OK);
+    CHECK(FSOpen("case.txt", FSMODE_READ, &case_file) == FS_OK);
+    CHECK(FSCloseAndDelete(case_file) == FS_OK);
+    CHECK(hpclang_namespace_path_query("case.txt;", &case_info) < 0 && errno == ENOENT);
+    CHECK(FSDelete("Case.txt") == FS_OK);
     // Mode changes retain the actual open FatFs object, its offset and extent.
     FS_FILE *mode_file;
     CHECK(FSCreate("MODE.TXT", 0, &mode_file) == FS_OK);
