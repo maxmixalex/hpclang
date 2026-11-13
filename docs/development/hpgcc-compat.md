@@ -882,6 +882,24 @@ corrected native matrix now pass. These are local emulator results, not CI
 or physical-hardware acceptance. Controller sleep/wakeup (`FSSleep` and
 `FSWakeUp`) remains internal.
 
+### Reproduce the filesystem interface inventory
+
+The maintained inventory checks pinned original HPGCC 2.0 and HPGCC3 headers
+against both the installed adapter header and implementation. It accounts for
+39 of 41 and 41 of 43 original declarations respectively; `FSSleep/FSWakeUp`
+remain explicitly internal. Supply your original archive, without extracting it:
+
+```sh
+python3 tests/compat/check-fsystem-interface.py --release 2.0 --archive /path/to/hpgcc-2.0-SP2-Linux.tar.bz2
+python3 tests/compat/check-fsystem-interface.py --release 3 --archive /path/to/hpgcc3_R004.revA.tar.gz
+```
+
+The JSON lists each covered name and the reviewed header hash. Missing public
+declarations or implementations fail the check. This is a lexical inventory,
+not a signature, binary-layout, semantic or hardware-equivalence certificate;
+the original application comparisons and native behavior tests remain required.
+No historical source is bundled or added as a normal SDK dependency.
+
 ### Changing an open file's mode
 
 `FSChMode(file, newmode)` changes the existing file handle without reopening,
