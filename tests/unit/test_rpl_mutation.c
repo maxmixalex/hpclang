@@ -3275,6 +3275,58 @@ static void test_catalog_remove_commit(void)
     }
 }
 
+static void test_port0_registration_commit(void)
+{
+    const char *library = "04b2062000108510b7000000000000000000000d5c2";
+    uint8_t *before = malloc(sizeof memory);
+    assert(before);
+    for (unsigned scenario = 0; scenario < 8; ++scenario) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        put_word(0x80716, 5, 0x93000);
+        for (unsigned i = 0; i < 43; ++i)
+            memory[0x93000 + i] = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+        put_word(0x9302b, 5, 0);
+        const struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        struct hpclang_rpl_library_registration plan;
+        assert(hpclang_rpl_library_registration_plan(&reader, 0x93000, 0x100000, &reader,
+                                                     io.library_table, 0x100000 - io.library_table,
+                                                     123, &plan) == 1);
+        int expected = HPCLANG_RPL_MUTATION_MALFORMED;
+        if (scenario == 1) {
+            put_word(0x93000, 5, 0);
+            expected = HPCLANG_RPL_MUTATION_NOT_FOUND;
+        } else if (scenario == 2)
+            ++plan.header;
+        else if (scenario == 3)
+            memory[0x9302a] ^= 1;
+        else if (scenario == 4) {
+            put_word(0x82013, 3, 123);
+            expected = HPCLANG_RPL_MUTATION_EXISTS;
+        } else if (scenario == 5) {
+            rejected_read = 0x80716;
+            expected = HPCLANG_RPL_MUTATION_IO;
+        } else if (scenario == 6) {
+            rejected_write = 0;
+            expected = HPCLANG_RPL_MUTATION_INCOMPLETE;
+        } else if (scenario == 7)
+            ++plan.source.address;
+        memcpy(before, memory, sizeof memory);
+        int result = hpclang_rpl_port0_register_library_repaired(&io, 123, &plan, NULL);
+        if (scenario) {
+            assert(result == expected && !writes && !memcmp(before, memory, sizeof memory));
+        } else {
+            assert(!result && writes && get_word(io.library_table, 3) == 3);
+            struct hpclang_rpl_library_binding binding;
+            assert(hpclang_rpl_library_lookup(&reader, io.library_table,
+                                              0x100000 - io.library_table, 123, &binding) == 1);
+            assert(binding.address == plan.header && !binding.bank_switch && !binding.flags);
+            assert(!memcmp(before + 0x93000, memory + 0x93000, 48));
+            assert(write_trace[writes - 1] == io.library_table + 2);
+        }
+    }
+    free(before);
+}
+
 static void test_catalog_alias_repairs(void)
 {
     uint8_t *before = malloc(sizeof memory);
@@ -4584,6 +4636,7 @@ int main(void)
     test_cache_acptr();
     test_catalog_observed_guards();
     test_catalog_alias_repairs();
+    test_port0_registration_commit();
     test_catalog_insert_commit();
     test_catalog_remove_commit();
     test_catalog_attached_rejection();

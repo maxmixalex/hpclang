@@ -521,8 +521,7 @@ static int probe_register(void)
     const struct hpclang_rpl_catalog_repairs repairs = {
         1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0, NULL, NULL, 0};
     /* After this boundary an error must halt the test, never return Stock. */
-    const struct hpclang_rpl_library_binding added = {binding, 0, 0};
-    if (hpclang_rpl_catalog_insert_repaired(&io, 123, &added, &insertion, &repairs)) {
+    if (hpclang_rpl_port0_register_library_repaired(&io, 123, &registration, &repairs)) {
         hpclang_e2e_result = 0x46410ffe;
         for (;;)
             __asm__ volatile("nop");
