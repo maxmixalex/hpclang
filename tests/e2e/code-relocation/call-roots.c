@@ -167,7 +167,10 @@ static int probe_collect(struct live_probe *p, struct hpclang_rpl_reader *reader
     int result = 5;
     /* Keep the full capacity ceiling without reserving two maximum-size tables
      * for every case. Discovery is read-only; a capacity retry starts afresh. */
-    unsigned edit_capacity = 512, guard_capacity = 512;
+    /* Most registrations only observe dependencies and need few changed fields.
+     * Start edits small so unused slots do not crowd out the guard table on
+     * Stock's bounded heap. Exhaustion still grows the table to 4096 below. */
+    unsigned edit_capacity = 64, guard_capacity = 512;
     for (;;) {
         probe_buffers_free(p);
         p->edits = malloc(edit_capacity * sizeof *p->edits);

@@ -6229,3 +6229,26 @@ RAM-device rebuild effects remain rejected. These extended numeric traces are
 not yet common-repair-plan, actual-movement or maintained-Stock qualification.
 Current outputs reuse `/work/nov06-sum/unconfig-continuation`; future ctypes
 observed-callback clients must use the new eight-slot internal layout.
+
+
+## 2026-11-13 — Bounded native collector edit allocation
+
+The e77ad904 HP49g+ Stock failure snapshot has a 61,064-byte heap capacity
+before allocator overhead and other live objects. Its read-only registration
+collection needs 2,344 guards and no edits, but reserving 512 edit slots raises
+the requested peak to 65,536 bytes. Start with 64 edit slots and retain doubling
+on exhaustion, the 4,096-entry ceiling, all guard records and all validation.
+
+Actual-snapshot ASan/UBSan replay passes under a 60,000-byte requested-allocation
+budget: peak 56,576 bytes, all 2,344 guards byte-identical to the large-table
+baseline, no native writes, and complete cleanup after scratch/table allocation
+failure. Maintained reference and call-root shadow sanitizer tests pass. Fresh
+ARM build and 144-configuration ARM analysis pass. Reproduction driver:
+`research/nov13-collector-budget-check.py`; build and sealed-input Stock runner:
+`research/nov13-native271-budget-build.py` and
+`research/nov13-native271-budget-stock.py`.
+
+Stock validation is still running in `/work/nov06-sum/native271-budget-stock`;
+this is local validation, not Stock or CI acceptance. Finish this bounded batch,
+then rotate to UI/native exception-stack reservation work without extending
+M8.0's scope. Original milestone requirements remain unchanged.
