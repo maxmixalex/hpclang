@@ -17,6 +17,17 @@ The output directory must not exist. `program.HP` is the transfer artifact;
 storage. `build.json` records compiler identity and source/artifact SHA-256s.
 No research scripts, ROM files or installed HPGCC objects are build inputs.
 
+Core runtime CI also runs the build-only reproducibility check:
+
+```sh
+python3 tests/e2e/independent-entry/check-build.py --toolchain /path/to/atfe/bin
+```
+
+It builds two independent source copies (including a path containing a space),
+checks their input/output manifests and compares all five emitted release/debug
+artifacts byte for byte. Temporary sources and builds are removed on completion
+or failure. This gate needs no ROM and does not replace Stock execution checks.
+
 The Saturn encoder uses HP50g SAVE/RESTORE addresses and the SRAM physical
 mapping. It copies the ARM payload into aligned storage reserved inside the
 program object. IRQ and FIQ are masked during the C call; the saved CPSR and

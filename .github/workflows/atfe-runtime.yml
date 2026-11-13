@@ -20,6 +20,7 @@ on:
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
       - "tests/e2e/port-recovery/**"
+      - "tests/e2e/independent-entry/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -65,6 +66,7 @@ on:
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
       - "tests/e2e/port-recovery/**"
+      - "tests/e2e/independent-entry/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -181,6 +183,9 @@ jobs:
           clang -O2 .cache/hp39-aplet/sdk/src/hp2aplet.c -o "$host_tool/hp2aplet"
           python3 tests/sdk/check.py --aplet-tool "$host_tool/hp2aplet" \
             --aplet-assets .cache/hp39-aplet/sdk/data
+
+      - name: Verify independent HP50g entry build reproducibility
+        run: python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin"
 
       - name: Build hardware-validation E2E
         run: |
