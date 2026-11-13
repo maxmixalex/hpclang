@@ -21,7 +21,8 @@ python3 /path/to/sdk/share/hpclang/tools/check-migration.py --json --check /path
 It reports source locations and concrete advice for legacy umbrella includes,
 raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units and
 application `errno` declarations, legacy decimal settings, borrowed formatting
-buffers and storage capability checks. Comments and string/character literals are
+buffers, storage capability checks and KOS tone waiting/replacement semantics.
+Comments and string/character literals are
 ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
 `build`, `.cache` and `third_party`; explicitly named files are always checked.
 Inputs default to UTF-8 (an optional BOM is accepted). For an older Windows
@@ -48,6 +49,14 @@ legacy formatters, not standard `printf`. Review the explicit opt-in and format
 grammar described below. The hint remains even if a source file defines the
 switch: this lexical tool cannot establish include order or which formatter a
 call ultimately uses, and opting in still requires a format-string audit.
+
+`HP011` flags `kos_beep` and `kos_CheckBeepEnd`. Durations are milliseconds;
+mode bit 0 permits replacement and bit 1 requests waiting. A true
+`kos_CheckBeepEnd()` result can occur while a nonwaiting tone is still playing.
+Use `hpclang_sound_status()` when you need to distinguish playing, completed
+and failed states, and `hpclang_sound_stop()` to cancel. Check each operation's
+return value. The checker does not evaluate mode expressions or prove that a
+polling loop is correct, so even calls with constant modes request review.
 
 ## Choose the boundary for each old call
 

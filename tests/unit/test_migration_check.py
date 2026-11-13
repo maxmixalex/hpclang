@@ -16,6 +16,24 @@ SPEC.loader.exec_module(CHECK)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_kos_tones_request_semantic_review_without_guessing_modes(self):
+        source = (
+            "kos_beep /* ms */ (880, 10, 0);\n"
+            "if (kos_CheckBeepEnd()) saved = 1;\n"
+            "#if 0\n  kos_\\\nbeep(440, 20, flags);\n#endif\n"
+            '// kos_beep(1, 2, 3);\nconst char *s = "kos_CheckBeepEnd()";\n'
+            'auto raw = R"tag(kos_beep(1, 2, 3))tag";\n'
+            "mykos_beep(); kos_CheckBeepEnd_extra();\n"
+            "hpclang_sound_status(); hpclang_sound_stop();\n"
+        )
+        rows = CHECK.scan(source, "audio.cpp")
+        self.assertEqual(
+            [(r["rule"], r["line"], r["column"]) for r in rows],
+            [("HP011", 1, 1), ("HP011", 2, 5), ("HP011", 4, 3)],
+        )
+        self.assertTrue(all("does not guarantee silence" in r["message"] for r in rows))
+        self.assertTrue(all("hpclang_sound_status" in r["message"] for r in rows))
+
     def test_capability_hints_cover_storage_entry_points(self):
         source = (
             "FSOpen /* path */ (name, mode, &file); FSCreate(name, 0, &file);\n"

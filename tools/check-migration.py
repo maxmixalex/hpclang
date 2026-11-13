@@ -22,6 +22,11 @@ TOKENS = re.compile(
 )
 RULES = (
     (
+        "HP011",
+        r"\b(?:kos_beep|kos_CheckBeepEnd)\s*\(",
+        "Review KOS tone semantics: durations are milliseconds; mode bit 0 permits replacement and bit 1 waits. kos_CheckBeepEnd returning true does not guarantee silence. Use hpclang_sound_status for playing/completed/error status and hpclang_sound_stop for cancellation; check operation failures.",
+    ),
+    (
         "HP009",
         r"\b(?:FSOpen|FSCreate|FSOpenDir)\s*\(",
         "Review SD filesystem availability: query hpclang_device_capability(HPCLANG_CAPABILITY_STREAM_STORAGE). This backend is supported on HP49g+/HP50g, not HP39/HP40 or HP48gII; supported does not guarantee media presence or operation success. Check the FS result.",

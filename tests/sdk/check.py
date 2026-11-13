@@ -26,6 +26,7 @@ def check_migration_tool(package, work, env):
         "void g() { auto a = 1'000; gets(buffer); auto b = 2'000; }\n"
         "void h() { copy(ints(12, 10)); uints(34, 10); sys_bcd2str(0x1234); }\n"
         "void storage() { FSOpen(name, mode, &file); sat_dir_open(); }\n"
+        "void audio() { kos_beep(880, 10, 0); kos_CheckBeepEnd(); }\n"
     )
     source.write_text(original)
     result = subprocess.run(
@@ -53,6 +54,8 @@ def check_migration_tool(package, work, env):
         "HP008",
         "HP009",
         "HP010",
+        "HP011",
+        "HP011",
     ]:
         raise AssertionError(f"Unexpected migration findings: {report}")
     if source.read_text() != original:
