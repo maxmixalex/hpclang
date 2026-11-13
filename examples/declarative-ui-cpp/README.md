@@ -13,5 +13,15 @@ font packaging and builds without exceptions or RTTI.
 
 `counter` is an ordinary reusable component function. Early returns close its
 scope; a failed view aborts the candidate without replacing the accepted tree.
-The example intentionally keeps C context/renderer creation and teardown
-visible. The lexical guards borrow those resources and do not own them.
+The example keeps C context and display-session teardown explicit. Its
+`owned_ui_surface` adopts the C renderer and releases it on ordinary scope exit;
+`get()` only borrows it for the C drawing calls. The lexical guards borrow the
+UI context and do not own it. Fonts must outlive the renderer. Do not replace
+or destroy its owner from a rendering callback, and use normal return rather
+than `exit()` when relying on automatic C++ cleanup.
+
+The maintained `ui_cpp_lifecycle` host test runs this entry point and view with
+the real UI core and renderer. Across all six model configurations it checks
+each allocation failure, display/keyboard errors, timeout retry, ON exit and
+Add/Reset/Quit, then verifies cleanup and restart. Its display and keyboard
+drivers and font are host fixtures; this is separate from native device testing.

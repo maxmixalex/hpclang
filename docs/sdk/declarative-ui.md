@@ -627,6 +627,18 @@ is recorded in the roadmap.
 
 ## C++ declaration guards
 
+`<hpclang/ui-surface.hpp>` provides the C++17 `hpclang::owned_ui_surface`
+owner for a renderer returned by `hpclang_ui_surface_create`. It adds no
+allocation: move transfers destruction responsibility, `get()` borrows for C
+calls, and `release()` transfers that responsibility back to the caller.
+Destruction and `reset()` preserve `errno`. Fonts remain borrowed and must
+outlive the renderer; the owner does not acquire a display session or own the
+UI context. Do not destroy or replace it from its rendering callbacks.
+To retain a working renderer when replacement fails, create a candidate owner,
+check it, then `swap` only after success. Ordinary scope exit cleans up;
+`exit()` and `_Exit()` do not unwind automatic owners. The installed C++ counter
+example uses this owner alongside the lexical declaration guards below.
+
 `<hpclang/ui.hpp>` adds C++17 lexical guards over the same C context. They do
 not allocate, throw, commit implicitly or introduce a second state model.
 Check construction before declaring children and explicitly commit only after

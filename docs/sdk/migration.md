@@ -177,6 +177,27 @@ The hint also applies to ASCII literals: this lexical checker cannot prove which
 font is selected or which characters dynamic strings will contain. Explicitly
 include runtime characters in generated fonts and check missing-glyph behavior.
 
+## Enumerate native ports from C++
+
+`hpclang/port.hpp` provides `hpclang::owned_port_iterator`, an allocation-free
+owner for an independently allocated metadata snapshot. Open a candidate and
+swap after success when replacing an existing snapshot:
+
+```cpp
+hpclang::owned_port_iterator candidate{hpclang_port_iterator_open(port)};
+if (!candidate)
+    return -1;
+entries.swap(candidate); // entries is an owned_port_iterator; old snapshot closes hereafter.
+```
+
+Use `get()` with `hpclang_port_iterator_read`; initialize each entry's size and
+version as required by the C interface. Names remain raw calculator bytes.
+Moving transfers close responsibility, `release()` transfers it to the caller,
+and destruction/reset preserves errno. Ordinary scope exit closes the snapshot;
+`exit()` and `_Exit()` do not unwind automatic C++ objects. Opening Port 2 retains
+the C service's recovery behavior and can write recovery metadata. The owner
+does not change model/context availability or imply new port capabilities.
+
 ## Make ownership visible
 
 `ints`, `uints` and `sys_bcd2str` return borrowed formatting buffers. Copy a result
@@ -218,6 +239,17 @@ Returning normally destroys automatic C++ owners. Calling `exit()` does not
 unwind those scopes; release local resources explicitly before that path.
 `_Exit()` skips language callbacks. SDK-owned hardware restoration does not
 substitute for saving application data or running application cleanup.
+
+For cooperative schedules, `<hpclang/timer.hpp>` provides the move-only C++17
+`cooperative_timer`. Pass `hpclang::microseconds` to `start(delay, period)` and
+call `poll(count)` from your loop; a zero period is one-shot. Moving disarms the
+source, while move assignment discards the destination's previous schedule.
+Failed start/poll calls retain the old schedule and failed polls leave `count`
+unchanged. Negative durations return `-1/EINVAL`; other errors follow the C
+timer/clock API. `armed()` observes the stored state without sampling time; a
+due one-shot remains armed until polled. No allocation or IRQ is involved.
+The installed `examples/timer-cpp` demonstrates periodic polling and moving.
+Use the C API when you need durations beyond signed chrono microseconds.
 
 The legacy `gets` / `_gets` aliases accept fixed character arrays with a known
 capacity. For a pointer or variable-length buffer, call

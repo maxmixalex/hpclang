@@ -1,5 +1,6 @@
 #include "../../../examples/declarative-ui-cpp/app.hpp"
 #include <hpclang/ui.hpp>
+#include <hpclang/ui-surface.hpp>
 #include <hpclang/display.hpp>
 #include <hpclang/device.h>
 #include <cstdlib>
@@ -54,14 +55,17 @@ extern "C" unsigned hpclang_cpp_ui_test(void)
     void *storage = std::malloc(bytes);
     auto *ui = storage ? hpclang_ui_init(storage, bytes, capacity) : nullptr;
     const hpclang_ui_surface_style style{&demo_font, 255, 0, 128, 255, 1, 1, 1, 0, 0, 0};
-    auto *renderer =
-        hpclang_ui_surface_create(device->display_width, device->display_height, 2, &style, 1, 0);
-    unsigned result = ui && renderer
-                          ? exercise(ui, renderer, device->display_width, device->display_height)
-                          : 0x1901;
+    hpclang::owned_ui_surface renderer{
+        hpclang_ui_surface_create(device->display_width, device->display_height, 2, &style, 1, 0)};
+    auto transferred = std::move(renderer);
+    unsigned result = ui && transferred ? exercise(ui, transferred.get(), device->display_width,
+                                                   device->display_height)
+                                        : 0x1901;
+    if (renderer)
+        result = 0x190b;
     if (ui)
         hpclang_ui_shutdown(ui);
-    hpclang_ui_surface_destroy(renderer);
+    transferred.reset();
     std::free(storage);
     return result;
 }
