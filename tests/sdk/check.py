@@ -363,16 +363,31 @@ endforeach()
         # the same notebook source and packages only its matching launcher.
         for model in ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g"):
             selected = work / f"model-{model}"
+            selected_source = work / f"model-{model}-source"
+            shutil.copytree(package / "examples/notebook", selected_source)
+            aplet_options = []
+            if args.aplet_tool and model in ("hp39gplus", "hp39gs", "hp40gs"):
+                with (selected_source / "CMakeLists.txt").open("a") as source:
+                    source.write(
+                        "\nhpclang_target_aplet(notebook MODEL ${HPCLANG_BUILD_MODEL}"
+                        ' NAME "SDK example" AUTHOR hpclang'
+                        ' TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")\n'
+                    )
+                aplet_options = [
+                    f"-DAPLET_TOOL={args.aplet_tool.resolve()}",
+                    f"-DAPLET_ASSETS={args.aplet_assets.resolve()}",
+                ]
             run(
                 "cmake",
                 "-S",
-                str(package / "examples/notebook"),
+                str(selected_source),
                 "-B",
                 str(selected),
                 "-DCMAKE_BUILD_TYPE=MinSizeRel",
                 f"-DHPCLANG_BUILD_MODEL={model}",
                 f"-DCMAKE_PREFIX_PATH={sdk}",
                 f"-DCMAKE_TOOLCHAIN_FILE={package / 'cmake/toolchains/hpclang-armv4t.cmake'}",
+                *aplet_options,
                 env=env,
             )
             run("cmake", "--build", str(selected), "--parallel", "2", env=env)
@@ -389,7 +404,7 @@ endforeach()
             # universal comparison above does not cover these release files.
             repeated_source = work / f"model-{model}-second-source"
             repeated = work / f"model-{model}-second-build"
-            shutil.copytree(package / "examples/notebook", repeated_source)
+            shutil.copytree(selected_source, repeated_source)
             run(
                 "cmake",
                 "-S",
@@ -400,6 +415,7 @@ endforeach()
                 f"-DHPCLANG_BUILD_MODEL={model}",
                 f"-DCMAKE_PREFIX_PATH={sdk}",
                 f"-DCMAKE_TOOLCHAIN_FILE={package / 'cmake/toolchains/hpclang-armv4t.cmake'}",
+                *aplet_options,
                 env=env,
             )
             run("cmake", "--build", str(repeated), "--parallel", "2", env=env)
@@ -410,6 +426,40 @@ endforeach()
                 Path("notebook-launchers") / f"{model}.hp",
                 Path("notebook-launchers/memory.json"),
             }
+            if aplet_options:
+                bundle = Path("notebook-aplet") / model
+                files = (
+                    "HPGCC000.000",
+                    "HPCRESET.000",
+                    "LIB275L.000",
+                    "HP39DIR.000",
+                    "HP39DIR.CUR",
+                )
+                outputs.update(bundle / name for name in (*files, "footprint.json"))
+                for directory in (selected, repeated):
+                    wrapped = (directory / "notebook-launchers" / f"{model}.hp").read_bytes()
+                    aplet = (directory / bundle / "HPGCC000.000").read_bytes()
+                    if (
+                        not aplet.startswith(b"HP39BinB\x0bSDK example")
+                        or aplet.count(wrapped[8:]) != 1
+                    ):
+                        raise AssertionError(
+                            f"{model}: specialized Aplet launcher identity mismatch"
+                        )
+                    sizes = {name: (directory / bundle / name).stat().st_size for name in files}
+                    footprint = json.loads((directory / bundle / "footprint.json").read_text())
+                    if (
+                        not all(sizes.values())
+                        or footprint["version"] != 1
+                        or footprint["files"] != sizes
+                        or footprint["input_launcher_file_bytes"] != len(wrapped)
+                        or footprint["embedded_launcher_bytes"] != len(wrapped) - 8
+                        or footprint["aplet_file_bytes"] != len(aplet)
+                        or footprint["aplet_non_launcher_bytes"] != len(aplet) - len(wrapped) + 8
+                        or footprint["bundle_file_bytes"] != sum(sizes.values())
+                        or not footprint["excludes"]
+                    ):
+                        raise AssertionError(f"{model}: specialized Aplet footprint mismatch")
             font_sets = [
                 {
                     p.relative_to(directory)
@@ -428,6 +478,7 @@ endforeach()
             shutil.rmtree(selected)
             shutil.rmtree(repeated)
             shutil.rmtree(repeated_source)
+            shutil.rmtree(selected_source)
         print("Installed SDK: all six model-specific notebook builds PASS")
         print("Installed SDK: all six model-specific release outputs byte-identical PASS")
         rejected = work / "rejected model application"

@@ -368,5 +368,15 @@ and HPC1/launcher output. It rejects compile commands referring to the source ch
 or the old install prefix. This establishes build/relocation acceptance;
 calculator launch and return have separate E2E gates.
 Core's installed-SDK gate also builds the historical host tool with Clang
-and verifies both external examples' installable Aplets for all three
+and verifies the external examples' installable Aplets for all three
 HP39 models. The SDK and E2E share both launcher and Aplet packaging tools.
+
+The release checks rebuild Notebook for each of the six models from two
+separate source/build directories. They compare the HPC1 image, matching
+launcher, memory report and generated font sources. When the Aplet tool/assets
+are supplied, the three HP39 model builds also compare their installable Aplet,
+Reset/library/directory companions and footprint report. Each Aplet must embed
+its matching launcher, and reported sizes must match the actual bundle files.
+These checks use the same toolchain and configuration; ELF/debug metadata are
+excluded. Reproducible packaging does not establish runtime resource limits
+or calculator startup/return correctness.
