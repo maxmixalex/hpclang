@@ -474,23 +474,18 @@ static int probe_register(void)
             __asm__ volatile("nop");
     }
     struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
-    struct hpclang_rpl_catalog_insertion insertion;
-    if (hpclang_rpl_catalog_plan_insert(&reader, io.library_table, 0x100000 - io.library_table, 123,
-                                        &insertion) != 1)
-        return 2;
     uint32_t end, bottom, top, home, port;
     if (probe_read_word(&io, 0x806f3, 5, &end) || probe_read_word(&io, 0x806e9, 5, &bottom) ||
         probe_read_word(&io, 0x806ee, 5, &top) || probe_read_word(&io, 0x80711, 5, &home) ||
         probe_read_word(&io, 0x80716, 5, &port))
         return 3;
-    struct hpclang_rpl_port_cursor cursor = {port, 0x100000, 0};
-    struct hpclang_rpl_port_entry entry;
-    uint32_t binding = 0;
-    int next;
-    while ((next = hpclang_rpl_port_next(&reader, &cursor, &entry)) == 1)
-        if (entry.prologue == 0x2b40 && entry.library_number == 123)
-            binding = entry.address + 14 + 2 * entry.name_length;
-    if (next || !binding || binding < end)
+    struct hpclang_rpl_library_registration registration;
+    if (hpclang_rpl_library_registration_plan(&reader, port, 0x100000, &reader, io.library_table,
+                                              0x100000 - io.library_table, 123, &registration) != 1)
+        return 2;
+    const struct hpclang_rpl_catalog_insertion insertion = registration.insertion;
+    uint32_t binding = registration.header;
+    if (!binding || binding < end)
         return 4;
     struct live_probe *p = calloc(1, sizeof *p);
     if (!p)
