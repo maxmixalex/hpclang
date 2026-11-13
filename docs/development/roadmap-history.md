@@ -4456,7 +4456,7 @@ Deliver and review this core in the following slices, using the retained
   The [C application sketch review](sdk-design.md#c-application-sketch-review)
   maps these requirements to the installed example and independent fixtures.
   This technical review does not freeze names before UI milestone acceptance.
-- [ ] Define bounded node storage, deterministic sizing/measurement/overflow,
+- [x] Define bounded node storage, deterministic sizing/measurement/overflow,
   stable-key reconciliation and predictable allocation-failure behavior.
   Measure actual memory and update cost on the smallest supported target.
 - [x] Implement focus retention/traversal, keyboard navigation and event/action
@@ -4485,16 +4485,25 @@ Deliver and review this core in the following slices, using the retained
   to actual monochrome/grayscale surfaces and keyboard-only operation. Keep
   pointer support optional and test clipped drawing ownership/publication;
   RGB565 and device scanning in the sketch do not imply new target hardware.
-- [ ] Validate six-model geometry, native/fallback fonts, clipping, scrolling,
+- [x] Validate six-model geometry, native/fallback fonts, clipping, scrolling,
   partial redraw and custom canvas, including low-memory failure and clean
   Stock return. Record frame/update and memory budgets.
 
-The first four items are covered by the reusable C/C++ interfaces, the installed
-device-manager example, independent theme/font/canvas LCD checks in the accepted
-six-model Runtime UI suite, and the current `ui`, `ui_cpp`, `ui_surface`,
-`ui_demo` and `ui_surface_alloc` sanitizer tests. The final resource/low-memory
-acceptance remains open for the bounded follow-up's CI and whole-app analysis;
-this does not claim faithful HP39 native styling or complete M8.3.
+The component and bounded-workload checks are accepted. The reusable C/C++
+interfaces, installed device-manager example and host tests cover storage,
+identity, allocation failure and renderer behavior. PR #33's
+[Runtime run at 236e792b](https://github.com/maxmixalex/hpclang/actions/runs/43130132986)
+passes all six Direct and all six Stock UI cases, including pressure/recovery
+pixels, 36 KiB RW admission, application stack/heap budgets, nine timed frames,
+34 input edges and Stock capacity recovery after return. The
+[UI resource observations](../sdk/declarative-ui.md) distinguish current accepted
+measurements from older local results.
+
+M8.2/M8.3 remain open for the retained whole-application analysis: native
+exception-stack reservations and whole-system transient memory admission are
+not proven by the application arena, sampled pool or native free-list checks.
+This status correction does not remove those gates or claim faithful HP39
+native styling, physical-hardware timing bounds or whole-stage completion.
 
 The maintained 36 KiB UI artifact now passes all six Direct and all six Stock
 targets locally, including exhausted-allocator rendering, reconstruction pixels,
