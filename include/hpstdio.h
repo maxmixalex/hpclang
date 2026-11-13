@@ -9,6 +9,7 @@
  * when no standard-stream owner has been bound.
  */
 #include <stdio.h>
+#include <stdarg.h>
 #include <hpclang/hpgcc-format.h>
 
 #ifndef HPCLANG_HPGCC_LONG_TYPES_DEFINED
@@ -23,6 +24,13 @@ extern "C"
 #endif
 
     int fdelete(char *filename);
+    /* Historical spellings with standard C conversion semantics. _scanf reads
+     * one editable line (at most 1023 calculator bytes), then scans that line.
+     * Empty EOF/cancel/input failure returns EOF. Use field widths for %s/%[.
+     * Standard scanf/sscanf/vsscanf names are not redirected. */
+    int _vsscanf(const char *text, const char *format, va_list args);
+    int _sscanf(const char *text, const char *format, ...);
+    int _scanf(const char *format, ...);
     /* Editable line of at most 31 calculator bytes. Decimal integer / C double
      * conversion accepts a numeric prefix, as historical atoi/atof did.
      * No conversion: zero/EINVAL. Integer overflow: INT_MIN/MAX and ERANGE;

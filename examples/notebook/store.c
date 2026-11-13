@@ -173,6 +173,18 @@ int notebook_text_size(const char *text, size_t *length)
     return 0;
 }
 
+/* HOME/aplet writes have their own substantial mutation workspace. Keep that
+ * workspace out of the Port backup caller's frame, including under LTO. */
+__attribute__((noinline)) static int save_home_object(const struct destination *destination,
+                                                      struct hpclang_object *object, int exists)
+{
+    return destination->aplet
+               ? hpclang_aplet_data_set(object)
+               : hpclang_object_store_put(destination->home, name, sizeof(name) - 1, object,
+                                          exists ? HPCLANG_OBJECT_STORE_REPLACE_ONLY
+                                                 : HPCLANG_OBJECT_STORE_CREATE_ONLY);
+}
+
 static int save_note(int port, const char *text)
 {
     size_t length;
@@ -200,12 +212,7 @@ static int save_note(int port, const char *text)
                 exists ? hpclang_port_backup_replace((unsigned)port, name, sizeof(name) - 1, object)
                        : hpclang_port_backup_create((unsigned)port, name, sizeof(name) - 1, object);
         else if (!result)
-            result =
-                destination.aplet
-                    ? hpclang_aplet_data_set(object)
-                    : hpclang_object_store_put(destination.home, name, sizeof(name) - 1, object,
-                                               exists ? HPCLANG_OBJECT_STORE_REPLACE_ONLY
-                                                      : HPCLANG_OBJECT_STORE_CREATE_ONLY);
+            result = save_home_object(&destination, object, exists);
     }
     int error = errno;
     hpclang_object_release(object);

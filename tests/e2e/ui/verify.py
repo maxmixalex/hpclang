@@ -54,7 +54,7 @@ def verify_memory(prefix: Path) -> tuple[int, int, int, int]:
     return final_peak, stack_limit, heap_peak, heap_limit
 
 
-def verify_stack_pointer(prefix: Path) -> dict:
+def verify_stack_pointer(prefix: Path, artifact: Path | None = None) -> dict:
     """Check the shared User/System SP bank against the application stack arena."""
     output = Path(f"{prefix}-stack-pointer-budget.json")
     output.unlink(missing_ok=True)
@@ -96,6 +96,60 @@ def verify_stack_pointer(prefix: Path) -> dict:
         memory_sha256=hashlib.sha256(Path(f"{prefix}-memory-1.json").read_bytes()).hexdigest(),
         scope="Executed application SP writes in the shared User/System bank; excludes native firmware instructions, exception bank switches and unexecuted paths.",
     )
+    if artifact is not None:
+        payload = (artifact / "e2e.hpc").read_bytes()
+        assert payload[:4] == b"HPC1" and len(payload) >= 16
+        assert int.from_bytes(payload[4:8], "little") == len(payload) - 16
+        # Exact ARM supervisor body from runtime/bootstrap/sync.S. Matching the
+        # whole bounded helper ties the minimum-PC observation to the tested
+        # image, rather than attributing arbitrary SVC activity by address alone.
+        helper = struct.pack(
+            "<14I",
+            0xE5824000,
+            0xE92D4007,
+            0xE1500003,
+            0x2A000002,
+            0xEE070F3A,
+            0xE2800020,
+            0xEAFFFFFA,
+            0xE3A00000,
+            0xEE070F9A,
+            0xEE070F15,
+            0xE1A00000,
+            0xE1A00000,
+            0xE8BD4007,
+            0xE1B0F00E,
+        )
+        borrowed = []
+        for mode, row in modes.items():
+            if mode in (16, 31):
+                continue
+            assert mode == 19, f"{prefix}: unattributed exception-mode stack"
+            offset = 16 + row["minimum_pc"] - 0x01220000 - 4
+            assert offset >= 16 and payload[offset : offset + len(helper)] == helper, (
+                f"{prefix}: borrowed stack does not match cache-clean supervisor body"
+            )
+            assert row["maximum"] - row["minimum"] == 16, (
+                f"{prefix}: borrowed stack span differs from helper frame"
+            )
+            borrowed.append(
+                dict(
+                    mode=mode,
+                    helper="hpclang_cache_clean supervisor",
+                    frame_bytes=16,
+                    minimum=row["minimum"],
+                    maximum=row["maximum"],
+                    minimum_pc=row["minimum_pc"],
+                    writes=row["writes"],
+                )
+            )
+        report["borrowed_stacks"] = borrowed
+        report["payload_sha256"] = hashlib.sha256(payload).hexdigest()
+        report["borrowed_scope"] = (
+            "Application-PC exception-stack extrema attributed to the linked helper; "
+            "not the native stack reservation, total native peak, or unseen paths. "
+            "Do not add borrowed bytes to the application arena."
+        )
     output.write_text(json.dumps(report, indent=2) + "\n")
     print(f"PASS: {prefix}: observed SP usage {used}/{limit}, touched {touched}")
     return report
@@ -531,7 +585,7 @@ def main() -> None:
             args.mode == "stock",
         )
         if args.stack_pointer:
-            verify_stack_pointer(Path(f"build/{target}-frame"))
+            verify_stack_pointer(Path(f"build/{target}-frame"), args.artifact)
         if args.stage_stack:
             verify_stage_stack(Path(f"build/{target}-frame"), target, args.artifact)
         elif args.artifact:

@@ -107,6 +107,7 @@ def main() -> None:
                 "HPCLANG_E2E_SEQUENCE": str(sequences / step["sequence"]),
                 "HPCLANG_STOCK_REQUIRE_OBJECT_PHASE": "1",
                 "HPCLANG_STOCK_PREFIX": str(prefix),
+                "HPCLANG_E2E_FRAME_PREFIX": f"{prefix}-frame",
                 "HPCLANG_STOCK_JSON": f"{prefix}-stock.json",
                 "HPCLANG_X50NG_E2E_JSON": str(result),
                 "HPCLANG_X50NG_BEFORE_PGM": f"{prefix}-before.pgm",

@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
@@ -16,6 +17,67 @@ SPEC.loader.exec_module(lifecycle)
 
 
 class StockLifecycleTests(unittest.TestCase):
+    def test_relaunch_checkpoints_do_not_overwrite_initial_or_prior_launch(self):
+        for family in ("hp39", "hp48", "hp4950"):
+            with self.subTest(family=family), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                sequences = root / "tests/e2e/sequences"
+                sequences.mkdir(parents=True)
+                (sequences / "reload.seq").write_text("")
+                build = root / "build"
+                build.mkdir()
+                initial = build / "initial.json"
+                good = dict(status="pass", saw_pass=True, returned=True, return_settled=True)
+                initial.write_text(json.dumps(good | {"object_store_phase": 0x4F530300}))
+                checkpoint = build / "model-frame-memory-1.json"
+                checkpoint.write_text("initial measurement")
+                contract = root / "contract.json"
+                contract.write_text(
+                    json.dumps(
+                        dict(
+                            version=1,
+                            family=family,
+                            initial_phase="0x4f530300",
+                            relaunches=[
+                                dict(sequence="reload.seq", phase=f"0x4f53030{i}") for i in (1, 2)
+                            ],
+                        )
+                    )
+                )
+                observed = []
+
+                def launch(command, *, env, **kwargs):
+                    # Match the observer's exclusive creation: a reused prefix
+                    # must fail rather than silently replace an earlier report.
+                    path = Path(env["HPCLANG_E2E_FRAME_PREFIX"] + "-memory-1.json")
+                    with path.open("x") as output:
+                        output.write("new measurement")
+                    observed.append(path)
+                    Path(env["HPCLANG_X50NG_E2E_JSON"]).write_text(
+                        json.dumps(good | {"object_store_phase": 0x4F530300 + len(observed)})
+                    )
+
+                env = dict(
+                    HPCLANG_E2E_FAMILY=family,
+                    TARGET="model",
+                    HPCLANG_X50NG_E2E_JSON=str(initial),
+                    HPCLANG_E2E_FRAME_PREFIX=str(build / "model-frame"),
+                )
+                with (
+                    mock.patch.dict(os.environ, env, clear=True),
+                    mock.patch.object(
+                        lifecycle, "__file__", str(root / "tests/e2e/harness/stock-lifecycle.py")
+                    ),
+                    mock.patch.object(sys, "argv", ["stock-lifecycle.py", str(contract)]),
+                    mock.patch.object(lifecycle.subprocess, "run", side_effect=launch),
+                ):
+                    lifecycle.main()
+                self.assertEqual(checkpoint.read_text(), "initial measurement")
+                self.assertEqual(
+                    observed,
+                    [build / f"model-lifecycle-{index}-frame-memory-1.json" for index in (2, 3)],
+                )
+
     def test_transport_selection_rejects_malformed_contracts(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "e2e.stock-lifecycle.json"
@@ -34,7 +96,11 @@ class StockLifecycleTests(unittest.TestCase):
             command = [
                 "bash",
                 "-c",
-                'set -eu; source "$ROOT/tests/e2e/harness/stock-lifecycle-env.sh"; '
+                # Normalize checkout line endings before passing shell source to Bash.
+                # Keep the real environment, parser and fail-fast shell behavior.
+                "set -eu\n"
+                + (ROOT / "tests/e2e/harness/stock-lifecycle-env.sh").read_text(encoding="utf-8")
+                + "\n"
                 'test -z "$LIFECYCLE"; test -z "${HPCLANG_STOCK_REQUIRE_OBJECT_PHASE:-}"',
             ]
             result = subprocess.run(command, env=env, capture_output=True, text=True)

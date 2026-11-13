@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 4 ]]; then
-    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|hpgcc-console|hpgcc-format|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
+    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|hpgcc-console|hpgcc-format|display|ui|notebook|notebook-entry|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
     echo "sound exit variants: system-services-exit | system-services-immediate" >&2
     echo "window suites: hpgcc-window | hpgcc-window-dialogs" >&2
     exit 2
@@ -118,7 +118,7 @@ case "$MODE" in
         [[ "$MODE" != hpgcc-window-dialogs ]] || window_group=2
         E2E_CMAKE_ARGS=(-DHPCLANG_WINDOW_GROUP="$window_group")
         ;;
-    system-services|hpgcc-system|hpgcc-console|hpgcc-format|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|object-basics|sd-media-manual)
+    system-services|hpgcc-system|hpgcc-console|hpgcc-format|display|ui|notebook|notebook-entry|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|object-basics|sd-media-manual)
         E2E_SOURCE="$ROOT/tests/e2e/$MODE"
         E2E_TARGET="hpclang_${MODE//-/_}_e2e"
         E2E_ELF="hpclang-$MODE-e2e.elf"
@@ -194,7 +194,8 @@ test -n "$result_addr"
 printf '%s\n' "$result_addr" > "$OUT/e2e.result-address"
 
 "$NM" "$OUT/e2e.elf" |
-    awk '$2 == "T" && $3 == "hpclang_start" { found = 1 } END { exit !found }'
+    # LTO may retain the real startup as a weak definition when a fixture wraps it.
+    awk '($2 == "T" || $2 == "W") && $3 == "hpclang_start" { found = 1 } END { exit !found }'
 if "$ATFE/bin/llvm-readelf" -Ws "$OUT/e2e.elf" |
     grep -E ' GLOBAL .* UND '; then
     echo "unexpected undefined E2E symbols" >&2

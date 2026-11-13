@@ -37,6 +37,38 @@ static void clock_read(struct notebook *note)
                  (unsigned long)now.hour, (unsigned long)now.minute, (unsigned long)now.second);
 }
 
+static void storage_error(struct notebook *note, const char *operation, int error)
+{
+    const char *reason;
+    switch (error) {
+    case ENOSPC:
+        reason = "storage full";
+        break;
+    case ENOMEM:
+        reason = "not enough memory";
+        break;
+    case EROFS:
+        reason = "read-only storage";
+        break;
+    case ENODEV:
+        reason = "storage unavailable";
+        break;
+    case ENOSYS:
+        reason = "not supported here";
+        break;
+    case EIO:
+        reason = "storage I/O error";
+        break;
+    case EILSEQ:
+        reason = "foreign or invalid data";
+        break;
+    default:
+        snprintf(note->status, sizeof(note->status), "%s error %d", operation, error);
+        return;
+    }
+    snprintf(note->status, sizeof(note->status), "%s: %s", operation, reason);
+}
+
 static void load(struct notebook *note)
 {
     if (!notebook_load(note->text))
@@ -112,7 +144,7 @@ int notebook_update(struct notebook *note, const struct hpclang_ui_event *event)
         break;
     case SAVE:
         if (notebook_save(note->text))
-            snprintf(note->status, sizeof(note->status), "Save error %d", errno);
+            storage_error(note, "Save", errno);
         else
             strcpy(note->status, "Saved; exit normally");
         break;
@@ -124,13 +156,13 @@ int notebook_update(struct notebook *note, const struct hpclang_ui_event *event)
         break;
     case BACKUP:
         if (notebook_backup_save(event->action.arg, note->text))
-            snprintf(note->status, sizeof(note->status), "Backup error %d", errno);
+            storage_error(note, "Backup", errno);
         else
             strcpy(note->status, "Backup saved");
         break;
     case RESTORE:
         if (notebook_backup_load(event->action.arg, note->text))
-            snprintf(note->status, sizeof(note->status), "Restore error %d", errno);
+            storage_error(note, "Restore", errno);
         else
             strcpy(note->status, "Restored; Save to keep here");
         break;
@@ -139,7 +171,7 @@ int notebook_update(struct notebook *note, const struct hpclang_ui_event *event)
             if (errno == EEXIST)
                 strcpy(note->status, "HPCNOTE.TXT already exists");
             else
-                snprintf(note->status, sizeof(note->status), "Export error %d", errno);
+                storage_error(note, "Export", errno);
         } else
             strcpy(note->status, "Exported HPCNOTE.TXT");
         break;

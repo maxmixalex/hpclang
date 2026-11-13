@@ -98,22 +98,31 @@ def main():
         )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
         shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
+        shutil.copytree(package / "examples/timer-cpp", application / "timer-cpp")
         shutil.copytree(package / "examples/hpgcc-window", application / "window")
         shutil.copyfile(application / "window/main.c", application / "window.cpp")
         shutil.copytree(package / "examples/hpgcc-console", application / "console")
         shutil.copytree(package / "examples/notebook", application / "notebook")
         shutil.copyfile(root / "tests/sdk/numeric-input.cpp", application / "numeric-input.cpp")
         for suffix in ("c", "cpp"):
+            shutil.copyfile(
+                root / "tests/sdk/formatted-input.c", application / f"formatted-input.{suffix}"
+            )
             shutil.copyfile(root / "tests/sdk/sound.c", application / f"sound.{suffix}")
             shutil.copyfile(root / "tests/sdk/widget.c", application / f"widget.{suffix}")
         shutil.copytree(package / "examples/storage-cpp", application / "storage")
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
+                "add_subdirectory(timer-cpp)\n"
                 "add_subdirectory(notebook)\nadd_subdirectory(console)\nadd_subdirectory(devices)\n"
                 "hpclang_add_application(numeric_input numeric-input.cpp)\n"
                 "target_compile_features(numeric_input PRIVATE cxx_std_17)\n"
                 "hpclang_target_launchers(numeric_input)\n"
+                "hpclang_add_application(formatted_input_c formatted-input.c)\n"
+                "hpclang_add_application(formatted_input_cpp formatted-input.cpp)\n"
+                "hpclang_target_launchers(formatted_input_c)\n"
+                "hpclang_target_launchers(formatted_input_cpp)\n"
                 "hpclang_add_application(sound_c sound.c)\n"
                 "hpclang_add_application(sound_cpp sound.cpp)\n"
                 "hpclang_target_launchers(sound_c)\n"
@@ -132,7 +141,7 @@ def main():
         if args.aplet_tool:
             with (application / "CMakeLists.txt").open("a") as source:
                 source.write("""
-foreach(application IN ITEMS hello_c hello_cpp numeric_input sound_c sound_cpp window_cpp widget_c widget_cpp)
+foreach(application IN ITEMS hello_c hello_cpp numeric_input formatted_input_c formatted_input_cpp sound_c sound_cpp window_cpp widget_c widget_cpp)
     foreach(model IN ITEMS hp39gplus hp39gs hp40gs)
         hpclang_target_aplet(${application} MODEL ${model} NAME "SDK example"
             AUTHOR hpclang TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")
@@ -145,6 +154,7 @@ endforeach()
                 ("objects", "object_cpp"),
                 ("storage", "storage_cpp"),
                 ("timer", "hpgcc_timer"),
+                ("timer-cpp", "timer_cpp"),
                 ("window", "hpgcc_window"),
                 ("console", "hpgcc_console"),
                 ("notebook", "notebook"),
@@ -191,6 +201,8 @@ endforeach()
             ("hello_c", build),
             ("hello_cpp", build),
             ("numeric_input", build),
+            ("formatted_input_c", build),
+            ("formatted_input_cpp", build),
             ("sound_c", build),
             ("sound_cpp", build),
             ("storage_cpp", build / "storage"),
@@ -198,6 +210,7 @@ endforeach()
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
+            ("timer_cpp", build / "timer-cpp"),
             ("hpgcc_window", build / "window"),
             ("window_cpp", build),
             ("widget_c", build),

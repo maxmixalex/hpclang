@@ -267,6 +267,9 @@ target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpgcc_string test_hpgcc_string.c "${HPCLANG_ROOT}/runtime/core/hpgcc-string.c")
 target_include_directories(test_hpgcc_string PRIVATE "${HPCLANG_ROOT}/include")
 
+hpclang_unit(hpgcc_scan test_hpgcc_scan.c "${HPCLANG_ROOT}/runtime/core/hpgcc-scan.c")
+target_include_directories(test_hpgcc_scan PRIVATE "${HPCLANG_ROOT}/include")
+
 hpclang_unit(hpgcc_number test_hpgcc_number.c "${HPCLANG_ROOT}/runtime/core/hpgcc-number.c")
 target_include_directories(test_hpgcc_number PRIVATE "${HPCLANG_ROOT}/include")
 
@@ -388,6 +391,10 @@ set(HPCLANG_UI_SURFACE_TEST_SOURCES ${HPCLANG_UI_TEST_SOURCES}
     "${HPCLANG_ROOT}/runtime/core/saturn-view.c")
 hpclang_unit(ui_surface test_ui_surface.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
 target_include_directories(test_ui_surface PRIVATE "${HPCLANG_ROOT}/include")
+hpclang_unit(ui_surface_cpp test_ui_surface_cpp.cpp)
+target_compile_features(test_ui_surface_cpp PRIVATE cxx_std_17)
+target_compile_options(test_ui_surface_cpp PRIVATE -fno-exceptions -fno-rtti)
+target_include_directories(test_ui_surface_cpp PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(ui_demo test_ui_demo.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
     "${HPCLANG_ROOT}/examples/declarative-ui/app.c")
 target_include_directories(test_ui_demo PRIVATE "${HPCLANG_ROOT}/include")
@@ -397,6 +404,22 @@ hpclang_unit(notebook_ui test_notebook_ui.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
 target_include_directories(test_notebook_ui PRIVATE "${HPCLANG_ROOT}/include")
 
 if(UNIX)
+    hpclang_unit(ui_cpp_lifecycle test_ui_cpp_lifecycle.cpp ${HPCLANG_UI_SURFACE_TEST_SOURCES}
+        "${HPCLANG_ROOT}/examples/declarative-ui-cpp/app.cpp")
+    target_include_directories(test_ui_cpp_lifecycle PRIVATE "${HPCLANG_ROOT}/include")
+    target_compile_features(test_ui_cpp_lifecycle PRIVATE cxx_std_20)
+    target_compile_options(test_ui_cpp_lifecycle PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+    target_link_options(test_ui_cpp_lifecycle PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
+    hpclang_unit(notebook_lifecycle test_notebook_lifecycle.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
+        "${HPCLANG_ROOT}/examples/notebook/app.c")
+    target_include_directories(test_notebook_lifecycle PRIVATE "${HPCLANG_ROOT}/include")
+    target_link_options(test_notebook_lifecycle PRIVATE
+        "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
+    hpclang_unit(ui_demo_lifecycle test_ui_demo_lifecycle.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
+        "${HPCLANG_ROOT}/examples/declarative-ui/app.c")
+    target_include_directories(test_ui_demo_lifecycle PRIVATE "${HPCLANG_ROOT}/include")
+    target_compile_definitions(test_ui_demo_lifecycle PRIVATE HPCLANG_DEMO_NATIVE_FONT=0 HPCLANG_DEMO_INVERTED=0)
+    target_link_options(test_ui_demo_lifecycle PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
     hpclang_unit(ui_surface_alloc test_ui_surface_alloc.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
     target_include_directories(test_ui_surface_alloc PRIVATE "${HPCLANG_ROOT}/include")
     target_link_options(test_ui_surface_alloc PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
@@ -490,6 +513,14 @@ hpclang_unit(timer test_timer.c
     "${HPCLANG_ROOT}/runtime/core/timer-engine.c"
     "${HPCLANG_ROOT}/runtime/core/timer.c")
 target_include_directories(test_timer PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(timer_cpp test_timer_cpp.cpp
+    "${HPCLANG_ROOT}/runtime/core/timer-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/timer.c")
+target_compile_features(test_timer_cpp PRIVATE cxx_std_17)
+target_compile_options(test_timer_cpp PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+target_include_directories(test_timer_cpp PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(sound_api test_sound_api.c "${HPCLANG_ROOT}/runtime/core/sound.c")
@@ -716,6 +747,7 @@ target_compile_options(test_object_store PRIVATE
 
 hpclang_unit(port
     test_port.c
+    test_port_cpp.cpp
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
     "${HPCLANG_ROOT}/runtime/core/object-construct.c"
@@ -729,6 +761,9 @@ hpclang_unit(port
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_compile_features(test_port PRIVATE cxx_std_17)
+target_compile_options(test_port PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
 target_include_directories(test_port PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 

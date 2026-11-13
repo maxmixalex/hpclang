@@ -13,6 +13,7 @@ static char saved[NOTEBOOK_CAPACITY];
 static int load_error, save_error, clock_error;
 static unsigned port_mask;
 static int storage_available;
+static int export_error = EEXIST;
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
     return NULL;
@@ -69,8 +70,8 @@ int notebook_backup_save(unsigned port, const char *text)
 int notebook_export_file(const char *path, const char *text)
 {
     assert(!strcmp(path, "/HPCNOTE.TXT") && text);
-    errno = EEXIST;
-    return -1;
+    errno = export_error;
+    return export_error ? -1 : 0;
 }
 
 static uint32_t control(struct hpclang_ui *ui, unsigned action)
@@ -143,6 +144,38 @@ static void run(unsigned height, unsigned ports, int files, unsigned expected_no
     save_error = ENOSPC;
     assert(!activate(&note, ui, SAVE) && !strcmp(saved, "restored"));
     assert(!strcmp(note.text, "restored!"));
+    assert(!strcmp(note.status, "Save: storage full"));
+    const int errors[] = {ENOMEM, EROFS, ENODEV, ENOSYS, EIO, EILSEQ};
+    const char *reasons[] = {"not enough memory",  "read-only storage", "storage unavailable",
+                             "not supported here", "storage I/O error", "foreign or invalid data"};
+    for (unsigned i = 0; i < sizeof(errors) / sizeof(errors[0]); ++i) {
+        save_error = errors[i];
+        assert(!activate(&note, ui, SAVE) && strstr(note.status, reasons[i]));
+        assert(!strcmp(note.text, "restored!") && !strcmp(saved, "restored"));
+        if (ports) {
+            assert(!activate(&note, ui, BACKUP) && strstr(note.status, reasons[i]));
+            load_error = errors[i];
+            assert(!activate(&note, ui, RESTORE) && strstr(note.status, reasons[i]));
+            assert(!strcmp(note.text, "restored!") && !strcmp(saved, "restored"));
+        }
+        if (files) {
+            export_error = errors[i];
+            assert(!activate(&note, ui, EXPORT) && strstr(note.status, reasons[i]));
+            assert(!strcmp(note.text, "restored!") && !strcmp(saved, "restored"));
+        }
+        assert(!notebook_view(ui, renderer, &note, 131, (int)height));
+        assert(hpclang_ui_surface_render(renderer, ui) >= 0);
+    }
+    save_error = 12345;
+    assert(!activate(&note, ui, SAVE) && !strcmp(note.status, "Save error 12345"));
+    save_error = load_error = 0;
+    assert(!activate(&note, ui, SAVE) && !strcmp(saved, "restored!"));
+    assert(!strcmp(note.status, "Saved; exit normally"));
+    if (files) {
+        export_error = 0;
+        assert(!activate(&note, ui, EXPORT) && !strcmp(note.status, "Exported HPCNOTE.TXT"));
+    }
+    export_error = EEXIST;
     clock_error = EIO;
     assert(!activate(&note, ui, CLOCK) && strstr(note.clock, "Clock error"));
     assert(activate(&note, ui, EXIT) == 1);

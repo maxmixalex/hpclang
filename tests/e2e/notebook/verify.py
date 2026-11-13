@@ -3,6 +3,7 @@
 
 import argparse
 from pathlib import Path
+import runpy
 
 
 def font_rows(source: Path) -> dict:
@@ -47,6 +48,10 @@ def check_line(
 
 def verify(build: Path, target: str, height: int, source: Path) -> None:
     glyphs = font_rows(source)
+    root = Path(__file__).resolve().parents[3]
+    verify_resources = runpy.run_path(str(root / "tests/e2e/notebook-entry/verify.py"))[
+        "verify_resources"
+    ]
     for index, (text, status) in enumerate(
         (
             ("First saved note", "Saved; exit normally"),
@@ -63,6 +68,7 @@ def verify(build: Path, target: str, height: int, source: Path) -> None:
         pixels = frame[len(header) :]
         for top, line in ((0, "Notebook"), (16, "Alpha to type"), (24, text), (32, status)):
             check_line(pixels, glyphs, top, line, path, focused=index == 3 and top == 24)
+        verify_resources(build, name)
     print(f"PASS: {target}: notebook content across three Stock launches")
 
 
