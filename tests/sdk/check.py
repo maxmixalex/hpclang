@@ -385,7 +385,51 @@ endforeach()
                 >= (build / "notebook/notebook.hpc").stat().st_size
             ):
                 raise AssertionError("HP39 specialization did not reduce notebook code size")
+            # Model specialization changes code generation and packaging. The
+            # universal comparison above does not cover these release files.
+            repeated_source = work / f"model-{model}-second-source"
+            repeated = work / f"model-{model}-second-build"
+            shutil.copytree(package / "examples/notebook", repeated_source)
+            run(
+                "cmake",
+                "-S",
+                str(repeated_source),
+                "-B",
+                str(repeated),
+                "-DCMAKE_BUILD_TYPE=MinSizeRel",
+                f"-DHPCLANG_BUILD_MODEL={model}",
+                f"-DCMAKE_PREFIX_PATH={sdk}",
+                f"-DCMAKE_TOOLCHAIN_FILE={package / 'cmake/toolchains/hpclang-armv4t.cmake'}",
+                env=env,
+            )
+            run("cmake", "--build", str(repeated), "--parallel", "2", env=env)
+            if {p.stem for p in (repeated / "notebook-launchers").glob("*.hp")} != {model}:
+                raise AssertionError(f"{model}: repeated build packaged other calculators")
+            outputs = {
+                Path("notebook.hpc"),
+                Path("notebook-launchers") / f"{model}.hp",
+                Path("notebook-launchers/memory.json"),
+            }
+            font_sets = [
+                {
+                    p.relative_to(directory)
+                    for p in directory.rglob("*")
+                    if p.is_file() and "hpclang-fonts" in p.parts and p.suffix in (".c", ".h")
+                }
+                for directory in (selected, repeated)
+            ]
+            if not font_sets[0] or font_sets[0] != font_sets[1]:
+                raise AssertionError(f"{model}: generated font output sets differ or are empty")
+            for relative in sorted(outputs | font_sets[0]):
+                if (selected / relative).read_bytes() != (repeated / relative).read_bytes():
+                    raise AssertionError(f"{model}: nonreproducible release output {relative}")
+            # Keep the installed SDK for subsequent models; completed build
+            # trees are temporary and no longer needed after byte comparison.
+            shutil.rmtree(selected)
+            shutil.rmtree(repeated)
+            shutil.rmtree(repeated_source)
         print("Installed SDK: all six model-specific notebook builds PASS")
+        print("Installed SDK: all six model-specific release outputs byte-identical PASS")
         rejected = work / "rejected model application"
         shutil.copytree(package / "examples/notebook", rejected)
         cmake_file = rejected / "CMakeLists.txt"
