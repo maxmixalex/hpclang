@@ -5309,3 +5309,19 @@ Four fresh setup-runtime tests and strict docs pass. Existing six-model Direct
 and Stock evidence is retained; no redundant application rebuild is claimed.
 Identity audit: research/nov06-allocation-main-identity.json. The integration
 requires new exact-head CI; this is not broader M8.2/M8.3/M8.5 completion.
+## 2026-11-13 — C++ UI renderer ownership native acceptance
+
+Local runtime head `96bd21e5` passes all six Direct and all six Stock UI cases.
+Independent audits recheck sealed source/artifact hashes, current-image pixels,
+application SP and memory observations, and settled return. Stock additionally
+passes pool/native-allocation reconciliation, launcher stack observations,
+native block release and both native heaps' post-return capacity/fragmentation.
+Maximum Stock observations are stack 2432/8192 bytes, heap 20076/22880 bytes,
+frame 42586/100000 us and input 2562/5000 us (nine frames, 34 key edges per model).
+Reports: `/work/nov06-sum/ui-owner-native-runs/independent-audit.json` and
+`/work/nov06-sum/ui-owner-stock/independent-audit.json`; audit drivers are
+`research/nov13-ui-owner-direct-audit.py` and `research/nov13-ui-owner-stock-audit.py`.
+This closes the local owner validation batch, not remote acceptance or whole
+M8.2/M8.3/M8.5 completion. Native exception-stack reservations and whole-system
+transient-memory admission remain open. PR #14's preceding-head readiness
+failure remains unaccepted; its separate harness correction is PR #39.
