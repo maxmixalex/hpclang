@@ -16,6 +16,56 @@ SPEC.loader.exec_module(CHECK)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_text_hint_preserves_utf8_and_gbk_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "text.c"
+            text = '// \u4e2d\u6587\nhpg_draw_text("\u4e2d\u6587", 0, 0);\n'
+            for encoding in ("utf-8", "gbk"):
+                with self.subTest(encoding=encoding):
+                    original = text.encode(encoding)
+                    source.write_bytes(original)
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            str(TOOL),
+                            "--json",
+                            "--check",
+                            "--encoding",
+                            encoding,
+                            str(source),
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(result.returncode, 1)
+                    report = json.loads(result.stdout)
+                    self.assertEqual(report["errors"], [])
+                    self.assertEqual(
+                        [(r["rule"], r["line"], r["column"]) for r in report["findings"]],
+                        [("HP012", 2, 1)],
+                    )
+                    self.assertEqual(source.read_bytes(), original)
+
+    def test_hpg_text_encoding_boundaries(self):
+        source = (
+            'hpg_draw_text /* bytes */ ("text", 0, 0);\n'
+            "hpg_draw_text_on(g, dynamic, 0, 0);\n"
+            "hpg_draw_letter(ch, 0, 0); hpg_draw_letter_on(g, ch, 0, 0);\n"
+            "#if 0\n  hpg_draw_\\\ntext(dynamic, 0, 0);\n#endif\n"
+            '// hpg_draw_text(hidden, 0, 0);\nconst char *s = "hpg_draw_letter()";\n'
+            'auto raw = R"tag(hpg_draw_text_on(g, hidden, 0, 0))tag";\n'
+            "my_hpg_draw_text(); hpg_draw_text_extra();\n"
+            "hpclang_surface_draw_text(); hpclang_surface_draw_utf8();\n"
+        )
+        rows = CHECK.scan(source, "text.cpp")
+        self.assertEqual(
+            [(r["rule"], r["line"], r["column"]) for r in rows],
+            [("HP012", 1, 1), ("HP012", 2, 1), ("HP012", 3, 1), ("HP012", 3, 28), ("HP012", 5, 3)],
+        )
+        self.assertTrue(all("byte-indexed" in r["message"] for r in rows))
+        self.assertTrue(all("dynamic characters" in r["message"] for r in rows))
+        self.assertTrue(all("does not transcode" in r["message"] for r in rows))
+
     def test_kos_tones_request_semantic_review_without_guessing_modes(self):
         source = (
             "kos_beep /* ms */ (880, 10, 0);\n"

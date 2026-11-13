@@ -22,6 +22,7 @@ It reports source locations and concrete advice for legacy umbrella includes,
 raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units and
 application `errno` declarations, legacy decimal settings, borrowed formatting
 buffers, storage capability checks and KOS tone waiting/replacement semantics.
+It also locates HPG text/letter drawing calls for encoding and font review.
 Comments and string/character literals are
 ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
 `build`, `.cache` and `third_party`; explicitly named files are always checked.
@@ -159,6 +160,17 @@ predict text loaded from a file or constructed at runtime. The timer example
 packages printable ASCII for its formatted result. Check both missing-glyph
 behavior and the intended calculator's display size. Legacy default fonts can
 use native or packaged fallback faces, so pixel-identical glyphs are not promised.
+
+`HP012` identifies `hpg_draw_text`, `hpg_draw_letter` and their `_on` variants.
+Keeping those calls preserves byte-indexed rendering; check the selected font's
+mapping. Replacing them with UTF-8 drawing calls also requires converting legacy
+text at the appropriate boundary. Simply casting a pointer or saving the source
+file as UTF-8 does not convert text loaded from files or calculator objects.
+The checker's `--encoding` option only controls how it reads source files; it
+does not transcode application data or select the compiler's execution encoding.
+The hint also applies to ASCII literals: this lexical checker cannot prove which
+font is selected or which characters dynamic strings will contain. Explicitly
+include runtime characters in generated fonts and check missing-glyph behavior.
 
 ## Make ownership visible
 

@@ -27,6 +27,7 @@ def check_migration_tool(package, work, env):
         "void h() { copy(ints(12, 10)); uints(34, 10); sys_bcd2str(0x1234); }\n"
         "void storage() { FSOpen(name, mode, &file); sat_dir_open(); }\n"
         "void audio() { kos_beep(880, 10, 0); kos_CheckBeepEnd(); }\n"
+        "void text() { hpg_draw_text(dynamic, 0, 0); hpg_draw_letter_on(g, ch, 0, 0); }\n"
     )
     source.write_text(original)
     result = subprocess.run(
@@ -56,12 +57,16 @@ def check_migration_tool(package, work, env):
         "HP010",
         "HP011",
         "HP011",
+        "HP012",
+        "HP012",
     ]:
         raise AssertionError(f"Unexpected migration findings: {report}")
     if source.read_text() != original:
         raise AssertionError("Migration checker modified its input")
     legacy = work / "legacy input.cpp"
-    legacy_bytes = "// caf\u00e9\ngets(buffer);\n".encode("cp1252")
+    legacy_bytes = '// caf\u00e9\ngets(buffer);\nhpg_draw_text("caf\u00e9", 0, 0);\n'.encode(
+        "cp1252"
+    )
     legacy.write_bytes(legacy_bytes)
     result = subprocess.run(
         [
@@ -81,7 +86,8 @@ def check_migration_tool(package, work, env):
         raise AssertionError(f"Installed checker rejected legacy source: {result.stderr}")
     report = json.loads(result.stdout)
     if report["errors"] or [(r["rule"], r["line"], r["column"]) for r in report["findings"]] != [
-        ("HP002", 2, 1)
+        ("HP002", 2, 1),
+        ("HP012", 3, 1),
     ]:
         raise AssertionError(f"Unexpected legacy-source findings: {report}")
     if legacy.read_bytes() != legacy_bytes:

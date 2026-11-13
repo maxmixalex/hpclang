@@ -22,6 +22,11 @@ TOKENS = re.compile(
 )
 RULES = (
     (
+        "HP012",
+        r"\bhpg_draw_(?:text|letter)(?:_on)?\s*\(",
+        "Review text encoding: HPG text uses byte-indexed glyphs, not UTF-8. Keeping HPG requires its selected font's byte mapping; moving to hpclang_surface_draw_text/utf8 requires explicit transcoding of legacy bytes. Select a font with hpclang_target_font and include dynamic characters explicitly; source extraction cannot prove runtime glyph coverage. --encoding only decodes source for this checker; it does not transcode application text.",
+    ),
+    (
         "HP011",
         r"\b(?:kos_beep|kos_CheckBeepEnd)\s*\(",
         "Review KOS tone semantics: durations are milliseconds; mode bit 0 permits replacement and bit 1 waits. kos_CheckBeepEnd returning true does not guarantee silence. Use hpclang_sound_status for playing/completed/error status and hpclang_sound_stop for cancellation; check operation failures.",
