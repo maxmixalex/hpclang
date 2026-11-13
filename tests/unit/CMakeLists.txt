@@ -404,6 +404,12 @@ hpclang_unit(notebook_ui test_notebook_ui.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
 target_include_directories(test_notebook_ui PRIVATE "${HPCLANG_ROOT}/include")
 
 if(UNIX)
+    hpclang_unit(ui_cpp_lifecycle test_ui_cpp_lifecycle.cpp ${HPCLANG_UI_SURFACE_TEST_SOURCES}
+        "${HPCLANG_ROOT}/examples/declarative-ui-cpp/app.cpp")
+    target_include_directories(test_ui_cpp_lifecycle PRIVATE "${HPCLANG_ROOT}/include")
+    target_compile_features(test_ui_cpp_lifecycle PRIVATE cxx_std_20)
+    target_compile_options(test_ui_cpp_lifecycle PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+    target_link_options(test_ui_cpp_lifecycle PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
     hpclang_unit(notebook_lifecycle test_notebook_lifecycle.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
         "${HPCLANG_ROOT}/examples/notebook/app.c")
     target_include_directories(test_notebook_lifecycle PRIVATE "${HPCLANG_ROOT}/include")
