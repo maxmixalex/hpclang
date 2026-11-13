@@ -23,6 +23,8 @@
         }                                                                                          \
     } while (0)
 static BYTE disk[SECTORS * 512u];
+/* Fixed-size host fixture: CHECK may return before the restore step. */
+static BYTE saved_disk[sizeof disk];
 static int protected_media;
 static int inserted_media;
 static int initialized_media;
@@ -390,8 +392,6 @@ int main(void)
     FS_FILE *compat_file, *compat_directory;
     CHECK(FSOpen("NEW.TXT", FSMODE_MODIFY, &compat_file) == FS_OK);
     CHECK(FSOpenDir("/", &compat_directory) == FS_OK);
-    BYTE *saved_disk = malloc(sizeof disk);
-    CHECK(saved_disk != NULL);
     memcpy(saved_disk, disk, sizeof disk);
     CHECK(FSWrite("old", 3, compat_file) == 3);
     fd = hpclang_namespace_open("NEW.TXT", O_RDWR);
@@ -433,7 +433,6 @@ int main(void)
     inserted_media = 0;
     CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == ENODEV);
     memcpy(disk, saved_disk, sizeof disk);
-    free(saved_disk);
     inserted_media = 1;
     card_identity = 0x58;
     CHECK(hpclang_namespace_owned_card_identity(raw_identity) == 0 && raw_identity[0] == 0x58);
