@@ -27,6 +27,7 @@ def check_migration_tool(package, work, env):
         "void h() { copy(ints(12, 10)); uints(34, 10); sys_bcd2str(0x1234); }\n"
         "void storage() { FSOpen(name, mode, &file); sat_dir_open(); }\n"
         "void audio() { kos_beep(880, 10, 0); kos_CheckBeepEnd(); }\n"
+        "void addresses() { sys_map_v2p(pointer); sys_map_p2v(address); }\n"
         "void text() { hpg_draw_text(dynamic, 0, 0); hpg_draw_letter_on(g, ch, 0, 0); }\n"
     )
     source.write_text(original)
@@ -57,6 +58,8 @@ def check_migration_tool(package, work, env):
         "HP010",
         "HP011",
         "HP011",
+        "HP013",
+        "HP013",
         "HP012",
         "HP012",
     ]:

@@ -20,6 +20,18 @@ SPEC.loader.exec_module(CHECK)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_raw_address_translation_requires_design_review(self):
+        rows = CHECK.scan("sys_map_v2p(ptr);\nsys_map_p2v(address);\n", "legacy.c")
+        self.assertEqual(
+            [(r["rule"], r["line"], r["column"]) for r in rows], [("HP013", 1, 1), ("HP013", 2, 1)]
+        )
+        self.assertTrue(all("not public hpclang APIs" in r["message"] for r in rows))
+        self.assertTrue(all("fixed address offset" in r["message"] for r in rows))
+
+    def test_address_translation_ignores_text_and_other_names(self):
+        source = '// sys_map_v2p(p);\n"sys_map_p2v(a)"; my_sys_map_v2p(p);\n'
+        self.assertEqual(CHECK.scan(source, "legacy.cpp"), [])
+
     def test_excluded_directories_are_not_entered(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

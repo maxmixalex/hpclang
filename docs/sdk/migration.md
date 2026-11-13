@@ -22,7 +22,12 @@ It reports source locations and concrete advice for legacy umbrella includes,
 raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units and
 application `errno` declarations, legacy decimal settings, borrowed formatting
 buffers, storage capability checks and KOS tone waiting/replacement semantics.
-It also locates HPG text/letter drawing calls for encoding and font review.
+It also locates HPG text/letter drawing calls for encoding and font review. `HP013`
+identifies the historical `sys_map_v2p` and `sys_map_p2v` address translators.
+These are not public hpclang APIs. Do not substitute casts or fixed address
+offsets: use the owning display, storage or object service, or redesign custom
+physical-memory access explicitly. A borrowed pointer alone does not prove a
+physical address or how long it remains valid.
 Comments and string/character literals are
 ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
 `build`, `.cache` and `third_party`; explicitly named files are always checked.

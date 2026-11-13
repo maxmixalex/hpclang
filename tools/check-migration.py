@@ -24,6 +24,11 @@ TOKENS = re.compile(
 )
 RULES = (
     (
+        "HP013",
+        r"\b(?:sys_map_v2p|sys_map_p2v)\s*\(",
+        "Review raw address translation: these HPGCC MMU helpers are not public hpclang APIs. Do not replace them with casts or a fixed address offset. Keep buffers within their owning service and use display surfaces, storage streams or object snapshots as appropriate; custom physical-memory access needs a separate design. A borrowed pointer does not establish physical-address validity or lifetime.",
+    ),
+    (
         "HP012",
         r"\bhpg_draw_(?:text|letter)(?:_on)?\s*\(",
         "Review text encoding: HPG text uses byte-indexed glyphs, not UTF-8. Keeping HPG requires its selected font's byte mapping; moving to hpclang_surface_draw_text/utf8 requires explicit transcoding of legacy bytes. Select a font with hpclang_target_font and include dynamic characters explicitly; source extraction cannot prove runtime glyph coverage. --encoding only decodes source for this checker; it does not transcode application text.",
