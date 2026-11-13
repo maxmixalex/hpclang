@@ -18,30 +18,32 @@ ATFE=/path/to/atfe python3 tests/compat/check-fsystem-examples.py \
   --sdk /path/to/installed-sdk --work /new/filesystem-evidence
 ```
 
-There are four explicit migration rules:
+There are three explicit migration rules:
 
 - Replace the historical umbrella with `hpconio.h`, `hpkeyb49.h` and `string.h`.
 - Use `_clear_screen` for the historical console clear operation.
-- Remove the explicit `FSShutdown` call and its success/error message. The
-  hpclang runtime owns final filesystem shutdown at application exit; this
-  migration does not provide an equivalent earlier checked shutdown operation.
 - In example3, replace the out-of-bounds 17-byte read from `"Appended string"`
   with the literal's actual non-NUL length, used for both write and comparison.
 
+The original explicit `FSShutdown` calls and success/error messages are retained.
 All remaining application statements stay unchanged, including the four-volume
 loop, interactive waits and original error handling. The rename operation needs
-an existing `My own text document.txt` in the test directory; a future native
-gate must supply that fixture or explicitly test its absence. These programs
+an existing `My own text document.txt` in the test directory; the native
+gate supplies that fixture. These programs
 are not robust error-recovery examples and must run on disposable test media.
 
-Both compile/link and package all six targets against the relocated SDK in
-`/work/oct26-fsystem-original`; compiler commands contain no repository source
-or include paths. Two ARM analyses, exact reversal of the listed migration edits,
-and changed-source rejection for each member pass. This is build evidence only.
+The retained-shutdown versions compile/link and package all six targets against
+a relocated SDK; compiler commands contain no repository or old-prefix paths.
+Exact reversal of the three migration edits reproduces both pinned originals.
+HP49g+/HP50g Direct and Stock runs pass both original shutdown calls, directory
+pagination, writes/rename/deletion, console pixels and settled return. Independent
+raw-card checks pass, and a corrupted shutdown-output frame is rejected.
+This is local validation under `/work/nov06-sum/original-shutdown-fixed`, not
+remote CI acceptance. Earlier ARM analysis and changed-source rejection evidence
+is retained separately from this updated native run.
 SD runtime support remains HP49g+/HP50g; six-model packaging does not imply
-filesystem availability elsewhere. Original-source file-content, input/output,
-media and Stock-return validation remain open; the earlier clean-service
-behavioral ports do not close these checks.
+filesystem availability elsewhere. These emulator results do not establish
+physical-card or broader historical-application coverage.
 
 Add `--native` to build a combined `native-artifact` with the two original
 entry points renamed and an external observer. This fixture deliberately uses

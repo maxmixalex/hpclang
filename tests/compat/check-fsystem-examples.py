@@ -15,9 +15,6 @@ MEMBERS = {
     "example3": "0dd7a9db707d3fc6255c81aac5ce88810f43941a265db28bb5e79b5b9ced8aae",
 }
 MODELS = ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g")
-SHUTDOWN = """error=FSShutdown();
-if(error==FS_OK) printf("Shutdown OK\\n");
-else printf("Shutdown error: %s", FSGetErrorMsg(error));"""
 
 
 def replace_once(source, old, new):
@@ -42,11 +39,6 @@ def extract(archive):
                 "#include <hpconio.h>\n#include <hpkeyb49.h>\n#include <string.h>",
             )
             source = replace_once(source, "clear_screen();", "_clear_screen();")
-            source = replace_once(
-                source,
-                SHUTDOWN,
-                "/* hpclang closes the process-owned filesystem at application exit. */",
-            )
             if name == "example3":
                 source = replace_once(
                     source,
@@ -82,7 +74,7 @@ def main():
         "limits": [
             "Compile/link/package only; no native file/input/output/return acceptance",
             "SD runtime is available only on HP49g+/HP50g; packaging is not availability",
-            "Explicit FSShutdown and its success/error output are removed; exit owns shutdown",
+            "Original explicit FSShutdown and its success/error output are retained",
             "Original example3 rename needs a preexisting My own text document.txt fixture",
         ],
     }
@@ -133,6 +125,7 @@ def main():
             "FSCloseAndDelete",
             "FSRename",
             "FSGetNextEntry",
+            "FSShutdown",
         ):
             cmake.append(f"target_link_options(native PRIVATE LINKER:--wrap={symbol})")
     (app / "CMakeLists.txt").write_text("\n".join(cmake) + "\n", encoding="utf-8")
