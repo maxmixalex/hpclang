@@ -867,7 +867,11 @@ time to the pinned writable FatFs configuration with sharing locks disabled.
 Eight mode/flush observations match unchanged HPGCC3 `fschmode.c`, whose behavior
 also matches the HPGCC 2.0 SP2 Thumb library inspection. Production FatFs tests
 cover content, offset, extent, protection, flush failure and stale handles under
-ASan/UBSan. Native and CI acceptance are tracked separately on the roadmap.
+ASan/UBSan. The Storage regression passes all six Direct targets and HP49g+/HP50g
+Stock SD execution and settled return. Independent source/report-hash and raw-card
+checks pass under `/work/nov13-fsystem-mode/native/independent-audit.json`.
+Other families retain unsupported SD behavior; their Direct pass is not an SD
+availability claim. ARM analysis and strict docs pass; CI acceptance is pending.
 
 ## HP39 calculator objects
 
