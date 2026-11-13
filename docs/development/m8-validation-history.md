@@ -4576,3 +4576,31 @@ remaining models pending. Empty phases are unsampled, not zero free capacity.
 One allocation function does not establish whole-system transient admission
 or native exception-stack reservations. Rotate to other M8 deliveries before
 the next bounded UI coverage batch.
+
+
+### 2026-11-13 — Six-model live native heap observations
+
+The formatted observer/Stock frontend emulator completes all six original-Stock
+UI executions and settled returns in one uninterrupted matrix (session 45058,
+exit 0). Independent input, artifact, ROM profile, status and trace checks pass;
+four altered-trace/status negatives per model are rejected. The maintained
+verifier has five tests, alongside five sanitizer-backed trace tests. Reports:
+`/work/nov06-sum/native-heap-matrix/independent-audit.json` (`complete=true`).
+
+| Model | Accepted allocator returns | Failed allocation returns | Minimum sampled usable bytes |
+| --- | ---: | ---: | ---: |
+| HP39g+ | 44 | 37 | 1928 |
+| HP39gs | 44 | 37 | 1256 |
+| HP40gs | 44 | 37 | 1256 |
+| HP48gII | 52 | 37 | 1256 |
+| HP49g+ | 7 | 3 | 1672 |
+| HP50g | 16 | 3 | 1672 |
+
+All observations have zero rejected samples. Allocation failures are null
+allocator returns, not failed application runs. Counts may vary with Stock
+activity; no count is a universal bound. The reused UI-owner application is
+sealed by artifact hashes, not claimed as a fresh build from this branch.
+Long HP39 transfer waits resolved within the same runs without retries. The
+current formatted emulator supersedes the previous single-model experiment's
+binary; the earlier experiment remains historical evidence. No claim closes
+other allocation paths, native exception-stack bounds or whole-system peaks.
