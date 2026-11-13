@@ -23,9 +23,7 @@ def rom_image(data, update_image=False):
 
 
 def main():
-    verifier = runpy.run_path(
-        str(Path(__file__).with_name("verify-resource-snapshots.py"))
-    )
+    verifier = runpy.run_path(str(Path(__file__).with_name("verify-resource-snapshots.py")))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("rom", type=Path)
     parser.add_argument("--model", choices=verifier["MODELS"], required=True)
@@ -48,9 +46,7 @@ def main():
                 ("PC", "return_pc"),
                 ("ROOTS", "free_list_roots"),
             ):
-                output.write(
-                    f"export HPCLANG_X50NG_NATIVE_HEAP_{name}={int(profile[key])}\n"
-                )
+                output.write(f"export HPCLANG_X50NG_NATIVE_HEAP_{name}={int(profile[key])}\n")
         else:
             json.dump(profile, output, indent=2)
             output.write("\n")
