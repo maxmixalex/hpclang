@@ -873,8 +873,14 @@ are ignored. The clean storage API keeps its independent FatFs behavior.
 
 Production FatFs host tests cover all four modes, case collisions, directory
 names, restart defaults and deletion through a hidden physical suffix; ASan,
-UBSan and host Clang analysis pass. Native validation of this addition remains
-pending. Controller sleep/wakeup (`FSSleep` and `FSWakeUp`) remains internal.
+UBSan and host Clang analysis pass. Six Direct model runs and HP49g+/HP50g
+Stock runs pass, including all four modes on both mounted partitions and
+normal settled return. An independent audit verifies unchanged inputs, saved
+reports and raw-card persistence witnesses. The native test exposed a doubled
+separator at qualified volume roots; a reproducing host regression and the
+corrected native matrix now pass. These are local emulator results, not CI
+or physical-hardware acceptance. Controller sleep/wakeup (`FSSleep` and
+`FSWakeUp`) remains internal.
 
 ### Changing an open file's mode
 
