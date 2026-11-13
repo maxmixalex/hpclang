@@ -6269,3 +6269,19 @@ all 2,344 guards byte-for-byte, and passes allocation-failure cleanup. The old
 tests pass. Drivers: research/nov13-missing-message-budget.py and
 research/nov13-missing-message-negative.py. Fresh native validation remains
 required; this does not close M8.0 or establish general production discovery.
+## 2026-11-13 — Two-model native collector acceptance
+
+Local runtime `34034bd9` passes the complete HP49g+/HP50g Stock matrix
+(session 7501 exit 0). Independent saved-state replay passes both models:
+88 basic reference/control cases and 19 saved executions per model, including
+all 14 native/catalog/call scenarios. Sealed input hashes and recomputed
+results match. Reports are under `/work/nov06-sum/native271-snapshot-stock`;
+`independent-audit.json` now records complete=true. Reproducer:
+`research/nov13-native271-snapshot-audit.py` (session 95157 exit 0).
+
+This validates the payload-scoped provenance memoization and bounded collector
+allocation fixes, including the round-trip snapshot's live allocation. All
+2,344 guards remain; the 4096-entry ceiling is unchanged. The prior exact-head
+CI failures remain unaccepted pending a new delivery. Public native library
+management, Port1 and the retained Port2 requirements are not completed by this
+fixture acceptance.
