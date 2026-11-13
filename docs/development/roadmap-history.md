@@ -4709,12 +4709,18 @@ below are retained.
   This closes the representative-source compilation criterion only; model
   capability limits, runtime acceptance and broader adapter coverage remain
   separate requirements.
-- [ ] Complete `kos_beep/kos_CheckBeepEnd` compatibility with owned asynchronous
+- [x] Complete `kos_beep/kos_CheckBeepEnd` compatibility with owned asynchronous
   sound, completion queries and active-tone preemption policy. Verify flags
   against each original system; cover autonomous stop while application code is
   busy, overlapping requests, cancellation and normal/immediate-exit restoration.
   Keep Stock interrupt handlers out of the temporary application mapping; the
   existing blocking tone service alone does not satisfy this adapter group.
+  Accepted in PR #25 at `752b8999`, merged as `3c484673`: all 54
+  normal/exit/_Exit Runtime jobs across the two accepted runs pass.
+  The [sound acceptance record](hpgcc-compat.md#historical-tones-and-packed-bcd)
+  documents mode flags, autonomous completion, cancellation and pre-launcher
+  cleanup checks. The chronological investigation below preserves intermediate
+  failures and former open states; it does not reopen this accepted tone subset.
   The internal PWM4 one-shot lease passes host sanitizers and six-model Direct
   expiry/rearm/restoration probes with the interrupt masked. Banked IRQ stack
   exchange/restoration also passes six-model Direct probes with actual delivery
