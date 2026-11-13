@@ -2081,6 +2081,28 @@ captured. Reports fingerprint the ROM, status and each SRAM image and preserve
 phase/time and both heaps' free totals/largest blocks. Report creation is
 exclusive so a prior result cannot silently be overwritten.
 
+The optional native allocator-return observer complements these snapshots.
+Generate a model/ROM-qualified profile with `native-heap-profile.py`; set
+`HPCLANG_X50NG_NATIVE_HEAP` to a new JSON output path and set the corresponding
+`HPCLANG_X50NG_NATIVE_HEAP_MODEL`, `HPCLANG_X50NG_NATIVE_HEAP_PC` and
+`HPCLANG_X50NG_NATIVE_HEAP_ROOTS` values from that profile. The PC is the
+profile's `return_pc`, before the common return instruction executes. The Stock
+frontend supplies phase boundaries even when SRAM snapshot capture is disabled.
+The output contains bounded phase summaries rather than per-allocation files.
+
+```sh
+python3 tests/e2e/harness/verify-native-heap-trace.py /path/to/hp50g-heap.json \
+  --model hp50g --rom /path/to/matching/flash \
+  --stock-report /path/to/hp50g-stock.json --output /new/path/heap-verified.json
+```
+
+This verifier checks the ROM profile, execution/settled-return result, phase
+intervals, rejected-event counts and paired-heap minima. Allocation failures
+are reported separately from invalid observations. Unsampled phases have no
+measured minimum, rather than zero free capacity. Boot events before the first
+phase, other allocation functions and native exception stacks remain outside
+this measurement; it does not close whole-system transient-memory admission.
+
 The HP50g 20-snapshot run passes. Thirteen observer/verifier host tests pass;
 real-capture negatives reject missing return SRAM, wrong model, reordered phases,
 truncated SRAM and unsettled execution. Evidence is in
