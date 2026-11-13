@@ -764,7 +764,9 @@ publication and its non-replayable `INCOMPLETE` outcome. It neither attaches the
 library to HOME nor executes configuration code. Exclusive ownership and complete
 data/execution repairs remain caller obligations; the fixture collector is not
 production authorization. Local ASan/UBSan mutation tests and a fresh ARM fixture
-build pass. Native execution and remote acceptance of this addition are pending.
+build pass. HP49g+/HP50g Stock registration and removal pass, including independent
+replay of all four saved executions with unchanged inputs. Remote acceptance of
+this addition remains pending.
 
 Live registration probing also exposed a separate return-address source:
 HP49g+/HP50g Stock's Saturn instruction return stack contains eight ARM-stored
