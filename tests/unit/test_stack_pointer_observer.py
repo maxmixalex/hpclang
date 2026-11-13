@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import struct
 import tempfile
 import unittest
 
@@ -53,6 +54,42 @@ class StackPointerBudgetTests(unittest.TestCase):
         self.write([native])
         with self.assertRaises(AssertionError):
             VERIFY.verify_stack_pointer(self.prefix)
+        self.assertFalse(self.output.exists())
+
+    def test_borrowed_stack_is_bound_to_image_and_separate_from_arena(self):
+        artifact = Path(self.temp.name) / "artifact"
+        artifact.mkdir()
+        # Independent fixture for the ARM cache-maintenance supervisor body.
+        body = bytes.fromhex(
+            "004082e507402de9030050e10200002a3a0f07ee200080e2faffffea"
+            "0000a0e39a0f07ee150f07ee0000a0e10000a0e10740bde80ef0b0e1"
+        )
+        payload = b"HPC1" + struct.pack("<3I", len(body), 0, 0) + body
+        image = artifact / "e2e.hpc"
+        image.write_bytes(payload)
+        native = dict(
+            self.row, mode=19, minimum=0x80004EC, maximum=0x80004FC, minimum_pc=0x1220004, writes=24
+        )
+        self.write([native, self.row])
+        result = VERIFY.verify_stack_pointer(self.prefix, artifact)
+        self.assertEqual(result["stack_pointer_bytes"], 2424)
+        self.assertEqual(result["borrowed_stacks"][0]["frame_bytes"], 16)
+        for changes in (
+            {"mode": 18},
+            {"minimum_pc": 0x1220008},
+            {"minimum": native["minimum"] - 4},
+        ):
+            self.write([dict(native, **changes), self.row])
+            self.output.write_text("stale pass")
+            with self.subTest(changes=changes), self.assertRaises(AssertionError):
+                VERIFY.verify_stack_pointer(self.prefix, artifact)
+            self.assertFalse(self.output.exists())
+        self.write([native, self.row])
+        corrupt = bytearray(payload)
+        corrupt[-4] ^= 1  # The exception return is part of the provenance check.
+        image.write_bytes(corrupt)
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_stack_pointer(self.prefix, artifact)
         self.assertFalse(self.output.exists())
 
     def test_user_mode_and_shared_bank_transitions(self):

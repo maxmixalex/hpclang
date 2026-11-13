@@ -232,6 +232,13 @@ does not establish memory-exhaustion handling or whole-system resource bounds.
 
 ### Original window application gate
 
+The representative original-source compilation requirement is satisfied by
+this HPGCC 1.1 program and the two HPGCC 2.0 filesystem programs above. These
+are extracted historical applications with recorded migration edits, rather
+than new programs reproducing the same features. Both gates build through a
+relocated SDK and package all six models; packaging does not imply filesystem
+support on models without SD services or completion of every adapter group.
+
 `win.h` supplies the historical control umbrella. Run
 `ATFE=/path/to/atfe python3 tests/compat/check-win-simple.py /path/to/archives --work /new/output/path`
 to extract HPGCC 1.1's `examples/win/simple.c`, remove its unused `hpgcc49.h`
@@ -2138,3 +2145,33 @@ footer native-font glyphs are outside this checker. A wrong selected-row pixel
 is rejected. Every saved return record passes. Stock 51380 uses the same fixed
 artifact; full 150-test regression 29287 and analysis 29830 run. Logs use
 `/work/oct24-choose-*`. Stock and CI acceptance remain open.
+
+### Historical formatted-input entry points
+
+`hpstdio.h` provides `_scanf`, `_sscanf` and `_vsscanf`, as declared by HPGCC
+2.0 `sources/hplib/hpstdio.h`. The original `examples/scanf.c` date/time format
+is covered by a regression test. String conversions delegate to standard C
+`vsscanf`; standard `scanf`, `sscanf` and `vsscanf` names remain unchanged.
+This does not reproduce the old `_vsscanf.c` parser's documented incomplete
+features or conversion bugs.
+
+`_scanf` retains the historical read-one-line-then-parse behavior, using the
+existing bounded console editor with a 1024-byte buffer. It accepts at most
+1023 calculator bytes; further typed characters follow the editor's full-line
+behavior until deletion or submission. EOF without input, cancellation and
+input failure return `EOF`, preserving the editor's error indication. Use
+conversion widths for destination arrays, as with standard C scanning.
+
+Local sanitizer tests cover the original date/time conversion, `va_list`,
+field widths, suppression, scansets, `%n`, partial conversion and input failure.
+ARMv4T compilation and analysis pass; `_scanf` has a 1056-byte own frame,
+excluding nested editor/libc stack use. The installed-SDK gate compiles and
+links `tests/sdk/formatted-input.c` as both C and C++ after relocating the SDK
+to a path containing spaces. It validates their HPC1 images and six-model
+launchers alongside the existing SDK examples. Two clean builds produce 257
+byte-identical release outputs. All six Direct and all six Stock executions
+of the installed C/C++ fixture subsequently pass independent source/artifact,
+result and settled-return audits. PR #32 is accepted and merged as `2f60c739`;
+its exact-head CI passes seven workflows and 203 jobs, with one intentional
+evidence-publisher skip. These results cover the formatted-input entry points,
+not physical-hardware qualification or completion of the whole M8.4 stage.

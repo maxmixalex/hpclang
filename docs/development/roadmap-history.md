@@ -4456,7 +4456,7 @@ Deliver and review this core in the following slices, using the retained
   The [C application sketch review](sdk-design.md#c-application-sketch-review)
   maps these requirements to the installed example and independent fixtures.
   This technical review does not freeze names before UI milestone acceptance.
-- [ ] Define bounded node storage, deterministic sizing/measurement/overflow,
+- [x] Define bounded node storage, deterministic sizing/measurement/overflow,
   stable-key reconciliation and predictable allocation-failure behavior.
   Measure actual memory and update cost on the smallest supported target.
 - [x] Implement focus retention/traversal, keyboard navigation and event/action
@@ -4485,16 +4485,25 @@ Deliver and review this core in the following slices, using the retained
   to actual monochrome/grayscale surfaces and keyboard-only operation. Keep
   pointer support optional and test clipped drawing ownership/publication;
   RGB565 and device scanning in the sketch do not imply new target hardware.
-- [ ] Validate six-model geometry, native/fallback fonts, clipping, scrolling,
+- [x] Validate six-model geometry, native/fallback fonts, clipping, scrolling,
   partial redraw and custom canvas, including low-memory failure and clean
   Stock return. Record frame/update and memory budgets.
 
-The first four items are covered by the reusable C/C++ interfaces, the installed
-device-manager example, independent theme/font/canvas LCD checks in the accepted
-six-model Runtime UI suite, and the current `ui`, `ui_cpp`, `ui_surface`,
-`ui_demo` and `ui_surface_alloc` sanitizer tests. The final resource/low-memory
-acceptance remains open for the bounded follow-up's CI and whole-app analysis;
-this does not claim faithful HP39 native styling or complete M8.3.
+The component and bounded-workload checks are accepted. The reusable C/C++
+interfaces, installed device-manager example and host tests cover storage,
+identity, allocation failure and renderer behavior. PR #33's
+[Runtime run at 236e792b](https://github.com/maxmixalex/hpclang/actions/runs/43130132986)
+passes all six Direct and all six Stock UI cases, including pressure/recovery
+pixels, 36 KiB RW admission, application stack/heap budgets, nine timed frames,
+34 input edges and Stock capacity recovery after return. The
+[UI resource observations](../sdk/declarative-ui.md) distinguish current accepted
+measurements from older local results.
+
+M8.2/M8.3 remain open for the retained whole-application analysis: native
+exception-stack reservations and whole-system transient memory admission are
+not proven by the application arena, sampled pool or native free-list checks.
+This status correction does not remove those gates or claim faithful HP39
+native styling, physical-hardware timing bounds or whole-stage completion.
 
 The maintained 36 KiB UI artifact now passes all six Direct and all six Stock
 targets locally, including exhausted-allocator rendering, reconstruction pixels,
@@ -4689,14 +4698,29 @@ below are retained.
 - [ ] Deliver the common 59-function HPG graphics surface and maintained
   keyboard, console/text, system, filesystem and object adapters in focused
   groups. Expand the four-generation declaration/implementation/evidence ledger.
-- [ ] Compile representative original historical applications, recording each
+- [x] Compile representative original historical applications, recording each
   required source edit; distinguish these from M7's clean-API behavioral ports.
-- [ ] Complete `kos_beep/kos_CheckBeepEnd` compatibility with owned asynchronous
+  Original HPGCC 2.0 filesystem `example2.c`/`example3.c` and HPGCC 1.1
+  `examples/win/simple.c` pass relocated-SDK ARM compilation and six-model
+  packaging. The maintained extraction gates retain original/adapted hashes
+  and explicit migration diffs; the window gate also checks exact reversal of
+  its documented edits. See the [filesystem source gate](hpgcc-compat.md#original-hpgcc-20-filesystem-programs)
+  and [window source gate](hpgcc-compat.md#original-window-application-gate).
+  This closes the representative-source compilation criterion only; model
+  capability limits, runtime acceptance and broader adapter coverage remain
+  separate requirements.
+- [x] Complete `kos_beep/kos_CheckBeepEnd` compatibility with owned asynchronous
   sound, completion queries and active-tone preemption policy. Verify flags
   against each original system; cover autonomous stop while application code is
   busy, overlapping requests, cancellation and normal/immediate-exit restoration.
   Keep Stock interrupt handlers out of the temporary application mapping; the
   existing blocking tone service alone does not satisfy this adapter group.
+  Accepted in PR #25 at `752b8999`, merged as `3c484673`: all 54
+  normal/exit/_Exit Runtime jobs across the two accepted runs pass.
+  The [sound acceptance record](hpgcc-compat.md#historical-tones-and-packed-bcd)
+  documents mode flags, autonomous completion, cancellation and pre-launcher
+  cleanup checks. The chronological investigation below preserves intermediate
+  failures and former open states; it does not reopen this accepted tone subset.
   The internal PWM4 one-shot lease passes host sanitizers and six-model Direct
   expiry/rearm/restoration probes with the interrupt masked. Banked IRQ stack
   exchange/restoration also passes six-model Direct probes with actual delivery

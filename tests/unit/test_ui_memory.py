@@ -91,7 +91,7 @@ class UiMemoryTests(unittest.TestCase):
                 ):
                     VERIFY.main()
                     pixels.assert_called_once()
-                    stack.assert_called_once_with(Path("build/hp50g-frame"))
+                    stack.assert_called_once_with(Path("build/hp50g-frame"), Path("artifact"))
                     budget.assert_called_once_with(
                         Path("build/hp50g-frame"), "hp50g", Path("artifact")
                     )

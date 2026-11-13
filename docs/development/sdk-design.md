@@ -2106,6 +2106,15 @@ These successful sampled runs do not establish a transient peak bound.
 
 ### UI resource measurements
 
+The `ui_demo_lifecycle` sanitizer test executes the shipped declarative-UI
+entry point with real UI/effect/rendering code and simulated display/keyboard
+services. Across all six model IDs it injects each startup allocation failure,
+display acquisition/presentation and keyboard errors, and a recoverable refresh
+timeout. It checks ON exit with a pending scan, exactly-once effect cleanup,
+paired display release, zero live allocations, allocation-free idle processing
+and successful restart after failed initialization. This is host lifecycle
+coverage, not native stack-capacity or whole-system peak-memory acceptance.
+
 The UI E2E application limits its mapped writable arena to 36 KiB. Its test-only
 startup wrapper fills the unused reserved stack with a pattern before C/C++
 initialization, then samples the lowest changed word during main and after
