@@ -2197,6 +2197,24 @@ records trace, pool, layout and payload hashes. This checks observed shared-bank
 launcher assignments only; native/exception stack bounds and system allocation
 peaks still require separate evidence.
 
+`tests/e2e/harness/verify-native-stack-init.py` reconciles each supported ROM's
+five runtime bank initializers with a saved stack-region trace:
+
+```sh
+python tests/e2e/harness/verify-native-stack-init.py --model hp50g \
+  --flash build/hp50g-state/flash \
+  --trace build/hp50g-frame-stack-regions.jsonl
+```
+
+It checks the mode selector, CPSR write, SP literal load and known stack top,
+rejects missing/duplicate/malformed observations, and emits input hashes plus
+all observed regions. Output is JSON on stdout; success proves initializer
+reconciliation only. In particular, top minus observed minimum is not a reserved
+capacity, and adjacent bank tops do not establish ownership of the intervening
+memory. Six saved Stock UI runs pass locally, as do 132 real-input rejection
+variants and four unit tests. Native reservation bounds and whole-system
+transient-memory admission remain open.
+
 Before the launcher removes the mappings, the test requests a memory checkpoint.
 The shared Direct/Stock harness accepts a word-aligned descriptor within the
 reported application RW arena: `{id, count, words[count]}` with 1–64 words.
