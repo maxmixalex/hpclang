@@ -667,6 +667,12 @@ unavailable. `FSChAttr` replaces mutable flags while requiring directory/volume
 type bits to remain unchanged. Entries retain their path independently of the
 parent iterator. This metadata extension is formally accepted on `6a7f9a28`.
 
+`FSChMode` is implemented locally for open adapter files. It preserves identity,
+offset and extent, normalizes APPEND/MODIFY to include WRITE, and flushes before
+changing to READ. Failed transitions retain the old mode. Changing to WRITE does
+not itself truncate. See the [compatibility contract](hpgcc-compat.md#changing-an-open-files-mode)
+and roadmap for native validation and pending CI acceptance.
+
 `HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts. The private HP39 runtime uses the real Stock model rather than one generic HOME namespace: Aplets are native DORRP snapshots below `'apletdir`, Program/Note bodies use the current `PGMCXT` / `NOTESCXT` directories, and Aplet Variables use the current `ApletVars#` schema plus native recall/type/store descriptors. Descriptor-driven Variable recall now quotes the genuine extended variable ID and invokes Stock `@`; no generic HOME/current mapping or public HP39 catalog hierarchy is claimed.
 
 ## Aplet-owned data (M7.3h, accepted)

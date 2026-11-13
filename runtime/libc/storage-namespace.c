@@ -415,6 +415,30 @@ int hpclang_namespace_close(int fd)
     return fr == FR_OK ? 0 : set_fatfs_errno(fr);
 }
 
+int hpclang_namespace_change_mode(int fd, int writable, int append)
+{
+    /* f_open initializes the directory locator and data buffer even for read
+     * handles in this pinned writable FatFs build. Share-lock bookkeeping
+     * would require a different transition implementation if enabled. */
+    _Static_assert(!FF_FS_READONLY && !FF_FS_LOCK, "mode changes require writable, unlocked FatFs");
+    struct direct_fd_state *slot = direct_fd_from_number(fd);
+    if (slot == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+    if (!direct_file_ready(slot, writable))
+        return -1;
+    if (!writable && (slot->file.flag & FA_WRITE)) {
+        FRESULT result = f_sync(&slot->file);
+        if (result != FR_OK)
+            return set_fatfs_errno(result);
+    }
+    slot->file.flag =
+        (BYTE)((slot->file.flag & ~(FA_READ | FA_WRITE)) | FA_READ | (writable ? FA_WRITE : 0));
+    slot->append = writable && append;
+    return 0;
+}
+
 ssize_t hpclang_namespace_read(int fd, void *buffer, size_t count)
 {
     struct direct_fd_state *slot = direct_fd_from_number(fd);

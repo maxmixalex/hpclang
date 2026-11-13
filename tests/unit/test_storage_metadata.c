@@ -344,6 +344,44 @@ int main(void)
     protected_media = 0;
     CHECK(hpclang_namespace_write(fresh, "new", 3) == 3);
     CHECK(hpclang_namespace_close(fresh) == 0);
+    // Mode changes retain the actual open FatFs object, its offset and extent.
+    FS_FILE *mode_file;
+    CHECK(FSCreate("MODE.TXT", 0, &mode_file) == FS_OK);
+    int mode_fd = mode_file->_hpclang_fd;
+    CHECK(FSWrite("abcdef", 6, mode_file) == 6);
+    CHECK(FSChMode(mode_file, FSMODE_READ) == FS_OK);
+    CHECK(mode_file->_hpclang_fd == mode_fd && FSTell(mode_file) == 6);
+    CHECK(FSFileLength(mode_file) == 6 && FSWrite("!", 1, mode_file) == 0);
+    CHECK(FSSeek(mode_file, 1, SEEK_SET) == FS_OK);
+    char mode_bytes[8] = {0};
+    CHECK(FSRead(mode_bytes, 2, mode_file) == 2 && !memcmp(mode_bytes, "bc", 2));
+    CHECK(FSChMode(mode_file, FSMODE_MODIFY) == FS_OK);
+    CHECK(mode_file->Mode == (FSMODE_WRITE | FSMODE_MODIFY) && FSTell(mode_file) == 3);
+    CHECK(FSWrite("WXYZ", 4, mode_file) == 3 && FSFileLength(mode_file) == 6);
+    CHECK(FSChMode(mode_file, FSMODE_APPEND) == FS_OK && FSTell(mode_file) == 6);
+    CHECK(mode_file->Mode == (FSMODE_WRITE | FSMODE_APPEND));
+    CHECK(FSSeek(mode_file, 0, SEEK_SET) == FS_OK);
+    CHECK(FSChMode(mode_file, FSMODE_APPEND | FSMODE_NOGROW) == FS_OK);
+    CHECK(FSWrite("!", 1, mode_file) == 0 && FSFileLength(mode_file) == 6);
+    CHECK(FSChMode(mode_file, FSMODE_APPEND) == FS_OK);
+    CHECK(FSWrite("!", 1, mode_file) == 1 && FSTell(mode_file) == 7);
+    CHECK(FSChMode(mode_file, FSMODE_WRITE) == FS_OK && FSFileLength(mode_file) == 7);
+    CHECK(FSSeek(mode_file, 2, SEEK_SET) == FS_OK && FSWrite("Q", 1, mode_file) == 1);
+    CHECK(FSFileLength(mode_file) == 3);
+    protected_media = 1;
+    CHECK(FSChMode(mode_file, FSMODE_READ) != FS_OK);
+    CHECK(mode_file->Mode == FSMODE_WRITE && FSTell(mode_file) == 3);
+    protected_media = 0;
+    CHECK(FSChMode(mode_file, FSMODE_READ) == FS_OK);
+    CHECK(FSSeek(mode_file, 0, SEEK_SET) == FS_OK);
+    CHECK(FSRead(mode_bytes, sizeof mode_bytes, mode_file) == 3);
+    CHECK(!memcmp(mode_bytes, "abQ", 3));
+    CHECK(FSChAttr(mode_file, FSATTR_RDONLY) == FS_OK);
+    CHECK(FSChMode(mode_file, FSMODE_MODIFY) == FS_CANTWRITE && mode_file->Mode == FSMODE_READ);
+    CHECK(FSChMode(mode_file, 0x4000) == FS_ERROR && mode_file->Mode == FSMODE_READ);
+    CHECK(FSChMode(NULL, FSMODE_WRITE) == FS_ERROR);
+    CHECK(FSChAttr(mode_file, 0) == FS_OK);
+    CHECK(FSClose(mode_file) == FS_OK && FSDelete("MODE.TXT") == FS_OK);
     // Identity-only replacement inspection must not mount/flush a new card.
     // Exercise the actual namespace and FatFs with a blank replacement, then
     // restore the original FAT bytes: old handles stay invalid in both cases.
@@ -371,6 +409,8 @@ int main(void)
     before_removal = media_writes;
     inserted_media = 0;
     CHECK(FSVolumeInserted(0) == FS_NOCARD && FSVolumeMounted(0));
+    unsigned stale_mode = compat_file->Mode;
+    CHECK(FSChMode(compat_file, FSMODE_READ) == FS_INVHANDLE && compat_file->Mode == stale_mode);
     CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == ENODEV);
     CHECK(raw_identity[0] == 0x22);
     memset(disk, 0, sizeof disk);

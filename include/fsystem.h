@@ -130,6 +130,10 @@ extern "C"
 
     int FSCreate(char *name, int attr, FS_FILE **fileptr);
     int FSOpen(char *name, int mode, FS_FILE **fileptr);
+    /* Change an open file's mode without reopening, truncating or seeking.
+     * APPEND/MODIFY imply WRITE. Downgrading to READ flushes buffered writes;
+     * failure leaves the previous mode in force. */
+    int FSChMode(FS_FILE *file, int newmode);
     int FSClose(FS_FILE *file);
     int FSCloseAndDelete(FS_FILE *file);
     int FSSeek(FS_FILE *file, int offset, int position);

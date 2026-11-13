@@ -850,6 +850,25 @@ extended partitions, GPT and exFAT are outside this FAT primary-partition API.
 
 Raw KOS filesystem calls, raw filesystem handles, global `chdir/getcwd` state, FSystem sleep/wakeup/controller ownership, and timestamp setters remain Migration/Internal rather than canonical compatibility APIs.
 
+### Changing an open file's mode
+
+`FSChMode(file, newmode)` changes the existing file handle without reopening,
+truncating or seeking. APPEND and MODIFY imply WRITE in the exposed `Mode`
+field. Switching to WRITE does not truncate immediately; the next write retains
+the historical truncate-after-write behavior. MODIFY writes stop at the existing
+end, while APPEND writes use the end even after a seek. APPEND with NOGROW rejects
+a nonempty write. Switching to READ flushes pending writes first; a failed flush
+leaves the mode unchanged. Read-only file attributes reject write modes, and
+removed-card handles remain invalid. Unknown mode bits return `FS_ERROR`.
+
+The implementation is independent of the old controller and operates on the
+same owned FatFs object. Its internal access transition is restricted at compile
+time to the pinned writable FatFs configuration with sharing locks disabled.
+Eight mode/flush observations match unchanged HPGCC3 `fschmode.c`, whose behavior
+also matches the HPGCC 2.0 SP2 Thumb library inspection. Production FatFs tests
+cover content, offset, extent, protection, flush failure and stale handles under
+ASan/UBSan. Native and CI acceptance are tracked separately on the roadmap.
+
 ## HP39 calculator objects
 
 HP39gs/40gs have typed internal calculator objects, but the native storage model is split across Stock catalogs/contexts rather than one HOME-like directory hierarchy. ROM evidence establishes the current structure: `GetApDirList` exposes the Aplet catalog; `CatPgm` enumerates `PGMCXT`; `CatNot` enumerates `NOTESCXT`; ordinary variable operations such as `StoVar` run inside the caller's active Aplet/topic context. Aplet selection/creation updates the Program/Note context pointers together with the active Aplet state.

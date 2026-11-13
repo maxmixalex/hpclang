@@ -925,6 +925,24 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         !FSEof(legacy_file) || FSClose(legacy_file) != FS_OK)
         return 0x85u;
 
+    if (FSCreate("HPCLANG.MOD", 0, &legacy_file) != FS_OK ||
+        FSWrite("abcdef", 6, legacy_file) != 6 || FSChMode(legacy_file, FSMODE_READ) != FS_OK ||
+        FSTell(legacy_file) != 6 || FSWrite("!", 1, legacy_file) != 0 ||
+        FSSeek(legacy_file, 2, SEEK_SET) != FS_OK ||
+        FSChMode(legacy_file, FSMODE_MODIFY) != FS_OK ||
+        legacy_file->Mode != (FSMODE_WRITE | FSMODE_MODIFY) ||
+        FSWrite("WXYZ!", 5, legacy_file) != 4 || FSFileLength(legacy_file) != 6 ||
+        FSChMode(legacy_file, FSMODE_APPEND | FSMODE_NOGROW) != FS_OK ||
+        FSSeek(legacy_file, 0, SEEK_SET) != FS_OK || FSWrite("!", 1, legacy_file) != 0 ||
+        FSChMode(legacy_file, FSMODE_APPEND) != FS_OK || FSWrite("!", 1, legacy_file) != 1 ||
+        FSTell(legacy_file) != 7 || FSChMode(legacy_file, FSMODE_WRITE) != FS_OK ||
+        FSFileLength(legacy_file) != 7 || FSSeek(legacy_file, 2, SEEK_SET) != FS_OK ||
+        FSWrite("Q", 1, legacy_file) != 1 || FSChMode(legacy_file, FSMODE_READ) != FS_OK ||
+        FSSeek(legacy_file, 0, SEEK_SET) != FS_OK || FSRead(buffer, 8, legacy_file) != 3 ||
+        memcmp(buffer, "abQ", 3) != 0 || FSClose(legacy_file) != FS_OK ||
+        FSDelete("HPCLANG.MOD") != FS_OK)
+        return 0x140u;
+
     if (FSMkdir("CMPDIR") != FS_OK || FSChdir("CMPDIR") != FS_OK)
         return 0x86u;
 

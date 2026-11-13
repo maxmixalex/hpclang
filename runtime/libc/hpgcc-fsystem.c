@@ -526,6 +526,24 @@ int FSOpen(char *name, int mode, FS_FILE **fileptr)
     return FS_OK;
 }
 
+int FSChMode(FS_FILE *file, int newmode)
+{
+    const int allowed =
+        FSMODE_WRITE | FSMODE_APPEND | FSMODE_MODIFY | FSMODE_NOGROW | FSMODE_NOCREATE;
+    if (file == NULL || !file->_hpclang_owned || file->_hpclang_kind != HPCLANG_HPGCC_FS_FILE ||
+        file->Volume > 3 || (newmode & ~allowed))
+        return FS_ERROR;
+    if (newmode & (FSMODE_APPEND | FSMODE_MODIFY))
+        newmode |= FSMODE_WRITE;
+    if ((file->Attr & FSATTR_RDONLY) && (newmode & FSMODE_WRITE))
+        return FS_CANTWRITE;
+    if (hpclang_namespace_change_mode(file->_hpclang_fd, (newmode & FSMODE_WRITE) != 0,
+                                      (newmode & FSMODE_APPEND) != 0))
+        return compat_error();
+    file->Mode = (unsigned)newmode;
+    return FS_OK;
+}
+
 int FSCreate(char *name, int attr, FS_FILE **fileptr)
 {
     if (fileptr == NULL)
@@ -633,11 +651,13 @@ int FSWrite(char *buffer, int nbytes, FS_FILE *file)
         return 0;
     if ((file->Mode & (FSMODE_WRITE | FSMODE_APPEND | FSMODE_MODIFY)) == 0)
         return 0;
+    int base_mode = (file->Mode & FSMODE_APPEND)   ? FSMODE_APPEND
+                    : (file->Mode & FSMODE_MODIFY) ? FSMODE_MODIFY
+                                                   : FSMODE_WRITE;
+    uint32_t write_position = base_mode == FSMODE_APPEND ? file->FileSize : file->CurrentOffset;
     if ((file->Mode & FSMODE_NOGROW) != 0 &&
-        (uint64_t)file->CurrentOffset + (uint64_t)(unsigned)nbytes > file->FileSize)
+        (uint64_t)write_position + (uint64_t)(unsigned)nbytes > file->FileSize)
         return 0;
-
-    int base_mode = file->Mode & (FSMODE_WRITE | FSMODE_APPEND | FSMODE_MODIFY);
 
     /*
      * Historical MODIFY preserves the original extent. Cap the request at EOF
