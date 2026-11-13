@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import runpy
+import shutil
 import subprocess
 import unittest
 
@@ -37,6 +38,7 @@ class HeapProfileInput(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ROM_IMAGE(data, True)
 
+    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
     def test_disabled_capture_needs_no_rom_or_runner_paths(self):
         result = subprocess.run(
             [
@@ -44,12 +46,14 @@ class HeapProfileInput(unittest.TestCase):
                 "-c",
                 'HPCLANG_E2E_CAPTURE_NATIVE_HEAP=0; source "$1" /missing',
                 "test",
-                str(HARNESS / "native-heap-env.sh"),
+                "/dev/stdin",
             ],
             capture_output=True,
+            input=(HARNESS / "native-heap-env.sh").read_text().encode(),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
     def test_invalid_capture_switch_rejects(self):
         result = subprocess.run(
             [
@@ -57,9 +61,10 @@ class HeapProfileInput(unittest.TestCase):
                 "-c",
                 'HPCLANG_E2E_CAPTURE_NATIVE_HEAP=invalid; source "$1" /missing',
                 "test",
-                str(HARNESS / "native-heap-env.sh"),
+                "/dev/stdin",
             ],
             capture_output=True,
+            input=(HARNESS / "native-heap-env.sh").read_text().encode(),
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn(b"must be 0 or 1", result.stderr)
