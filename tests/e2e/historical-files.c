@@ -9,6 +9,65 @@
 #include <string.h>
 #include <fsystem.h>
 
+/* Four legacy case modes must select the intended physical FAT entry. */
+static int case_client(void)
+{
+    FS_FILE *file = NULL;
+    int failed = 1;
+    char byte = 0;
+    FSSetCaseMode(FSCASE_SENSHP);
+    if (FSCreate("Case.txt", 0, &file) != FS_OK || FSWrite("A", 1, file) != 1)
+        goto done;
+    int closed = FSClose(file);
+    file = NULL;
+    if (closed != FS_OK)
+        goto done;
+    FSSetCaseMode(FSCASE_SENS);
+    if (FSOpen("case.txt", FSMODE_READ, &file) != FS_NOTFOUND ||
+        FSCreate("case.txt", 0, &file) != FS_EXIST)
+        goto done;
+    FSSetCaseMode(FSCASE_SENSHP);
+    if (FSCreate("case.txt", 0, &file) != FS_OK || FSWrite("B", 1, file) != 1)
+        goto done;
+    closed = FSClose(file);
+    file = NULL;
+    if (closed != FS_OK)
+        goto done;
+    FSSetCaseMode(FSCASE_SENSHPTRUE);
+    if (FSOpen("case.txt;;;", FSMODE_READ, &file) != FS_OK || FSRead(&byte, 1, file) != 1 ||
+        byte != 'B' || !strstr(file->Name, "case.txt;"))
+        goto done;
+    closed = FSClose(file);
+    file = NULL;
+    if (closed != FS_OK)
+        goto done;
+    FSSetCaseMode(FSCASE_INSENS);
+    if (FSOpen("cAsE.TxT", FSMODE_READ, &file) != FS_OK || FSRead(&byte, 1, file) != 1 ||
+        byte != 'A')
+        goto done;
+    closed = FSClose(file);
+    file = NULL;
+    if (closed != FS_OK)
+        goto done;
+    FSSetCaseMode(FSCASE_SENSHP);
+    if (FSOpen("case.txt", FSMODE_READ, &file) != FS_OK || strchr(file->Name, ';'))
+        goto done;
+    closed = FSCloseAndDelete(file);
+    file = NULL;
+    if (closed != FS_OK || FSOpen("Case.txt", FSMODE_READ, &file) != FS_OK ||
+        FSRead(&byte, 1, file) != 1 || byte != 'A')
+        goto done;
+    closed = FSCloseAndDelete(file);
+    file = NULL;
+    if (closed == FS_OK)
+        failed = 0;
+done:
+    if (file)
+        (void)FSClose(file);
+    FSSetCaseMode(FSCASE_SENSHP);
+    return failed;
+}
+
 static int volume_client(int volume)
 {
     static const char greeting[] = "Hello world!\n";
@@ -80,6 +139,9 @@ static int volume_client(int volume)
     failure = 7;
     if (FSDelete("Renamed text.txt") != FS_OK || FSChdir("..") != FS_OK ||
         FSRmdir("Subdir") != FS_OK || FSChdir("..") != FS_OK || FSRmdir("Test Dir") != FS_OK)
+        goto done;
+    failure = 8;
+    if (case_client())
         goto done;
     failure = 0;
 done:
