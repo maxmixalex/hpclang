@@ -4556,3 +4556,23 @@ instructions are rejected. No emulator rerun or new full SRAM copy was needed.
 Report: /work/nov06-sum/native-heap-replay/report.json; temporary replay binaries
 were removed. The live emulator hook, phase coverage and actual transient
 resource acceptance remain required before this can close an admission gate.
+
+
+### 2026-11-13 — Native heap live observation, local integration
+
+The qualified allocator-return hook now links into x50ng and receives Stock
+lifecycle phase marks independently of full SRAM snapshots. An actual HP50g
+Stock UI run passes execution, settled return and independent input/report/profile
+checks. Its 20 phases contain seven accepted observations, zero rejected and
+three failed allocation returns. The ARMToolbox launch interval reaches 1,672
+combined usable bytes; the minimum retains both heaps from the same event.
+Report: `/work/nov06-sum/native-heap-live-qualified/independent-audit.json`.
+
+Five sanitizer-backed trace tests pass (disabled observation, phase minima,
+rejected samples, invalid phase ordering and invalid profile settings). Fresh
+QEMU compilation exposed a missing exported-function prototype, now fixed;
+the rebuilt emulator and actual run pass. This is local validation only, with
+remaining models pending. Empty phases are unsampled, not zero free capacity.
+One allocation function does not establish whole-system transient admission
+or native exception-stack reservations. Rotate to other M8 deliveries before
+the next bounded UI coverage batch.
