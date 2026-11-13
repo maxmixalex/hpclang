@@ -862,6 +862,14 @@ extended partitions, GPT and exFAT are outside this FAT primary-partition API.
 
 Raw KOS filesystem calls, raw filesystem handles, global `chdir/getcwd` state, FSystem sleep/wakeup/controller ownership, and timestamp setters remain Migration/Internal rather than canonical compatibility APIs.
 
+The original HPGCC3 `FSSetCaseMode` entry point is not implemented yet. It sets
+a filesystem-wide lookup mode; the adapter's `FSNameCompare` only compares the
+two supplied strings using its explicit mode argument. It does not change later
+path lookup, which currently follows the shared FatFs namespace. Defining the
+historical `FSCASE_*` constants therefore does not establish global case-mode
+compatibility. This remains an implementation gap, separate from the deliberately
+internal controller sleep/wakeup functions (`FSSleep` and `FSWakeUp`).
+
 ### Changing an open file's mode
 
 `FSChMode(file, newmode)` changes the existing file handle without reopening,
