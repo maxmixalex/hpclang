@@ -4528,3 +4528,31 @@ Four fresh setup-runtime tests and strict docs pass. Existing six-model Direct
 and Stock evidence is retained; no redundant application rebuild is claimed.
 Identity audit: research/nov06-allocation-main-identity.json. The integration
 requires new exact-head CI; this is not broader M8.2/M8.3/M8.5 completion.
+
+
+### Native heap observation core — local, 2026-11-13
+
+M8.2/M8.3 whole-system transient admission remains open. Existing lifecycle
+snapshots cannot establish intermediate peaks. The new host-only observation
+core validates both native free lists, including flags, reciprocal links,
+footers, bounds and cross-heap overlap. It accumulates the lowest combined free
+capacity from a single observed event, retaining both heaps from that event;
+it does not add independent minima that never coexisted. Rejected observations
+are counted and cannot overwrite the last valid state or minimum.
+
+The ROM profile extractor qualifies the existing allocator fingerprints and
+their common return instruction at entry + 0x88 for all six model fixtures.
+The planned live hook must execute before that return, after list updates,
+and delimit the lifecycle being measured. These profiles alone do not prove
+that live allocator events have been captured or that every native memory
+owner is accounted for.
+
+The C core passes ASan/UBSan tests covering an intermediate capacity reduction
+hidden by equal initial/final capacity, independent-heap minima, corrupt and
+overlapping lists, read failure and exhausted heaps. Nine existing snapshot
+verifier tests pass. Its decoding matches the independent Python verifier on
+79 retained snapshots across all six models; six modified allocator return
+instructions are rejected. No emulator rerun or new full SRAM copy was needed.
+Report: /work/nov06-sum/native-heap-replay/report.json; temporary replay binaries
+were removed. The live emulator hook, phase coverage and actual transient
+resource acceptance remain required before this can close an admission gate.
