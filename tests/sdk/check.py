@@ -92,6 +92,54 @@ def check_migration_tool(package, work, env):
         raise AssertionError(f"Unexpected legacy-source findings: {report}")
     if legacy.read_bytes() != legacy_bytes:
         raise AssertionError("Migration checker modified legacy source bytes")
+    tree = work / "migration source tree"
+    (tree / "src").mkdir(parents=True)
+    (tree / "src/main.c").write_text("gets(buffer);\n", encoding="utf-8")
+    for name in (".git", "build", ".cache", "third_party"):
+        excluded = tree / "src" / name
+        excluded.mkdir()
+        (excluded / "unreadable.c").write_bytes(b"\xff")
+    explicit = tree / "src/build/manual.c"
+    explicit.write_text("exit(0);\n", encoding="utf-8")
+    # A Python audit hook observes the installed CLI's real directory I/O.
+    # Filtering its final findings is insufficient: excluded trees must never
+    # be entered, while an explicitly selected file remains reviewable.
+    probe = (
+        "import pathlib,runpy,sys\n"
+        "def audit(event,args):\n"
+        " if event == 'os.scandir' and pathlib.Path(args[0]).name in "
+        "{'.git','build','.cache','third_party'}:\n"
+        "  raise AssertionError('entered excluded directory: '+str(args[0]))\n"
+        "sys.addaudithook(audit)\n"
+        "sys.argv=sys.argv[1:]\n"
+        "runpy.run_path(sys.argv[0],run_name='__main__')\n"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            probe,
+            str(package / "tools/check-migration.py"),
+            "--json",
+            "--check",
+            str(tree),
+            str(explicit),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 1 or result.stderr:
+        raise AssertionError(
+            f"Installed checker did not prune excluded directories: {result.stderr}"
+        )
+    report = json.loads(result.stdout)
+    if (
+        report["files"] != 2
+        or report["errors"]
+        or sorted(row["rule"] for row in report["findings"]) != ["HP002", "HP003"]
+    ):
+        raise AssertionError(f"Unexpected installed directory scan: {report}")
     print("Installed SDK: standalone migration checker PASS")
 
 
@@ -184,7 +232,8 @@ def main():
         shutil.copyfile(root / "tests/sdk/numeric-input.cpp", application / "numeric-input.cpp")
         for suffix in ("c", "cpp"):
             shutil.copyfile(
-                root / "tests/sdk/formatted-input.c", application / f"formatted-input.{suffix}"
+                root / "tests/sdk/formatted-input.c",
+                application / f"formatted-input.{suffix}",
             )
             shutil.copyfile(root / "tests/sdk/sound.c", application / f"sound.{suffix}")
             shutil.copyfile(root / "tests/sdk/widget.c", application / f"widget.{suffix}")
@@ -259,7 +308,15 @@ endforeach()
                 else []
             ),
         ]
-        run("cmake", "-S", str(application), "-B", str(build), *configure_options, env=env)
+        run(
+            "cmake",
+            "-S",
+            str(application),
+            "-B",
+            str(build),
+            *configure_options,
+            env=env,
+        )
         run("cmake", "--build", str(build), "--parallel", "2", env=env)
         counter_args = (
             (build / "counter/declarative_ui_cpp-launchers.args").read_text().splitlines()
@@ -428,7 +485,10 @@ endforeach()
                 raise AssertionError(f"Nonreproducible installed SDK output: {relative}")
         print(f"Installed SDK: {len(reproducible_outputs)} release outputs byte-identical PASS")
         # A missing declared output must be regenerated without touching source.
-        missing = [build / "hello_c-launchers/hp50g.hp", build / "hello_cpp-launchers/memory.json"]
+        missing = [
+            build / "hello_c-launchers/hp50g.hp",
+            build / "hello_cpp-launchers/memory.json",
+        ]
         if args.aplet_tool:
             missing.append(build / "hello_cpp-aplet/hp39gs/HPCRESET.000")
             missing.append(build / "hello_c-aplet/hp40gs/footprint.json")

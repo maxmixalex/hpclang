@@ -26,6 +26,11 @@ It also locates HPG text/letter drawing calls for encoding and font review.
 Comments and string/character literals are
 ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
 `build`, `.cache` and `third_party`; explicitly named files are always checked.
+Excluded subdirectories are pruned before traversal, so their generated files
+do not add scanning work. Directory symlinks are not followed recursively.
+Unreadable included directories produce errors and exit code two, even when
+other files were successfully checked; inspect `errors` before treating a JSON
+report as a complete scan.
 Inputs default to UTF-8 (an optional BOM is accepted). For an older Windows
 project, select its known encoding explicitly, for example
 `--encoding cp1252` or `--encoding gbk`. The setting applies to all input files

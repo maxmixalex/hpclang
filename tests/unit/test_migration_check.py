@@ -1,12 +1,16 @@
 """Migration diagnostics must not mistake comments/literals for calls."""
 
 import importlib.util
+import contextlib
+import errno
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 TOOL = Path(__file__).resolve().parents[2] / "tools/check-migration.py"
@@ -16,6 +20,69 @@ SPEC.loader.exec_module(CHECK)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_excluded_directories_are_not_entered(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            source = root / "src/main.c"
+            source.write_text("gets(buffer);")
+            for name in CHECK.SKIP:
+                (root / "src" / name / "nested").mkdir(parents=True)
+                (root / "src" / name / "nested/generated.c").write_text("exit(0);")
+            visited = []
+            scandir = CHECK.os.scandir
+
+            def observe(path):
+                visited.append(Path(path))
+                self.assertFalse(CHECK.SKIP.intersection(Path(path).relative_to(root).parts))
+                return scandir(path)
+
+            errors = []
+            with mock.patch.object(CHECK.os, "scandir", side_effect=observe):
+                files = list(CHECK.source_files(root, errors))
+            self.assertEqual(files, [source.resolve()])
+            self.assertEqual(errors, [])
+            self.assertEqual(set(visited), {root, root / "src"})
+
+    def test_unreadable_directory_reports_incomplete_scan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            blocked = root / "src"
+            blocked.mkdir()
+            (root / "visible.c").write_text("gets(buffer);")
+            scandir = CHECK.os.scandir
+
+            def deny(path):
+                if Path(path) == blocked:
+                    raise PermissionError(errno.EACCES, "permission denied", str(path))
+                return scandir(path)
+
+            output = io.StringIO()
+            with mock.patch.object(CHECK.os, "scandir", side_effect=deny):
+                with contextlib.redirect_stdout(output):
+                    result = CHECK.main(["--json", "--check", str(root)])
+            report = json.loads(output.getvalue())
+            self.assertEqual(result, 2)
+            self.assertEqual(report["files"], 1)
+            self.assertEqual(len(report["findings"]), 1)
+            self.assertEqual(len(report["errors"]), 1)
+            self.assertIn(str(blocked), report["errors"][0])
+
+    def test_explicit_build_source_remains_reviewable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "build").mkdir()
+            source = root / "build/generated.c"
+            source.write_text("gets(buffer);")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = CHECK.main(["--json", "--check", str(root), str(source)])
+            report = json.loads(output.getvalue())
+            self.assertEqual(result, 1)
+            self.assertEqual(report["files"], 1)
+            self.assertEqual(report["errors"], [])
+            self.assertEqual(report["findings"][0]["path"], str(source.resolve()))
+
     def test_text_hint_preserves_utf8_and_gbk_sources(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "text.c"
@@ -60,7 +127,13 @@ class MigrationTests(unittest.TestCase):
         rows = CHECK.scan(source, "text.cpp")
         self.assertEqual(
             [(r["rule"], r["line"], r["column"]) for r in rows],
-            [("HP012", 1, 1), ("HP012", 2, 1), ("HP012", 3, 1), ("HP012", 3, 28), ("HP012", 5, 3)],
+            [
+                ("HP012", 1, 1),
+                ("HP012", 2, 1),
+                ("HP012", 3, 1),
+                ("HP012", 3, 28),
+                ("HP012", 5, 3),
+            ],
         )
         self.assertTrue(all("byte-indexed" in r["message"] for r in rows))
         self.assertTrue(all("dynamic characters" in r["message"] for r in rows))
@@ -171,13 +244,15 @@ char c = '\\'';
         source = '#include "hpgcc49.h"\n// hidden \\\ngets(x);\n  sat_\\\npeek(0);\n'
         rows = CHECK.scan(source, "old.c")
         self.assertEqual(
-            [(r["rule"], r["line"], r["column"]) for r in rows], [("HP006", 1, 1), ("HP001", 4, 3)]
+            [(r["rule"], r["line"], r["column"]) for r in rows],
+            [("HP006", 1, 1), ("HP001", 4, 3)],
         )
 
     def test_review_categories_and_identifier_boundaries(self):
         source = "void f() { gets(x); _Exit(1); sys_playTone2(440, 2); }\nint errno;\nmygets(x);"
         self.assertEqual(
-            [r["rule"] for r in CHECK.scan(source, "old.c")], ["HP002", "HP003", "HP004", "HP005"]
+            [r["rule"] for r in CHECK.scan(source, "old.c")],
+            ["HP002", "HP003", "HP004", "HP005"],
         )
 
     def test_decimal_settings_request_review_even_with_local_opt_in(self):
@@ -205,7 +280,14 @@ char c = '\\'';
             (root / "build").mkdir()
             (root / "build/generated.c").write_text("exit(0);")
             result = subprocess.run(
-                [sys.executable, str(TOOL), "--json", "--check", str(root), str(source)],
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--json",
+                    "--check",
+                    str(root),
+                    str(source),
+                ],
                 capture_output=True,
                 text=True,
             )

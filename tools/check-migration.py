@@ -5,7 +5,9 @@ import argparse
 import bisect
 import codecs
 import json
+import os
 import re
+import stat
 import sys
 from pathlib import Path
 
@@ -145,6 +147,28 @@ def source_encoding(value):
     return value
 
 
+def source_files(directory, errors):
+    # Prune before descent: build trees can be much larger than application
+    # sources. os.walk reports unreadable directories through onerror instead
+    # of silently presenting an incomplete scan as a clean project.
+    for parent, directories, names in os.walk(
+        directory,
+        topdown=True,
+        onerror=lambda error: errors.append(str(error)),
+        followlinks=False,
+    ):
+        directories[:] = sorted(name for name in directories if name not in SKIP)
+        for name in sorted(names):
+            path = Path(parent) / name
+            if path.suffix.lower() not in SUFFIXES:
+                continue
+            try:
+                if stat.S_ISREG(path.stat().st_mode):
+                    yield path.resolve()
+            except OSError as error:
+                errors.append(f"{path}: {error}")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", type=Path, help="C/C++ files or source directories")
@@ -162,13 +186,7 @@ def main(argv=None):
         if path.is_file():
             files.add(path.resolve())
         elif path.is_dir():
-            files.update(
-                p.resolve()
-                for p in path.rglob("*")
-                if p.is_file()
-                and p.suffix.lower() in SUFFIXES
-                and not SKIP.intersection(p.relative_to(path).parts)
-            )
+            files.update(source_files(path, errors))
         else:
             errors.append(f"{path}: path does not exist")
     for path in sorted(files):
