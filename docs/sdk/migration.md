@@ -6,6 +6,63 @@ Start from the installed `examples/hpgcc-timer` for a C application or
 the launcher. Keep your application's source and assets; replace its historical
 startup objects, linker script and precompiled HPGCC libraries with the SDK build.
 Do not put historical include directories before the installed headers.
+The [API contracts and ownership guide](api-conventions.md) explains result
+conventions, versioned output structures and the owner/view distinction.
+
+## Locate migration work
+
+Run the installed read-only checker against your application's source:
+
+```sh
+python3 /path/to/sdk/share/hpclang/tools/check-migration.py /path/to/application
+python3 /path/to/sdk/share/hpclang/tools/check-migration.py --json --check /path/to/application
+```
+
+It reports source locations and concrete advice for legacy umbrella includes,
+raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units and
+application `errno` declarations, legacy decimal settings, borrowed formatting
+buffers, storage capability checks and KOS tone waiting/replacement semantics.
+It also locates HPG text/letter drawing calls for encoding and font review.
+Comments and string/character literals are
+ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
+`build`, `.cache` and `third_party`; explicitly named files are always checked.
+Excluded subdirectories are pruned before traversal, so their generated files
+do not add scanning work. Directory symlinks are not followed recursively.
+Unreadable included directories produce errors and exit code two, even when
+other files were successfully checked; inspect `errors` before treating a JSON
+report as a complete scan.
+Inputs default to UTF-8 (an optional BOM is accepted). For an older Windows
+project, select its known encoding explicitly, for example
+`--encoding cp1252` or `--encoding gbk`. The setting applies to all input files
+in that invocation; run separate commands for projects with mixed encodings.
+Decoding errors remain errors; the checker never guesses an encoding, replaces
+undecodable bytes or changes source files. Diagnostic columns count decoded
+characters, not encoded bytes.
+
+Normal mode returns zero even when review findings exist. `--check` returns one
+for findings; unreadable/missing inputs return two in either mode. JSON output
+has `schema_version`, `files`, `findings`, `errors` and `scope` fields.
+
+This is a lexical checklist, not a compiler or compatibility certificate. It
+does not expand macros, resolve types or prove resource lifetimes; it also scans
+inactive preprocessor branches. A finding asks for review and may describe a
+supported call with changed semantics. No findings does not establish that a
+project builds, runs correctly or supports a particular calculator. Continue
+with the API and launch-context checks below.
+
+`HP007` flags `set_decimal_digits` and `set_decimal_separator`: they affect
+legacy formatters, not standard `printf`. Review the explicit opt-in and format
+grammar described below. The hint remains even if a source file defines the
+switch: this lexical tool cannot establish include order or which formatter a
+call ultimately uses, and opting in still requires a format-string audit.
+
+`HP011` flags `kos_beep` and `kos_CheckBeepEnd`. Durations are milliseconds;
+mode bit 0 permits replacement and bit 1 requests waiting. A true
+`kos_CheckBeepEnd()` result can occur while a nonwaiting tone is still playing.
+Use `hpclang_sound_status()` when you need to distinguish playing, completed
+and failed states, and `hpclang_sound_stop()` to cancel. Check each operation's
+return value. The checker does not evaluate mode expressions or prove that a
+polling loop is correct, so even calls with constant modes request review.
 
 ## Choose the boundary for each old call
 
@@ -19,7 +76,7 @@ Do not put historical include directories before the installed headers.
 | Direct LCD addresses, packed framebuffer writes, MMU changes or interrupt handlers | Express drawing through `hpclang/display.h` surfaces and fonts, and timing through `hpclang/time.h` / `timer.h`. A raw hardware algorithm requires a separate design review. |
 | `win*` widgets | Include `win.h` or individual control headers for the HPGCC 1.1/2.0 event, focus, text, image, progress, menu, checkbox, chooser and box adapters. Preserve synchronous callbacks and borrowed resources. For a new application, the [declarative UI](declarative-ui.md) provides a separate canonical view contract. |
 | Window events and timers | `winevent.h`, `wintimer.h` and `winkeys.h` provide events, timers, typed keys and modifiers; start from `examples/hpgcc-window`. Intervals are positive milliseconds. Check `hpclang_win_error()` for latched errors, including fixed-pool exhaustion; reset only after callbacks unwind. |
-| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags; modes and both KOS-entry exit paths pass locally on all six Direct/Stock models. CI acceptance remains pending. A true completion query can still mean a nonwaiting tone is playing; use the flag and polling contracts in the installed header. |
+| `kos_beep` and completion polling | `kos.h` provides the sound subset with old-request replacement and waiting flags. Frequency is in Hz and duration is in milliseconds. A true completion query can still mean a nonwaiting tone is playing; use the flag and polling contracts in the installed header. Use `hpclang_sound_status` to distinguish runtime failures. |
 
 Compile with the normal SDK target options and resolve diagnostics one family
 at a time. Do not suppress undeclared functions or cast away mismatched pointer
@@ -95,7 +152,6 @@ use `%L`/`%U`; standard length modifiers, `*`, `+`, `#` and `%n` are rejected.
 Precision is capped at 15 and historical malformed carry/zero-precision outputs
 are corrected. Audit each format string before opting in; see the
 [formatting contract and original-source comparisons](../development/hpgcc-compat.md#historical-console-output).
-This compatibility slice has local validation; remote acceptance is pending.
 
 Legacy HPG text and the default compatibility console use calculator bytes.
 The clean `hpclang_surface_draw_text` and `hpclang_surface_draw_utf8` functions
@@ -110,6 +166,17 @@ packages printable ASCII for its formatted result. Check both missing-glyph
 behavior and the intended calculator's display size. Legacy default fonts can
 use native or packaged fallback faces, so pixel-identical glyphs are not promised.
 
+`HP012` identifies `hpg_draw_text`, `hpg_draw_letter` and their `_on` variants.
+Keeping those calls preserves byte-indexed rendering; check the selected font's
+mapping. Replacing them with UTF-8 drawing calls also requires converting legacy
+text at the appropriate boundary. Simply casting a pointer or saving the source
+file as UTF-8 does not convert text loaded from files or calculator objects.
+The checker's `--encoding` option only controls how it reads source files; it
+does not transcode application data or select the compiler's execution encoding.
+The hint also applies to ASCII literals: this lexical checker cannot prove which
+font is selected or which characters dynamic strings will contain. Explicitly
+include runtime characters in generated fonts and check missing-glyph behavior.
+
 ## Make ownership visible
 
 `ints`, `uints` and `sys_bcd2str` return borrowed formatting buffers. Copy a result
@@ -117,6 +184,13 @@ before another call that reuses its buffer; do not free it. A native object
 snapshot, by contrast, is independently owned and must be released with
 `hpclang_object_release`. Closing a directory handle does not release separately
 owned snapshots or metadata iterators.
+
+The migration checker reports these formatting calls as `HP008`. It cannot
+prove whether a result escapes or has already been copied, so a call nested
+inside a copy operation still receives a review hint. Never adopt these
+pointers into a freeing C++ owner. For example, copy into application storage
+before formatting the next value; retaining two returned pointers does not
+create two independent strings.
 
 In C++, use `owned_object` from `hpclang/object.hpp` and the directory/iterator
 owners from `hpclang/object-store.hpp`. Move to transfer ownership; borrow with
@@ -152,6 +226,18 @@ NUL. Check cancellation/error and partial text. Do not replace the bounded
 editor with an unbounded read to preserve a historical spelling.
 
 ## Validate the actual launch context
+
+The checker flags `FSOpen`, `FSCreate` and `FSOpenDir` as `HP009`: their SD
+backend requires `HPCLANG_CAPABILITY_STREAM_STORAGE`, currently supported on
+HP49g+/HP50g rather than HP39/HP40 or HP48gII. It flags native RPL directory
+entry/read calls (`sat_dir_open`, `sat_dir_chdir`, object lookup/search and
+real-value helpers) as `HP010`, pointing to `HPCLANG_CAPABILITY_RPL_OBJECT_STORE`.
+These adapters do not access HP39 Aplet storage. Include `hpclang/device.h`
+for capability queries and keep each adapter's own result/error checks.
+
+These hints remain inside capability guards and inactive preprocessor branches:
+the checker cannot prove a guard's control flow, launch context or error handling.
+They cover these named entry points, not every storage API or indirect call.
 
 Use `hpclang_device_capability` from `hpclang/device.h` to distinguish supported,
 unsupported and context-unavailable services. A supported capability still
