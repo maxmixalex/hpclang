@@ -5530,3 +5530,23 @@ This closes the local owner validation batch, not remote acceptance or whole
 M8.2/M8.3/M8.5 completion. Native exception-stack reservations and whole-system
 transient-memory admission remain open. PR #14's preceding-head readiness
 failure remains unaccepted; its separate harness correction is PR #39.
+
+
+## 2026-11-14 — M8.5 retained acceptance audit
+
+The original three M8.5 requirements remain unchanged. This audit maps their
+implementation and evidence instead of adding an unspecified broader feature set.
+
+| Original requirement | Inspected implementation and evidence | Remaining acceptance |
+| --- | --- | --- |
+| Owned C++ wrappers and composable UI helpers; C remains first-class; destruction/exit behavior | Object/store/Port/stream/surface/renderer owners, lexical declaration/scope guards and cooperative timer; actual C runtime remains underneath. Thirteen host ASan/UBSan targets pass on the current integration tree, including runtime exit and immediate-exit ordering. Existing six-model UI Direct/Stock audits remain independently recorded. | Current main integration #43 CI is incomplete. Host exit hooks do not replace native runtime/return evidence. |
+| Migration guidance/tooling for historical APIs, precision, ownership, capabilities, encoding/fonts and retired raw access | Installed migration guide and checker HP001–HP013; twenty tests and the actual installed/relocated CLI pass. HP013 is based on the original HPGCC3 address-translation declarations, with no fabricated replacement API. | Latest HP013 commit 1d71eb21 is local; publication and CI remain pending. |
+| Public C/C++ examples, API conventions and deterministic installed resources | Installed C and C++ examples; public ownership/error/lifetime guide; local integration SDK audit reports 613 identical outputs, six Notebook builds and three HP39 Aplet packages. Latest guide commit 27d96119 passes strict docs. | Guide update is local and main integration is pending. UI names remain explicitly provisional; conventions are not a claim to freeze the unfinished UI ABI. |
+
+Current host audit: `/work/nov14-cpp-acceptance/result.json`; complete=true,
+source hashes unchanged, all thirteen targets pass, temporary build removed.
+Installed/relocated CLI: `/work/nov14-migration-address.json`. Earlier full SDK
+report `/work/nov14-main-sdk-full.json` applies to 3e6023e2, not a claim that the
+later documentation/tool-only commits received a fresh full application matrix.
+M8.5 remains open. Native exception-stack and whole-system transient-memory
+proofs remain requirements of M8.2/M8.3 and are not established by owner tests.
