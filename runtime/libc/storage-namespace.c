@@ -251,6 +251,33 @@ int hpclang_namespace_stock_active(void)
     return !namespace_ready || namespace_lease.state == HPCLANG_NAMESPACE_STOCK;
 }
 
+int hpclang_namespace_owned_card_identity(uint8_t cid[16])
+{
+    if (cid == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (!hpclang_namespace_direct_active()) {
+        errno = EBUSY;
+        return -1;
+    }
+    if (disk_status(0u) & STA_NOINIT) {
+        /* Initializing SD solely to read CID must not make an old mounted FAT
+         * look live again. Unmount without flushing dirty objects first; even
+         * the same returning card requires a fresh filesystem generation. */
+        hpclang_storage_volumes_unmount(&namespace_volumes);
+        if (disk_initialize(0u) & STA_NOINIT) {
+            errno = ENODEV;
+            return -1;
+        }
+    }
+    uint8_t identity[16];
+    if (hpclang_hp4950_fatfs_card_identity(identity))
+        return -1;
+    memcpy(cid, identity, sizeof identity);
+    return 0;
+}
+
 static struct direct_fd_state *direct_fd_from_number(int fd)
 {
     if (fd < (int)DIRECT_FD_BASE || fd >= (int)(DIRECT_FD_BASE + DIRECT_FD_SLOTS))

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <hpclang/device.h>
 #include <hpclang/target.h>
+#include <fsystem.h>
 #include "storage-namespace.h"
 #include "ff.h"
 #include "diskio.h"
@@ -27,6 +28,7 @@ static int inserted_media;
 static int initialized_media;
 static unsigned media_writes;
 static unsigned controller_acquires;
+static int identity_error;
 static uint8_t card_identity = 0x37;
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 void test_stream_directory_cpp(void);
@@ -55,6 +57,11 @@ void hpclang_hp4950_fatfs_controller_release(void)
 int hpclang_hp4950_fatfs_card_identity(uint8_t cid[16])
 {
     assert(inserted_media && initialized_media);
+    if (identity_error) {
+        memset(cid, 0xff, 16);
+        errno = EIO;
+        return -1;
+    }
     memset(cid, card_identity, 16);
     return 0;
 }
@@ -337,7 +344,97 @@ int main(void)
     protected_media = 0;
     CHECK(hpclang_namespace_write(fresh, "new", 3) == 3);
     CHECK(hpclang_namespace_close(fresh) == 0);
+    // Identity-only replacement inspection must not mount/flush a new card.
+    // Exercise the actual namespace and FatFs with a blank replacement, then
+    // restore the original FAT bytes: old handles stay invalid in both cases.
+    CHECK(FSInit() == FS_OK && FSVolumeMounted(0) && !FSVolumeMounted(1));
+    CHECK(FSVolumeInserted(0) == FS_OK && FSVolumeInserted(4) == FS_BADVOLUME);
+    FS_FILE *compat_file, *compat_directory;
+    CHECK(FSOpen("NEW.TXT", FSMODE_MODIFY, &compat_file) == FS_OK);
+    CHECK(FSOpenDir("/", &compat_directory) == FS_OK);
+    BYTE *saved_disk = malloc(sizeof disk);
+    CHECK(saved_disk != NULL);
+    memcpy(saved_disk, disk, sizeof disk);
+    CHECK(FSWrite("old", 3, compat_file) == 3);
+    fd = hpclang_namespace_open("NEW.TXT", O_RDWR);
+    old_directory = hpclang_stream_directory_open("/");
+    CHECK(fd >= 0 && old_directory != NULL);
+    CHECK(hpclang_namespace_write(fd, "old", 3) == 3);
+    uint8_t raw_identity[16];
+    memset(raw_identity, 0x22, sizeof raw_identity);
+    CHECK(hpclang_namespace_owned_card_identity(NULL) == -1 && errno == EFAULT);
+    identity_error = 1;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == EIO);
+    for (unsigned i = 0; i < sizeof raw_identity; ++i)
+        CHECK(raw_identity[i] == 0x22);
+    identity_error = 0;
+    before_removal = media_writes;
+    inserted_media = 0;
+    CHECK(FSVolumeInserted(0) == FS_NOCARD && FSVolumeMounted(0));
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == ENODEV);
+    CHECK(raw_identity[0] == 0x22);
+    memset(disk, 0, sizeof disk);
+    card_identity = 0x91;
+    inserted_media = 1;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == 0);
+    CHECK(raw_identity[0] == 0x91 && raw_identity[15] == 0x91);
+    CHECK(FSVolumeInserted(0) == FS_CHANGED && FSVolumeInserted(0) == FS_CHANGED);
+    CHECK(FSInit() == FS_OK && FSVolumeInserted(0) == FS_CHANGED);
+    FS_FILE *rejected = compat_file;
+    CHECK(FSOpen("NEW.TXT", FSMODE_READ, &rejected) == FS_CHANGED && rejected == NULL);
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == 0);
+    CHECK(hpclang_namespace_read(fd, &old_byte, 1) == -1 && errno == EBADF);
+    CHECK(hpclang_namespace_write(fd, "bad", 3) == -1 && errno == EBADF);
+    CHECK(hpclang_stream_directory_read(old_directory, &dir_entry) == -1 && errno == EBADF);
+    CHECK(media_writes == before_removal);
+    unsigned volume_count = 99;
+    CHECK(hpclang_stream_volume_count(&volume_count) == -1 && errno == ENODEV);
+    CHECK(volume_count == 99);
+    inserted_media = 0;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == ENODEV);
+    memcpy(disk, saved_disk, sizeof disk);
+    free(saved_disk);
+    inserted_media = 1;
+    card_identity = 0x58;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == 0 && raw_identity[0] == 0x58);
+    CHECK(FSVolumeInserted(0) == FS_OK);
+    char adapter_byte = '?';
+    CHECK(FSRead(&adapter_byte, 1, compat_file) == 0 && adapter_byte == '?');
+    CHECK(FSClose(compat_file) == FS_INVHANDLE);
+    CHECK(FSClose(compat_directory) == FS_INVHANDLE);
+    CHECK(hpclang_stream_volume_count(&volume_count) == 0 && volume_count == 1);
+    CHECK(hpclang_namespace_read(fd, &old_byte, 1) == -1 && errno == EBADF);
+    CHECK(hpclang_namespace_close(fd) == -1 && errno == EBADF);
+    CHECK(hpclang_stream_directory_close(old_directory) == -1 && errno == EBADF);
+    CHECK(media_writes == before_removal);
+    fresh = hpclang_namespace_open("NEW.TXT", O_RDONLY);
+    CHECK(fresh >= 0 && hpclang_namespace_read(fresh, persisted, 3) == 3);
+    CHECK(memcmp(persisted, "new", 3) == 0);
+    CHECK(hpclang_namespace_close(fresh) == 0);
+    // Restart adopts a replacement and closes only adapter resources. A clean
+    // descriptor survives an ordinary same-card restart; cwd returns to root.
+    fresh = hpclang_namespace_open("NEW.TXT", O_RDONLY);
+    CHECK(fresh >= 0);
+    CHECK(FSMkdir("SUB") == FS_OK && FSChdir("SUB") == FS_OK);
+    CHECK(FSOpen("/NEW.TXT", FSMODE_READ, &compat_file) == FS_OK);
+    CHECK(FSOpenDir("/", &compat_directory) == FS_OK);
+    CHECK(FSRestart() == FS_OK);
+    char *cwd = FSGetcwd(0);
+    CHECK(cwd && strcmp(cwd, "\\") == 0);
+    free(cwd);
+    CHECK(hpclang_namespace_read(fresh, persisted, 3) == 3);
+    CHECK(hpclang_namespace_close(fresh) == 0);
+    inserted_media = 0;
+    CHECK(FSVolumeInserted(0) == FS_NOCARD);
+    inserted_media = 1;
+    card_identity = 0xab;
+    CHECK(FSVolumeInserted(0) == FS_CHANGED);
+    CHECK(FSRestart() == FS_OK && FSVolumeInserted(0) == FS_OK);
+    CHECK(FSShutdown() == FS_OK && FSShutdown() == FS_OK);
     hpclang_storage_shutdown();
+    unsigned previous_acquires = controller_acquires;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == EBUSY);
+    CHECK(controller_acquires == previous_acquires);
     CHECK(reset_calls > 0 && caller_irq_state == UINT32_C(0x60000010));
     unsigned previous_resets = reset_calls;
     caller_irq_state |= UINT32_C(0xc0);

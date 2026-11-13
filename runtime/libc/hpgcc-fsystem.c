@@ -11,6 +11,7 @@
 
 #include <fsystem.h>
 #include <hpclang/storage.h>
+#include "storage-namespace.h"
 
 enum
 {
@@ -66,6 +67,8 @@ static int compat_error(void)
         return FS_EXIST;
     case EBADF:
         return FS_INVHANDLE;
+    case ESTALE:
+        return FS_CHANGED;
     case EBUSY:
 #ifdef ENOTEMPTY
     case ENOTEMPTY:
@@ -78,14 +81,76 @@ static int compat_error(void)
 
 static char compat_cwd[4][HPCLANG_STREAM_NAME_CAPACITY] = {"/", "/", "/", "/"};
 static int compat_volume = -1;
+static unsigned compat_mounted;
+static uint8_t compat_cid[16];
+static FS_FILE *compat_files;
+static int compat_exit_registered;
+
+static void compat_shutdown_at_exit(void)
+{
+    (void)FSShutdown();
+}
+
+int FSInit(void)
+{
+    if (compat_mounted)
+        return FS_OK;
+    unsigned count, mounted = 0;
+    int first = -1;
+    if (hpclang_stream_volume_count(&count))
+        return compat_error();
+    for (unsigned i = 0; i < count; ++i) {
+        struct hpclang_stream_volume_info info;
+        if (hpclang_stream_volume_query(i, &info))
+            return compat_error();
+        unsigned slot = info.partition ? info.partition - 1u : 0u;
+        if (slot >= 4u)
+            return FS_BADVOLUME;
+        mounted |= 1u << slot;
+        if (first < 0)
+            first = (int)slot;
+    }
+    if (!mounted)
+        return FS_BADVOLUME;
+    struct hpclang_stream_media_identity identity;
+    if (hpclang_stream_media_identity_query(&identity))
+        return compat_error();
+    if (!compat_exit_registered) {
+        if (atexit(compat_shutdown_at_exit))
+            return FS_MAXFILES;
+        compat_exit_registered = 1;
+    }
+    memcpy(compat_cid, identity.cid, sizeof compat_cid);
+    compat_volume = first;
+    compat_mounted = mounted;
+    return FS_OK;
+}
+
+int FSShutdown(void)
+{
+    /* Like the historical shutdown, release all adapter-owned resources even
+     * if the old card disappeared. Close never flushes invalid FatFs objects.
+     * Preserve the shared namespace for independently owned clean clients. */
+    while (compat_files)
+        (void)FSClose(compat_files);
+    compat_mounted = 0;
+    compat_volume = -1;
+    for (unsigned i = 0; i < 4u; ++i)
+        strcpy(compat_cwd[i], "/");
+    return FS_OK;
+}
+
+int FSRestart(void)
+{
+    (void)FSShutdown();
+    return FSInit();
+}
 
 static int current_volume(void)
 {
     if (compat_volume < 0) {
-        struct hpclang_stream_volume_info info;
-        if (hpclang_stream_volume_query(0, &info))
+        if (FSInit() != FS_OK)
             return -1;
-        compat_volume = info.partition ? (int)info.partition - 1 : 0;
     }
     return compat_volume;
 }
@@ -96,6 +161,14 @@ static int resolve_volume(int volume, struct hpclang_stream_volume_info *info)
 {
     if (volume < 0 || volume >= 4) {
         errno = EXDEV;
+        return -1;
+    }
+    int status = FSVolumeInserted(volume);
+    if (status != FS_OK) {
+        if (status == FS_CHANGED)
+            errno = ESTALE;
+        else if (status == FS_BADVOLUME)
+            errno = EXDEV;
         return -1;
     }
     unsigned count;
@@ -448,6 +521,8 @@ int FSOpen(char *name, int mode, FS_FILE **fileptr)
     }
 
     *fileptr = file;
+    file->_hpclang_next = compat_files;
+    compat_files = file;
     return FS_OK;
 }
 
@@ -485,6 +560,8 @@ int FSCreate(char *name, int attr, FS_FILE **fileptr)
         return result;
     }
     *fileptr = file;
+    file->_hpclang_next = compat_files;
+    compat_files = file;
     return FS_OK;
 }
 
@@ -503,13 +580,16 @@ int FSClose(FS_FILE *file)
         return FS_INVHANDLE;
     }
 
-    if (result != 0)
-        return compat_error();
-
+    int status = result == 0 ? FS_OK : compat_error();
+    FS_FILE **link = &compat_files;
+    while (*link && *link != file)
+        link = &(*link)->_hpclang_next;
+    if (*link)
+        *link = file->_hpclang_next;
     free(file->Name);
     file->Name = NULL;
     free(file);
-    return FS_OK;
+    return status;
 }
 
 int FSCloseAndDelete(FS_FILE *file)
@@ -742,6 +822,8 @@ int FSOpenDir(char *name, FS_FILE **fileptr)
     file->_hpclang_directory = directory;
     file->Attr = FSATTR_DIR;
     *fileptr = file;
+    file->_hpclang_next = compat_files;
+    compat_files = file;
     return FS_OK;
 }
 
@@ -891,14 +973,21 @@ static int volume_info(int volume, struct hpclang_stream_storage_info *info)
 
 int FSVolumeMounted(int volume)
 {
-    struct hpclang_stream_storage_info info;
-    return volume_info(volume, &info) == FS_OK;
+    return FSInit() == FS_OK && volume >= 0 && volume < 4 &&
+           (compat_mounted & (1u << (unsigned)volume)) != 0;
 }
 
 int FSVolumeInserted(int volume)
 {
-    struct hpclang_stream_storage_info info;
-    return volume_info(volume, &info);
+    int initialized = FSInit();
+    if (initialized != FS_OK)
+        return initialized;
+    if (volume < 0 || volume >= 4 || !(compat_mounted & (1u << (unsigned)volume)))
+        return FS_BADVOLUME;
+    uint8_t cid[16];
+    if (hpclang_namespace_owned_card_identity(cid))
+        return compat_error();
+    return memcmp(compat_cid, cid, sizeof cid) ? FS_CHANGED : FS_OK;
 }
 
 int FSSetCurrentVolume(int volume)

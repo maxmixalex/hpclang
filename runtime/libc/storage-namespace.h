@@ -15,6 +15,11 @@ extern "C"
 
     int hpclang_namespace_direct_active(void);
     int hpclang_namespace_stock_active(void);
+    /* Inspect a replacement card while the namespace already owns the SD
+     * controller. Unlike volume discovery, this does not require a FAT layout.
+     * A detected removal invalidates every old FatFs object before card init.
+     * Never acquires a new controller lease; EBUSY means no direct lease. */
+    int hpclang_namespace_owned_card_identity(uint8_t cid[16]);
     int hpclang_namespace_open(const char *path, int flags);
     int hpclang_namespace_close(int fd);
     ssize_t hpclang_namespace_read(int fd, void *buffer, size_t count);

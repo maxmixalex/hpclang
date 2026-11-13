@@ -100,9 +100,20 @@ extern "C"
         struct tm _hpclang_created_tm;
         struct tm _hpclang_accessed_tm;
         unsigned _hpclang_time_validity;
+        struct hpclang_hpgcc_fs_file *_hpclang_next;
     } FS_FILE;
 
+    /* Init is implicit on first volume/path use. Restart/shutdown close all
+     * adapter-owned files/directories; their pointers must no longer be used.
+     * The shared hpclang SD controller lease remains owned until app return.
+     * Clean storage API handles are not closed by these adapter operations. */
+    int FSInit(void);
+    int FSShutdown(void);
+    int FSRestart(void);
     int FSVolumeMounted(int volume);
+    /* Compare against the card mounted by FSInit, including a non-FAT
+     * replacement. FS_CHANGED persists until FSRestart or the original card
+     * returns. Matching CID never revives handles invalidated by removal. */
     int FSVolumeInserted(int volume);
     int FSSetCurrentVolume(int volume);
     int FSGetCurrentVolume(void);

@@ -394,7 +394,7 @@ ports to public hpclang APIs, not claims that unchanged HPGCC binaries run.
 | Physical keyboard and bounded console input | HPGCC 1.0.3 `examples/libtests/keyboard.c`; 1.1/2.0 `hpkeyb49.h` implementations | Physical snapshots/events, separate native text mode, editor and owned console; all six models D/S | Historical modal/blocking spellings remain M8 | Text/input acceptance `c7451364` and `41d75dec`; `system-services/console.c` additionally ports the eight-column matrix/ON display and Alpha exit, with real GPIO transitions. Direct and Stock six-model checks and formal CI pass on `7303a3d6` |
 | Civil time, elapsed time, deadlines and sound | 1.1/2.0 `hpsys.h` implementations; HPGCC3 RTC/timer sources; benchmark and game examples | Stable civil snapshots, explicit conversion/set, monotonic time, polling timers and owned PWM; all six models D/S | Ordinary callback dispatch belongs to the application loop; selected delay, stopwatch, RTC, tone and BCD names now have adapters, with raw timer setup still open | M7.4 System Services covers forward/backward clock adjustment without deadline drift, cancellation and shared-register restoration. The HPGCC 1.1/2.0 sieve client passes six-model Direct/Stock locally; its additional formal CI is accepted on `2988e1de` |
 | Files, directories, metadata and partition selection | HPGCC2 `fsystem/examples/example2.c`/`example3.c`; HPGCC3 `fsinit.c` implements four primary volumes | libc streams, owned directory snapshots, masked FAT metadata and explicit volume paths; HP49g+/HP50g D/S, other models `ENOSYS` | Bounded `fsystem.h` adapter, local cwd and historical MBR-slot aliases | `historical-files.c` ports the create/append/modify/move/read/enumerate/delete flow on all four FAT volumes. HP49g+/HP50g D/S and formal CI pass on `7303a3d6`. The original example's excessive literal write length is corrected |
-| Media removal and card identity | HPGCC3 `FSVolumePresent` compares CID after reinitialization; GPIO/SD driver sources | Removal latch, remount and stale-object rejection accepted on `cada0f2e`; `hpclang_stream_media_identity_query` now exposes stable CID (accepted on `7303a3d6`) | `FSVolumeInserted` currently reports presence/volume errors, not the full historical `FS_CHANGED` distinction | Raw A→B→A image replacement covers old dirty streams and directory handles. CID comparison now distinguishes another card from a returning card in HP49g+/HP50g Direct/Stock raw-image tests; formal CI is accepted on `7303a3d6`. Physical SD test is a maintainer-approved nonblocking follow-up |
+| Media removal and card identity | HPGCC3 `FSVolumePresent` compares CID after reinitialization; GPIO/SD driver sources | Removal latch, remount and stale-object rejection accepted on `cada0f2e`; `hpclang_stream_media_identity_query` now exposes stable CID (accepted on `7303a3d6`) | Local lifecycle adapter distinguishes persistent `FS_CHANGED`; see SD media discovery below for the contract and pending native/CI gates | Raw A→B→A image replacement covers old dirty streams and directory handles. CID comparison now distinguishes another card from a returning card in HP49g+/HP50g Direct/Stock raw-image tests; formal CI is accepted on `7303a3d6`. Physical SD test is a maintainer-approved nonblocking follow-up |
 | Calculator arguments, composite values and stack results | 1.0.3 `examples/libtests/stack.c`, 1.1 `examples/stack/rplstk.c`, 2.0 `examples/stack.c`, HPGCC3 `sat3.h` list example | Owned typed objects, explicit numeric precision and transactional stack operations; classic Stock with capability checks | Bounded `saturn.h`/`satdir.h` adapters; raw pointers and remaining names are not public clean APIs | Accepted on `6a7f9a28`: `object-composite/historical.c` ports all four generations' representative flows; nested directories, numerical composites and reorder have additional focused tests |
 | Persistent HP39 Aplet and native catalogs | HP39-enabled 1.1 Aplet template, checked against native ROM behavior | Aplet data/Reset and Program/Note catalogs; HP39 Stock with portal validation | Aplet packaging/template integration; no invented HOME namespace | Accepted on `6a7f9a28`: 15-invocation Reset and eight-invocation composite lifecycles, independent instances, SAVE and GC boundaries |
 | Native Port 0/1/2 storage | Historical backup/library object semantics, distinct from FAT and HOME directories | M8.0 in progress: classic Port 0 owned reads and backup mutation; HP49g+/HP50g Port 1/2 owned reads | No historical adapter claims | Port 0 three-launch backup persistence passes locally on all classic models; Port 1 native backup readback passes locally on HP49g+/HP50g. Port 1 backup creation and native RPL recall also pass locally on both models. Port 2 owned enumeration and backup/library reads also pass both models across three launches. Port 2 backup CRUD uses native Flash records, with journaled replacement. Complete library mutation, Port 1 replacement/removal, Flash reclamation and automatic startup recovery remain required |
@@ -1869,6 +1869,35 @@ Quality CI are accepted on `413e5891`; the HPGCC system jobs pass in all three
 Direct families and all six Stock models.
 
 ### SD media discovery and replacement
+
+The current local adapter adds `FSInit`, `FSRestart` and `FSShutdown` and retains
+the original card CID and mounted MBR slots. `FSVolumeInserted` returns
+`FS_NOCARD` on absence and persistent `FS_CHANGED` on replacement, including an
+unformatted replacement after initial FAT acquisition. `FSInit` is idempotent;
+it does not silently adopt a different card. `FSVolumeMounted` describes the
+initialized volume set, not live insertion. Call `FSRestart` to adopt the new
+card and reset the adapter's working directories. Initial acquisition still
+requires a supported FAT card.
+
+Restart/shutdown close and free all adapter-owned files and directories, even
+when the removed card makes close report an error. `FSClose` likewise consumes
+an owned handle on close failure; do not retry it using the old pointer.
+Caller-owned directory-entry metadata still needs `FSReleaseEntry`. These
+operations leave independently owned clean storage clients and the shared
+controller lease alone; the runtime restores the controller at application
+exit. A returning CID never makes stale handles valid again.
+
+Host ASan/UBSan checks execute the production adapter, namespace and FatFs core
+through removal, blank-card replacement, return, stale-handle rejection and
+restart with clean-client coexistence. A seven-observation trace matches the
+unchanged HPGCC3 volume-insertion/presence functions. Installed/relocated ARM
+builds include both original filesystem examples with `FSShutdown` retained.
+The maintained Storage payload passes all six Direct models and HP49g+/HP50g
+Stock SD launch/return, including A→B→A card changes and independent raw-card
+content checks. This uses the same SD transport selected by Storage CI; the
+USB harness does not prepare the media-swap fixtures. ARM static analysis of
+both changed runtime units and the Storage entry passes. CI acceptance for
+this addition remains pending; these results do not complete M8.4.
 
 Historical HPGCC 2.0 `sources/fsystem/fsystem.h` and HPGCC3
 `libs_workspace/headers/fsystem.h` distinguish `FS_NOCARD` from `FS_CHANGED`

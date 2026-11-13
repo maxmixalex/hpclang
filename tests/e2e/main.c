@@ -252,6 +252,11 @@ static uint32_t storage_replacement_test(void)
     secondary = NULL;
     if (closed)
         goto done;
+    FS_FILE *compat_file = NULL, *compat_directory = NULL;
+    if (FSInit() != FS_OK || FSVolumeInserted(0) != FS_OK ||
+        FSOpen("STALE.BIN", FSMODE_READ, &compat_file) != FS_OK ||
+        FSOpenDir("/", &compat_directory) != FS_OK)
+        goto done;
     secondary = fopen("1:/STALE.BIN", "r+b");
     if (!secondary || setvbuf(secondary, secondary_dirty, _IOFBF, sizeof secondary_dirty) ||
         fwrite("WRONG", 1, 5, secondary) != 5)
@@ -283,6 +288,14 @@ static uint32_t storage_replacement_test(void)
     (void)hpclang_stream_directory_close(directory);
     directory = NULL;
     result = 0xc5u;
+    if (FSVolumeInserted(0) != FS_CHANGED || FSVolumeInserted(0) != FS_CHANGED)
+        goto done;
+    char stale_byte = '?';
+    if (FSRead(&stale_byte, 1, compat_file) != 0 || stale_byte != '?' || FSRestart() != FS_OK ||
+        FSVolumeInserted(0) != FS_OK)
+        goto done;
+    /* Restart consumed both old adapter objects, while clean namespace clients
+     * continue to use the replacement card below. */
     if (hpclang_stream_media_identity_query(&observed) ||
         memcmp(original.cid, observed.cid, sizeof original.cid) == 0)
         goto done;
@@ -305,6 +318,8 @@ static uint32_t storage_replacement_test(void)
     if (media_swap(3))
         goto done;
     result = 0xc8u;
+    if (FSVolumeInserted(0) != FS_CHANGED || FSRestart() != FS_OK || FSVolumeInserted(0) != FS_OK)
+        goto done;
     if (hpclang_stream_media_identity_query(&observed) ||
         memcmp(original.cid, observed.cid, sizeof original.cid) != 0)
         goto done;
@@ -325,6 +340,7 @@ static uint32_t storage_replacement_test(void)
         goto done;
     result = 0;
 done:
+    (void)FSShutdown();
     if (secondary)
         fclose(secondary);
     if (file)
