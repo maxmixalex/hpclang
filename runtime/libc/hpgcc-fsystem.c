@@ -456,6 +456,23 @@ static FS_FILE *alloc_file(const char *name, unsigned mode)
     }
 
     file->Volume = info.partition ? info.partition - 1u : 0u;
+    /* Keep historical first-free, per-volume numbering independently of the
+     * namespace descriptor and of insertion order in the ownership list. */
+    for (int handle = 3;; ++handle) {
+        FS_FILE *used = compat_files;
+        while (used && (used->Volume != file->Volume || used->_hpclang_handle != handle))
+            used = used->_hpclang_next;
+        if (used == NULL) {
+            file->_hpclang_handle = handle;
+            break;
+        }
+        if (handle == INT_MAX) {
+            free(file->Name);
+            free(file);
+            errno = EMFILE;
+            return NULL;
+        }
+    }
     file->Mode = mode;
     file->_hpclang_fd = -1;
     file->_hpclang_owned = 1u;
@@ -581,6 +598,29 @@ int FSCreate(char *name, int attr, FS_FILE **fileptr)
     file->_hpclang_next = compat_files;
     compat_files = file;
     return FS_OK;
+}
+
+int FSGetHandle(FS_FILE *file)
+{
+    if (!compat_mounted || file == NULL)
+        return FS_INVHANDLE;
+    for (FS_FILE *entry = compat_files; entry; entry = entry->_hpclang_next)
+        if (entry == file && entry->Volume < 4u && (compat_mounted & (1u << entry->Volume)))
+            return entry->_hpclang_handle;
+    return FS_INVHANDLE;
+}
+
+int FSGetFileFromHandle(int handle, FS_FILE **file)
+{
+    if (!compat_mounted || compat_volume < 0 || handle < 3 || file == NULL)
+        return FS_INVHANDLE;
+    for (FS_FILE *entry = compat_files; entry; entry = entry->_hpclang_next) {
+        if (entry->Volume == (unsigned)compat_volume && entry->_hpclang_handle == handle) {
+            *file = entry;
+            return FS_OK;
+        }
+    }
+    return FS_INVHANDLE;
 }
 
 int FSClose(FS_FILE *file)

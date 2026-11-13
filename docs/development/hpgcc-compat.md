@@ -465,6 +465,17 @@ The historical releases are more source-stable than their runtime implementation
 
 HPGCC3 adds two public filesystem handle helpers beyond HPGCC 2.0: `FSGetFileFromHandle` and `FSGetHandle`.
 
+The local adapter now implements both helpers for its owned files and directories.
+Numbers start at 3 independently in each volume; reverse lookup uses the current
+volume. Closing a handle, restarting or shutting down releases its number, which
+may be reused. Directory-entry snapshots do not have numbers. These values are
+not POSIX descriptors and do not transfer ownership. Lookup does not refresh
+media state or revive a handle invalidated by removal. Invalid lookup leaves the
+output pointer unchanged. The adapter uses its existing resource limits rather
+than imposing HPGCC3's ten-slot table limit. Production FatFs sanitizer tests and
+nine original-function comparisons pass locally; calculator-side execution and
+remote acceptance of this addition remain pending.
+
 Compatibility consequence:
 
 - HPG is a strong broad source-compatibility target;

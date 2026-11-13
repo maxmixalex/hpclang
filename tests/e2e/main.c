@@ -925,8 +925,15 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         !FSEof(legacy_file) || FSClose(legacy_file) != FS_OK)
         return 0x85u;
 
-    if (FSCreate("HPCLANG.MOD", 0, &legacy_file) != FS_OK ||
-        FSWrite("abcdef", 6, legacy_file) != 6 || FSChMode(legacy_file, FSMODE_READ) != FS_OK ||
+    if (FSCreate("HPCLANG.MOD", 0, &legacy_file) != FS_OK)
+        return 0x141u;
+    int legacy_handle = FSGetHandle(legacy_file);
+    FS_FILE *legacy_lookup = NULL;
+    if (legacy_handle < 3 || FSGetFileFromHandle(legacy_handle, &legacy_lookup) != FS_OK ||
+        legacy_lookup != legacy_file || FSGetFileFromHandle(2, &legacy_lookup) != FS_INVHANDLE ||
+        legacy_lookup != legacy_file)
+        return 0x142u;
+    if (FSWrite("abcdef", 6, legacy_file) != 6 || FSChMode(legacy_file, FSMODE_READ) != FS_OK ||
         FSTell(legacy_file) != 6 || FSWrite("!", 1, legacy_file) != 0 ||
         FSSeek(legacy_file, 2, SEEK_SET) != FS_OK ||
         FSChMode(legacy_file, FSMODE_MODIFY) != FS_OK ||
@@ -942,6 +949,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         memcmp(buffer, "abQ", 3) != 0 || FSClose(legacy_file) != FS_OK ||
         FSDelete("HPCLANG.MOD") != FS_OK)
         return 0x140u;
+    legacy_lookup = NULL;
+    if (FSGetFileFromHandle(legacy_handle, &legacy_lookup) != FS_INVHANDLE || legacy_lookup != NULL)
+        return 0x143u;
 
     if (FSMkdir("CMPDIR") != FS_OK || FSChdir("CMPDIR") != FS_OK)
         return 0x86u;

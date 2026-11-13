@@ -101,6 +101,7 @@ extern "C"
         struct tm _hpclang_accessed_tm;
         unsigned _hpclang_time_validity;
         struct hpclang_hpgcc_fs_file *_hpclang_next;
+        int _hpclang_handle;
     } FS_FILE;
 
     /* Init is implicit on first volume/path use. Restart/shutdown close all
@@ -134,6 +135,12 @@ extern "C"
      * APPEND/MODIFY imply WRITE. Downgrading to READ flushes buffered writes;
      * failure leaves the previous mode in force. */
     int FSChMode(FS_FILE *file, int newmode);
+    /* HPGCC3 adapter handle numbers start at 3 and are local to each volume.
+     * Reverse lookup uses the current volume and leaves *file unchanged on
+     * failure. These are not POSIX descriptors. Close/restart/shutdown release
+     * the number, which a later open may reuse. Entry snapshots have no handle. */
+    int FSGetHandle(FS_FILE *file);
+    int FSGetFileFromHandle(int handle, FS_FILE **file);
     int FSClose(FS_FILE *file);
     int FSCloseAndDelete(FS_FILE *file);
     int FSSeek(FS_FILE *file, int offset, int position);

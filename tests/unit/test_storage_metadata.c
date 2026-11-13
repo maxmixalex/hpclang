@@ -349,6 +349,23 @@ int main(void)
     // Mode changes retain the actual open FatFs object, its offset and extent.
     FS_FILE *mode_file;
     CHECK(FSCreate("MODE.TXT", 0, &mode_file) == FS_OK);
+    CHECK(FSGetHandle(mode_file) == 3);
+    FS_FILE *handle_file = NULL, *handle_dir;
+    CHECK(FSGetFileFromHandle(3, &handle_file) == FS_OK && handle_file == mode_file);
+    CHECK(FSOpenDir("/", &handle_dir) == FS_OK && FSGetHandle(handle_dir) == 4);
+    CHECK(FSGetFileFromHandle(4, &handle_file) == FS_OK && handle_file == handle_dir);
+    FS_FILE metadata_only = {0};
+    CHECK(FSGetHandle(NULL) == FS_INVHANDLE && FSGetHandle(&metadata_only) == FS_INVHANDLE);
+    CHECK(FSGetFileFromHandle(2, &handle_file) == FS_INVHANDLE && handle_file == handle_dir);
+    CHECK(FSGetFileFromHandle(-1, &handle_file) == FS_INVHANDLE && handle_file == handle_dir);
+    CHECK(FSGetFileFromHandle(1000000, &handle_file) == FS_INVHANDLE && handle_file == handle_dir);
+    CHECK(FSGetFileFromHandle(3, NULL) == FS_INVHANDLE);
+    CHECK(FSClose(handle_dir) == FS_OK);
+    handle_file = mode_file;
+    CHECK(FSGetFileFromHandle(4, &handle_file) == FS_INVHANDLE && handle_file == mode_file);
+    CHECK(FSOpen("MODE.TXT", FSMODE_READ, &handle_file) == FS_OK);
+    CHECK(FSGetHandle(handle_file) == 4 && FSGetHandle(mode_file) == 3);
+    CHECK(FSClose(handle_file) == FS_OK);
     int mode_fd = mode_file->_hpclang_fd;
     CHECK(FSWrite("abcdef", 6, mode_file) == 6);
     CHECK(FSChMode(mode_file, FSMODE_READ) == FS_OK);
@@ -384,6 +401,8 @@ int main(void)
     CHECK(FSChMode(NULL, FSMODE_WRITE) == FS_ERROR);
     CHECK(FSChAttr(mode_file, 0) == FS_OK);
     CHECK(FSClose(mode_file) == FS_OK && FSDelete("MODE.TXT") == FS_OK);
+    handle_file = &metadata_only;
+    CHECK(FSGetFileFromHandle(3, &handle_file) == FS_INVHANDLE && handle_file == &metadata_only);
     // Identity-only replacement inspection must not mount/flush a new card.
     // Exercise the actual namespace and FatFs with a blank replacement, then
     // restore the original FAT bytes: old handles stay invalid in both cases.

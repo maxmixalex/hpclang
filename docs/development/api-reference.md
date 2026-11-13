@@ -667,6 +667,12 @@ unavailable. `FSChAttr` replaces mutable flags while requiring directory/volume
 type bits to remain unchanged. Entries retain their path independently of the
 parent iterator. This metadata extension is formally accepted on `6a7f9a28`.
 
+`FSGetHandle` and `FSGetFileFromHandle` expose adapter-owned file/directory
+numbers from 3, local to each volume. Reverse lookup uses the current volume;
+failure preserves the output pointer. These are not POSIX descriptors, and
+closing/restarting/shutting down releases numbers for reuse. Lookup does not
+refresh media state. Native validation of these local additions remains pending.
+
 `FSChMode` is implemented locally for open adapter files. It preserves identity,
 offset and extent, normalizes APPEND/MODIFY to include WRITE, and flushes before
 changing to READ. Failed transitions retain the old mode. Changing to WRITE does
