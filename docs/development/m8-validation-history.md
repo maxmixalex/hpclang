@@ -6252,3 +6252,20 @@ Stock validation is still running in `/work/nov06-sum/native271-budget-stock`;
 this is local validation, not Stock or CI acceptance. Finish this bounded batch,
 then rotate to UI/native exception-stack reservation work without extending
 M8.0's scope. Original milestone requirements remain unchanged.
+
+
+## 2026-11-13 — Include round-trip snapshots in collector budgets
+
+The 8ba0f42d Stock run completed HP49g+ base return, 88 reference/control
+cases, native and native-new-message, then native-missing-message halted with
+0x46410005 at PC 0x01233d9a. Its 4,422-byte round-trip snapshot remained live
+beside the collector; the preceding collector-only budget omitted that cost.
+
+Guard growth now uses 128-entry increments, retaining all guards and the
+4,096-entry ceiling. The actual missing-message snapshot replay peaks at
+59,054 requested bytes including the snapshot and host-sized probe, preserves
+all 2,344 guards byte-for-byte, and passes allocation-failure cleanup. The old
+512-entry growth fails the same 60,000-byte budget. Reference/shadow sanitizer
+tests pass. Drivers: research/nov13-missing-message-budget.py and
+research/nov13-missing-message-negative.py. Fresh native validation remains
+required; this does not close M8.0 or establish general production discovery.
