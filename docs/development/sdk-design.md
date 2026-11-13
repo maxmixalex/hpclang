@@ -2090,6 +2090,16 @@ profile's `return_pc`, before the common return instruction executes. The Stock
 frontend supplies phase boundaries even when SRAM snapshot capture is disabled.
 The output contains bounded phase summaries rather than per-allocation files.
 
+Stock UI CI enables `HPCLANG_E2E_CAPTURE_NATIVE_HEAP=1`. Each Stock runner
+derives the observer's numeric settings from its selected firmware immediately
+before the measured emulator starts. Full NOR fixtures use their existing
+addresses; Kinpo update files are mapped at offset `0x4000`, retaining their
+16-byte header. Unknown allocator fingerprints stop the run. For the two-process
+SD transport, only the application run is observed. The resulting
+`build/<model>-native-heap.json` is checked against the actual loaded flash and
+settled Stock result, and uploaded with the UI evidence. The capture switch is
+optional for local runs and defaults to disabled.
+
 ```sh
 python3 tests/e2e/harness/verify-native-heap-trace.py /path/to/hp50g-heap.json \
   --model hp50g --rom /path/to/matching/flash \

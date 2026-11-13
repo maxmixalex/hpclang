@@ -109,6 +109,8 @@ if [[ -f "$APP_DIR/e2e.stock-media.json" ]]; then
     COMMON_ARGS+=(--sd-dir="$HPCLANG_STOCK_MEDIA_IMAGE")
 fi
 
+source "$ROOT/tests/e2e/harness/native-heap-env.sh" \
+    "$ROOT/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin" --update-image
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}" &
 X50_PID=$!
 
