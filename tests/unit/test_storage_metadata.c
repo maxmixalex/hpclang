@@ -165,6 +165,15 @@ static int partition_checks(void)
     CHECK(hpclang_stream_volume_query(1, &info) == 0 && info.partition == 3 &&
           info.first_sector == VOLUME_SECTORS * 3u);
     CHECK(info.storage.capacity_bytes == VOLUME_SECTORS * 512u);
+    FS_FILE *partition_file;
+    CHECK(FSCreate("E:/VOLUME.TST", 0, &partition_file) == FS_OK);
+    char *partition_name =
+        FSGetFileName(partition_file, FSNAME_HASVOL | FSNAME_VOLHP | FSNAME_ABSPATH);
+    int partition_named = partition_name && strcmp(partition_name, ":5:/VOLUME.TST") == 0;
+    free(partition_name);
+    CHECK(partition_named);
+    CHECK(FSCloseAndDelete(partition_file) == FS_OK && FSShutdown() == FS_OK);
+
     CHECK(hpclang_stream_volume_query(2, &info) == -1 && errno == ENODEV);
     CHECK(hpclang_namespace_open("2:/NEW.TXT", O_RDONLY) == -1 && errno == ENODEV);
     CHECK(hpclang_stream_directory_open("2:/") == NULL && errno == ENODEV);

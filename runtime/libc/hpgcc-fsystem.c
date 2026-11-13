@@ -269,7 +269,7 @@ static int append_component(char *path, size_t *length, size_t capacity, const c
     if (component_length == 2u && component[0] == '.' && component[1] == '.')
         return pop_component(path, length);
 
-    size_t need_separator = *length > 1u ? 1u : 0u;
+    size_t need_separator = *length && path[*length - 1u] != '/' ? 1u : 0u;
     if (*length + need_separator + component_length >= capacity) {
         errno = ENAMETOOLONG;
         return -1;
