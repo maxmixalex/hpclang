@@ -4698,8 +4698,17 @@ below are retained.
 - [ ] Deliver the common 59-function HPG graphics surface and maintained
   keyboard, console/text, system, filesystem and object adapters in focused
   groups. Expand the four-generation declaration/implementation/evidence ledger.
-- [ ] Compile representative original historical applications, recording each
+- [x] Compile representative original historical applications, recording each
   required source edit; distinguish these from M7's clean-API behavioral ports.
+  Original HPGCC 2.0 filesystem `example2.c`/`example3.c` and HPGCC 1.1
+  `examples/win/simple.c` pass relocated-SDK ARM compilation and six-model
+  packaging. The maintained extraction gates retain original/adapted hashes
+  and explicit migration diffs; the window gate also checks exact reversal of
+  its documented edits. See the [filesystem source gate](hpgcc-compat.md#original-hpgcc-20-filesystem-programs)
+  and [window source gate](hpgcc-compat.md#original-window-application-gate).
+  This closes the representative-source compilation criterion only; model
+  capability limits, runtime acceptance and broader adapter coverage remain
+  separate requirements.
 - [ ] Complete `kos_beep/kos_CheckBeepEnd` compatibility with owned asynchronous
   sound, completion queries and active-tone preemption policy. Verify flags
   against each original system; cover autonomous stop while application code is
