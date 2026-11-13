@@ -473,8 +473,9 @@ not POSIX descriptors and do not transfer ownership. Lookup does not refresh
 media state or revive a handle invalidated by removal. Invalid lookup leaves the
 output pointer unchanged. The adapter uses its existing resource limits rather
 than imposing HPGCC3's ten-slot table limit. Production FatFs sanitizer tests and
-nine original-function comparisons pass locally; calculator-side execution and
-remote acceptance of this addition remain pending.
+nine original-function comparisons pass locally. Six Direct and two Stock SD
+emulator runs pass, with independent source/report hashes and raw-card persistence
+checks. Remote acceptance of this addition remains pending.
 
 Compatibility consequence:
 

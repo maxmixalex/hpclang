@@ -671,7 +671,8 @@ parent iterator. This metadata extension is formally accepted on `6a7f9a28`.
 numbers from 3, local to each volume. Reverse lookup uses the current volume;
 failure preserves the output pointer. These are not POSIX descriptors, and
 closing/restarting/shutting down releases numbers for reuse. Lookup does not
-refresh media state. Native validation of these local additions remains pending.
+refresh media state. Six-model Direct and HP49g+/HP50g Stock emulator checks
+pass locally; remote acceptance remains pending.
 
 `FSChMode` is implemented locally for open adapter files. It preserves identity,
 offset and extent, normalizes APPEND/MODIFY to include WRITE, and flushes before
