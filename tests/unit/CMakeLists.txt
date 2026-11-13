@@ -391,6 +391,10 @@ set(HPCLANG_UI_SURFACE_TEST_SOURCES ${HPCLANG_UI_TEST_SOURCES}
     "${HPCLANG_ROOT}/runtime/core/saturn-view.c")
 hpclang_unit(ui_surface test_ui_surface.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
 target_include_directories(test_ui_surface PRIVATE "${HPCLANG_ROOT}/include")
+hpclang_unit(ui_surface_cpp test_ui_surface_cpp.cpp)
+target_compile_features(test_ui_surface_cpp PRIVATE cxx_std_17)
+target_compile_options(test_ui_surface_cpp PRIVATE -fno-exceptions -fno-rtti)
+target_include_directories(test_ui_surface_cpp PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(ui_demo test_ui_demo.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
     "${HPCLANG_ROOT}/examples/declarative-ui/app.c")
 target_include_directories(test_ui_demo PRIVATE "${HPCLANG_ROOT}/include")
