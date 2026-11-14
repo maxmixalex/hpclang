@@ -300,7 +300,11 @@ def verify_allocation(prefix: Path, model: int) -> int:
         "mapped_pages",
         "unmapped_usable_bytes",
     }
-    begin, end = 0x08000000, 0x08040000 if model == 4 else 0x08080000
+    # Stock's low SRAM page contains exception vectors and the qualified
+    # runtime mode-stack tops (see verify-native-stack-init.py). It cannot
+    # belong to this launch's pool/block. This exclusion does not establish
+    # individual stack capacities or ownership of the rest of SRAM.
+    begin, end = 0x08001000, 0x08040000 if model == 4 else 0x08080000
     for checkpoint in (1, 2):
         report = json.loads(Path(f"{prefix}-allocation-{checkpoint}.json").read_text())
         pool = json.loads(Path(f"{prefix}-pool-{checkpoint}.json").read_text())

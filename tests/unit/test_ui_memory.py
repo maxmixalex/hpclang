@@ -379,6 +379,18 @@ class UiMemoryTests(unittest.TestCase):
         save(allocation, invalid_pool)  # a mapped page overlaps only the footer
         with self.assertRaises(AssertionError):
             VERIFY.verify_allocation(self.prefix, 6)
+        # An otherwise aligned pool must not claim Stock vectors/mode stacks.
+        invalid_pool = dict(pool, physical_pages=[0x08000000] + pool["physical_pages"][1:])
+        save(allocation, invalid_pool)
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_allocation(self.prefix, 6)
+        # Even an unmapped allocation header cannot occupy that native page.
+        invalid = dict(
+            allocation, pointer=0x08001000, usable_bytes=0x3000, unmapped_usable_bytes=0x1000
+        )
+        save(invalid, dict(pool, native_os_block=invalid["pointer"]))
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_allocation(self.prefix, 6)
         save(allocation)
         path = Path(f"{self.prefix}-allocation-2.json")
         changed = dict(allocation, flags=0x2103, id=2)

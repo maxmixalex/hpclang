@@ -1,5 +1,18 @@
 # M8 validation history
 
+### 2026-11-14 — UI pool exclusion of the native vector/stack page
+
+The Stock UI allocation verifier now rejects pool pages, allocation headers,
+payloads and free-list links in `[0x08000000, 0x08001000)`. That page contains
+native exception vectors and the five runtime mode-stack tops qualified by the
+maintained ROM initializer decoder. Eleven UI-memory tests pass; the old
+verifier accepts the forbidden page and fails the new regression.
+Read-only replay of retained pool/allocation reports passes all six models,
+with ROM hashes and decoded tops checked against the saved stack observations.
+Report: `/work/nov14-ui-native-page-replay.json`. This strengthens the measured
+pool's separation from native state; it is not new emulator execution, an
+individual stack-capacity proof or complete transient-memory admission.
+
 ### 2026-11-14 — File-open stack reduction
 
 The read-only create probe now calls FatFs `f_stat(path, NULL)`: it needs only
