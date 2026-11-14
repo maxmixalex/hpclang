@@ -87,7 +87,7 @@ loads an embedded Thumb HPC1 image through the common bootstrap and returns to
 Stock. The fixture documents model-specific native snapshot checks, including
 unchanged Flash, restored MMU/control state and stack guards. Its isolated
 build check runs in Core CI; build reproducibility alone does not establish
-native execution. This delivery is awaiting combined PR #43 acceptance.
+native execution. This bounded delivery is accepted through #43 / `38e9472a`.
 
 The prototype supplies no native-service context and is not a general
 application loader. HP39 Aplet integration, HP48gII entry and cross-family
@@ -115,9 +115,31 @@ borrowed mapping and original stack before restoring interrupt state and
 releasing the optional KOS block; the independent path needs equivalent ordered
 cleanup, including rejected startup.
 
-The next bounded evaluation is a service-capable HP49/50 Notebook prototype,
-using the existing independent entry and common loader, followed by HP48gII
-entry/allocation and the HP39 Aplet data boundary. Compare identical application
+Fresh unmodified Notebook builds on 2026-11-14 give the following sizing baseline
+(ATFE 22.1.0, MinSizeRel, model-specific builds):
+
+| Model | HPC1 code bytes | Static RW bytes | Minimum RW pages | Production minimum Stock pool pages | Production transfer bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HP39g+ | 45,456 | 1,048 | 4 | 25 | 48,396 |
+| HP48gII | 64,248 | 1,048 | 4 | 27 | 62,828 |
+| HP50g | 79,152 | 4,320 | 5 | 32 | 74,620 |
+
+Pages are 4 KiB. Minimum RW includes boot, static data and the 8 KiB stack;
+it is not a measured heap budget. Transfer sizes include the production wrapper
+and compressed payload, but exclude the separately installed support library
+and HP39 Aplet envelope. These are build measurements, not execution or peak
+Stock RAM measurements. Report: `/work/nov14-independent-notebook-budget/result.json`.
+
+The bounded independent entry copies at most 65,536 bytes (`code_for`), and
+its arena is serialized inside that copied blob. Even the HP39 image plus the
+minimal 12 code + 4 RW + 1 MMU pages exceeds that copy limit, before entry code,
+alignment and its separate stack. HP50 code alone exceeds it. Simply expanding
+the fixture's one-code-page/four-RW-page constants cannot launch this application.
+The next bounded implementation step is to acquire the page pool outside the
+serialized/copied payload, with matching cleanup on failure and return. Then
+connect the captured Stock context and service fences to a service-capable
+HP49/50 Notebook prototype, followed by HP48gII entry/allocation and the HP39
+Aplet data boundary. Compare identical application
 sources and configuration; record package transfer cost, supported-flow memory
 use, allocation failure and settled return. This does not require the deferred
 whole-system worst-case memory proof. Until those comparisons exist, the
