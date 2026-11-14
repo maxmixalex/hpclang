@@ -33,7 +33,8 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build(source, tool, output):
+def build(source, tool, output, model="hp50g"):
+    model_id = {"hp49gplus": 5, "hp50g": 6}[model]
     output.mkdir(parents=True, exist_ok=False)
     inputs = {name: digest(source / name) for name in INPUTS}
     common = [
@@ -41,6 +42,7 @@ def build(source, tool, output):
         "--target=arm-none-eabi",
         "-march=armv4t",
         "-ffreestanding",
+        f"-DHPCLANG_PROBE_MODEL={model_id}",
         "-fno-builtin",
         "-fno-unwind-tables",
         "-fno-asynchronous-unwind-tables",
@@ -165,7 +167,8 @@ def build(source, tool, output):
     if any(digest(source / name) != expected for name, expected in inputs.items()):
         raise ValueError("build inputs changed")
     manifest = dict(
-        scope="HP50g bounded embedded HPC1 experiment; no native-service context",
+        scope="HP49g+/HP50g bounded embedded HPC1 experiment; no native-service context",
+        model=model,
         inputs=inputs,
         outputs={name: digest(output / name) for name in OUTPUTS},
         compiler=subprocess.check_output([str(tool / "clang"), "--version"], text=True),
@@ -178,9 +181,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[3])
     args = parser.parse_args()
-    build(args.source_root.resolve(), args.toolchain.resolve(), args.output.resolve())
+    build(args.source_root.resolve(), args.toolchain.resolve(), args.output.resolve(), args.model)
 
 
 if __name__ == "__main__":

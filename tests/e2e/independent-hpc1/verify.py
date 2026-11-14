@@ -13,6 +13,14 @@ require = module["require"]
 
 def verify(artifact, state, baseline):
     manifest = json.loads((artifact / "build.json").read_text())
+    model = manifest.get("model", "hp50g")
+    require(model in ("hp49gplus", "hp50g"), "unsupported fixture model")
+    model_id = 5 if model == "hp49gplus" else 6
+    rom_hash = (
+        "894e146c3252191ad3700b17d24bc0669c6f3f0923e9307c1ed4f3d9857477d8"
+        if model_id == 5
+        else module["ROM_SHA256"]
+    )
     for name, expected in manifest["outputs"].items():
         require(Path(name).name == name, "invalid artifact path")
         require(
@@ -25,7 +33,7 @@ def verify(artifact, state, baseline):
         flash == (baseline / "flash").read_bytes(), "flash == (baseline / 'flash').read_bytes()"
     )
     require(
-        hashlib.sha256(flash[:1310720]).hexdigest() == module["ROM_SHA256"],
+        hashlib.sha256(flash[:1310720]).hexdigest() == rom_hash,
         "hashlib.sha256(flash[:1310720]).hexdigest() == module['ROM_SHA256']",
     )
     module["no_toolbox"]((baseline / "sram").read_bytes(), flash)
@@ -58,7 +66,10 @@ def verify(artifact, state, baseline):
         result[2] == 42 and result[3:5] == result[5:7] and (result[7] == result[8]),
         "result[2] == 42 and result[3:5] == result[5:7] and (result[7] == result[8])",
     )
-    require(result[11:14] == (6, 16384, 826495048), "result[11:14] == (6, 16384, 826495048)")
+    require(
+        result[11:14] == (model_id, 16384, 826495048),
+        "result[11:14] == (model_id, 16384, 826495048)",
+    )
     require(
         result[14] & 255 == result[15] & 255 == 208, "result[14] & 255 == result[15] & 255 == 208"
     )
@@ -89,8 +100,8 @@ def verify(artifact, state, baseline):
         "ram[arena - 134217728 + 4096:arena - 134217728 + 4096 + size] == hpc[16:]",
     )
     require(
-        struct.unpack_from("<III", ram, arena - 134217728 + 12288) == (6, 16384, 826495048),
-        "struct.unpack_from('<III', ram, arena - 134217728 + 12288) == (6, 16384, 826495048)",
+        struct.unpack_from("<III", ram, arena - 134217728 + 12288) == (model_id, 16384, 826495048),
+        "struct.unpack_from('<III', ram, arena - 134217728 + 12288) == (model_id, 16384, 826495048)",
     )
     mutable = [
         (symbols["control"], symbols["control"] + 20),
@@ -119,7 +130,7 @@ def verify(artifact, state, baseline):
     require(len(owners) == 1, "len(owners) == 1")
     report = dict(
         complete=True,
-        model="hp50g",
+        model=model,
         payload_physical=physical,
         app_result=result[2],
         boot_model=result[11],

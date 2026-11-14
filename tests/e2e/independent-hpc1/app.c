@@ -8,5 +8,5 @@ int app(void)
     data[1] = boot->rw_bytes;
     data[2] = 0x31435048u;
     hpclang_cache_clean((const void *)data, 12);
-    return boot->model == 6 && boot->rw_bytes == 16384 ? 42 : -1;
+    return boot->model == HPCLANG_PROBE_MODEL && boot->rw_bytes == 16384 ? 42 : -1;
 }

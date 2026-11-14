@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 
-def check(toolchain):
+def check(toolchain, model="hp50g"):
     source = Path(__file__).resolve().parents[3]
     fixture = runpy.run_path(str(Path(__file__).with_name("build.py")))
     inputs = {
@@ -30,6 +30,8 @@ def check(toolchain):
                 [
                     sys.executable,
                     str(root / "source" / fixture["FIXTURE"] / "build.py"),
+                    "--model",
+                    model,
                     "--toolchain",
                     str(toolchain),
                     "--output",
@@ -38,7 +40,7 @@ def check(toolchain):
                 check=True,
             )
             manifest = json.loads((output / "build.json").read_text())
-            if manifest["inputs"] != inputs:
+            if manifest["inputs"] != inputs or manifest["model"] != model:
                 raise ValueError("isolated source hashes differ")
             for artifact, expected in manifest["outputs"].items():
                 if hashlib.sha256((output / artifact).read_bytes()).hexdigest() != expected:
@@ -65,8 +67,9 @@ def check(toolchain):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True)
+    parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
     args = parser.parse_args()
-    print(json.dumps(check(args.toolchain.resolve()), indent=2))
+    print(json.dumps(check(args.toolchain.resolve(), args.model), indent=2))
 
 
 if __name__ == "__main__":

@@ -46,7 +46,7 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
     launch.mmu.code_page_count = 1;
     launch.mmu.code_window_pages = 0;
     launch.mmu.code_window_page_count = 0;
-    launch.model = 6;
+    launch.model = HPCLANG_PROBE_MODEL;
     launch.entry_offset = image->entry_offset;
     launch.saturn_state = 0;
     launch.platform_cookie = 0;
@@ -67,7 +67,7 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
     out[12] = data[1];
     out[13] = data[2];
     out[1] = out[2] == 42 && out[3] == out[5] && out[4] == out[6] && out[7] == out[8] &&
-                     out[11] == 6 && out[12] == 16384 && out[13] == 0x31435048u &&
+                     out[11] == HPCLANG_PROBE_MODEL && out[12] == 16384 && out[13] == 0x31435048u &&
                      (out[14] & 255u) == (out[15] & 255u)
                  ? 0
                  : 3;

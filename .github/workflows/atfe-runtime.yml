@@ -190,7 +190,9 @@ jobs:
         run: python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin"
 
       - name: Verify independent HPC1 build reproducibility
-        run: python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin"
+        run: |
+          python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp49gplus
+          python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp50g
 
       - name: Build hardware-validation E2E
         run: |

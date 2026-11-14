@@ -4858,3 +4858,29 @@ Reports: `/work/nov14-independent-entry-swi-live/verified-final.json`,
 `/work/nov14-independent-entry-swi-live/negative.json` and
 `/work/nov14-independent-hpc1-swi-live/verified.json`.
 The fix is locally validated; existing #40 CI still tests head 5476624d.
+
+
+## 2026-11-14 — Independent HPC1 prototype on HP49g+
+
+The maintained fixture now selects hp49gplus (model 5) or hp50g (model 6),
+records the target in its build manifest and checks the matching ROM fingerprint
+and boot metadata. Core CI builds both targets twice in isolated source copies.
+Both two-copy comparisons pass locally. The default HP50g transfer package
+remains byte-identical to the executed prototype and its native snapshot still
+passes. Cross-model artifact/snapshot pairings are rejected.
+
+A fresh HP49g+ baseline was booted with boot-49g+.bin and the original shared
+2.15 firmware, without library 275. The first transfer completed but the
+execution verifier rejected it: the factory baseline was in algebraic mode and
+EVAL entered an expression instead of executing the recalled program. The
+failed screen/snapshot remain in /work/nov14-hpc1-hp49-live. A new baseline
+explicitly selected RPN through the existing Stock MODE-form sequence.
+
+The corrected run passes model 5, app result 42, 16 KiB RW, owned six-page arena,
+RPL result 124275, absent library 275, unchanged Flash and restored MMU/SWI/CPSR.
+All fifteen corrupted snapshots reject. Program SHA-256:
+42ae935a06ff0823e300147f847bfd41e1d2abdf3a5c742a3129f8ad6e88f0bf.
+Inputs remain unchanged. Independent two-model/native/build/mismatch audit:
+/work/nov14-hpc1-hp49-live-rpn/independent-audit.json. Ruff and strict docs pass.
+This is local bounded-prototype qualification; arbitrary applications, native
+services and HP39/HP48 independent launch remain unqualified. M8.6 stays open.
