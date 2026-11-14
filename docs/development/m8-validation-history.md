@@ -4833,3 +4833,29 @@ full-region evidence; fresh low-window runs have not been claimed for them.
 
 This is local executed-path observation, not a reservation proof, whole-system
 transient-memory admission, physical-device qualification or M8 completion.
+
+
+## 2026-11-14 — Six-model low-SRAM stack observations
+
+All six Stock UI runs pass application pixels, resources and settled return.
+The independent replay verifies each completed status, all sealed inputs,
+twelve shared firmware hashes, five ROM bank initializers per model and the
+qualified allocator traces. The current formatted verifier reproduces all six
+saved stack reports. The native observer and existing UI payload are unchanged;
+this is new observer coverage, not a rebuild of the application.
+
+| Model | Observed IRQ/FIQ/SVC downward extent, bytes | Minimum sampled native usable bytes |
+| --- | --- | --- |
+| HP39g+ | 120 / 0 / 112 | 1928 |
+| HP39gs | 176 / 0 / 104 | 1256 |
+| HP40gs | 176 / 0 / 104 | 1256 |
+| HP48gII | 200 / 36 / 104 | 1256 |
+| HP49g+ | 200 / 36 / 104 | 1672 |
+| HP50g | 200 / 36 / 104 | 1672 |
+
+Zero means no downward excursion was observed in this window. Neither these
+extents nor the sampled heap minima establish reserved capacities or bounds
+on unobserved paths/allocators. Native stack reservations and whole-system
+transient-memory admission remain open. Combined report:
+`/work/nov14-native-stack-window-remaining/independent-audit.json`.
+Formatting-only follow-up 4d2dd3fd is submitted in #44; CI remains pending.
