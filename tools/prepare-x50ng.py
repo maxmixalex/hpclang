@@ -1488,6 +1488,54 @@ def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
     )
 
 
+def patch_native_heap_observer(root: Path, args: argparse.Namespace) -> None:
+    """Observe a qualified allocation return, with phases supplied by Stock."""
+    arm = root / "src/qemu/target-arm"
+    for name in ("native-heap-observer.h", "native-heap-trace.h"):
+        shutil.copy2(args.headless_header.parent / name, arm)
+    replace_once(
+        arm / "helpers.h",
+        '#include "def-helper.h"',
+        '#include "def-helper.h"\nDEF_HELPER_3(hpclang_native_heap, void, ptr, i32, i32)',
+        "native heap helper declaration",
+    )
+    replace_once(
+        arm / "helper.c",
+        '#include "helpers.h"',
+        '#include "helpers.h"\n#include "native-heap-trace.h"\n'
+        "static int hpclang_native_heap_read(void *context, uint32_t address, uint32_t *value)\n"
+        "{ unsigned char bytes[4];\n"
+        "  if (cpu_memory_rw_debug(context, address, bytes, 4, 0)) return -1;\n"
+        "  *value = (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 |\n"
+        "           (uint32_t)bytes[2] << 16 | (uint32_t)bytes[3] << 24; return 0; }\n"
+        "void hpclang_native_heap_phase(const char *phase, uint64_t time_us)\n"
+        "{ native_heap_trace_mark(phase, time_us); }\n"
+        "void HELPER(hpclang_native_heap)(void *opaque, uint32_t pc, uint32_t result)\n"
+        "{ native_heap_trace_observe(hpclang_native_heap_read, opaque, pc, result); }\n",
+        "native heap helper implementation",
+    )
+    replace_once(
+        arm / "translate.c",
+        "        if (env->thumb) {\n            disas_thumb_insn(env, dc);",
+        '        const char *heap_path = getenv("HPCLANG_X50NG_NATIVE_HEAP");\n'
+        "        if (heap_path && *heap_path) {\n"
+        '            const char *text = getenv("HPCLANG_X50NG_NATIVE_HEAP_PC");\n'
+        "            char *end;\n"
+        "            unsigned long address = text ? strtoul(text, &end, 0) : 0;\n"
+        "            if (!text || !*text || *end || address > UINT32_MAX || (address & 3u)) {\n"
+        '                fputs("invalid native heap return PC\\n", stderr); exit(1);\n'
+        "            }\n"
+        "            if (!env->thumb && address == dc->pc) {\n"
+        "                TCGv pc = tcg_const_i32(dc->pc);\n"
+        "                gen_helper_hpclang_native_heap(cpu_env, pc, cpu_R[0]);\n"
+        "                tcg_temp_free_i32(pc);\n"
+        "            }\n"
+        "        }\n"
+        "        if (env->thumb) {\n            disas_thumb_insn(env, dc);",
+        "native heap allocation return observation",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("x50ng", type=Path)
@@ -1504,6 +1552,7 @@ def main() -> None:
     patch_execution_clock(root, args)
     patch_execution_snapshot(root, args)
     patch_stack_pointer_observer(root, args)
+    patch_native_heap_observer(root, args)
     verify_ui_build_inheritance(root)
     patch_universal_flash(root)
     patch_flash_busy(root)

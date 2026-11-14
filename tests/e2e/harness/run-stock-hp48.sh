@@ -32,6 +32,7 @@ printf '%s  %s\n' \
     4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937 \
     "$NOR" | sha256sum -c -
 python3 "$ROOT/tools/prepare-hp48gii-nor.py" "$NOR" "$STATE"
+source "$ROOT/tests/e2e/harness/native-heap-env.sh" "$STATE/flash"
 
 printf 'HPCLANG-E2E' > "$SEND/ZZE2E.txt"
 python3 "$ROOT/tools/hp-rpl-string-wrap.py" \

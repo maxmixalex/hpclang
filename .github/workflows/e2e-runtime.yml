@@ -389,6 +389,7 @@ jobs:
         run: |
           if [[ "$SUITE" == ui ]]; then
             snapshot_dir="$PWD/build/resource-snapshots/$HPCLANG_E2E_TARGET"
+            export HPCLANG_E2E_CAPTURE_NATIVE_HEAP=1
             mkdir -p "$(dirname "$snapshot_dir")"
             mkdir "$snapshot_dir"
             export HPCLANG_X50NG_RESOURCE_SNAPSHOT="$snapshot_dir/$HPCLANG_E2E_TARGET"
@@ -454,6 +455,20 @@ jobs:
           cp "build/$HPCLANG_E2E_TARGET-state/flash" "$snapshot_dir/state/flash"
           python3 tests/e2e/harness/verify-resource-snapshots.py "$snapshot_dir" \
             --model "$HPCLANG_E2E_TARGET" --ui-return --report "$snapshot_dir/verified-lifecycle.json"
+          python3 tests/e2e/harness/verify-native-heap-trace.py \
+            "build/$HPCLANG_E2E_TARGET-native-heap.json" --model "$HPCLANG_E2E_TARGET" \
+            --rom "build/$HPCLANG_E2E_TARGET-state/flash" \
+            --stock-report "build/$HPCLANG_E2E_TARGET-stock.json" \
+            --output "build/$HPCLANG_E2E_TARGET-native-heap-verified.json"
+
+      - name: Verify UI native stack initializers
+        if: always() && matrix.suite.mode == 'ui'
+        run: |
+          python3 tests/e2e/harness/verify-native-stack-init.py \
+            --model "$HPCLANG_E2E_TARGET" \
+            --flash "build/$HPCLANG_E2E_TARGET-state/flash" \
+            --trace "build/$HPCLANG_E2E_TARGET-frame-stack-regions.jsonl" \
+            > "build/$HPCLANG_E2E_TARGET-native-stack-init.json"
 
       - name: Generate suite LCD evidence
         if: always()

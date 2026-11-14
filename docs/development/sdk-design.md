@@ -2081,6 +2081,38 @@ captured. Reports fingerprint the ROM, status and each SRAM image and preserve
 phase/time and both heaps' free totals/largest blocks. Report creation is
 exclusive so a prior result cannot silently be overwritten.
 
+The optional native allocator-return observer complements these snapshots.
+Generate a model/ROM-qualified profile with `native-heap-profile.py`; set
+`HPCLANG_X50NG_NATIVE_HEAP` to a new JSON output path and set the corresponding
+`HPCLANG_X50NG_NATIVE_HEAP_MODEL`, `HPCLANG_X50NG_NATIVE_HEAP_PC` and
+`HPCLANG_X50NG_NATIVE_HEAP_ROOTS` values from that profile. The PC is the
+profile's `return_pc`, before the common return instruction executes. The Stock
+frontend supplies phase boundaries even when SRAM snapshot capture is disabled.
+The output contains bounded phase summaries rather than per-allocation files.
+
+Stock UI CI enables `HPCLANG_E2E_CAPTURE_NATIVE_HEAP=1`. Each Stock runner
+derives the observer's numeric settings from its selected firmware immediately
+before the measured emulator starts. Full NOR fixtures use their existing
+addresses; Kinpo update files are mapped at offset `0x4000`, retaining their
+16-byte header. Unknown allocator fingerprints stop the run. For the two-process
+SD transport, only the application run is observed. The resulting
+`build/<model>-native-heap.json` is checked against the actual loaded flash and
+settled Stock result, and uploaded with the UI evidence. The capture switch is
+optional for local runs and defaults to disabled.
+
+```sh
+python3 tests/e2e/harness/verify-native-heap-trace.py /path/to/hp50g-heap.json \
+  --model hp50g --rom /path/to/matching/flash \
+  --stock-report /path/to/hp50g-stock.json --output /new/path/heap-verified.json
+```
+
+This verifier checks the ROM profile, execution/settled-return result, phase
+intervals, rejected-event counts and paired-heap minima. Allocation failures
+are reported separately from invalid observations. Unsampled phases have no
+measured minimum, rather than zero free capacity. Boot events before the first
+phase, other allocation functions and native exception stacks remain outside
+this measurement; it does not close whole-system transient-memory admission.
+
 The HP50g 20-snapshot run passes. Thirteen observer/verifier host tests pass;
 real-capture negatives reject missing return SRAM, wrong model, reordered phases,
 truncated SRAM and unsettled execution. Evidence is in
@@ -2164,6 +2196,24 @@ stack observations reject and remove any stale stage-budget report. The report
 records trace, pool, layout and payload hashes. This checks observed shared-bank
 launcher assignments only; native/exception stack bounds and system allocation
 peaks still require separate evidence.
+
+`tests/e2e/harness/verify-native-stack-init.py` reconciles each supported ROM's
+five runtime bank initializers with a saved stack-region trace:
+
+```sh
+python tests/e2e/harness/verify-native-stack-init.py --model hp50g \
+  --flash build/hp50g-state/flash \
+  --trace build/hp50g-frame-stack-regions.jsonl
+```
+
+It checks the mode selector, CPSR write, SP literal load and known stack top,
+rejects missing/duplicate/malformed observations, and emits input hashes plus
+all observed regions. Output is JSON on stdout; success proves initializer
+reconciliation only. In particular, top minus observed minimum is not a reserved
+capacity, and adjacent bank tops do not establish ownership of the intervening
+memory. Six saved Stock UI runs pass locally, as do 132 real-input rejection
+variants and four unit tests. Native reservation bounds and whole-system
+transient-memory admission remain open.
 
 Before the launcher removes the mappings, the test requests a memory checkpoint.
 The shared Direct/Stock harness accepts a word-aligned descriptor within the
