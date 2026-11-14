@@ -5643,3 +5643,22 @@ transient memory or native exception-stack reservations.
 Evidence: `/work/nov14-notebook-export-native/independent-audit.json` and
 `verified.json`. This is local native acceptance of the exporter change;
 #43 CI/main integration and broader M8.6 acceptance remain pending.
+
+
+## 2026-11-14 — Installed C++ header/profile acceptance
+
+The relocated SDK check now compiles each of its nine public C++ headers in
+an independent translation unit using the installed ARMv4T toolchain. Eight
+headers pass C++17; display.hpp passes C++20 (its span interface requires it).
+Each translation unit rejects enabled exceptions/RTTI and verifies its actual
+language level, preventing a newer default dialect from hiding requirements.
+The public API guide states these language requirements.
+
+The focused real install/relocation check passes all nine headers. Deliberately
+enabling exceptions and RTTI in a disposable installed toolchain is rejected
+by the new gate. Source hashes remain unchanged during validation and temporary
+SDK/build directories were removed. Ruff and strict docs pass. Report:
+/work/nov14-cpp-public-headers.json. This is header/profile qualification;
+existing owner lifecycle/native and full application SDK gates remain separate.
+The check is integrated into tests/sdk/check.py, but this local follow-up has
+not yet received remote CI. M8.5 remains open.

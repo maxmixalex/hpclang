@@ -18,6 +18,51 @@ def run(*args, env):
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
 
 
+def check_cpp_headers(package, work, env):
+    """Compile each installed public C++ header alone with the shipped profile."""
+    source = work / "public header client"
+    source.mkdir()
+    headers = sorted((package / "include/hpclang").glob("*.hpp"))
+    if not headers:
+        raise AssertionError("installed SDK has no public C++ headers")
+    lines = [
+        "cmake_minimum_required(VERSION 3.20)",
+        "project(public_headers LANGUAGES CXX)",
+    ]
+    for header in headers:
+        target = header.stem.replace("-", "_")
+        standard = 20 if header.name == "display.hpp" else 17
+        (source / (target + ".cpp")).write_text(
+            f"#include <hpclang/{header.name}>\n"
+            "#if defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(__GXX_RTTI)\n"
+            '#error "installed embedded profile must disable exceptions and RTTI"\n'
+            "#endif\n"
+            f"static_assert(__cplusplus == {202002 if standard == 20 else 201703}L);\n",
+            encoding="utf-8",
+        )
+        lines.extend(
+            [
+                f"add_library({target} OBJECT {target}.cpp)",
+                f'target_include_directories({target} PRIVATE "{package.as_posix()}/include")',
+                f"set_target_properties({target} PROPERTIES CXX_STANDARD {standard} "
+                "CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)",
+            ]
+        )
+    (source / "CMakeLists.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    build = work / "public header build"
+    run(
+        "cmake",
+        "-S",
+        str(source),
+        "-B",
+        str(build),
+        f"-DCMAKE_TOOLCHAIN_FILE={package / 'cmake/toolchains/hpclang-armv4t.cmake'}",
+        env=env,
+    )
+    run("cmake", "--build", str(build), "--parallel", "2", env=env)
+    print(f"Installed SDK: {len(headers)} standalone C++ headers/profile PASS")
+
+
 def check_migration_tool(package, work, env):
     source = work / "migration input.cpp"
     original = (
@@ -209,6 +254,7 @@ def main():
         )
         prefix.rename(sdk)
         package = sdk / "share/hpclang"
+        check_cpp_headers(package, work, env)
         check_migration_tool(package, work, env)
         check_interworking(package, work, env)
         application = work / "external application"

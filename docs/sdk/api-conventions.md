@@ -12,6 +12,14 @@ internal runtime structures can be exchanged between separately built SDK
 versions. Rebuild when changing SDK versions. UI names remain provisional until
 UI milestone acceptance; these usage conventions do not freeze those names.
 
+The object, directory, Port, storage, timer and UI helper headers support C++17.
+`hpclang/display.hpp` requires C++20 because its borrowed drawing interfaces use
+`std::span`. Select the language level explicitly with CMake's
+`target_compile_features(your_app PRIVATE cxx_std_17)` or `cxx_std_20` as needed.
+Each public `.hpp` can be included on its own; applications need not supply an
+umbrella header or depend on another helper's incidental includes. The installed
+toolchain disables exceptions and RTTI for both language levels.
+
 ## Read the result before reading errno
 
 Return values are specific to each operation. In particular, a positive result
