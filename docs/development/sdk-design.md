@@ -1692,7 +1692,7 @@ The core must **not** freeze visual policy. Style identifiers are renderer/theme
 
 A canvas/custom-paint escape hatch is part of the boundary: declarative layout owns the node and its bounds, while application/backend code performs specialized drawing only when the node revision changes or its region is damaged. Historical HPGCC `win*` compatibility may later target this engine where useful, but the legacy widget model does not define the canonical UI API.
 
-Public C names, node storage limits, layout units, focus traversal rules, and renderer ABI remain deliberately unfrozen until a focused design/fixture slice begins.
+The C declaration, layout, focus and renderer contracts below are accepted for M8.2/M8.3 after the 2026-11-14 supported-workload audit. Cross-version binary layout remains outside this source/API contract.
 
 ### Declarative application contract
 
@@ -1759,7 +1759,7 @@ The 2026-10-23 technical review uses the installed
 `app.h` model and `main.c` event loop. This is executable ordinary C, built
 from a relocated SDK, rather than a second illustrative API that could drift
 from the implementation. The review preserves the application contract above.
-Public names remain provisional until UI milestone acceptance.
+The reviewed public C names are accepted for M8.2/M8.3 after the 2026-11-14 audit.
 
 | Original requirement | Public sketch | Independent evidence |
 | --- | --- | --- |
@@ -1789,8 +1789,9 @@ alternative; jumping into a scope or using `longjmp` across it is unsupported.
 The caller retains responsibility for commit/abort and error propagation.
 
 This review finds the six application patterns represented in the public C
-surface. It does not freeze names, claim pointer hardware or faithful HP39
-native styling, or close physical-memory/performance acceptance. The simulated
+surface. The subsequent supported-workload resource audit closes M8.2/M8.3
+under the approved scope; it does not claim pointer hardware, faithful HP39
+native styling, physical-device deadlines or universal Stock memory bounds. The simulated
 provider, renderer palette/font choices and keyboard-only interaction are the
 documented target adaptations, not removed application requirements.
 
@@ -2382,8 +2383,9 @@ all observed regions. Output is JSON on stdout; success proves initializer
 reconciliation only. In particular, top minus observed minimum is not a reserved
 capacity, and adjacent bank tops do not establish ownership of the intervening
 memory. Six saved Stock UI runs pass locally, as do 132 real-input rejection
-variants and four unit tests. Native reservation bounds and whole-system
-transient-memory admission remain open.
+variants and four unit tests. Comprehensive native reservation bounds and whole-system worst-case
+transient-memory research are deferred by the 2026-11-14 user decision;
+supported-flow budgets, isolation and failure handling remain required.
 
 Before the launcher removes the mappings, the test requests a memory checkpoint.
 The shared Direct/Stock harness accepts a word-aligned descriptor within the

@@ -1,6 +1,6 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-14. **M8 is incomplete; only M8.1 is accepted complete.**
+Current checkpoint: 2026-11-14. **M8 is incomplete; M8.1, M8.2 and M8.3 are accepted complete.**
 Accepted main: `2a65079f` (#31). The combined compatibility, C++ and SDK delivery
 is submitted as #43 / `00fb45ac`; local integration `58e21c5e` also includes
 accepted main and the UI low-SRAM exclusion. Local validation, submitted CI,
@@ -99,8 +99,8 @@ M7 acceptance does not imply those capabilities are implemented.
 | --- | --- | --- |
 | M8.0 Native Port 0/1/2 | Implemented in part; active mainline | Complete safe reference handling and movement, public library management and Port 1 edits; Port2 trusted recovery installation, authority lifecycle, safe startup and reclamation |
 | M8.1 Installable SDK | **Accepted complete** | Preserve installed external C/C++ builds, relocatability, packaging and reproducibility |
-| M8.2 Declarative C UI core | Design and bounded-workload resource/lifecycle gates accepted; stage open | Supported-flow resource acceptance and main integration; broad Stock memory research deferred |
-| M8.3 Components/renderers | Six-model rendering, low-memory, application budgets and clean return accepted; stage open | Supported-workload memory/update/low-memory acceptance and main integration |
+| M8.2 Declarative C UI core | **Accepted complete** under the approved resource scope | Preserve declarative identity/layout/input/effects and supported-flow resource regressions |
+| M8.3 Components/renderers | **Accepted complete** under the approved resource scope | Preserve six-model rendering, low-memory recovery, budgets and clean return |
 | M8.4 HPGCC source adapters | SD Reset #15, opt-in formatting #17 and async/KOS tone gates #25 accepted; stage open | Complete retained historical application/API coverage, documented migrations and pending branch acceptance |
 | M8.5 Modern C++/migration | Implemented in part; stage open | Complete ownership/error/lifetime contracts, migration tooling/guidance and public downstream examples |
 | M8.6 Applications/release | Stage open | Nontrivial integrated apps, clean SDK use, cross-family resource/return checks, documentation and release acceptance |
@@ -120,8 +120,13 @@ allocation-failure handling, low-memory recovery and correction of observed
 faults. Measurements remain bounded-workload evidence, not universal bounds.
 Avoid expanding marginal cases while ordinary supported flows need work.
 This decision does not defer Port2 recovery/reclamation or change other M8 goals.
-UI stages remain open until the supported-workload evidence and main integration
-are reconciled; this scope decision alone is not milestone completion.
+The subsequent acceptance audit confirms M8.2/M8.3 complete on main 2a65079f:
+29 UI source/header/example/test paths match accepted 236e792b; all six Direct
+and six Stock UI cases pass in Runtime 43130132986. Identity/layout/input/effects,
+renderer/theme/font/canvas behavior, 36 KiB RW admission, allocation pressure,
+reconstruction, stack/heap and update budgets, and settled return are covered.
+This uses existing accepted execution plus source-identity reconciliation; no
+new hardware or universal-memory-bound claim. #43 follow-ups remain pending.
 
 ## Current work: balanced M8 delivery
 
@@ -137,7 +142,7 @@ CI (2026-11-14): #43 / 00fb45ac is mergeable against accepted main 2a65079f. Exa
 | --- | --- | --- |
 | M8.0 / #31 | Internal Port0 registration and Port1 owned-tail edits pass local host/native gates. Accepted and merged as 2a65079f: exact head c662b236 passes all nine workflows, 219 jobs and three skips. This accepts the bounded implementation, not all M8.0 requirements. | Production reference collection, public library management and Port1 edits remain open. Test-owned-tail guards do not authorize existing-object edits; execution collection in call-roots.c also depends on fixture-specific ROM addresses and trace counts, so it cannot be promoted directly. This investigation is bounded here while other stages advance. Earlier HP39gs transfer failure passes exact replay, original cause unresolved. Evidence: /work/nov14-port1-owned-edit-native-v2/independent-audit.json. |
 | M8.0 / Port2 | Both supported ID769 recovery/rejection matrices pass locally; explicit recovery-ID support is accepted in #25. | Trusted installation, authority lifecycle, startup and reclamation remain. Mutable-Flash configuration execution is unqualified; forty data targets retain separate execution obligations. |
-| M8.2/M8.3 / UI | #42 accepted on main; corrected six-model saved-user-SP observation and boot decoder are submitted in combined #43 / 00fb45ac. Local follow-up excludes the native vector/runtime-stack page from the Stock UI pool and allocation block. Eleven tests, old-behavior negative and six-model retained-report replay pass. | Follow-up is submitted in 00fb45ac. New-head CI is running without reported failure; acceptance is incomplete; #44 acceptance is routed through #43. Comprehensive Stock stack capacities and whole-system worst-case memory research are deferred by user decision; supported-flow budgets, isolation and failure handling remain required; replay is not new native execution. Evidence: /work/nov14-ui-native-page-replay.json and /work/nov14-user-stack-remaining/independent-audit.json. |
+| M8.2/M8.3 / UI | #42 accepted on main; corrected six-model saved-user-SP observation and boot decoder are submitted in combined #43 / 00fb45ac. Local follow-up excludes the native vector/runtime-stack page from the Stock UI pool and allocation block. Eleven tests, old-behavior negative and six-model retained-report replay pass. | Core/component milestones are accepted on main under the approved scope. The additional observer/exclusion follow-up is submitted in 00fb45ac and awaits CI; #44 delivery acceptance is routed through #43. Comprehensive Stock stack capacities and whole-system worst-case memory research are deferred by user decision; supported-flow budgets, isolation and failure handling remain required; replay is not new native execution. Evidence: /work/nov14-ui-native-page-replay.json and /work/nov14-user-stack-remaining/independent-audit.json. |
 | M8.4 / compatibility #41 | Adapters and original signatures are included in combined #43 / 00fb45ac. Fresh relocated-SDK checks pass all 76 original/repaired window exports in C/C++ and both original filesystem programs with six-model launcher envelopes; exact migration diffs retained. Accepted HPG/tone/RTC/window commits remain main ancestors. | New-head CI is running without reported failure; acceptance is incomplete. Final stage/main acceptance remains open; packaging does not prove SD availability or native behavior. Physical SD remains an approved nonblocking follow-up. Evidence: /work/nov14-combined-compat-source and /work/nov14-fsystem-native-provenance.json. |
 | M8.5 / ownership #14 | #14 is accepted on its allocation base; main integration #43 / 00fb45ac is in CI. The original three M8.5 requirements have local implementation/evidence. Public C++ wrappers/examples match accepted 35ee317c. Local integration 58e21c5e includes accepted main 2a65079f and the UI exclusion follow-up; executable sources are unchanged from validated 81412db5. 295 Python tests and strict docs pass. | All 180 host tests pass under ASan/UBSan; temporary build removed. Report: /work/nov14-final-integration-host/result.json. Full relocated SDK now passes: reproducible 4,121-file archives, nine headers, fourteen documentation links, migration and assembly checks pass; 613 byte-identical release outputs and all six model-specific Notebook builds now pass; HP39g+/HP39gs/HP40gs C/C++ Aplet packaging also passes. Sealed-input check passes and temporary SDK builds are removed; report: /work/nov14-final-integration-sdk.json. Submitted as #43 / 00fb45ac; new-head CI is running without reported failure; acceptance is incomplete. Full native/resource acceptance remains open. Logs: /work/nov14-final-integration-host/commands.log and /work/nov14-final-integration-sdk.log. Earlier evidence: research/nov14-cpp-delivery-reconciliation.json and /work/nov14-sdk-compat-owners-integration.json. |
 | M8.5 / migration #27 | Directory pruning/incomplete-scan reporting accepted on main via #27. HP013 raw-address guidance and HP014/HP015 borrowed window-string hints are submitted together in #43 / 00fb45ac. | Twenty-one migration tests and actual installed/relocated read-only CLI pass; all 295 Python regressions, Ruff and strict docs pass after integration. New-head CI is running without reported failure; acceptance is incomplete; main acceptance remains open. Evidence: /work/nov14-migration-window-lifetime.json. |

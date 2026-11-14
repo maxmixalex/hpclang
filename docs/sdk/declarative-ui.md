@@ -1,14 +1,15 @@
 # Declarative UI: declaration core
 
-The current M8.2 slice provides bounded declaration storage, node identity,
+The accepted M8.2 core provides bounded declaration storage, node identity,
 row/column layout, button actions, focus traversal, controlled text edits and
 model-aware physical-key routing, revision-driven canvas callbacks and damage
 tracking and bounded asynchronous effects. A surface/font renderer and integrated
 loading/error/retry application passed six-model Direct and Stock acceptance,
 and its C implementation is integrated into main at `a7692b4b`. The C++ helpers
 and compact-storage changes below also pass formal CI and are integrated at `e6f04dbd`.
-The interface below is a working application sketch; its names are not yet a
-frozen UI API.
+The reviewed C interface is accepted for M8.2/M8.3 under the resource scope
+approved on 2026-11-14. This is source/API acceptance, not a cross-version
+binary-layout guarantee.
 
 Node metadata is selected by `kind`: read `capacity`, `cursor` and `anchor`
 for inputs; `paint`, `canvas_state` and `revision` for canvases; and `value`
@@ -554,8 +555,9 @@ adding requested byte counts alone does not bound that extent or guarantee a
 physically contiguous span.
 Host allocation tests check the two-buffer cost at every size/level combination
 above, independently of host descriptor sizes, and retain allocation-failure
-and allocation-free frame checks. Peak whole-application memory and complete
-update-cost acceptance remain open.
+and allocation-free frame checks. The maintained workload
+passes the application-memory and update-cost gates above; comprehensive Stock
+worst-case memory research is deferred.
 
 ## Vertical scrolling
 

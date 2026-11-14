@@ -1,5 +1,28 @@
 # M8 validation history
 
+### 2026-11-14 — M8.2/M8.3 accepted under approved resource scope
+
+The user deferred comprehensive Stock stack-capacity and whole-system worst-case
+memory research, retaining supported-flow budgets, isolation and failure handling.
+The independent reconciliation confirms 29 UI core/header/C-example/test paths
+unchanged between accepted UI head `236e792b` and current main `2a65079f`.
+PR #33 is merged as `ddcdaa38`; its Runtime workflow
+[43130132986](https://github.com/maxmixalex/hpclang/actions/runs/43130132986)
+passes all three Direct family jobs (six models) and all six Stock UI jobs.
+The actual job logs retain geometry/theme/font/canvas, stack/heap and update-cost
+checks for all twelve cases. The maintained verifier requires unchanged pixels
+under allocation pressure and after reconstruction, a 36 KiB RW budget, nine
+frame samples and 34 input samples; the host suite covers identity, rejected
+frames, controlled input, focus, scrolling, effects and cleanup.
+The existing C sketch review maps all six original application patterns to the
+shipped application and tests. Main preserves the accepted implementation.
+M8.2 and M8.3 are therefore complete within this approved scope. This is an
+audit of accepted execution and source identity, not new execution or hardware
+qualification. #43's additional C++ owners and observers remain pending.
+Audit summaries: `research/nov14-ui-main-reconciliation.json`,
+`research/nov14-ui-direct-accepted-checks.json`, and
+`research/nov14-ui-stock-accepted-checks.json`.
+
 ### 2026-11-14 — Combined native-port and SDK integration
 
 Local merge 81412db5 combines #31's c662b236 with the combined M8 delivery and
