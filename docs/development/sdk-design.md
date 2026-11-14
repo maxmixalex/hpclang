@@ -1800,8 +1800,9 @@ The retained M8.6 requirement is an evaluation with an HPC1-connected prototype
 and an explicit migration/acceptance plan. It does not equate an entry probe
 with a replacement launcher. The proposal is to keep the existing launchers as
 the supported default while developing an optional independent path. No
-historical dependency is retired by this proposal, and the original
-cross-family allocation, relocation, service and exit evaluation stays open.
+historical dependency is retired by this proposal. The source and packaging
+evaluation below supports retaining the current default; the separate rollout
+criteria describe what a future replacement would still have to prove.
 
 **Concrete benefit:** a qualified independent package could remove library-275
 installation and launcher-version coupling on classic models. Sharing the
@@ -1810,6 +1811,28 @@ layout. These are expected packaging benefits, not measured savings: embedding
 startup code and reserving storage inside each RPL object can increase package
 size and peak memory. HP39 also needs an Aplet package and native service bridge;
 removing a classic RPL library dependency alone does not replace that path.
+
+A same-input packaging comparison now measures that tradeoff. Both classic
+prototype images have 380 code bytes, 12 static bytes and exactly 16 KiB of
+application RW. The current SDK packages those same HPC1 files, without altering
+them, using the existing launchers. The other-family rows use the same image
+only to measure layout/packaging; they are not execution claims for that image.
+
+| Package/layout | Serialized transfer bytes | Required pool layout |
+| --- | ---: | --- |
+| Existing HP49g+/HP50g wrapper | 15,540 | 12 pages / 49,152 bytes |
+| Independent HP49g+/HP50g prototype | 71,148 | Six backing pages inside the RPL object's reserved copy; separate 4 KiB entry stack already included in that copy |
+| Existing HP48gII wrapper, layout only | 15,540 | 12 pages / 49,152 bytes |
+| Existing HP39 wrappers, before Aplet envelope | 15,588 | 14 pages / 57,344 bytes, including two native workspace pages |
+
+The independent transfer is 55,608 bytes larger for this bounded workload.
+It embeds its entry/loader and reserves copy/arena storage; the standard package
+compresses its embedded image. The table is not a whole-system peak comparison:
+the standard pool ledger excludes native allocation policy/overhead, stored
+objects and transfer staging, and the prototype's internal arena must not be
+added again to its containing RPL object. HP39 rows also exclude Aplet envelopes.
+Rebuilding the standard packages reproduces their bytes; source/input hashes
+remain unchanged. Report: `/work/nov14-launcher-comparison.json`.
 
 The current evidence separates three layers:
 
@@ -1852,7 +1875,39 @@ allocate those pages, establish native object ownership, or recover arbitrary
 launcher failures. The candidate must implement and validate those surrounding
 contracts explicitly.
 
-Before offering the independent path for application use:
+The evaluation conclusions by contract are:
+
+- **Allocation and smallest-model budget:** the prototype proves ownership of
+  its bounded classic-model arena, not a general allocator. Existing HP39 needs
+  the Aplet/native workspace split; HP48 has only 256 KiB SRAM, and the current
+  prototype's 512 KiB physical range check is unsuitable there. The measured
+  wrapper layout already needs 48 KiB of pool on HP48 and 56 KiB on HP39 before
+  the excluded costs. Therefore the current independent storage scheme provides
+  no demonstrated admission advantage for the smallest models.
+- **MMU and portability:** all paths can share the existing bootstrap contract,
+  but owned backing pages must come from the family-specific allocator. HP39
+  additionally needs model-specific NOR font mappings. The prototype qualifies
+  temporary map restoration on HP49g+/HP50g only; it is not a transferable HP39
+  or HP48 entry implementation.
+- **Relocation and native services:** the current launchers supply the hidden
+  return roots, native memory bounds and HP39 portal lifetime described above.
+  A zero native context in the prototype cannot satisfy those contracts. It is
+  suitable for the demonstrated bounded compute workload, not for replacing
+  the existing Notebook/object/file/UI launch path.
+- **Exit recovery:** common bootstrap mapping/IRQ restoration is reusable, while
+  the surrounding stage must still retain its Stock context and backing pages
+  through cleanup and return. Existing stage0/stage1 handle their family-specific
+  return/portal restoration; the prototype proves normal compute return only.
+  Failure and exit/_Exit with active native services remain rollout tests for
+  a future replacement, not behavior established by the compute experiment.
+
+**Migration decision:** retain all current launchers and dependencies as the
+supported default. Keep the independent fixture as a reproducible experimental
+path. This delivers the retained evaluation/prototype/decision locally; it does
+not approve retirement or claim a replacement implementation. M8.6 still needs
+its release/resource acceptance and remote integration gates.
+
+Before offering a future independent replacement for application use:
 
 1. Preserve a maintained HPC1-connected prototype with source/artifact manifests,
    isolated reproducible builds and no-library-275 native execution evidence.
@@ -1871,8 +1926,9 @@ Before offering the independent path for application use:
 Current experiment reports are
 `/work/nov14-independent-entry-swi-live/verified-final.json` and
 `/work/nov14-independent-hpc1-swi-live/verified.json`. The proposal and source
-assessment are documentation deliverables; they do not mark the launcher
-replacement, the full cross-family evaluation or M8.6 complete.
+assessment are evaluation deliverables, supported by the two-model prototype
+and measured packaging comparison. They do not mark a launcher replacement or
+M8.6 complete. HP49g+ evidence: `/work/nov14-hpc1-hp49-live-rpn/independent-audit.json`.
 
 ### Startup resource admission
 

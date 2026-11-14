@@ -4884,3 +4884,30 @@ Inputs remain unchanged. Independent two-model/native/build/mismatch audit:
 /work/nov14-hpc1-hp49-live-rpn/independent-audit.json. Ruff and strict docs pass.
 This is local bounded-prototype qualification; arbitrary applications, native
 services and HP39/HP48 independent launch remain unqualified. M8.6 stays open.
+
+
+## 2026-11-14 — Independent-launcher evaluation decision
+
+Reconciled the original M8.6 wording: it requires a connected HPC1 prototype,
+three-family allocation/MMU/root/service/exit evaluation and an explicit
+migration decision/acceptance plan. It does not require retiring ARMToolbox or
+implementing a full independent replacement before the evaluation can finish.
+The retained prototype now has HP49g+/HP50g native evidence; the source-backed
+family assessment and future replacement gates remain in sdk-design.md.
+
+A fresh same-input comparison measures 15,540-byte existing classic transfer
+packages versus 71,148-byte independent packages. Both use the exact respective
+380-byte HPC1 image and 16 KiB application RW contract. The standard layout
+requires twelve pool pages on classic models; HP39 layout-only packages require
+fourteen, including two native pages, before Aplet envelopes. Repeated builds
+match and source/input hashes remain unchanged. These are serialized/layout
+measurements, not total peak-memory savings or new standard-package execution.
+Report: /work/nov14-launcher-comparison.json; temporary repeated builds removed.
+
+The local evaluation decision is to keep current launchers/dependencies as the
+supported default and retain the independent fixture for experiments. Missing
+native context, HP39 portal ownership and HP48 physical-range support prevent
+claiming a replacement. Future rollout tests are distinguished from evaluation
+deliverables. Release resource acceptance, documentation/integration and M8.6
+remote acceptance remain open; no original requirement is removed. Strict docs
+pass.
