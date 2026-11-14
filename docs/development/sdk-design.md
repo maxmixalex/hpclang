@@ -2183,9 +2183,12 @@ modes remain separate; their address distance is not stack consumption. A
 region boundary crossing produces separate records and must not be discarded
 when checking a known stack reservation. The original application-only trace
 can run alongside it. Both outputs refuse to overwrite existing evidence.
-This diagnostic uses host memory only and is disabled by default. It does not
-observe implicit bank switches or SP updates outside the translated register
-store path, and it does not itself certify a stack bound or memory admission.
+This diagnostic uses host memory only and is disabled by default. It also records ARM `LDM ...^` writes to the saved user SP, attributed to
+mode 16 and the actual load instruction address. This covers the ROM task-restore
+path that bypasses the ordinary translated register-store helper. Such saved-bank
+assignments are not active supervisor-stack use. Implicit bank switches and other
+SP updates outside these two paths remain separate, and these observations do not
+by themselves certify a stack bound or memory admission.
 
 For SRAM region 128, new records also include `low_sram`: independent counts,
 extrema and instruction addresses for SP values in `[0x08000000, 0x08001000)`,

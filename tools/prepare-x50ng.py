@@ -1447,7 +1447,8 @@ def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
     replace_once(
         arm / "helpers.h",
         '#include "def-helper.h"',
-        '#include "def-helper.h"\nDEF_HELPER_3(hpclang_stack_pointer, void, ptr, i32, i32)',
+        '#include "def-helper.h"\nDEF_HELPER_3(hpclang_stack_pointer, void, ptr, i32, i32)\n'
+        "DEF_HELPER_2(hpclang_user_stack, void, i32, i32)",
         "stack pointer helper declaration",
     )
     replace_once(
@@ -1458,7 +1459,9 @@ def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
         '#include "stack-bank-observer.h"\n'
         "void HELPER(hpclang_stack_pointer)(void *opaque, uint32_t sp, uint32_t pc)\n"
         "{ CPUState *env = opaque; uint32_t mode = env->uncached_cpsr & 31u;\n"
-        "  stack_pointer_observe(sp, pc, mode); stack_region_observe(sp, pc, mode); }\n",
+        "  stack_pointer_observe(sp, pc, mode); stack_region_observe(sp, pc, mode); }\n"
+        "void HELPER(hpclang_user_stack)(uint32_t sp, uint32_t pc)\n"
+        "{ stack_region_observe(sp, pc, 16u); }\n",
         "stack pointer helper implementation",
     )
     replace_once(
@@ -1485,6 +1488,20 @@ def patch_stack_pointer_observer(root: Path, args: argparse.Namespace) -> None:
         "        }\n"
         "    }\n    dead_tmp(var);",
         "translated application SP writes",
+    )
+    replace_once(
+        arm / "translate.c",
+        "                                gen_helper_set_user_reg(tmp2, tmp);\n",
+        "                                gen_helper_set_user_reg(tmp2, tmp);\n"
+        "                                if (i == 13) {\n"
+        '                                    const char *regions = getenv("HPCLANG_X50NG_STACK_REGIONS");\n'
+        "                                    if (regions && *regions) {\n"
+        "                                        TCGv pc = tcg_const_i32(s->pc - 4);\n"
+        "                                        gen_helper_hpclang_user_stack(tmp, pc);\n"
+        "                                        tcg_temp_free_i32(pc);\n"
+        "                                    }\n"
+        "                                }\n",
+        "ARM LDM user-bank SP assignments",
     )
 
 

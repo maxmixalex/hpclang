@@ -4859,3 +4859,24 @@ on unobserved paths/allocators. Native stack reservations and whole-system
 transient-memory admission remain open. Combined report:
 `/work/nov14-native-stack-window-remaining/independent-audit.json`.
 Formatting-only follow-up 4d2dd3fd is submitted in #44; CI remains pending.
+
+
+## 2026-11-14 — Saved user-stack observation
+
+The ordinary translated-register SP observer missed ARM LDM user-bank loads.
+The HP50g ROM task restore at 0x3f3e0 uses this instruction. The preparation
+patch now emits an optional host-only observation after loading register 13,
+with the instruction PC and user-bank mode 16, without changing guest state.
+Other registers and disabled/empty tracing emit no observer. Four emitted-code
+checks and eighteen existing observer tests pass, as do a fresh emulator build,
+Ruff and strict docs.
+
+Fresh HP50g Stock UI execution passes pixels, resources and settled return.
+Independent source/artifact/firmware, native heap and initializer checks pass.
+The user-bank SRAM maximum now includes 134344700 at PC 0x3f3e0, eight bytes above
+the old recorded maximum; this is concrete previously missed saved-bank evidence,
+not increased active-stack consumption. Application stack remains 2432/8192.
+Report: /work/nov14-user-stack-live/hp50-independent-audit.json.
+HP39gs is still running on the same sealed inputs; the two-model gate is pending.
+This closes one observer coverage gap, not native reservation bounds or
+whole-system transient-memory admission. The change remains local.
