@@ -53,8 +53,12 @@ Backup checks whether the name exists before choosing creation or replacement.
 An existing foreign record is rejected. A port with creation but no replacement
 can accept a new backup but cannot overwrite an existing one. There is no
 delete-and-recreate fallback. These controls follow the public Port capability
-mask; they do not add missing native write support (currently Port 1 replacement
-and Port 2 writes remain unavailable).
+mask; they do not add missing native write support. Port 1 replacement remains
+unavailable. HP49g+/HP50g Stock Port 2 supports backup creation and transactional
+replacement when reported by the capability query. These operations consume
+erased tail space; logically deleted records do not reclaim space, and a full
+port returns `ENOSPC`. This does not provide automatic power-on recovery or
+compaction. The example preserves the editable note when an operation fails.
 
 Host tests cover operation selection and rejected writes for all three port
 indices using simulated service capabilities. The separate `notebook-backup`
