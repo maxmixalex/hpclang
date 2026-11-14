@@ -63,8 +63,8 @@ For scale, the 2026-11-04 maintained Notebook entry packages contain a
 1,489-byte HP39gs `LIB275L.000`, a 2,404-byte HP48gII `L275_48`, and a
 7,673-byte HP49g+ `SETUP.BIN`. These are measured transfer artifacts, including
 their respective envelopes/installers, not comparable library bodies or
-resident-memory measurements. An independent implementation has no measured
-size yet; these numbers do not establish a net size or RAM saving.
+resident-memory measurements. The bounded prototype below is not an equivalent
+Notebook package; these numbers do not establish a net size or RAM saving.
 
 Replacing the outer entry is insufficient. `hpclang_armtoolbox_stage1` currently
 consumes a preallocated page pool and coarse L2 table. Its return path also
@@ -81,8 +81,20 @@ library 275, measuring transferred files, resident and peak installation RAM,
 startup cost and settled return against the current packages. HP39 additionally
 needs save/relaunch and copied-Aplet isolation checks. A prototype must preserve
 the HPC1/application service contracts before replacing the current path.
-No such independent prototype is accepted here, no replacement is selected,
-and the retained option is not retired by this evaluation.
+The repository now includes a bounded HP49g+/HP50g prototype in
+`tests/e2e/independent-hpc1`. It enters ARM from Stock RPL without library 275,
+loads an embedded Thumb HPC1 image through the common bootstrap and returns to
+Stock. The fixture documents model-specific native snapshot checks, including
+unchanged Flash, restored MMU/control state and stack guards. Its isolated
+build check runs in Core CI; build reproducibility alone does not establish
+native execution. This delivery is awaiting combined PR #43 acceptance.
+
+The prototype supplies no native-service context and is not a general
+application loader. HP39 Aplet integration, HP48gII entry and cross-family
+ownership/coexistence remain evaluation work. The migration decision is to
+retain the existing production launchers while evaluating the same Notebook
+application and cleanup contracts described above. No production replacement
+or retirement of the historical dependency is authorized by this prototype.
 
 ## Common bootstrap
 
