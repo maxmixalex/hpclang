@@ -513,7 +513,7 @@ def verify_stage_stack(prefix: Path, model: str, artifact: Path) -> dict:
     }
     seen = set()
     for row in rows:
-        assert isinstance(row, dict) and set(row) == fields
+        assert isinstance(row, dict) and set(row) in (fields, fields | {"low_sram"})
         assert all(type(row[key]) is int for key in fields)
         assert row["version"] == 1 and 0 < row["writes"] <= 0xFFFFFFFFFFFFFFFF
         assert row["mode"] in (16, 17, 18, 19, 23, 27, 31)
@@ -525,6 +525,23 @@ def verify_stage_stack(prefix: Path, model: str, artifact: Path) -> dict:
         assert row["minimum"] % 4 == row["maximum"] % 4 == 0
         assert 0 <= row["minimum_pc"] <= 0xFFFFFFFF and row["minimum_pc"] % 2 == 0
         assert 0 <= row["maximum_pc"] <= 0xFFFFFFFF and row["maximum_pc"] % 2 == 0
+        # The observer optionally adds a low-SRAM subset to native-region
+        # rows. Validate that metadata without treating it as launcher capacity.
+        if "low_sram" in row:
+            assert row["region"] == 128
+            low = row["low_sram"]
+            if low is not None:
+                low_fields = fields - {"version", "mode", "region"}
+                assert isinstance(low, dict) and set(low) == low_fields
+                assert all(type(low[key]) is int for key in low_fields)
+                assert 0 < low["writes"] <= row["writes"]
+                assert 0x08000000 <= low["minimum"] <= low["maximum"] < 0x08001000
+                assert row["minimum"] <= low["minimum"] <= low["maximum"] <= row["maximum"]
+                assert low["minimum"] % 4 == low["maximum"] % 4 == 0
+                assert all(
+                    0 <= low[key] <= 0xFFFFFFFF and low[key] % 2 == 0
+                    for key in ("minimum_pc", "maximum_pc")
+                )
     stage = [row for row in rows if row["region"] == 19 and row["mode"] in (16, 31)]
     # The adjacent application-code and post-pool regions contain no shared-bank
     # stack. Do not silently discard a trace that crossed this reservation.

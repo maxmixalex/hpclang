@@ -1,5 +1,20 @@
 # M8 validation history
 
+### 2026-11-14 — UI stack-observer schema integration repair
+
+At `886a3fde`, Runtime job 132410119377 reaches HP49g+ application PASS and
+Stock return, then fails the UI launcher-stack verifier's exact-field check.
+The region observer now emits optional `low_sram` metadata for native SRAM;
+the launcher verifier still accepts only the original fields. The repair
+validates the optional subset and rejects unknown/malformed fields while
+retaining the launcher stack geometry and 4 KiB limit. No runtime changes.
+Eleven UI-memory tests pass, including null/populated subsets and invalid
+metadata. Replaying the actual failed CI artifact passes pixels, application
+SP, launcher SP (3240/4096 bytes), pool and allocation checks; the old verifier
+rejects the same artifact. This is report replay, not new native execution or
+whole-system memory qualification. Ruff and formatting pass. Local report:
+`/work/nov14-ui-ci-schema-replay.json`; new-head CI acceptance remains pending.
+
 ### 2026-11-14 — Independent HPC1 isolated-build dependency repair
 
 Core CI job 132401987116 in run 43579804552 fails at head `00fb45ac`:
