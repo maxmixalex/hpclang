@@ -5858,6 +5858,15 @@ links, migration and assembly checks, 613 byte-identical release outputs,
 all six Notebook model builds and all three HP39 C/C++ Aplet families. All
 4,149 sealed inputs remain unchanged; temporary installations/builds are removed.
 Report: /work/nov14-sdk-compat-owners-integration.json. This is local full-SDK
-integration, not remote CI, main or milestone acceptance. A fresh two-model
-Notebook export/relaunch run checks the combined filesystem runtime separately
-in /work/nov14-compat-notebook-native; its result remains pending.
+integration, not remote CI, main or milestone acceptance.
+
+Fresh HP49g+/HP50g Stock Notebook export/relaunch passes all four launches with
+the combined filesystem runtime. Independent verification rechecks exact raw
+SD-card UTF-8/maximum-length outputs and retained files, viewport pixels,
+settled returns, all 4,445 sealed inputs and application artifacts. Both models
+retain stack peaks 6656/8192 on export and 3944/8192 on relaunch, with heap
+12412/245504. This does not prove whole-system transient-memory or native
+exception-stack bounds. Report:
+/work/nov14-compat-notebook-native/independent-audit.json. Four historical
+filesystem signature regressions also pass on the combined tree. No remote
+submission or broader milestone acceptance is claimed by these local results.
