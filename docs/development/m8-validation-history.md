@@ -5627,3 +5627,19 @@ Long HP39 transfer waits resolved within the same runs without retries. The
 current formatted emulator supersedes the previous single-model experiment's
 binary; the earlier experiment remains historical evidence. No claim closes
 other allocation paths, native exception-stack bounds or whole-system peaks.
+
+
+## 2026-11-14 — Optimized Notebook export native regression
+
+Current ad9ffada passes a fresh HP49g+/HP50g Stock export/relaunch matrix
+(four launches). Independent checks verify exact UTF-8 and maximum-length
+raw-card contents, retained fixture data, pixels, lifecycle phases, settled
+return, and sealed source/artifact identities. Both models retain measured
+stack peaks of 6656/8192 bytes on export and 3944/8192 on relaunch; reserved heap
+is 12412/245504 bytes. The smaller isolated export frame does not reduce this
+whole-application observed peak. This result does not prove whole-system
+transient memory or native exception-stack reservations.
+
+Evidence: `/work/nov14-notebook-export-native/independent-audit.json` and
+`verified.json`. This is local native acceptance of the exporter change;
+#43 CI/main integration and broader M8.6 acceptance remain pending.
