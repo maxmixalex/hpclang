@@ -5870,3 +5870,18 @@ exception-stack bounds. Report:
 /work/nov14-compat-notebook-native/independent-audit.json. Four historical
 filesystem signature regressions also pass on the combined tree. No remote
 submission or broader milestone acceptance is claimed by these local results.
+
+### 2026-11-14 — Original-source interfaces on the combined SDK
+
+Submitted #43 source 45d6d525 passes a fresh relocated installation check against
+all four caller-supplied HPGCC archives. All 76 original/repaired window names
+compile and link in C and C++ ARM applications. Original HPGCC 2.0 example2 and
+example3 compile and produce all six launcher envelopes; source hashes and exact
+migration diffs are retained. Packaging on a model does not establish SD service
+availability there. This is source/link/package evidence, not another native run.
+
+The installed inputs and archive hashes remain unchanged. Temporary SDK and
+build directories are removed. Concise reports and migration diffs are in
+/work/nov14-combined-compat-source. The accepted HPG, tone, RTC and window commits
+listed in the acceptance map were independently rechecked as main ancestors.
+The M8.4 integration/final acceptance gate remains open while #43 awaits CI.
