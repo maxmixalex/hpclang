@@ -5800,3 +5800,27 @@ also pass. Source hashes remain unchanged and temporary SDK/build directories
 are removed. Report: `/work/nov14-sdk-owners-integration.json`; parent-function
 and source-tree checks: `research/nov14-sdk-integration-preservation.json`.
 This is a prepared local integration, not remote CI or main acceptance.
+
+
+### 2026-11-14 — Filesystem native evidence provenance review
+
+The current #41 source matches all 4,344 recorded host-check inputs, 4,142
+installed/relocated SDK inputs and four signature-audit inputs. Replaying the
+older native audit against current files initially rejects `object-store.h`.
+A complete comparison identifies exactly two changed sealed paths: that header
+adds only an API documentation comment, and `cmake/install-sdk.cmake` adds the
+migration checker and API guide to the install list. Original Git blobs, with
+checkout newline normalization accounted for, match the hashes sealed by the
+native run. All other sealed source inputs remain identical.
+
+The provenance audit verifies unchanged C tokens in the header and exactly the
+two install-list additions. All eight saved native result hashes, pass/return
+states and both classic-model raw-card persistence oracles pass again. This
+reconciles the earlier native execution with current code; it is not a new
+native run or a claim that every source byte remained unchanged. The separate
+current-source SDK gate covers the expanded installed package.
+
+Reports: `/work/nov14-fsystem-acceptance-source-audit.json` and
+`/work/nov14-fsystem-native-provenance.json`. Current #41 CI still has eight
+queued workflows, ten queued jobs and one running job, with no reported failure;
+CI and final stage acceptance remain pending.

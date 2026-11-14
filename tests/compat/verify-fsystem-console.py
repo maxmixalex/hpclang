@@ -120,7 +120,13 @@ def verify(directory, model, rom=None, *, mode="stock", font=None):
         * 3
         + ["rename=No error"]
     )
-    expected = [first, listing, listing[1:] + ["Exit"], writes, writes + ["Exit"]]
+    expected = [
+        first,
+        listing,
+        listing[2:] + ["Shutdown OK", "Exit"],
+        writes,
+        writes[1:] + ["Shutdown OK", "Exit"],
+    ]
     if mode == "direct":
         # The Direct harness seeds a directory-backed card with three entries;
         # its 32-cell capacity line wraps before the explicit newline.
@@ -155,7 +161,14 @@ def verify(directory, model, rom=None, *, mode="stock", font=None):
             * 3
             + ["rename=No error"]
         )
-        expected = [first, listing, totals, totals[1:] + ["Exit"], writes, writes[1:] + ["Exit"]]
+        expected = [
+            first,
+            listing,
+            totals,
+            totals[2:] + ["Shutdown OK", "Exit"],
+            writes,
+            writes[2:] + ["Shutdown OK", "Exit"],
+        ]
     report.update(model=model, mode=mode, passed=False, frames=[])
     for index, lines in enumerate(expected, 2300):
         path = directory / f"{model}-frame-{index}.pgm"

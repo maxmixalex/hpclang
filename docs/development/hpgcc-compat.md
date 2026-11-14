@@ -1,6 +1,28 @@
 # HPGCC compatibility inventory
 
-This page records the M7 source-compatibility inventory. Historical names are inputs to the compatibility layer, not automatically names for the hpclang core API. For current implementation status, see [API reference and HPGCC parity](api-reference.md).
+This page records the M7/M8 source-compatibility inventory. Historical names are inputs to the compatibility layer, not automatically names for the hpclang core API. For current implementation status, see [API reference and HPGCC parity](api-reference.md).
+
+## Current M8.4 acceptance map
+
+The five original [M8.4 requirements](roadmap-history.md#m84-historical-source-compatibility)
+remain the acceptance scope. The component narratives below preserve earlier
+checkpoints; their old “pending” statements do not override later accepted
+deliveries. This map distinguishes those deliveries from the current filesystem
+integration, which is still awaiting CI.
+
+| Original requirement | Current implementation/evidence | Remaining gate |
+| --- | --- | --- |
+| Common 59-function HPG surface; maintained keyboard, console/text, system, filesystem and object groups; four-generation ledger | The capability and declaration tables on this page retain source/implementation/evidence links. HPG is accepted at `1e46aa3d`; keyboard, console, numeric, system and object groups retain their individual acceptance records. Filesystem lifecycle, handle, mode and case adapters are implemented in #41, including pinned 2.0/3 inventories and C11/C++17 checks of all 39/41 covered source signatures. | #41's current main integration is not CI accepted. Source signature checks do not establish binary ABI or runtime semantics; those retain separate application/native gates. |
+| Compile representative original applications with every source edit recorded | Pinned original 1.1 window and 2.0 filesystem programs have extraction, migration-diff/reversal and relocated-SDK gates; HPGCC3 graphics programs have a separate maintained source gate. The retained roadmap records the representative-source compilation criterion complete. | Preserve these regressions and model limits; do not relabel M7 behavioral ports as original-source tests. |
+| Owned asynchronous `kos_beep`/`kos_CheckBeepEnd`, flags, preemption, busy completion and exit restoration | Accepted in #25 (`752b8999`, main merge `3c484673`); the tone record retains normal/exit/_Exit and Stock interrupt-isolation evidence. | No new tone implementation gap is established by the filesystem work. |
+| RTC tick period, pending/coalescing, query/restore and exit ownership | Accepted at `413e5891`, including six-model Direct/Stock timing and restoration checks. | Retain the documented ownership and model/context contracts. |
+| Useful `win*` adapters where semantics fit; explicit raw KOS/Saturn/MMU migration and unsupported-context errors | Window controls and their native source/geometry/return gates were merged through #11/#12 (`69c2b831`/`67b8e26d`). The persistent event/widget bridge coexists with declarative C UI; raw access is mapped to clean services in the migration guide rather than silent stubs. | The distinct HPGCC3 C++ GUI is not made source-compatible by `win*`; preserve the capability/migration boundaries in the API reference. |
+
+The accepted HPG, tone, RTC and window commits above are ancestors of main
+`2c2477f5`. This is a requirements/evidence reconciliation, not a new native
+execution or blanket historical ABI claim. M8.4 remains open while #41 and the
+final acceptance review are pending. The physical SD-card exercise remains the
+previously approved nonblocking follow-up; it is not a newly introduced gate.
 
 ## Sources and method
 
@@ -18,30 +40,32 @@ ATFE=/path/to/atfe python3 tests/compat/check-fsystem-examples.py \
   --sdk /path/to/installed-sdk --work /new/filesystem-evidence
 ```
 
-There are four explicit migration rules:
+There are three explicit migration rules:
 
 - Replace the historical umbrella with `hpconio.h`, `hpkeyb49.h` and `string.h`.
 - Use `_clear_screen` for the historical console clear operation.
-- Remove the explicit `FSShutdown` call and its success/error message. The
-  hpclang runtime owns final filesystem shutdown at application exit; this
-  migration does not provide an equivalent earlier checked shutdown operation.
 - In example3, replace the out-of-bounds 17-byte read from `"Appended string"`
   with the literal's actual non-NUL length, used for both write and comparison.
 
+The original explicit `FSShutdown` calls and success/error messages are retained.
 All remaining application statements stay unchanged, including the four-volume
 loop, interactive waits and original error handling. The rename operation needs
-an existing `My own text document.txt` in the test directory; a future native
-gate must supply that fixture or explicitly test its absence. These programs
+an existing `My own text document.txt` in the test directory; the native
+gate supplies that fixture. These programs
 are not robust error-recovery examples and must run on disposable test media.
 
-Both compile/link and package all six targets against the relocated SDK in
-`/work/oct26-fsystem-original`; compiler commands contain no repository source
-or include paths. Two ARM analyses, exact reversal of the listed migration edits,
-and changed-source rejection for each member pass. This is build evidence only.
+The retained-shutdown versions compile/link and package all six targets against
+a relocated SDK; compiler commands contain no repository or old-prefix paths.
+Exact reversal of the three migration edits reproduces both pinned originals.
+HP49g+/HP50g Direct and Stock runs pass both original shutdown calls, directory
+pagination, writes/rename/deletion, console pixels and settled return. Independent
+raw-card checks pass, and a corrupted shutdown-output frame is rejected.
+This is local validation under `/work/nov06-sum/original-shutdown-fixed`, not
+remote CI acceptance. Earlier ARM analysis and changed-source rejection evidence
+is retained separately from this updated native run.
 SD runtime support remains HP49g+/HP50g; six-model packaging does not imply
-filesystem availability elsewhere. Original-source file-content, input/output,
-media and Stock-return validation remain open; the earlier clean-service
-behavioral ports do not close these checks.
+filesystem availability elsewhere. These emulator results do not establish
+physical-card or broader historical-application coverage.
 
 Add `--native` to build a combined `native-artifact` with the two original
 entry points renamed and an external observer. This fixture deliberately uses
@@ -314,8 +338,9 @@ the maintained builds byte-for-byte. Eight planning tests, both ARM analysis
 configurations, verifier dispatch and missing-frame rejection pass. Both Stock
 processes 51945/76541 exit 0 with all six models passing for each group.
 Integrated SDK validation also passes (517 byte-identical outputs), including
-the C widget client using `win.h` and `wincore.h`. These are local results;
-CI acceptance remains open.
+the C widget client using `win.h` and `wincore.h`. These local results were
+subsequently accepted through #11/#12 and merged into main as `69c2b831` and
+`67b8e26d`. The merged window delivery does not complete the other M8 stages.
 
 The earlier component snapshots below retain their original validation stage.
 
@@ -394,7 +419,7 @@ ports to public hpclang APIs, not claims that unchanged HPGCC binaries run.
 | Physical keyboard and bounded console input | HPGCC 1.0.3 `examples/libtests/keyboard.c`; 1.1/2.0 `hpkeyb49.h` implementations | Physical snapshots/events, separate native text mode, editor and owned console; all six models D/S | Historical modal/blocking spellings remain M8 | Text/input acceptance `c7451364` and `41d75dec`; `system-services/console.c` additionally ports the eight-column matrix/ON display and Alpha exit, with real GPIO transitions. Direct and Stock six-model checks and formal CI pass on `7303a3d6` |
 | Civil time, elapsed time, deadlines and sound | 1.1/2.0 `hpsys.h` implementations; HPGCC3 RTC/timer sources; benchmark and game examples | Stable civil snapshots, explicit conversion/set, monotonic time, polling timers and owned PWM; all six models D/S | Ordinary callback dispatch belongs to the application loop; selected delay, stopwatch, RTC, tone and BCD names now have adapters, with raw timer setup still open | M7.4 System Services covers forward/backward clock adjustment without deadline drift, cancellation and shared-register restoration. The HPGCC 1.1/2.0 sieve client passes six-model Direct/Stock locally; its additional formal CI is accepted on `2988e1de` |
 | Files, directories, metadata and partition selection | HPGCC2 `fsystem/examples/example2.c`/`example3.c`; HPGCC3 `fsinit.c` implements four primary volumes | libc streams, owned directory snapshots, masked FAT metadata and explicit volume paths; HP49g+/HP50g D/S, other models `ENOSYS` | Bounded `fsystem.h` adapter, local cwd and historical MBR-slot aliases | `historical-files.c` ports the create/append/modify/move/read/enumerate/delete flow on all four FAT volumes. HP49g+/HP50g D/S and formal CI pass on `7303a3d6`. The original example's excessive literal write length is corrected |
-| Media removal and card identity | HPGCC3 `FSVolumePresent` compares CID after reinitialization; GPIO/SD driver sources | Removal latch, remount and stale-object rejection accepted on `cada0f2e`; `hpclang_stream_media_identity_query` now exposes stable CID (accepted on `7303a3d6`) | `FSVolumeInserted` currently reports presence/volume errors, not the full historical `FS_CHANGED` distinction | Raw A→B→A image replacement covers old dirty streams and directory handles. CID comparison now distinguishes another card from a returning card in HP49g+/HP50g Direct/Stock raw-image tests; formal CI is accepted on `7303a3d6`. Physical SD test is a maintainer-approved nonblocking follow-up |
+| Media removal and card identity | HPGCC3 `FSVolumePresent` compares CID after reinitialization; GPIO/SD driver sources | Removal latch, remount and stale-object rejection accepted on `cada0f2e`; `hpclang_stream_media_identity_query` now exposes stable CID (accepted on `7303a3d6`) | Local lifecycle adapter distinguishes persistent `FS_CHANGED`; see SD media discovery below for the contract and pending native/CI gates | Raw A→B→A image replacement covers old dirty streams and directory handles. CID comparison now distinguishes another card from a returning card in HP49g+/HP50g Direct/Stock raw-image tests; formal CI is accepted on `7303a3d6`. Physical SD test is a maintainer-approved nonblocking follow-up |
 | Calculator arguments, composite values and stack results | 1.0.3 `examples/libtests/stack.c`, 1.1 `examples/stack/rplstk.c`, 2.0 `examples/stack.c`, HPGCC3 `sat3.h` list example | Owned typed objects, explicit numeric precision and transactional stack operations; classic Stock with capability checks | Bounded `saturn.h`/`satdir.h` adapters; raw pointers and remaining names are not public clean APIs | Accepted on `6a7f9a28`: `object-composite/historical.c` ports all four generations' representative flows; nested directories, numerical composites and reorder have additional focused tests |
 | Persistent HP39 Aplet and native catalogs | HP39-enabled 1.1 Aplet template, checked against native ROM behavior | Aplet data/Reset and Program/Note catalogs; HP39 Stock with portal validation | Aplet packaging/template integration; no invented HOME namespace | Accepted on `6a7f9a28`: 15-invocation Reset and eight-invocation composite lifecycles, independent instances, SAVE and GC boundaries |
 | Native Port 0/1/2 storage | Historical backup/library object semantics, distinct from FAT and HOME directories | M8.0 in progress: classic Port 0 owned reads and backup mutation; HP49g+/HP50g Port 1/2 owned reads | No historical adapter claims | Port 0 three-launch backup persistence passes locally on all classic models; Port 1 native backup readback passes locally on HP49g+/HP50g. Port 1 backup creation and native RPL recall also pass locally on both models. Port 2 owned enumeration and backup/library reads also pass both models across three launches. Port 2 backup CRUD uses native Flash records, with journaled replacement. Complete library mutation, Port 1 replacement/removal, Flash reclamation and automatic startup recovery remain required |
@@ -462,6 +487,18 @@ The historical releases are more source-stable than their runtime implementation
 | `kos.h` | 2.0 → HPGCC3 | 33 / 33 |
 
 HPGCC3 adds two public filesystem handle helpers beyond HPGCC 2.0: `FSGetFileFromHandle` and `FSGetHandle`.
+
+The local adapter now implements both helpers for its owned files and directories.
+Numbers start at 3 independently in each volume; reverse lookup uses the current
+volume. Closing a handle, restarting or shutting down releases its number, which
+may be reused. Directory-entry snapshots do not have numbers. These values are
+not POSIX descriptors and do not transfer ownership. Lookup does not refresh
+media state or revive a handle invalidated by removal. Invalid lookup leaves the
+output pointer unchanged. The adapter uses its existing resource limits rather
+than imposing HPGCC3's ten-slot table limit. Production FatFs sanitizer tests and
+nine original-function comparisons pass locally. Six Direct and two Stock SD
+emulator runs pass, with independent source/report hashes and raw-card persistence
+checks. Remote acceptance of this addition remains pending.
 
 Compatibility consequence:
 
@@ -847,6 +884,78 @@ every volume. MBR overlap and out-of-card partition extents are rejected;
 extended partitions, GPT and exFAT are outside this FAT primary-partition API.
 
 Raw KOS filesystem calls, raw filesystem handles, global `chdir/getcwd` state, FSystem sleep/wakeup/controller ownership, and timestamp setters remain Migration/Internal rather than canonical compatibility APIs.
+
+`FSSetCaseMode` now applies the historical policy to adapter path lookup and
+creation. `FSCASE_SENS` compares raw names exactly; `FSCASE_INSENS` compares
+raw names without case sensitivity. `FSCASE_SENSHP` (the initialization default)
+and `FSCASE_SENSHPTRUE` compare case sensitively while ignoring trailing
+semicolons, and add semicolons to encode otherwise conflicting FAT names.
+The former hides those suffixes in returned names; the latter reports them.
+Long names and FAT short aliases participate in lookup. Invalid mode values
+are ignored. The clean storage API keeps its independent FatFs behavior.
+
+Production FatFs host tests cover all four modes, case collisions, directory
+names, restart defaults and deletion through a hidden physical suffix; ASan,
+UBSan and host Clang analysis pass. Six Direct model runs and HP49g+/HP50g
+Stock runs pass, including all four modes on both mounted partitions and
+normal settled return. An independent audit verifies unchanged inputs, saved
+reports and raw-card persistence witnesses. The native test exposed a doubled
+separator at qualified volume roots; a reproducing host regression and the
+corrected native matrix now pass. These are local emulator results, not CI
+or physical-hardware acceptance. Controller sleep/wakeup (`FSSleep` and
+`FSWakeUp`) remains internal.
+
+### Reproduce the filesystem interface inventory
+
+The maintained inventory checks pinned original HPGCC 2.0 and HPGCC3 headers
+against both the installed adapter header and implementation. It accounts for
+39 of 41 and 41 of 43 original declarations respectively; `FSSleep/FSWakeUp`
+remain explicitly internal. Supply your original archive, without extracting it:
+
+```sh
+python3 tests/compat/check-fsystem-interface.py --release 2.0 --archive /path/to/hpgcc-2.0-SP2-Linux.tar.bz2
+python3 tests/compat/check-fsystem-interface.py --release 3 --archive /path/to/hpgcc3_R004.revA.tar.gz
+```
+
+The JSON lists each covered name and the reviewed header hash. Missing public
+declarations or implementations fail the check. Add `--cc cc --cxx c++` to
+compile every covered original declaration alongside the current adapter header
+in C11 and C++17. Both compilers are required: C++ also detects argument changes
+hidden by historical C declarations with empty parameter lists. These checks
+pass for all 39/41 covered declarations. Regression tests reject changed return
+types, pointer qualifiers and formerly parameterless functions. The existing
+CMake `python_tools` test discovers these checks in CI; a local run of that
+complete Python suite passes all 276 tests without skips. The original archives
+remain caller-supplied inputs to the separate full declaration audit.
+
+Without compiler arguments this remains a lexical inventory. Even with them,
+the check does not establish historical structure layouts, binary ABI, runtime
+semantics or hardware equivalence; original application and native behavior
+tests remain required.
+No historical source is bundled or added as a normal SDK dependency.
+
+### Changing an open file's mode
+
+`FSChMode(file, newmode)` changes the existing file handle without reopening,
+truncating or seeking. APPEND and MODIFY imply WRITE in the exposed `Mode`
+field. Switching to WRITE does not truncate immediately; the next write retains
+the historical truncate-after-write behavior. MODIFY writes stop at the existing
+end, while APPEND writes use the end even after a seek. APPEND with NOGROW rejects
+a nonempty write. Switching to READ flushes pending writes first; a failed flush
+leaves the mode unchanged. Read-only file attributes reject write modes, and
+removed-card handles remain invalid. Unknown mode bits return `FS_ERROR`.
+
+The implementation is independent of the old controller and operates on the
+same owned FatFs object. Its internal access transition is restricted at compile
+time to the pinned writable FatFs configuration with sharing locks disabled.
+Eight mode/flush observations match unchanged HPGCC3 `fschmode.c`, whose behavior
+also matches the HPGCC 2.0 SP2 Thumb library inspection. Production FatFs tests
+cover content, offset, extent, protection, flush failure and stale handles under
+ASan/UBSan. The Storage regression passes all six Direct targets and HP49g+/HP50g
+Stock SD execution and settled return. Independent source/report-hash and raw-card
+checks pass under `/work/nov13-fsystem-mode/native/independent-audit.json`.
+Other families retain unsupported SD behavior; their Direct pass is not an SD
+availability claim. ARM analysis and strict docs pass; CI acceptance is pending.
 
 ## HP39 calculator objects
 
@@ -1870,6 +1979,35 @@ Direct families and all six Stock models.
 
 ### SD media discovery and replacement
 
+The current local adapter adds `FSInit`, `FSRestart` and `FSShutdown` and retains
+the original card CID and mounted MBR slots. `FSVolumeInserted` returns
+`FS_NOCARD` on absence and persistent `FS_CHANGED` on replacement, including an
+unformatted replacement after initial FAT acquisition. `FSInit` is idempotent;
+it does not silently adopt a different card. `FSVolumeMounted` describes the
+initialized volume set, not live insertion. Call `FSRestart` to adopt the new
+card and reset the adapter's working directories. Initial acquisition still
+requires a supported FAT card.
+
+Restart/shutdown close and free all adapter-owned files and directories, even
+when the removed card makes close report an error. `FSClose` likewise consumes
+an owned handle on close failure; do not retry it using the old pointer.
+Caller-owned directory-entry metadata still needs `FSReleaseEntry`. These
+operations leave independently owned clean storage clients and the shared
+controller lease alone; the runtime restores the controller at application
+exit. A returning CID never makes stale handles valid again.
+
+Host ASan/UBSan checks execute the production adapter, namespace and FatFs core
+through removal, blank-card replacement, return, stale-handle rejection and
+restart with clean-client coexistence. A seven-observation trace matches the
+unchanged HPGCC3 volume-insertion/presence functions. Installed/relocated ARM
+builds include both original filesystem examples with `FSShutdown` retained.
+The maintained Storage payload passes all six Direct models and HP49g+/HP50g
+Stock SD launch/return, including A→B→A card changes and independent raw-card
+content checks. This uses the same SD transport selected by Storage CI; the
+USB harness does not prepare the media-swap fixtures. ARM static analysis of
+both changed runtime units and the Storage entry passes. CI acceptance for
+this addition remains pending; these results do not complete M8.4.
+
 Historical HPGCC 2.0 `sources/fsystem/fsystem.h` and HPGCC3
 `libs_workspace/headers/fsystem.h` distinguish `FS_NOCARD` from `FS_CHANGED`
 and describe reinitialization after a card change. Those declarations do not
@@ -1882,7 +2020,7 @@ presence and active-low GPD3 write protection. x50ng models the same pins.
 | --- | --- | --- | --- |
 | Query an absent card, insert it, retry before controller acquisition | HP49g+/HP50g: fresh GPIO sampling; no pin reconfiguration or repeated Stock `CHECKINSERT`. HP39/40 and HP48: `ENOSYS` | `FSVolumeInserted` uses the clean media query | Host register-transition and ownership tests; formal regression accepted on `256e8496` |
 | Observe write protection before acquisition | HP49g+/HP50g: GPD3 sampled per attempt; absent media does not require a protection read | Existing open/attribute/volume adapters inherit the mounted policy | Host polarity/change/error tests; formal regression accepted on `256e8496` |
-| Remove/replace a mounted card and recover stale handles | HP49g+/HP50g: observed absence or transfer failure invalidates the mount; new path operations remount and stale objects fail without flushing old data | Existing stream adapters inherit recovery; broad historical reinitialization adapters remain unimplemented | Host replacement/stale-handle/driver tests and six-model Direct plus HP49/50 Stock Storage pass; formal CI accepted on `56e4a9dd`. The EINT3 extension is accepted on `cada0f2e`: 68 host tests, HP49g+/HP50g Direct/Stock raw-image swap tests and all six CI workflows pass. A manual hardware-check package is provided, with physical execution nonblocking |
+| Remove/replace a mounted card and recover stale handles | HP49g+/HP50g: observed absence or transfer failure invalidates the mount; new path operations remount and stale objects fail without flushing old data | Stream adapters inherit recovery; #41 implements `FSInit`/`FSRestart`/`FSShutdown` and persistent `FS_CHANGED`, with current integration CI pending | Host replacement/stale-handle/driver tests and six-model Direct plus HP49/50 Stock Storage pass; formal CI accepted on `56e4a9dd`. The EINT3 extension is accepted on `cada0f2e`: 68 host tests, HP49g+/HP50g Direct/Stock raw-image swap tests and all six CI workflows pass. A manual hardware-check package is provided, with physical execution nonblocking |
 
 Pre-acquisition sampling and the owned removal latch are separate stages of
 the same media lifecycle. Emulator tests establish stale-handle rejection and

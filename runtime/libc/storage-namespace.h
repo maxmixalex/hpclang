@@ -15,8 +15,22 @@ extern "C"
 
     int hpclang_namespace_direct_active(void);
     int hpclang_namespace_stock_active(void);
+    /* Inspect a replacement card while the namespace already owns the SD
+     * controller. Unlike volume discovery, this does not require a FAT layout.
+     * A detected removal invalidates every old FatFs object before card init.
+     * Never acquires a new controller lease; EBUSY means no direct lease. */
+    int hpclang_namespace_owned_card_identity(uint8_t cid[16]);
     int hpclang_namespace_open(const char *path, int flags);
     int hpclang_namespace_close(int fd);
+    /* Adapter lookup needs the FAT short alias as well as the displayed name.
+     * short_name points to at least 13 bytes; NULL omits it. */
+    int hpclang_namespace_directory_read(struct hpclang_stream_directory *directory,
+                                         struct hpclang_stream_directory_entry *entry,
+                                         char *short_name);
+    /* HPGCC adapter-only access-mode transition. Caller checks the file's
+     * read-only attribute. Preserve identity/position and flush before dropping
+     * write access. Requires the pinned FatFs configuration with no share locks. */
+    int hpclang_namespace_change_mode(int fd, int writable, int append);
     ssize_t hpclang_namespace_read(int fd, void *buffer, size_t count);
     ssize_t hpclang_namespace_write(int fd, const void *buffer, size_t count);
     off_t hpclang_namespace_lseek(int fd, off_t offset, int whence);

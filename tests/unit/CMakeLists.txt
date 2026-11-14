@@ -845,6 +845,7 @@ target_link_libraries(test_fatfs_config PRIVATE hpclang_fatfs_vendor)
 
 hpclang_unit(storage_metadata test_storage_metadata.c
     test_storage_cpp.cpp
+    test_hpgcc_fsystem_bridge.c
     "${HPCLANG_ROOT}/runtime/libc/storage-volumes.c"
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace.c"
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")

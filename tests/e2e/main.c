@@ -252,6 +252,11 @@ static uint32_t storage_replacement_test(void)
     secondary = NULL;
     if (closed)
         goto done;
+    FS_FILE *compat_file = NULL, *compat_directory = NULL;
+    if (FSInit() != FS_OK || FSVolumeInserted(0) != FS_OK ||
+        FSOpen("STALE.BIN", FSMODE_READ, &compat_file) != FS_OK ||
+        FSOpenDir("/", &compat_directory) != FS_OK)
+        goto done;
     secondary = fopen("1:/STALE.BIN", "r+b");
     if (!secondary || setvbuf(secondary, secondary_dirty, _IOFBF, sizeof secondary_dirty) ||
         fwrite("WRONG", 1, 5, secondary) != 5)
@@ -283,6 +288,14 @@ static uint32_t storage_replacement_test(void)
     (void)hpclang_stream_directory_close(directory);
     directory = NULL;
     result = 0xc5u;
+    if (FSVolumeInserted(0) != FS_CHANGED || FSVolumeInserted(0) != FS_CHANGED)
+        goto done;
+    char stale_byte = '?';
+    if (FSRead(&stale_byte, 1, compat_file) != 0 || stale_byte != '?' || FSRestart() != FS_OK ||
+        FSVolumeInserted(0) != FS_OK)
+        goto done;
+    /* Restart consumed both old adapter objects, while clean namespace clients
+     * continue to use the replacement card below. */
     if (hpclang_stream_media_identity_query(&observed) ||
         memcmp(original.cid, observed.cid, sizeof original.cid) == 0)
         goto done;
@@ -305,6 +318,8 @@ static uint32_t storage_replacement_test(void)
     if (media_swap(3))
         goto done;
     result = 0xc8u;
+    if (FSVolumeInserted(0) != FS_CHANGED || FSRestart() != FS_OK || FSVolumeInserted(0) != FS_OK)
+        goto done;
     if (hpclang_stream_media_identity_query(&observed) ||
         memcmp(original.cid, observed.cid, sizeof original.cid) != 0)
         goto done;
@@ -325,6 +340,7 @@ static uint32_t storage_replacement_test(void)
         goto done;
     result = 0;
 done:
+    (void)FSShutdown();
     if (secondary)
         fclose(secondary);
     if (file)
@@ -908,6 +924,34 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (FSRead(buffer, 6, legacy_file) != 3 || memcmp(buffer, "leX", 3u) != 0 ||
         !FSEof(legacy_file) || FSClose(legacy_file) != FS_OK)
         return 0x85u;
+
+    if (FSCreate("HPCLANG.MOD", 0, &legacy_file) != FS_OK)
+        return 0x141u;
+    int legacy_handle = FSGetHandle(legacy_file);
+    FS_FILE *legacy_lookup = NULL;
+    if (legacy_handle < 3 || FSGetFileFromHandle(legacy_handle, &legacy_lookup) != FS_OK ||
+        legacy_lookup != legacy_file || FSGetFileFromHandle(2, &legacy_lookup) != FS_INVHANDLE ||
+        legacy_lookup != legacy_file)
+        return 0x142u;
+    if (FSWrite("abcdef", 6, legacy_file) != 6 || FSChMode(legacy_file, FSMODE_READ) != FS_OK ||
+        FSTell(legacy_file) != 6 || FSWrite("!", 1, legacy_file) != 0 ||
+        FSSeek(legacy_file, 2, SEEK_SET) != FS_OK ||
+        FSChMode(legacy_file, FSMODE_MODIFY) != FS_OK ||
+        legacy_file->Mode != (FSMODE_WRITE | FSMODE_MODIFY) ||
+        FSWrite("WXYZ!", 5, legacy_file) != 4 || FSFileLength(legacy_file) != 6 ||
+        FSChMode(legacy_file, FSMODE_APPEND | FSMODE_NOGROW) != FS_OK ||
+        FSSeek(legacy_file, 0, SEEK_SET) != FS_OK || FSWrite("!", 1, legacy_file) != 0 ||
+        FSChMode(legacy_file, FSMODE_APPEND) != FS_OK || FSWrite("!", 1, legacy_file) != 1 ||
+        FSTell(legacy_file) != 7 || FSChMode(legacy_file, FSMODE_WRITE) != FS_OK ||
+        FSFileLength(legacy_file) != 7 || FSSeek(legacy_file, 2, SEEK_SET) != FS_OK ||
+        FSWrite("Q", 1, legacy_file) != 1 || FSChMode(legacy_file, FSMODE_READ) != FS_OK ||
+        FSSeek(legacy_file, 0, SEEK_SET) != FS_OK || FSRead(buffer, 8, legacy_file) != 3 ||
+        memcmp(buffer, "abQ", 3) != 0 || FSClose(legacy_file) != FS_OK ||
+        FSDelete("HPCLANG.MOD") != FS_OK)
+        return 0x140u;
+    legacy_lookup = NULL;
+    if (FSGetFileFromHandle(legacy_handle, &legacy_lookup) != FS_INVHANDLE || legacy_lookup != NULL)
+        return 0x143u;
 
     if (FSMkdir("CMPDIR") != FS_OK || FSChdir("CMPDIR") != FS_OK)
         return 0x86u;
