@@ -2035,6 +2035,81 @@ passed. The original failure log remains `/work/oct30-migration-sdk-full.log`.
 Preceding remote audit: #26 `6a582958` has 125 successful, fourteen running and
 239 queued jobs, no failures; #27 `b59fb56d` has ten queued workflows and sixteen
 materialized queued jobs. Neither branch is CI-accepted. M8 remains incomplete.
+
+## 2026-10-30 — Installed public API conventions
+
+The M8.5 guide `docs/sdk/api-conventions.md` documents service-specific results,
+errno handling, versioned output initialization, failure-safe output replacement,
+C++ owner/view/lexical-guard distinctions, close errors and exit behavior. Public
+object-store iterator declarations now state 1/0/-1 results and output/name rules,
+matching the existing implementation. The guide is linked from Getting started,
+migration and navigation and installed with the SDK. It does not freeze pending
+UI names or imply cross-version object/layout compatibility. The obsolete note
+claiming opt-in formatting still awaited remote acceptance was removed.
+
+Strict docs pass. Actual CMake installation and prefix relocation preserve the
+new guide byte-for-byte; installed navigation links resolve, and its complete
+C11 example compiles for ARMv4T with Wall/Wextra/Werror. Temporary installation
+and build directories are removed. Evidence: `/work/oct30-api-contracts-installed.json`.
+This documentation/header-comment change adds no runtime behavior; the prior
+517-output full SDK result remains separately scoped to `b59fb56d`.
+
+CI audit: #26 `6a582958` has 228 successful/twenty running/129 queued/one skipped
+and one failed job (the previously investigated HP39g+ runtime transfer).
+#27 and #29 each have ten queued workflows/sixteen materialized queued jobs;
+#28 has eight queued workflows/twelve materialized queued jobs. No new failure
+was found and no branch was accepted.
+
+M8.5 delivery: guide follow-up `5d5195dc` pushed to existing PR #27 after the
+preceding exact-head audit; new-head CI was not polled in this submission turn.
+
+## 2026-10-30 — Explicit legacy-format migration hint
+
+Local M8.5 follow-up adds HP007 for set_decimal_digits/set_decimal_separator.
+It explains the user's explicit opt-in choice and the named-formatter alternative,
+without claiming to prove preprocessor state or format-string compatibility.
+Six checker tests pass, including comments/literals, identifier boundaries,
+physical positions after line splicing and locally defined opt-in. A fresh CMake
+SDK install, relocated to a path containing spaces, passes the updated standalone
+checker gate (HP006/HP002/HP007, exit 1, unchanged source). The temporary install
+was removed. Full tracked-file formatting/Ruff/ShellCheck and strict docs pass.
+This follow-up is local, not submitted or accepted; the earlier 517-output full
+SDK reproduction has not been rerun for it.
+
+PR #27 exact-head audit 5d5195dc: seven successful/three queued workflows;
+286 successful, 70 queued, eleven running and one cancelled job. Job 124020549105
+(HP39gs Stock Object Basics) was cancelled in execution before verification and
+artifact upload. Its log endpoint returns 404 BlobNotFound. No cause is inferred
+and the incomplete gate is not waived. Audit: research/oct27-reserve-pr27-ci.json.
+
+## 2026-10-30 — Migration hint delivery and CI setup retry
+
+Submitted HP007 as 583f38e6 to existing PR #27 after auditing all preceding
+5d5195dc workflows/jobs: seven successful/three queued workflows, 295 successful,
+fourteen running, 58 queued and one cancelled job. New-head CI was not polled.
+The local checker/installation/quality evidence above applies to this delivery;
+full 517-output SDK reproduction remains tied to the preceding implementation.
+
+PR #29 head fce14d73 had 374 successful/two skipped/one failed/one running jobs.
+Job 124001018937 failed solely in runner setup: checkout, download-artifact and
+upload-artifact v7 could not be resolved. All three refs resolve now via the
+GitHub API. Retried that job; run 41031458583 attempt 2 is queued. No project test
+executed in the failed job, no passing result is inferred, and no gate is waived.
+
+## 2026-10-30 — Correct stale SDK compatibility status
+
+GitHub confirms PR #17 merged as 88aae022 and PR #25 as 3c484673.
+The migration branch's hpgcc-format.c/hpgcc-format.h and hpgcc-sound.c/kos.h
+match their corresponding accepted implementations. Getting started and
+migration still claimed their acceptance was pending. Removed those obsolete
+statements, retaining API behavior and documenting Hz/milliseconds and the
+unambiguous sound-status query. Pending UI/resource requirements are unchanged.
+Strict documentation passes; this documentation correction remains local.
+
+## 2026-10-30 — Current status consolidation
+
+Historical submitted roadmap from migration head 583f38e6; superseded status, not current acceptance. All requirements are retained.
+
 ## 2026-10-30 — UI native heap return regression
 
 The optional `--ui-return` lifecycle-verifier mode is enabled for Stock UI CI.
@@ -2467,6 +2542,9 @@ M7 acceptance does not imply those capabilities are implemented.
 | --- | --- | --- |
 | M8.0 Native Port 0/1/2 | Implemented in part; active mainline | Complete safe reference handling and movement, public library management and Port 1 edits; Port2 trusted recovery installation, authority lifecycle, safe startup and reclamation |
 | M8.1 Installable SDK | **Accepted complete** | Preserve installed external C/C++ builds, relocatability, packaging and reproducibility |
+| M8.2 Declarative C UI core | Implemented substantially; stage open | Complete whole-application resource/lifecycle acceptance and pending CI; original design reviewed, six host UI regressions pass locally |
+| M8.3 Components/renderers | Implemented substantially; stage open | Complete reusable components, renderer/theme independence and six-model interaction/resource acceptance |
+
 | M8.2 Declarative C UI core | Declaration, layout, input and effects implemented; design reviewed; stage open | Smallest-target memory/update-cost and whole-application resource/lifecycle acceptance; pending follow-up CI |
 | M8.3 Components/renderers | Reusable controls and renderer/theme independence implemented; stage open | Complete six-model low-memory, resource-budget and clean-return acceptance; pending follow-up CI |
 | M8.4 HPGCC source adapters | SD Reset #15, opt-in formatting #17 and async/KOS tone gates #25 accepted; stage open | Complete retained historical application/API coverage, documented migrations and pending branch acceptance |
@@ -2478,12 +2556,34 @@ UI must retain the user's declarative C design: nested ordinary C declarations,
 stable keyed identity, controlled inputs, explicit asynchronous state and
 revision-driven canvas. A superficially similar imperative API is not completion.
 
+## Current work: M8.0 mainline and independent M8.5 tooling
+
 ## Current work: M8.0 mainline and independent UI/C++ acceptance
 
 The mainline remains safe movement and execution-reference coverage for native
 library management and Port1 edits, followed by Port2 trusted recovery
 installation, authority lifecycle, safe startup and reclamation. Sound
 compatibility is independent.
+
+M8.5 migration checker `b59fb56d` is submitted in draft PR #27; ten workflows
+and sixteen currently materialized jobs are queued. Local full relocated-SDK
+validation now passes external C/C++ builds, all six model-specific Notebook
+builds, three HP39 Aplet variants and 517 byte-identical release outputs.
+Five focused tests and full formatting/static/documentation checks also pass.
+A local installed API-contract guide now documents results, versioned outputs,
+owners/views and exit behavior; relocated links and its ARMv4T C11 example pass.
+This is not CI acceptance or completion of M8.5; remaining ownership/application
+migration acceptance is still required.
+
+M8.2/M8.3 UI return-capacity gate `8849b85f` is submitted in draft PR #28;
+eight workflows and twelve materialized jobs are queued. It checks native free capacity and largest-block
+recovery after settled return. Fifteen tests, all 79 retained snapshots across
+six models, the actual CI commands and strict docs pass locally. This is not a
+new emulator run or complete physical-memory admission; whole-application
+resource acceptance remains open.
+
+CI follow-up `fce14d73` is submitted in draft PR #29; ten workflows and sixteen
+materialized jobs are queued. The failing #26 server lacks the previously tested retransmission pause. The exact downloaded CI binary fails the NAK-turnaround regression;
 
 M8.5 Port C++ `3b06b8c0` is submitted in PR #14 on allocation parent
 `97d5ba74` (PR #13). Both await new-head CI acceptance: #13 has twelve queued workflows and
@@ -2550,6 +2650,15 @@ replaced passes application execution, 52 keyboard frames and settled Stock
 return. No failing remote gate is waived; the initial packet-loss cause remains
 unproven.
 
+M8.0 local follow-up `9e220d9b` captures library-configuration read dependencies;
+sanitisers, ARM analysis and both-model maintained regressions pass. It is not
+part of submitted head `6a582958` and does not qualify startup execution.
+
+PR #26 now includes the accepted resource-snapshot mainline, unified bank
+planning, bounded live Stock readers, continuation mapping checks and startup
+configuration regressions. Head `6a582958` is submitted for CI and is not yet
+accepted; its local Stock and maintained regression evidence is recorded below.
+
 M8.0 head `21e0822e` is submitted in PR #26, including bounded mapped
 reads and C banked data-target resolution. CI has eight queued/three pending
 workflows and eighteen queued jobs. The exact
@@ -2606,6 +2715,9 @@ Guarded ID769 tests retain 23,900 user elements. Earlier complete two-model
 matrices used ID1701. Fourteen configured Stock libraries precede supported
 ID769 among 59 lower-ID catalog entries in both saved fixtures. Their mapped
 configuration objects are now resolved; IDs 226, 227 and 229 lie in mutable user
+Flash, outside immutable-ROM identity coverage. Their execution dependencies
+still require qualification. Maintained tests cover this baseline and the Stock
+
 Flash, outside immutable-ROM identity coverage. Their configuration bodies invoke `0x7709`. All six ordinary-Stock executions
 add the expected HOME record and preserve catalog/Flash/child/sentinel/stack;
 current C traversal recognizes the resulting references. Startup execution,
@@ -2641,6 +2753,8 @@ passes. CI acceptance and complete graph/execution policy remain open.
 
 | PR / head | State |
 | --- | --- |
+| #26 / `6a582958` | **CI failure, not accepted:** HP39g+ Stock runtime failed before payload entry while fetching packet 57. Audit: 228 successful, twenty running, 129 queued, one skipped and one failed job; seven successful/three queued/one running workflows. Earlier `bdeb3227` passed eleven workflows (379 successful jobs, two conditional skips). Historical HP39g+ pre-entry Kermit failure remains unexplained. |
+
 | #26 / `21e0822e` | Submitted; eight workflows queued/three pending and eighteen jobs queued. Bounded data-target resolution passes both-model Stock matrices and local quality gates. Remote acceptance remains open. |
 | #26 previous head / `6a582958` | **Five failed jobs retained:** HP39g+ runtime/console pre-entry transfer, plus three HP49g+/HP50g relocation jobs across push/PR runs. Final pre-push audit: 370 successful, one skipped, five failed, three running and one queued job; nine successful, one running and one queued workflow. The workspace fix passes all 28 local call/return cases. HP39g+ packet-loss origin remains unproven; no failing gate is waived. |
 | #25 / `752b8999` | **Accepted and merged as `3c484673`.** All eight workflows pass: 355 successful jobs and one intentionally skipped PR publisher. Push evidence publication succeeded. |
@@ -2687,6 +2801,16 @@ inside M8. The chosen HPGCC numeric-format behavior is explicit opt-in through
 `HPCLANG_HPGCC_LEGACY_FORMAT=1`; standard C behavior remains the default.
 Any actual scope reduction requires the user's agreement. No repeated approval
 is needed for an already authorized implementation or a proven status update.
+
+## 2026-10-30 — SDK migration documentation delivery
+
+PR #27 `f960876e` removes obsolete pending-acceptance claims for formatting and
+KOS sound, whose implementation files match accepted commits 88aae022 and
+3c484673. Strict documentation passes after preserving the branch roadmap
+snapshot and resolving its history anchor. This is documentation delivery, not
+new runtime validation. Prior exact head 583f38e6 has two successful/five queued
+workflows and ten successful/78 queued jobs, none failed or cancelled. New-head
+CI was not polled in the submission turn; M8.5 remains incomplete.
 
 ## 2026-10-30 — UI allocation failure matrix
 
@@ -2800,6 +2924,58 @@ entry. The PR also retains publisher queue: max from bfddd250. Prior exact head
 had four queued workflows/eight queued jobs, none failed/cancelled. New-head CI
 was not polled after push. Mainline integration and PR #27 core coverage remain
 open; no existing test, threshold, permissions or publishing policy was removed.
+
+## 2026-10-31 — Migration Quality timeout and targeted retry
+
+PR #27 exact head f960876ec9a57d2de8ef75dce30aa62f57438500 was audited
+with all job pages. Before retry: 25 successful, three running, 148 queued
+and one cancelled job. Quality job 124171152266 (run 41087137996) is
+terminal cancelled. Its annotation reports the 20-minute execution limit;
+recorded lint, format, analysis and cleanup steps report success. This does
+not establish a successful workflow or explain the timing discrepancy.
+No newer Quality run exists on the branch. A targeted job rerun was accepted
+(HTTP 201); acceptance remains pending. PR #30 exact-head audit reports
+16 successful, eight running and 157 queued jobs, with no failed/cancelled
+jobs. Full audit records: research/oct30-independent-ci-27.json and -30.json.
+No push or merge was performed.
+
+## 2026-10-31 — C++ migration digit separators
+
+Local migration commit 6d312ad5 fixes a reproduced false negative: two numeric
+constants such as `1'000` and `2'000` caused intervening calls to be hidden as
+a character literal. Preprocessing-number recognition now preserves those
+diagnostics. All seven checker tests pass in the independent container venv,
+including numeric bases, fractions/exponents, suffixes, literals, comments and
+diagnostic positions. Ruff lint/format pass with cache disabled for the read-only
+mount; git whitespace checks pass. Installed-SDK/runtime matrices were not rerun.
+The fix is not pushed. Quality retry 124251710102 was confirmed queued.
+
+## 2026-10-31 — Installed migration regression delivery
+
+Commit a785c7e4 extends the maintained installed-SDK checker gate with C++
+digit separators. Fresh CMake installation, relocation to a path containing
+spaces, expected diagnostic categories, check-mode exit status and unchanged
+external source all pass. Temporary installation was removed. Ruff and strict
+documentation pass. This targeted gate does not rerun the complete ARM matrix.
+Before submission, exact remote f960876e audit reports one successful/five
+queued workflows; jobs: 29 successful, three running and 145 queued. No current
+failed/cancelled jobs; earlier Quality timeout remains recorded above.
+
+## 2026-11-04 — CI configuration acceptance and migration integration
+
+PR #30 head 97d9eb46 passes four workflows, 181 jobs and two intentionally
+skipped PR evidence publishers. Reviewed three-line diff and mergeable head;
+merged as dfb3ee874f3861a56da2117833f3f225ee8053ea. Live queue behavior is not
+claimed from skipped publishers. Migration branch integrates this exact change
+as 22802c34. Prior migration head 3d126411 passes two workflows/all 19 jobs.
+PR #14 has seven successful workflows/337 successful jobs/one skip; parent #13
+currently returns zero runs, so parent acceptance cannot be re-established.
+PR #28 has 195 successful jobs and one cancelled publisher; annotation confirms
+queue replacement, no executed steps. Targeted rerun requested for 124311891341.
+Reports: research/nov04-independent-ci-{14,27,28,30}.json. Batch audit terminated
+on missing #13 runs; no complete new audit is claimed for #26 or #19.
+Docker Desktop and existing development container restored; venv executable
+is present. No new environment or duplicate validation process was created.
 
 ## 2026-10-31 — UI stage follow-up delivery validation
 
@@ -4283,6 +4459,26 @@ seven UI memory tests, plus strict documentation and whitespace checks.
 The merged runtime workflow retains UI capture and adds the accepted publisher
 queue setting. No new emulator matrix is claimed; merged-version CI is required.
 
+
+### 2026-11-04 — Migration delivery integration
+
+Submitted `00eb48fd` merges accepted main `dfb3ee87` into PR #27. Both sides of the validation history conflict are retained; the roadmap uses current status and preserves M0–M7. Prior uncommitted roadmap retained at `research/nov04-migration-premerge-roadmap.md`. Migration checker, unit tests, SDK check and install rules are byte-unchanged from the preceding head; runtime/platform/workflows and transport files match accepted main. The only public-header difference is the existing iterator contract comment. Seven migration tests, Ruff without cache (host mount is read-only), strict docs and diff checks pass. Exact preceding b89d520d CI has two successful workflows and one running, 162 successful jobs and two running, no failures; evidence is `research/nov04-migration-final-ci-27.json`. New-head CI is not polled this submission turn, and the branch is not accepted.
+
+
+### 2026-11-05 — Migration integration with accepted UI main
+
+Local merge of cdd6bd86 into 00eb48fd has no code conflicts; both roadmap
+and history conflicts are resolved, retaining distinct parent records. Existing
+local documents were saved byte-for-byte with SHA256 manifest under
+research/nov05-migration-premerge before the merge, and the historical local
+appendix was restored. Initial merge refusal was an index/line-ending refresh
+issue after restoring HEAD text, resolved without losing the saved documents.
+
+Seven migration-checker tests and Ruff pass on the Windows host; checker, tests,
+and installation rules remain unchanged from the prior branch head. Diff checks
+pass. Strict documentation build and fresh CI are pending Docker recovery and
+submission; this merge remains uncommitted/unpushed. The old publisher retry
+cancellation is not accepted as CI success. M8.5 remains incomplete.
 ### 2026-11-05 — Allocation/UI integration candidate
 
 PR13 head 5bc78efd passes 9 workflows, 199 jobs and one intentional skip after
@@ -4314,6 +4510,15 @@ running, 370 successful jobs, one intentional skip and two running jobs. The
 toolchain-download retry job 126957988835 completed successfully; the branch
 still awaits all gates. Full audit: `research/nov05-current-native-ci-26.json`.
 
+## 2026-11-05 — Migration integration ready for fresh CI
+
+Docker access recovered without restarting the original Notebook matrix.
+The integrated migration candidate passes all seven migration tests and Ruff
+in the development container; strict host docs already pass. Checker source,
+regressions, SDK installation checks and installation rules are unchanged
+from 00eb48fd. The merge brings accepted UI main cdd6bd86 into the delivery;
+only documentation required conflict resolution. New-head CI remains required;
+M8.5 acceptance is not claimed.
 ## 2026-11-05 — Native delivery integration with accepted UI main
 
 Prior exact head a0a31cb4 passes all ten workflows: 372 successful jobs and
@@ -4528,3 +4733,79 @@ Four fresh setup-runtime tests and strict docs pass. Existing six-model Direct
 and Stock evidence is retained; no redundant application rebuild is claimed.
 Identity audit: research/nov06-allocation-main-identity.json. The integration
 requires new exact-head CI; this is not broader M8.2/M8.3/M8.5 completion.
+
+
+### Native heap observation core — local, 2026-11-13
+
+M8.2/M8.3 whole-system transient admission remains open. Existing lifecycle
+snapshots cannot establish intermediate peaks. The new host-only observation
+core validates both native free lists, including flags, reciprocal links,
+footers, bounds and cross-heap overlap. It accumulates the lowest combined free
+capacity from a single observed event, retaining both heaps from that event;
+it does not add independent minima that never coexisted. Rejected observations
+are counted and cannot overwrite the last valid state or minimum.
+
+The ROM profile extractor qualifies the existing allocator fingerprints and
+their common return instruction at entry + 0x88 for all six model fixtures.
+The planned live hook must execute before that return, after list updates,
+and delimit the lifecycle being measured. These profiles alone do not prove
+that live allocator events have been captured or that every native memory
+owner is accounted for.
+
+The C core passes ASan/UBSan tests covering an intermediate capacity reduction
+hidden by equal initial/final capacity, independent-heap minima, corrupt and
+overlapping lists, read failure and exhausted heaps. Nine existing snapshot
+verifier tests pass. Its decoding matches the independent Python verifier on
+79 retained snapshots across all six models; six modified allocator return
+instructions are rejected. No emulator rerun or new full SRAM copy was needed.
+Report: /work/nov06-sum/native-heap-replay/report.json; temporary replay binaries
+were removed. The live emulator hook, phase coverage and actual transient
+resource acceptance remain required before this can close an admission gate.
+
+
+### 2026-11-13 — Native heap live observation, local integration
+
+The qualified allocator-return hook now links into x50ng and receives Stock
+lifecycle phase marks independently of full SRAM snapshots. An actual HP50g
+Stock UI run passes execution, settled return and independent input/report/profile
+checks. Its 20 phases contain seven accepted observations, zero rejected and
+three failed allocation returns. The ARMToolbox launch interval reaches 1,672
+combined usable bytes; the minimum retains both heaps from the same event.
+Report: `/work/nov06-sum/native-heap-live-qualified/independent-audit.json`.
+
+Five sanitizer-backed trace tests pass (disabled observation, phase minima,
+rejected samples, invalid phase ordering and invalid profile settings). Fresh
+QEMU compilation exposed a missing exported-function prototype, now fixed;
+the rebuilt emulator and actual run pass. This is local validation only, with
+remaining models pending. Empty phases are unsampled, not zero free capacity.
+One allocation function does not establish whole-system transient admission
+or native exception-stack reservations. Rotate to other M8 deliveries before
+the next bounded UI coverage batch.
+
+
+### 2026-11-13 — Six-model live native heap observations
+
+The formatted observer/Stock frontend emulator completes all six original-Stock
+UI executions and settled returns in one uninterrupted matrix (session 45058,
+exit 0). Independent input, artifact, ROM profile, status and trace checks pass;
+four altered-trace/status negatives per model are rejected. The maintained
+verifier has five tests, alongside five sanitizer-backed trace tests. Reports:
+`/work/nov06-sum/native-heap-matrix/independent-audit.json` (`complete=true`).
+
+| Model | Accepted allocator returns | Failed allocation returns | Minimum sampled usable bytes |
+| --- | ---: | ---: | ---: |
+| HP39g+ | 44 | 37 | 1928 |
+| HP39gs | 44 | 37 | 1256 |
+| HP40gs | 44 | 37 | 1256 |
+| HP48gII | 52 | 37 | 1256 |
+| HP49g+ | 7 | 3 | 1672 |
+| HP50g | 16 | 3 | 1672 |
+
+All observations have zero rejected samples. Allocation failures are null
+allocator returns, not failed application runs. Counts may vary with Stock
+activity; no count is a universal bound. The reused UI-owner application is
+sealed by artifact hashes, not claimed as a fresh build from this branch.
+Long HP39 transfer waits resolved within the same runs without retries. The
+current formatted emulator supersedes the previous single-model experiment's
+binary; the earlier experiment remains historical evidence. No claim closes
+other allocation paths, native exception-stack bounds or whole-system peaks.

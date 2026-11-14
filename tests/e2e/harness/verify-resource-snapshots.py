@@ -19,7 +19,8 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def allocator_root(rom, model):
+def allocator_profile(rom, model):
+    require(type(model) is int and model in MODELS.values(), "invalid allocator model")
     signature = struct.pack("<3I", 0xE2810003, 0xE3C05003, 0xE2854014)
     require(rom.count(signature) == 1, "unrecognized allocator signature")
     start = rom.index(signature) - 0x4C
@@ -35,7 +36,31 @@ def allocator_root(rom, model):
     require(instruction & 0xFFFFF000 == 0xE59F6000, "unexpected root-load instruction")
     literal = start + 0x60 + (instruction & 0xFFF)
     require(literal <= len(rom) - 4, "root literal outside ROM")
-    return struct.unpack_from("<I", rom, literal)[0], digest
+    roots = struct.unpack_from("<I", rom, literal)[0]
+    end = 0x08040000 if model == 4 else 0x08080000
+    require(roots % 4 == 0 and 0x08000000 <= roots <= end - 32, "invalid allocator roots")
+    # The fingerprinted implementation has one common return, reached both
+    # after linking a successful allocation and on an allocation failure.
+    # Observe BEFORE this pop executes, when metadata is stable and r0 contains
+    # the result. Instruction offsets alone never qualify an unknown ROM.
+    returned = start + 0x88
+    require(struct.unpack_from("<I", rom, returned)[0] == 0xE8BD80F0, "unexpected allocator return")
+    return dict(
+        version=1,
+        model=model,
+        begin=0x08000000,
+        end=end,
+        entry_pc=start,
+        return_pc=returned,
+        free_list_roots=roots,
+        allocator_code_sha256=digest,
+        scope="One fingerprinted native allocation function; lifecycle gating and live event coverage remain separate requirements.",
+    )
+
+
+def allocator_root(rom, model):
+    profile = allocator_profile(rom, model)
+    return profile["free_list_roots"], profile["allocator_code_sha256"]
 
 
 def free_capacity(ram, roots):

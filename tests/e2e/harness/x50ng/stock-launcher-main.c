@@ -25,6 +25,9 @@
 #include "input-checkpoint.h"
 #include "media-checkpoint.h"
 
+/* Implemented in QEMU's ARM helper alongside the allocation-return observer. */
+extern void hpclang_native_heap_phase(const char *phase, uint64_t time_us);
+
 #define LCD_W 131
 #define KEY_HOLD_US 100000LL
 #define PAYLOAD_KEY_HOLD_US 50000LL
@@ -438,6 +441,7 @@ static int resource_read(void *context, uint32_t address, void *bytes, size_t co
 
 static int capture_resources(struct state *s, const char *phase)
 {
+    hpclang_native_heap_phase(phase, timer_get_clock());
     const char *prefix = getenv("HPCLANG_X50NG_RESOURCE_SNAPSHOT");
     if (!prefix || !*prefix)
         return 0;

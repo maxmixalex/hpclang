@@ -4698,14 +4698,29 @@ below are retained.
 - [ ] Deliver the common 59-function HPG graphics surface and maintained
   keyboard, console/text, system, filesystem and object adapters in focused
   groups. Expand the four-generation declaration/implementation/evidence ledger.
-- [ ] Compile representative original historical applications, recording each
+- [x] Compile representative original historical applications, recording each
   required source edit; distinguish these from M7's clean-API behavioral ports.
-- [ ] Complete `kos_beep/kos_CheckBeepEnd` compatibility with owned asynchronous
+  Original HPGCC 2.0 filesystem `example2.c`/`example3.c` and HPGCC 1.1
+  `examples/win/simple.c` pass relocated-SDK ARM compilation and six-model
+  packaging. The maintained extraction gates retain original/adapted hashes
+  and explicit migration diffs; the window gate also checks exact reversal of
+  its documented edits. See the [filesystem source gate](hpgcc-compat.md#original-hpgcc-20-filesystem-programs)
+  and [window source gate](hpgcc-compat.md#original-window-application-gate).
+  This closes the representative-source compilation criterion only; model
+  capability limits, runtime acceptance and broader adapter coverage remain
+  separate requirements.
+- [x] Complete `kos_beep/kos_CheckBeepEnd` compatibility with owned asynchronous
   sound, completion queries and active-tone preemption policy. Verify flags
   against each original system; cover autonomous stop while application code is
   busy, overlapping requests, cancellation and normal/immediate-exit restoration.
   Keep Stock interrupt handlers out of the temporary application mapping; the
   existing blocking tone service alone does not satisfy this adapter group.
+  Accepted in PR #25 at `752b8999`, merged as `3c484673`: all 54
+  normal/exit/_Exit Runtime jobs across the two accepted runs pass.
+  The [sound acceptance record](hpgcc-compat.md#historical-tones-and-packed-bcd)
+  documents mode flags, autonomous completion, cancellation and pre-launcher
+  cleanup checks. The chronological investigation below preserves intermediate
+  failures and former open states; it does not reopen this accepted tone subset.
   The internal PWM4 one-shot lease passes host sanitizers and six-model Direct
   expiry/rearm/restoration probes with the interrupt masked. Banked IRQ stack
   exchange/restoration also passes six-model Direct probes with actual delivery

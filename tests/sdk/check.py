@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import zlib
 
@@ -15,6 +16,131 @@ def run(*args, env):
     result = subprocess.run(args, env=env, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
+
+
+def check_migration_tool(package, work, env):
+    source = work / "migration input.cpp"
+    original = (
+        "#include <hpgcc49.h>\n"
+        "void f(void) { gets(buffer); set_decimal_digits(2); }\n"
+        "void g() { auto a = 1'000; gets(buffer); auto b = 2'000; }\n"
+        "void h() { copy(ints(12, 10)); uints(34, 10); sys_bcd2str(0x1234); }\n"
+        "void storage() { FSOpen(name, mode, &file); sat_dir_open(); }\n"
+        "void audio() { kos_beep(880, 10, 0); kos_CheckBeepEnd(); }\n"
+        "void text() { hpg_draw_text(dynamic, 0, 0); hpg_draw_letter_on(g, ch, 0, 0); }\n"
+    )
+    source.write_text(original)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(package / "tools/check-migration.py"),
+            "--json",
+            "--check",
+            str(source),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 1:
+        raise AssertionError(f"Migration checker did not request review: {result.stderr}")
+    report = json.loads(result.stdout)
+    if report["errors"] or [row["rule"] for row in report["findings"]] != [
+        "HP006",
+        "HP002",
+        "HP007",
+        "HP002",
+        "HP008",
+        "HP008",
+        "HP008",
+        "HP009",
+        "HP010",
+        "HP011",
+        "HP011",
+        "HP012",
+        "HP012",
+    ]:
+        raise AssertionError(f"Unexpected migration findings: {report}")
+    if source.read_text() != original:
+        raise AssertionError("Migration checker modified its input")
+    legacy = work / "legacy input.cpp"
+    legacy_bytes = '// caf\u00e9\ngets(buffer);\nhpg_draw_text("caf\u00e9", 0, 0);\n'.encode(
+        "cp1252"
+    )
+    legacy.write_bytes(legacy_bytes)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(package / "tools/check-migration.py"),
+            "--json",
+            "--check",
+            "--encoding",
+            "cp1252",
+            str(legacy),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 1:
+        raise AssertionError(f"Installed checker rejected legacy source: {result.stderr}")
+    report = json.loads(result.stdout)
+    if report["errors"] or [(r["rule"], r["line"], r["column"]) for r in report["findings"]] != [
+        ("HP002", 2, 1),
+        ("HP012", 3, 1),
+    ]:
+        raise AssertionError(f"Unexpected legacy-source findings: {report}")
+    if legacy.read_bytes() != legacy_bytes:
+        raise AssertionError("Migration checker modified legacy source bytes")
+    tree = work / "migration source tree"
+    (tree / "src").mkdir(parents=True)
+    (tree / "src/main.c").write_text("gets(buffer);\n", encoding="utf-8")
+    for name in (".git", "build", ".cache", "third_party"):
+        excluded = tree / "src" / name
+        excluded.mkdir()
+        (excluded / "unreadable.c").write_bytes(b"\xff")
+    explicit = tree / "src/build/manual.c"
+    explicit.write_text("exit(0);\n", encoding="utf-8")
+    # A Python audit hook observes the installed CLI's real directory I/O.
+    # Filtering its final findings is insufficient: excluded trees must never
+    # be entered, while an explicitly selected file remains reviewable.
+    probe = (
+        "import pathlib,runpy,sys\n"
+        "def audit(event,args):\n"
+        " if event == 'os.scandir' and pathlib.Path(args[0]).name in "
+        "{'.git','build','.cache','third_party'}:\n"
+        "  raise AssertionError('entered excluded directory: '+str(args[0]))\n"
+        "sys.addaudithook(audit)\n"
+        "sys.argv=sys.argv[1:]\n"
+        "runpy.run_path(sys.argv[0],run_name='__main__')\n"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            probe,
+            str(package / "tools/check-migration.py"),
+            "--json",
+            "--check",
+            str(tree),
+            str(explicit),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 1 or result.stderr:
+        raise AssertionError(
+            f"Installed checker did not prune excluded directories: {result.stderr}"
+        )
+    report = json.loads(result.stdout)
+    if (
+        report["files"] != 2
+        or report["errors"]
+        or sorted(row["rule"] for row in report["findings"]) != ["HP002", "HP003"]
+    ):
+        raise AssertionError(f"Unexpected installed directory scan: {report}")
+    print("Installed SDK: standalone migration checker PASS")
 
 
 def check_interworking(package, work, env):
@@ -80,6 +206,7 @@ def main():
         )
         prefix.rename(sdk)
         package = sdk / "share/hpclang"
+        check_migration_tool(package, work, env)
         check_interworking(package, work, env)
         application = work / "external application"
         shutil.copytree(package / "examples/hello", application)
@@ -105,7 +232,8 @@ def main():
         shutil.copyfile(root / "tests/sdk/numeric-input.cpp", application / "numeric-input.cpp")
         for suffix in ("c", "cpp"):
             shutil.copyfile(
-                root / "tests/sdk/formatted-input.c", application / f"formatted-input.{suffix}"
+                root / "tests/sdk/formatted-input.c",
+                application / f"formatted-input.{suffix}",
             )
             shutil.copyfile(root / "tests/sdk/sound.c", application / f"sound.{suffix}")
             shutil.copyfile(root / "tests/sdk/widget.c", application / f"widget.{suffix}")
@@ -180,7 +308,15 @@ endforeach()
                 else []
             ),
         ]
-        run("cmake", "-S", str(application), "-B", str(build), *configure_options, env=env)
+        run(
+            "cmake",
+            "-S",
+            str(application),
+            "-B",
+            str(build),
+            *configure_options,
+            env=env,
+        )
         run("cmake", "--build", str(build), "--parallel", "2", env=env)
         counter_args = (
             (build / "counter/declarative_ui_cpp-launchers.args").read_text().splitlines()
@@ -349,7 +485,10 @@ endforeach()
                 raise AssertionError(f"Nonreproducible installed SDK output: {relative}")
         print(f"Installed SDK: {len(reproducible_outputs)} release outputs byte-identical PASS")
         # A missing declared output must be regenerated without touching source.
-        missing = [build / "hello_c-launchers/hp50g.hp", build / "hello_cpp-launchers/memory.json"]
+        missing = [
+            build / "hello_c-launchers/hp50g.hp",
+            build / "hello_cpp-launchers/memory.json",
+        ]
         if args.aplet_tool:
             missing.append(build / "hello_cpp-aplet/hp39gs/HPCRESET.000")
             missing.append(build / "hello_c-aplet/hp40gs/footprint.json")

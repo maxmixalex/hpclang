@@ -109,6 +109,8 @@ if [[ -f "$APP_DIR/e2e.stock-media.json" ]]; then
     COMMON_ARGS+=(--sd-dir="$HPCLANG_STOCK_MEDIA_IMAGE")
 fi
 
+source "$ROOT/tests/e2e/harness/native-heap-env.sh" \
+    "$ROOT/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin" --update-image
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}" &
 X50_PID=$!
 
@@ -116,9 +118,10 @@ X50_PID=$!
 # server.  A packet delivered while the server is still in the I/O menu can
 # leave OUT_PKT_RDY latched after an otherwise harmless idle-state interrupt,
 # preventing the later retransmission from becoming a new endpoint event.
-for _ in $(seq 1 400); do
-    [[ -s "$SERVER_READY" ]] && break
-    kill -0 "$X50_PID" 2>/dev/null || break
+# Sequence milestones use emulated time. A busy host may take more than forty
+# wall-clock seconds to reach server-usb; the outer emulator timeout remains
+# the bound on a stalled boot, as on HP48.
+while [[ ! -s "$SERVER_READY" ]] && kill -0 "$X50_PID" 2>/dev/null; do
     sleep 0.1
 done
 [[ -s "$SERVER_READY" ]] || {

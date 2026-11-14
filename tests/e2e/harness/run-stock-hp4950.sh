@@ -99,6 +99,7 @@ export HPCLANG_STOCK_RESULT_ADDR
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-run"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-run.json"
 
+source "$ROOT/tests/e2e/harness/native-heap-env.sh" "$STATE/flash"
 timeout 45s "$ROOT/build/x50ng/dist/x50ng" \
     "${COMMON_ARGS[@]}"
 if [[ "$STORAGE_WITNESS" == 1 ]]; then

@@ -6,6 +6,9 @@ runtime library is compiled once in each application build with the selected
 toolchain. Calculator packaging uses explicit external ARMToolbox dependencies;
 the SDK does not redistribute those historical libraries or firmware.
 
+Read [API contracts and ownership](api-conventions.md) for result conventions,
+versioned structures and C/C++ resource lifetimes before combining services.
+
 ## Requirements
 
 - CMake 3.20 or later and a supported build tool, such as Make or Ninja.
@@ -109,7 +112,6 @@ Legacy decimal formatting is explicitly selected per application translation
 unit with `HPCLANG_HPGCC_LEGACY_FORMAT=1` before the compatibility include.
 Omitted/zero preserves standard formatting. See the [migration guide](migration.md)
 for the distinct legacy grammar, shared settings and bounded output entry points.
-The formatting addition is locally validated; remote acceptance remains pending.
 
 An application CMake file uses:
 

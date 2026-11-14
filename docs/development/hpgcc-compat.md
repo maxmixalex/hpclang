@@ -232,6 +232,13 @@ does not establish memory-exhaustion handling or whole-system resource bounds.
 
 ### Original window application gate
 
+The representative original-source compilation requirement is satisfied by
+this HPGCC 1.1 program and the two HPGCC 2.0 filesystem programs above. These
+are extracted historical applications with recorded migration edits, rather
+than new programs reproducing the same features. Both gates build through a
+relocated SDK and package all six models; packaging does not imply filesystem
+support on models without SD services or completion of every adapter group.
+
 `win.h` supplies the historical control umbrella. Run
 `ATFE=/path/to/atfe python3 tests/compat/check-win-simple.py /path/to/archives --work /new/output/path`
 to extract HPGCC 1.1's `examples/win/simple.c`, remove its unused `hpgcc49.h`
