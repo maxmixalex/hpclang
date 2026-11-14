@@ -9,8 +9,9 @@ details, even though runtime sources accompany the source SDK.
 Build the application and runtime with one SDK and its matching toolchain.
 The common HPC1 launch ABI does not promise that opaque objects, C++ layouts or
 internal runtime structures can be exchanged between separately built SDK
-versions. Rebuild when changing SDK versions. UI names remain provisional until
-UI milestone acceptance; these usage conventions do not freeze those names.
+versions. Rebuild when changing SDK versions. The reviewed declarative C UI
+interface is accepted for M8.2/M8.3; this does not promise cross-version binary
+layout compatibility.
 
 The object, directory, Port, storage, timer and UI helper headers support C++17.
 `hpclang/display.hpp` requires C++20 because its borrowed drawing interfaces use

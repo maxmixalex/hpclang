@@ -256,7 +256,8 @@ The C interfaces use `hpclang_` names and opaque handles; C++ helpers live in
 `hpclang` and retain the underlying C service's model and launch requirements.
 Rebuild application sources against the installed SDK. Its source compatibility
 does not make historical HPGCC binaries or private runtime structures compatible.
-UI names remain provisional until UI milestone acceptance.
+The reviewed declarative C UI interface is accepted for M8.2/M8.3; see the
+[UI guide](declarative-ui.md) for its supported behavior and resource scope.
 
 | Boundary | Application rule |
 | --- | --- |
