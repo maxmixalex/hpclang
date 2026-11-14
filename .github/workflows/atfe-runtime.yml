@@ -203,7 +203,9 @@ jobs:
     name: Stock ports / ${{ matrix.target }} / ${{ matrix.suite.name }}
     needs: runtime
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Recovery includes sequential power-cut, startup and reservation matrices.
+    # The HP50g run reached its final verified case at the former 30-minute limit.
+    timeout-minutes: ${{ matrix.suite.name == 'recovery' && 45 || 30 }}
     strategy:
       fail-fast: false
       matrix:
