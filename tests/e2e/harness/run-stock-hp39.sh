@@ -173,6 +173,12 @@ else
     )
 fi
 
+if [[ -n "${HPCLANG_E2E_NOR_PATH:-}" ]]; then
+    source "$ROOT/tests/e2e/harness/native-heap-env.sh" "$STATE/flash"
+else
+    source "$ROOT/tests/e2e/harness/native-heap-env.sh" "$FIRMWARE" --update-image
+fi
+
 python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" wait \
     "$KERMIT_LOG" "$HOST_GATE" \
     > "$ROOT/build/$TARGET-kermit-gate.log" 2>&1 &
