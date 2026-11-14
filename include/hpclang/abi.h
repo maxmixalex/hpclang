@@ -2,6 +2,7 @@
 #define HPCLANG_ABI_H
 
 #include <stdint.h>
+#include <hpclang/image-capabilities.h>
 
 #ifdef __cplusplus
 extern "C"

@@ -1412,6 +1412,7 @@ static int stage_rpl_memory_bounds(const void *saturn_state, volatile const uint
     bounds->native_roots = NULL;
     bounds->native_root_count = 0u;
     bounds->native_root_masks = NULL;
+    bounds->execution_pc = NULL;
     bounds->port1_limit = 0u;
     if (!hpclang_stage_port1_limit(model, pool_l2, pool_pages, &bounds->port1_limit))
         bounds->magic = HPCLANG_RPL_BOUNDS_MAGIC_V2;
@@ -1664,6 +1665,14 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
                     rpl_bounds.native_root_masks = native_root_masks;
                     break;
                 }
+            if (hpclang_stage_image_capabilities(
+                    hpc1,
+                    (const void *)(uintptr_t)(STAGE_WINDOW_BASE + code_first * HPCLANG_PAGE_SIZE),
+                    code_count * HPCLANG_PAGE_SIZE) &
+                HPCLANG_IMAGE_CAP_RPL_EXECUTION) {
+                rpl_bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V5;
+                rpl_bounds.execution_pc = (uint32_t *)stock_frame;
+            }
         }
         /* Do not publish Saturn's machine return stack as unconditional roots:
          * RSTK=C can also save numbers. Operations that move TEMP code must

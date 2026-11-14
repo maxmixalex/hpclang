@@ -12,6 +12,161 @@ static void cpu_put(uint8_t *bytes, uint32_t value)
         bytes[i] = (uint8_t)(value >> (8u * i));
 }
 
+int hpclang_rpl_bank_write_inspect(const uint8_t state[0xc60], uint32_t address,
+                                   struct hpclang_rpl_bank_write *output)
+{
+    if (!state || !output)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address > 0xfffff)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (cpu_word(state + 0xba0) == address >> 6 || cpu_word(state + 0xbb0) != address >> 12)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_bank_write next = {.lower = (address >> 5) & 3,
+                                          .upper = (address >> 1) & 15};
+    next.unchanged = cpu_word(state + 0xbcc) == next.lower && cpu_word(state + 0xbd0) == next.upper;
+    *output = next;
+    return 0;
+}
+
+int hpclang_rpl_unconfig_inspect(const uint8_t state[0xc60], uint32_t c,
+                                 struct hpclang_rpl_unconfig *output)
+{
+    if (!state || !output)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    c &= 0xfffff;
+    struct hpclang_rpl_unconfig next = {.flags = cpu_word(state + 0xb9c)};
+    if ((c & 0xfffc0) == (cpu_word(state + 0xba0) << 6)) {
+        next.kind = HPCLANG_RPL_UNCONFIG_IO;
+        next.flags &= 0x1e;
+        next.clear_field = 0xba0;
+    } else if ((next.flags & 2) && cpu_word(state + 0xba8) == c >> 12) {
+        next.kind = HPCLANG_RPL_UNCONFIG_RAM;
+        next.flags &= 0x1d;
+        next.rebuild = 1;
+    } else if ((next.flags & 8) && cpu_word(state + 0xbb8) == c >> 12) {
+        next.kind = HPCLANG_RPL_UNCONFIG_ERAM;
+        next.flags &= 0x17;
+        next.rebuild = 1;
+    } else if ((next.flags & 16) && cpu_word(state + 0xbc4) == c >> 12) {
+        next.kind = HPCLANG_RPL_UNCONFIG_PORT;
+        next.flags &= 0xf;
+        next.rebuild = 1;
+    } else if (cpu_word(state + 0xbb0) == c >> 12) {
+        next.kind = HPCLANG_RPL_UNCONFIG_BANK;
+        next.flags &= 0x1b;
+        next.clear_field = 0xbb0;
+    }
+    *output = next;
+    return 0;
+}
+
+int hpclang_rpl_config_predict(const uint8_t state[0xc60], uint32_t c, uint8_t output[0xc60])
+{
+    if (!state || !output)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    uint32_t flags = cpu_word(state + 0xb9c), low = flags & 31u;
+    uint32_t field = 0, value = 0, next_flags = flags;
+    uint32_t count = 0, first = 0, physical = 0, priority = 0, overlay = 0;
+    int map = 0;
+    c &= 0xfffffu;
+    if (flags <= 61) {
+        if (flags < 32 && !(flags & 1)) {
+            next_flags = flags | 1;
+            field = 0xba0;
+            value = c >> 6;
+        } else if ((low & 3) == 1) {
+            if (flags < 32) {
+                next_flags = flags | 32;
+                field = 0xbac;
+                value = 256 - (c >> 12);
+            } else {
+                next_flags = flags - 30;
+                field = 0xba8;
+                priority = 5;
+                map = 1;
+                count = cpu_word(state + 0xbac);
+                physical = cpu_word(state + 0xbd4);
+            }
+        } else if ((low & 7) == 3) {
+            next_flags = flags < 32 ? flags | 32 : flags - 28;
+            if (flags >= 32) {
+                field = 0xbb0;
+                value = c >> 12;
+            }
+        } else if ((low & 15) == 7) {
+            if (flags < 32) {
+                next_flags = flags | 32;
+                field = 0xbbc;
+                value = 256 - (c >> 12);
+            } else {
+                next_flags = flags - 24;
+                field = 0xbb8;
+                priority = 2;
+                map = 1;
+                count = cpu_word(state + 0xbbc);
+                physical = cpu_word(state + 0xbd8);
+            }
+        } else if (low == 15) {
+            if (flags < 32) {
+                next_flags = 47;
+                field = 0xbc8;
+                value = 256 - (c >> 12);
+            } else {
+                next_flags = 31;
+                field = 0xbc4;
+                priority = 3;
+                map = 1;
+                count = cpu_word(state + 0xbc8);
+                physical = cpu_word(state + 0xbdc);
+            }
+        }
+    }
+    if (map) {
+        value = c >> 12;
+        if (count > 256)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        if (count) {
+            first = (value / count) * count;
+            if (count > 256 - first)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            overlay = cpu_word(state + 0xc48);
+            if (overlay > 254)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+        }
+    }
+    for (unsigned i = 0; i < 0xc60; ++i)
+        output[i] = state[i];
+    cpu_put(output + 0xb9c, next_flags);
+    if (field)
+        cpu_put(output + field, value);
+    if (map) {
+        for (uint32_t page = first; page < first + count; ++page) {
+            if (output[0x808 + page] < priority) {
+                output[0x808 + page] = (uint8_t)priority;
+                cpu_put(output + page * 4, physical);
+                cpu_put(output + 0x404 + page * 4, physical);
+            }
+            physical += 0x800;
+        }
+        if (count && overlay)
+            for (unsigned i = 0; i < 2; ++i) {
+                unsigned at = (overlay + i) * 4;
+                uint32_t replacement = cpu_word(output + 0xc5c) + i * 0x800u;
+                uint32_t old = cpu_word(output + at);
+                if (old != replacement) {
+                    cpu_put(output + 0xc4c + 4 * i, old);
+                    cpu_put(output + at, replacement);
+                    cpu_put(output + 0xc54 + 4 * i, cpu_word(output + 0x404 + at));
+                    cpu_put(output + 0x404 + at, replacement);
+                }
+            }
+        output[0x908] = output[0x808];
+        cpu_put(output + 0x400, cpu_word(output));
+        cpu_put(output + 0x804, cpu_word(output + 0x404));
+    }
+    return 0;
+}
+
 int hpclang_rpl_bank_cpu_predict(const uint8_t state[0x90], uint32_t configuration,
                                  struct hpclang_rpl_bank_cpu_effects *output)
 {

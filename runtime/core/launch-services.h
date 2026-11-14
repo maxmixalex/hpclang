@@ -22,7 +22,8 @@ hpclang_launch_rpl_bounds(const struct hpclang_boot_info *boot)
     const struct hpclang_rpl_memory_bounds *bounds = (const void *)raw;
     if ((bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC &&
          bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V2 &&
-         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4) ||
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4 &&
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V5) ||
         bounds->temp_limit <= 0x80000u || bounds->temp_limit > 0x100000u ||
         bounds->user_limit < 0x80000u || bounds->user_limit >= 0x100000u ||
         bounds->stack_reserve_nibbles > 0x100000u - bounds->user_limit ||
@@ -31,12 +32,24 @@ hpclang_launch_rpl_bounds(const struct hpclang_boot_info *boot)
     return bounds;
 }
 
-/* Only RPL4 owns the extension. Never read beyond an older launch prefix. */
+/* Only RPL4/RPL5 own masks. Never read beyond an older launch prefix. */
 static inline const uint32_t *
 hpclang_launch_native_root_masks(const struct hpclang_rpl_memory_bounds *bounds)
 {
-    return bounds && bounds->magic == HPCLANG_RPL_BOUNDS_MAGIC_V4 ? bounds->native_root_masks
-                                                                  : NULL;
+    return bounds && (bounds->magic == HPCLANG_RPL_BOUNDS_MAGIC_V4 ||
+                      bounds->magic == HPCLANG_RPL_BOUNDS_MAGIC_V5)
+               ? bounds->native_root_masks
+               : NULL;
+}
+
+static inline uint32_t *hpclang_launch_execution_pc(const struct hpclang_boot_info *boot)
+{
+    const struct hpclang_rpl_memory_bounds *bounds = hpclang_launch_rpl_bounds(boot);
+    if (!bounds || bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V5 ||
+        (boot->model != HPCLANG_MODEL_HP49GPLUS && boot->model != HPCLANG_MODEL_HP50G) ||
+        !bounds->execution_pc || (uintptr_t)bounds->execution_pc % _Alignof(uint32_t))
+        return NULL;
+    return bounds->execution_pc;
 }
 
 static inline uint32_t hpclang_launch_port1_limit(const struct hpclang_boot_info *boot)
@@ -44,7 +57,8 @@ static inline uint32_t hpclang_launch_port1_limit(const struct hpclang_boot_info
     const struct hpclang_rpl_memory_bounds *bounds = hpclang_launch_rpl_bounds(boot);
     if (!bounds ||
         (bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC &&
-         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4) ||
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4 &&
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V5) ||
         (boot->model != HPCLANG_MODEL_HP49GPLUS && boot->model != HPCLANG_MODEL_HP50G) ||
         bounds->port1_limit > 0x40000u)
         return 0;

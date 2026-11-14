@@ -1549,8 +1549,72 @@ static void test_geometry_capture(void)
                                                 &state) < 0);
 }
 
+static void test_registration_plan(void)
+{
+    struct image port = {.fail_at = UINT32_MAX};
+    append(&port, backup);
+    uint32_t address = port.count;
+    append(&port, library);
+    uint32_t terminator = port.count;
+    append(&port, "00000");
+    struct image catalog = {.count = 35, .fail_at = UINT32_MAX};
+    put_word(&catalog, 0, 2, 3);
+    put_word(&catalog, 3, 1, 3);
+    put_word(&catalog, 19, 200, 3);
+    /* Equal numeric addresses in independent mappings must not alias. */
+    const struct hpclang_rpl_reader pr = {read_nibble, &port};
+    const struct hpclang_rpl_reader cr = {read_nibble, &catalog};
+    struct hpclang_rpl_library_registration plan, sentinel;
+    memset(&sentinel, 0xa5, sizeof sentinel);
+    plan = sentinel;
+    assert(hpclang_rpl_library_registration_plan(&pr, 0, port.count, &cr, 0, catalog.count, 123,
+                                                 &plan) == 1);
+    assert(plan.source.address == address && plan.source.library_number == 123);
+    assert(plan.header == address + 16);
+    assert(plan.insertion.slot == 19 && plan.insertion.end == 35 && plan.insertion.count == 2);
+    struct image saved_port = port, saved_catalog = catalog;
+    plan = sentinel;
+    assert(hpclang_rpl_library_registration_plan(&pr, 0, port.count, &cr, 0, catalog.count, 124,
+                                                 &plan) == 0);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    put_word(&catalog, 19, 123, 3);
+    assert(hpclang_rpl_library_registration_plan(&pr, 0, port.count, &cr, 0, catalog.count, 123,
+                                                 &plan) == 2);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    catalog = saved_catalog;
+    /* A found library must not hide a damaged trailing record or catalog. */
+    for (unsigned mapping = 0; mapping < 2; ++mapping) {
+        struct image *image = mapping ? &catalog : &port;
+        for (uint32_t cut = 0; cut < image->count; ++cut) {
+            image->fail_at = cut;
+            assert(hpclang_rpl_library_registration_plan(&pr, 0, port.count, &cr, 0, catalog.count,
+                                                         123, &plan) < 0);
+            assert(!memcmp(&plan, &sentinel, sizeof plan));
+        }
+        image->fail_at = UINT32_MAX;
+    }
+    port.count = terminator;
+    append(&port, library);
+    append(&port, "00000");
+    assert(hpclang_rpl_library_registration_plan(&pr, 0, port.count, &cr, 0, catalog.count, 123,
+                                                 &plan) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    port = saved_port;
+    put_word(&catalog, 19, 0, 3);
+    assert(hpclang_rpl_library_registration_plan(&pr, 0, port.count, &cr, 0, catalog.count, 123,
+                                                 &plan) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    catalog = saved_catalog;
+    assert(hpclang_rpl_library_registration_plan(&pr, 0, port.count, &cr, 0, catalog.count, 4096,
+                                                 &plan) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    assert(!memcmp(&port, &saved_port, sizeof port));
+    assert(!memcmp(&catalog, &saved_catalog, sizeof catalog));
+}
+
 int main(void)
 {
+    test_registration_plan();
     test_geometry_capture();
     test_catalog_rebind();
     test_catalog_insertion();

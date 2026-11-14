@@ -1069,6 +1069,41 @@ int hpclang_rpl_port_find(const struct hpclang_rpl_reader *reader, uint32_t firs
     return found;
 }
 
+int hpclang_rpl_library_registration_plan(const struct hpclang_rpl_reader *port_reader,
+                                          uint32_t first, uint32_t end,
+                                          const struct hpclang_rpl_reader *catalog_reader,
+                                          uint32_t catalog, uint32_t catalog_limit, uint32_t number,
+                                          struct hpclang_rpl_library_registration *plan)
+{
+    if (!plan || number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_library_registration next = {0};
+    struct hpclang_rpl_port_cursor cursor = {first, end, 0};
+    struct hpclang_rpl_port_entry entry;
+    int result, found = 0;
+    while ((result = hpclang_rpl_port_next(port_reader, &cursor, &entry)) > 0) {
+        if (entry.prologue != 0x02b40u || entry.library_number != number)
+            continue;
+        if (found)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        next.source = entry;
+        next.header = entry.address + 14u + 2u * entry.name_length;
+        found = 1;
+    }
+    if (result)
+        return result;
+    result = hpclang_rpl_catalog_plan_insert(catalog_reader, catalog, catalog_limit, number,
+                                             &next.insertion);
+    if (result < 0)
+        return result;
+    if (!found)
+        return 0;
+    if (!result)
+        return 2;
+    *plan = next;
+    return 1;
+}
+
 int hpclang_rpl_flash_next(const struct hpclang_rpl_reader *reader,
                            struct hpclang_rpl_port_cursor *cursor,
                            struct hpclang_rpl_port_entry *entry)

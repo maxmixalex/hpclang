@@ -11,6 +11,60 @@ struct hpclang_rpl_bank_effects
     uint32_t cache[4];    /* Saved read/read/write/write words at 0xc4c..0xc58. */
 };
 
+/* Predict the reviewed HP49g+/50g native CONFIG handler from a guarded native
+ * [0,0xc60) snapshot and the current C.A value. Models every flag-dispatch arm:
+ * IO, size/base phases for RAM/ERAM/port, bank-control routing, owner priority,
+ * read/write maps, sentinels and conditional two-page overlay caches. Other
+ * bytes survive, including CPU registers. c may contain the full native word;
+ * only its low 20 bits participate. No interpreter/PC step or native writes.
+ * Caller qualifies ROM identity, snapshot lifetime and all input dependencies;
+ * opaque physical words are predicted, not certified as accessible memory.
+ * Mapping spans outside 256 pages and active overlays outside pages 1..254
+ * are rejected before output changes. Zero-size maps skip overlay work, as
+ * the ROM does, but still refresh sentinels. Output may equal input exactly;
+ * otherwise the two buffers must be disjoint. No allocation or large scratch
+ * frame. This is a prediction primitive, not execution/mutation authority. */
+int hpclang_rpl_config_predict(const uint8_t state[0xc60], uint32_t c, uint8_t output[0xc60]);
+
+enum hpclang_rpl_unconfig_kind
+{
+    HPCLANG_RPL_UNCONFIG_NONE,
+    HPCLANG_RPL_UNCONFIG_IO,
+    HPCLANG_RPL_UNCONFIG_RAM,
+    HPCLANG_RPL_UNCONFIG_ERAM,
+    HPCLANG_RPL_UNCONFIG_PORT,
+    HPCLANG_RPL_UNCONFIG_BANK
+};
+struct hpclang_rpl_unconfig
+{
+    uint32_t kind, flags, clear_field, rebuild;
+};
+/* Inspect native UNCONFIG dispatch from a stable, ROM-qualified full snapshot.
+ * c contributes its low 20 bits. IO matches its containing 64-nibble block; enabled
+ * RAM/ERAM/Port then match the page, followed by the bank window. flags is the
+ * resulting full word. Nonzero clear_field becomes UINT32_MAX; zero means no
+ * base-word change. rebuild requires the native map-rebuild effects in addition
+ * to flags; this descriptor does NOT model or authorize that rebuild. Caller
+ * guards input state/ROM and applies effects to scratch, never live CPU state.
+ * No allocation or native-pointer access; errors leave output unchanged. */
+int hpclang_rpl_unconfig_inspect(const uint8_t state[0xc60], uint32_t c,
+                                 struct hpclang_rpl_unconfig *output);
+
+struct hpclang_rpl_bank_write
+{
+    uint32_t lower, upper, unchanged;
+};
+/* Classify the reviewed native memory-write dispatch using a stable full CPU
+ * snapshot. The higher-priority IO window at 0xba0 must not match; the bank
+ * window at 0xbb0 must match. The address, not the written data, selects banks.
+ * unchanged means the native selector handler returns before touching maps.
+ * Otherwise use the separately qualified bank-effects model; this function
+ * neither predicts those maps nor grants device/mutation authority. Caller
+ * guards ROM identity and native words 0xba0, 0xbb0, 0xbcc and 0xbd0. Errors
+ * preserve output. No reads through native pointers, writes or allocation. */
+int hpclang_rpl_bank_write_inspect(const uint8_t state[0xc60], uint32_t address,
+                                   struct hpclang_rpl_bank_write *output);
+
 struct hpclang_rpl_bank_cpu_effects
 {
     /* Native-state byte slice [0x90c,0x99c): A..R4, D0/D1/P, flags,

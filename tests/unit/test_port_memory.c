@@ -54,6 +54,7 @@ int main(void)
     assert(hpclang_launch_rpl_bounds(&boot));
     assert(hpclang_launch_port1_limit(&boot) == 0);
     assert(hpclang_launch_native_root_masks(hpclang_launch_rpl_bounds(&boot)) == NULL);
+    assert(hpclang_launch_execution_pc(&boot) == NULL);
     free(old);
     /* RPL3 has the ERAM fence but no address-mask pointer. Use an exact-size
      * allocation so ASan catches any accidental read of the RPL4 extension. */
@@ -65,6 +66,7 @@ int main(void)
     boot.platform_cookie = (uintptr_t)old | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
     assert(hpclang_launch_port1_limit(&boot) == 0x2000u);
     assert(hpclang_launch_native_root_masks(hpclang_launch_rpl_bounds(&boot)) == NULL);
+    assert(hpclang_launch_execution_pc(&boot) == NULL);
     free(old);
     const uint32_t masks[] = {UINT32_MAX, 0xfffff};
     bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V4;
@@ -73,6 +75,31 @@ int main(void)
     assert(hpclang_launch_rpl_bounds(&boot) == &bounds);
     assert(hpclang_launch_port1_limit(&boot) == 0x2000u);
     assert(hpclang_launch_native_root_masks(&bounds) == masks);
+    prefix = offsetof(struct hpclang_rpl_memory_bounds, execution_pc);
+    old = malloc(prefix);
+    assert(old);
+    memcpy(old, &bounds, prefix);
+    boot.platform_cookie = (uintptr_t)old | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    assert(hpclang_launch_execution_pc(&boot) == NULL);
+    assert(hpclang_launch_native_root_masks(hpclang_launch_rpl_bounds(&boot)) == masks);
+    free(old);
+    boot.platform_cookie = (uintptr_t)&bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V5;
+    uint32_t pc = 0x88b48;
+    bounds.execution_pc = &pc;
+    assert(hpclang_launch_execution_pc(&boot) == &pc);
+    assert(hpclang_launch_port1_limit(&boot) == 0x2000u);
+    assert(hpclang_launch_native_root_masks(&bounds) == masks);
+    boot.model = HPCLANG_MODEL_HP49GPLUS;
+    assert(hpclang_launch_execution_pc(&boot) == &pc);
+    boot.model = HPCLANG_MODEL_HP48GII;
+    assert(hpclang_launch_execution_pc(&boot) == NULL);
+    boot.model = HPCLANG_MODEL_HP50G;
+    bounds.execution_pc = (uint32_t *)((uint8_t *)&pc + 1);
+    assert(hpclang_launch_execution_pc(&boot) == NULL);
+    bounds.execution_pc = NULL;
+    assert(hpclang_launch_execution_pc(&boot) == NULL);
+    assert(hpclang_launch_execution_pc(NULL) == NULL);
     bounds.native_root_masks = NULL;
     assert(hpclang_launch_native_root_masks(&bounds) == NULL);
     assert(hpclang_launch_native_root_masks(NULL) == NULL);

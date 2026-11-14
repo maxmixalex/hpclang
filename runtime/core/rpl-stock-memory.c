@@ -5,6 +5,31 @@
 #include "rpl-stock-memory.h"
 #include "rpl-port.h"
 #include "launch-services.h"
+#include "rpl-code.h"
+
+int hpclang_rpl_stock_p_predict(uint8_t *snapshot, uint32_t size, unsigned p)
+{
+    if (!snapshot)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (size < 0xc60 || p > 15)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint64_t selected = UINT64_C(15) << (4 * p);
+    uint64_t through = UINT64_MAX >> (4 * (15 - p));
+    const uint32_t offsets[] = {0x95c, 0x960, 0x964, 0x99c, 0x9a0, 0x9a4, 0x9a8, 0xa9c, 0xb20};
+    const uint32_t values[] = {p,
+                               4 * p,
+                               4 * p - 32u,
+                               (uint32_t)selected,
+                               (uint32_t)(selected >> 32),
+                               (uint32_t)through,
+                               (uint32_t)(through >> 32),
+                               p,
+                               p + 1};
+    for (unsigned i = 0; i < sizeof offsets / sizeof offsets[0]; ++i)
+        for (unsigned byte = 0; byte < 4; ++byte)
+            snapshot[offsets[i] + byte] = (uint8_t)(values[i] >> (8 * byte));
+    return 0;
+}
 
 static int state_word(const struct hpclang_rpl_reader *state, uint32_t at, unsigned width,
                       uint32_t *word, hpclang_rpl_reference_dependency_fn dependency, void *context)
@@ -22,6 +47,146 @@ static int state_word(const struct hpclang_rpl_reader *state, uint32_t at, unsig
         next |= (uint32_t)value << (4u * j);
     }
     *word = next;
+    return 0;
+}
+
+static int execution_seeded(uint32_t at)
+{
+    int seeded = at >= 0x90cu * 2u && at < 0x954u * 2u;
+    if (at >= 0x954u * 2u && at < 0x95cu * 2u)
+        seeded = at % 8u < 5u;
+    if (at == 0x95cu * 2u)
+        seeded = 1;
+    if (at >= 0x978u * 2u && at < 0x998u * 2u)
+        seeded = at % 8u < 5u;
+    return seeded;
+}
+
+int hpclang_rpl_stock_execution_origin(void *context, uint32_t token,
+                                       struct hpclang_rpl_code_origin_cell *cell)
+{
+    const struct hpclang_rpl_stock_execution_source *source = context;
+    if (!source || !cell || !source->state || !source->state->read_nibble)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!source->origin_base || source->origin_base > UINT32_MAX - 0x1337u || !source->mapping ||
+        source->field_base > 0x100000u - 0xc60u * 2u || token < source->origin_base)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t at = token - source->origin_base;
+    if (!execution_seeded(at))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint8_t value;
+    if (!source->state->read_nibble(source->state->context, at, &value))
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (value > 15u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    *cell = (struct hpclang_rpl_code_origin_cell){source->mapping, source->field_base + at, value};
+    return 0;
+}
+
+int hpclang_rpl_stock_execution_edit(const struct hpclang_rpl_stock_execution_source *source,
+                                     uint32_t *state_words,
+                                     const struct hpclang_rpl_reference_edit *edit,
+                                     struct hpclang_rpl_native_edit *edits, unsigned *count,
+                                     hpclang_rpl_reference_dependency_fn dependency, void *context)
+{
+    if (!source || !source->state || !source->state->read_nibble || !state_words || !edit ||
+        !edits || !count || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if ((uintptr_t)state_words % _Alignof(uint32_t) || !source->mapping ||
+        source->field_base > 0x100000u - 0xc60u * 2u || edit->mapping != source->mapping ||
+        !edit->width || edit->width > 5 || edit->field < source->field_base ||
+        edit->field - source->field_base > 0xc60u * 2u - edit->width ||
+        (edit->expected >> (edit->width * 4)) || (edit->value >> (edit->width * 4)))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t at = edit->field - source->field_base;
+    for (unsigned digit = 0; digit < edit->width; ++digit)
+        if (!execution_seeded(at + digit))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_native_edit next[2];
+    unsigned words = (at % 8 + edit->width + 7) / 8;
+    for (unsigned index = 0; index < words; ++index) {
+        uint32_t base = (at / 8 + index) * 8, expected;
+        int result = state_word(source->state, base, 8, &expected, dependency, context);
+        if (result)
+            return result;
+        next[index] =
+            (struct hpclang_rpl_native_edit){state_words + base / 8, expected, expected, 0};
+        for (unsigned digit = 0; digit < edit->width; ++digit) {
+            if (at + digit < base || at + digit >= base + 8)
+                continue;
+            unsigned shift = (at + digit - base) * 4;
+            if (((expected >> shift) & 15u) != ((edit->expected >> (digit * 4)) & 15u))
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            uint32_t mask = 15u << shift;
+            next[index].mask |= mask;
+            next[index].value =
+                (next[index].value & ~mask) | (((edit->value >> (digit * 4)) & 15u) << shift);
+        }
+    }
+    for (unsigned i = 0; i < words; ++i)
+        edits[i] = next[i];
+    *count = words;
+    return 0;
+}
+
+int hpclang_rpl_stock_execution_capture(const struct hpclang_rpl_reader *state, uint32_t pc,
+                                        uint32_t origin_base,
+                                        struct hpclang_rpl_code_execution *execution,
+                                        hpclang_rpl_reference_dependency_fn dependency,
+                                        void *context)
+{
+    if (!state || !state->read_nibble || !execution || !dependency)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (pc >= 0x100000u || !origin_base || origin_base > UINT32_MAX - 0x1337u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct hpclang_rpl_code_execution next = {0};
+    next.control.pc = pc;
+    for (unsigned reg = 0; reg < 9; ++reg) {
+        uint32_t at = 2u * (0x90cu + reg * 8u), low, high;
+        int result = state_word(state, at, 8, &low, dependency, context);
+        if (!result)
+            result = state_word(state, at + 8, 8, &high, dependency, context);
+        if (result)
+            return result;
+        next.values.registers[reg] = (uint64_t)low | ((uint64_t)high << 32);
+        for (unsigned digit = 0; digit < 16; ++digit)
+            next.origins.registers[reg][digit] = origin_base + at + digit;
+    }
+    const unsigned registers[] = {HPCLANG_RPL_CODE_D0, HPCLANG_RPL_CODE_D1, HPCLANG_RPL_CODE_P};
+    for (unsigned index = 0; index < 3; ++index) {
+        uint32_t at = 2u * (0x954u + index * 4u), value;
+        int result = state_word(state, at, 8, &value, dependency, context);
+        if (result)
+            return result;
+        if (value > (index == 2 ? 15u : 0xfffffu))
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        next.values.registers[registers[index]] = value;
+        for (unsigned digit = 0; digit < (index == 2 ? 1u : 5u); ++digit)
+            next.origins.registers[registers[index]][digit] = origin_base + at + digit;
+    }
+    int result = state_word(state, 0x968u * 2u, 8, &next.status, dependency, context);
+    if (!result)
+        result = state_word(state, 0x96cu * 2u, 8, &next.hst, dependency, context);
+    if (!result)
+        result = state_word(state, 0x970u * 2u, 8, &next.control.carry, dependency, context);
+    if (!result)
+        result = state_word(state, 0x974u * 2u, 8, &next.values.decimal, dependency, context);
+    if (!result)
+        result = state_word(state, 0x998u * 2u, 8, &next.control.cursor, dependency, context);
+    if (result)
+        return result;
+    if (next.control.carry > 1 || next.values.decimal > 1 || next.control.cursor >= 8)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    next.values.carry = next.control.carry;
+    for (unsigned slot = 0; slot < 8; ++slot) {
+        uint32_t at = 2u * (0x978u + slot * 4u);
+        result = state_word(state, at, 8, &next.control.stack[slot], dependency, context);
+        if (result)
+            return result;
+        for (unsigned digit = 0; digit < 5; ++digit)
+            next.control.stack_origins[slot][digit] = origin_base + at + digit;
+    }
+    *execution = next;
     return 0;
 }
 
@@ -378,7 +543,8 @@ int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint
     struct hpclang_rpl_reader reader;
     if (!io || !limit || !bounds ||
         (bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC &&
-         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4) ||
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4 &&
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V5) ||
         bounds->port1_limit > HPCLANG_RPL_PORT1_NIBBLES || !hpclang_rpl_stock_port1_reader(&reader))
         return 0;
     *limit = hpclang_launch_port1_limit(boot);

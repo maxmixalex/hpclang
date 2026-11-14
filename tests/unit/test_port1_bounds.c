@@ -24,7 +24,8 @@ int main(void)
     struct hpclang_rpl_memory_bounds bounds = {.temp_limit = 0xa0000, .user_limit = 0xb0000};
     boot.saturn_state = 1;
     boot.platform_cookie = (uintptr_t)&bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
-    const uint32_t versions[] = {HPCLANG_RPL_BOUNDS_MAGIC, HPCLANG_RPL_BOUNDS_MAGIC_V4};
+    const uint32_t versions[] = {HPCLANG_RPL_BOUNDS_MAGIC, HPCLANG_RPL_BOUNDS_MAGIC_V4,
+                                 HPCLANG_RPL_BOUNDS_MAGIC_V5};
     const uint32_t limits[] = {0, 0x2000, 0x40000, 0x40001};
     for (unsigned model = HPCLANG_MODEL_HP39GPLUS; model <= HPCLANG_MODEL_HP50G; ++model)
         for (unsigned version = 0; version < 2; ++version)

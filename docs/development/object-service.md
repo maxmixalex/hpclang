@@ -754,6 +754,20 @@ check (`0x46410060`). This is evidence for the sampled suspended Stock states,
 not for relocation while an ARM application owns pages or for arbitrary opaque
 TEMP contents. Public registration remains unavailable until those ownership
 and reference obligations are implemented and tested.
+
+The internal `hpclang_rpl_port0_register_library_repaired` now connects the
+registration plan to catalog publication. It re-reads the actual Port 0 root,
+validates the complete source and catalog chains, matches the expected library
+geometry, and derives the stationary Port 0 binding instead of accepting an
+arbitrary caller address. The existing catalog transaction retains count-last
+publication and its non-replayable `INCOMPLETE` outcome. It neither attaches the
+library to HOME nor executes configuration code. Exclusive ownership and complete
+data/execution repairs remain caller obligations; the fixture collector is not
+production authorization. Local ASan/UBSan mutation tests and a fresh ARM fixture
+build pass. HP49g+/HP50g Stock registration and removal pass, including independent
+replay of all four saved executions with unchanged inputs. Remote acceptance of
+this addition remains pending.
+
 Live registration probing also exposed a separate return-address source:
 HP49g+/HP50g Stock's Saturn instruction return stack contains eight ARM-stored
 20-bit slots at `SAT_CPU+0x978`, with a circular index at `+0x998`. These

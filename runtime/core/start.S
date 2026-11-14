@@ -1,5 +1,11 @@
 .syntax unified
 .arm
+#include <hpclang/image-capabilities.h>
+
+.section .hpclang.capabilities,"a",%progbits
+.balign 4
+.word HPCLANG_IMAGE_CAPABILITIES_MAGIC
+.word HPCLANG_IMAGE_CAP_RPL_EXECUTION
 
 /*
  * hpclang v1 application entry.
