@@ -96,6 +96,35 @@ retain the existing production launchers while evaluating the same Notebook
 application and cleanup contracts described above. No production replacement
 or retirement of the historical dependency is authorized by this prototype.
 
+### Source-level family assessment
+
+The current sources identify the following concrete replacement boundaries.
+This is an implementation assessment, not additional native execution evidence.
+
+| Family | Existing contract and consequence for an owned launcher |
+| --- | --- |
+| HP39g+/39gs/40gs | `runtime/core/hp39-aplet-frame.c` recognizes the Aplet `_Action` instruction sequence, including the library-275 `xPrRUN` ROMPTR, before exposing the custom-data slot. `tools/prepare-hp39-aplet.py` also installs Start/Reset views and restores the caller's program context around Reset. A new entry must provide an explicit equivalent Aplet data/return contract; replacing the ARM jump alone would leave persistence unavailable. Keep save/relaunch, copied-Aplet isolation and Reset in the comparison. |
+| HP48gII | `platform/armtoolbox/stage0.S` consumes the launcher's pool count and L2 table, rejects insufficient space before changing mappings, and releases its optional KOS allocation on both rejection and return. No HP48gII entry is established by the HP49/50 prototype. Qualification must start with a model-4 Stock entry and owned allocation/cleanup, then run the same Notebook within the existing small-model budget. |
+| HP49g+/HP50g | `tests/e2e/independent-hpc1/loader.c` supplies one code page and four RW pages from its fixed arena, but sets both `saturn_state` and `platform_cookie` to zero. It proves the common HPC1 bootstrap boundary, not the native object/port services used by Notebook. Supplying those services requires a captured Stock context and equivalent relocation/allocation boundaries before the application comparison is meaningful. |
+
+Across families, `platform/armtoolbox/stage1.c` derives main/Port1 allocation
+fences from the actual pool and publishes launcher and suspended-execution roots.
+The replacement must preserve these supported service contracts, not copy a
+fixture's fixed addresses into a general launcher. `stage0.S` restores the
+borrowed mapping and original stack before restoring interrupt state and
+releasing the optional KOS block; the independent path needs equivalent ordered
+cleanup, including rejected startup.
+
+The next bounded evaluation is a service-capable HP49/50 Notebook prototype,
+using the existing independent entry and common loader, followed by HP48gII
+entry/allocation and the HP39 Aplet data boundary. Compare identical application
+sources and configuration; record package transfer cost, supported-flow memory
+use, allocation failure and settled return. This does not require the deferred
+whole-system worst-case memory proof. Until those comparisons exist, the
+installation-step benefit is established but a net memory, size or startup-time
+benefit is not. Production launchers remain in use and this evaluation remains
+open.
+
 ## Common bootstrap
 
 The common ARM bootstrap receives a small family-specific launch context, installs the HPC1 virtual layout, enters the application, restores the original mappings and privileged state, and returns to the calculator OS.
