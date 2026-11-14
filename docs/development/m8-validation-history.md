@@ -1,5 +1,28 @@
 # M8 validation history
 
+### 2026-11-14 — Combined native-port and SDK integration
+
+Local merge 81412db5 combines #31's c662b236 with the combined M8 delivery and
+the UI low-SRAM exclusion check. Only roadmap and validation-history conflicts
+required resolution; both histories are retained. All 295 Python regressions
+and strict docs pass. The full installed/relocated SDK also passes: 4,121
+manifest-checked archived files, identical distribution archives, nine standalone
+C++ headers, fourteen documentation links, installed migration/assembly checks,
+613 byte-identical release outputs, all six Notebook model builds and all three
+HP39 C/C++ Aplet package families. Sealed inputs remain unchanged; temporary SDK
+builds are removed. Report: `/work/nov14-final-integration-sdk.json`.
+All 180 host tests pass under ASan/UBSan (including the Python-tools target);
+the temporary build is removed. Report: `/work/nov14-final-integration-host/result.json`.
+The Stock Notebook backup regression passes all nine expected phases across
+HP48gII, HP49g+ and HP50g, with settled return and independent audit.
+Report: `/work/nov14-final-notebook-backup-native/independent-audit.json`. A driver-only postprocessing error
+referenced a nonexistent suite-specific verifier; the retained lifecycle reports
+were checked without restarting the completed emulator run. HP48gII artifact
+hashes are recorded after that run, while original source/runner hashes remain
+unchanged. HP49g+/HP50g pass with pre-execution artifact hashes. This suite
+checks functional Port0 backup/restore/replace/remove and persistence, not fresh
+pixel or resource-peak measurements. This integration is not submitted or CI accepted.
+
 ### 2026-11-14 — UI pool exclusion of the native vector/stack page
 
 The Stock UI allocation verifier now rejects pool pages, allocation headers,
