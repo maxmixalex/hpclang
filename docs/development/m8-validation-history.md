@@ -5853,7 +5853,11 @@ targets pass; the temporary build is removed. The initial driver named a
 nonexistent standalone filesystem-bridge target; that source belongs to the
 tested storage_metadata target. Report: /work/nov14-compat-owners-check/result.json.
 Three document-link regressions, Ruff and strict docs pass. The full SDK gate
-has passed archive identity (4,117 files), nine C++ headers, fourteen document
-links, migration and assembly checks; application builds are still running.
-Log: /work/nov14-sdk-compat-owners-integration.log. This is local integration,
-not completed full-SDK, remote CI, main or milestone acceptance.
+passes archive identity (4,117 files), nine C++ headers, fourteen document
+links, migration and assembly checks, 613 byte-identical release outputs,
+all six Notebook model builds and all three HP39 C/C++ Aplet families. All
+4,149 sealed inputs remain unchanged; temporary installations/builds are removed.
+Report: /work/nov14-sdk-compat-owners-integration.json. This is local full-SDK
+integration, not remote CI, main or milestone acceptance. A fresh two-model
+Notebook export/relaunch run checks the combined filesystem runtime separately
+in /work/nov14-compat-notebook-native; its result remains pending.
