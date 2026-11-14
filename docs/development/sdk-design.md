@@ -1794,6 +1794,83 @@ native styling, or close physical-memory/performance acceptance. The simulated
 provider, renderer palette/font choices and keyboard-only interaction are the
 documented target adaptations, not removed application requirements.
 
+### Independent-launcher assessment and migration proposal
+
+The retained M8.6 requirement is an evaluation with an HPC1-connected prototype
+and an explicit migration/acceptance plan. It does not equate an entry probe
+with a replacement launcher. The proposal is to keep the existing launchers as
+the supported default while developing an optional independent path. No
+historical dependency is retired by this proposal, and the original
+cross-family allocation, relocation, service and exit evaluation stays open.
+
+**Concrete benefit:** a qualified independent package could remove library-275
+installation and launcher-version coupling on classic models. Sharing the
+existing HPC1 ABI and bootstrap would preserve application source and virtual
+layout. These are expected packaging benefits, not measured savings: embedding
+startup code and reserving storage inside each RPL object can increase package
+size and peak memory. HP39 also needs an Aplet package and native service bridge;
+removing a classic RPL library dependency alone does not replace that path.
+
+The current evidence separates three layers:
+
+- The maintained `tests/e2e/independent-entry` fixture proves HP50g Stock ARM/C
+  entry and RPL return without library 275, owned stack/storage and privileged
+  IRQ/FIQ masking/restoration. Two-copy builds and native corrupt-snapshot checks
+  are reproducible from the repository.
+- The local HPC1-connected experiment uses `stage-image.c` validation and the
+  shared `runtime/bootstrap/{mmu.c,run.c,enter.S,sync.S}` implementation. A
+  380-byte Thumb payload returns 42, with expected boot/data contents, restored
+  L1 slots and SWI vector, RPL return and unchanged Flash. Its six backing pages
+  reside in the enclosing program's reserved storage. The package is 71,148
+  bytes; its copied ARM payload is 35,528 bytes, including a 28,672-byte alignment
+  arena and a separate 4,096-byte entry stack. The program also reserves 71,063
+  nibbles for that copy. These are experiment dimensions, not an application
+  memory budget or a claimed improvement over another program.
+- This experiment supplies zero `saturn_state` and `platform_cookie`. It therefore
+  has no production native mutation fence, HP39 portal or established relocation
+  roots. Successful compute-and-return execution does not qualify object/file/UI
+  service coexistence. Its build/run drivers are still local research inputs;
+  promotion to a maintained HPC1 fixture is an outstanding reproducibility task.
+
+The family assessment follows the existing implementation, rather than assuming
+that the HP50g entry addresses or page ownership transfer unchanged:
+
+| Family | Existing contract that an independent path must reproduce | Evaluation result / remaining proof |
+| --- | --- | --- |
+| HP39g+/39gs/40gs | `tools/package-hp39-aplet.sh` and `package-aplet.py` package model-specific Aplets. `stage0.S` leaves two Stock pool pages for native calls. `hp39_portal_configure` in `stage1.c` carries the saved Saturn/ARM context, Aplet arena and pinned cells; model-specific font pages are mapped separately. | Retain the Aplet boundary and custom-data ownership. Qualify independently owned backing pages and the portal's stable lifetime on all three models, including the smallest supported application's transfer/startup budget. No independent HP39 run is claimed. |
+| HP48gII | The existing ARMToolbox48 path supplies the pool and suspended Stock context. `stage1.c` checks stage/code/RW/stack admission, preserves the return trampoline and publishes native bounds. The physical SRAM limit is 256 KiB, as enforced by the resource snapshot verifier. | Do not reuse the HP50g 512 KiB address assumptions or SAVE/RESTORE constants. Establish HP48 entry/return and allocation ownership before testing its full application and native services. No independent HP48 run is claimed. |
+| HP49g+/HP50g | `stage1.c` publishes live Saturn context, hidden launcher/return roots and native mutation bounds. `port-memory.h` excludes every reserved ERAM pool page from Port1 growth. The wrapper's 240-byte native stack-growth request is a policy request, not the HPC1 RW arena size. | HP50g has the bounded compute prototype; HP49g+ is not inferred from it. Reproduce the live-context/return-root/fence contracts and verify each model's actual allocations, native service calls and release. |
+
+The shared bootstrap can remain unchanged if the independent launcher supplies
+valid owned code/RW pages, L2 workspace, model/context metadata and a live return
+path. `hpclang_bootstrap_run` installs temporary mappings with IRQ/FIQ masked,
+then restores mappings before restoring the caller interrupt state. It does not
+allocate those pages, establish native object ownership, or recover arbitrary
+launcher failures. The candidate must implement and validate those surrounding
+contracts explicitly.
+
+Before offering the independent path for application use:
+
+1. Preserve a maintained HPC1-connected prototype with source/artifact manifests,
+   isolated reproducible builds and no-library-275 native execution evidence.
+2. Qualify each family's entry, owned allocation and return path. Account for
+   package storage, transfer staging, page tables, stage and application stacks,
+   and native workspace together; reject inadequate space before mutation.
+3. Integrate the real native context, relocation roots and mutation fences.
+   Exercise object persistence, UI/effects, timers and supported storage through
+   normal return, initialization failure, `exit` and `_Exit`; test restoration
+   before any backing storage is released.
+4. Preserve all six SDK targets, HPC1 ABI, HP39 Aplet packaging and documented
+   compatibility with the existing paths. Publish installation/migration and
+   fallback instructions before considering a default change or dependency
+   retirement. A default change requires its own explicit decision and evidence.
+
+Current experiment reports are
+`/work/nov14-independent-entry-swi-live/verified-final.json` and
+`/work/nov14-independent-hpc1-swi-live/verified.json`. The proposal and source
+assessment are documentation deliverables; they do not mark the launcher
+replacement, the full cross-family evaluation or M8.6 complete.
+
 ### Startup resource admission
 
 The wrapper's native request word is `0x0fc00000`, not a byte count. The
