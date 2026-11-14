@@ -2136,6 +2136,23 @@ All six models now pass: HP40gs adds eight snapshots, HP48gII 14, and HP49g+
 `/work/oct26-resource-snapshot-matrix/final-audit.json` fingerprints the evidence.
 These successful sampled runs do not establish a transient peak bound.
 
+### Cold-boot stack layout
+
+`verify-native-stack-init.py --include-boot-layout` additionally decodes the
+reviewed cold-boot mode/SP sequence, without requiring that a restored Stock
+snapshot executed it. Boot tops differ from the later runtime tops:
+
+| Bootloader family | Undefined / Abort / IRQ / FIQ / Supervisor stack tops |
+| --- | --- |
+| HP39g+, HP49g+ | `08006D7C / 08006E7C / 08006F7C / 08006FFC / 08006CFC` |
+| HP39gs, HP40gs, HP48gII, HP50g | `08006450 / 080064A0 / 080065AC / 0800662C / 08006400` |
+
+The checker validates mode changes, SP-load instructions and literal values
+against each model's reviewed layout. Six original ROMs pass all thirty
+initializers. These are static tops, not lower bounds or reserved capacities;
+restored-state UI runs do not establish cold-boot stack usage. Existing dynamic
+runtime reconciliation is unchanged. Report: `/work/nov14-boot-stack-layout.json`.
+
 ### UI resource measurements
 
 The `ui_demo_lifecycle` sanitizer test executes the shipped declarative-UI

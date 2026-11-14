@@ -4883,3 +4883,14 @@ native heap profiles and ROM initializer reconciliation. Report:
 /work/nov14-user-stack-live/independent-audit.json.
 This closes one observer coverage gap, not native reservation bounds or
 whole-system transient-memory admission. The change remains local.
+
+
+### 2026-11-14 — Separate cold-boot and runtime stack layouts
+
+The optional maintained boot-layout decoder validates all thirty mode/SP
+initializers in six original ROMs. Seven focused tests pass, including wrong
+bootloader/layout, mode, SP-load, literal and truncation rejection. Runtime
+trace reconciliation retains its previous output unless the option is selected.
+This adds static boot coverage only; native stack reservation and whole-system
+transient-memory requirements remain open. Evidence:
+`/work/nov14-boot-stack-layout.json`.

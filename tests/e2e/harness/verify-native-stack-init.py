@@ -27,6 +27,46 @@ INITIALIZERS = (
 )
 
 
+# Bootloader stacks precede the runtime initializer and can occupy another
+# SRAM interval. These are qualified tops, not inferred allocation boundaries.
+BOOT_LAYOUTS = {
+    "hp39gplus": (0xCC, (0x08006D7C, 0x08006E7C, 0x08006F7C, 0x08006FFC, 0x08006CFC)),
+    "hp49gplus": (0x88, (0x08006D7C, 0x08006E7C, 0x08006F7C, 0x08006FFC, 0x08006CFC)),
+}
+for _model in ("hp39gs", "hp40gs", "hp48gii", "hp50g"):
+    BOOT_LAYOUTS[_model] = (0xC8, (0x08006450, 0x080064A0, 0x080065AC, 0x0800662C, 0x08006400))
+
+
+def boot_initializers(model, flash):
+    """Decode the reviewed boot sequence without asserting dynamic coverage."""
+    anchor, tops = BOOT_LAYOUTS[model]
+
+    def word(address):
+        if address < 0 or address % 4 or address + 4 > len(flash):
+            raise ValueError("boot instruction/literal outside image")
+        return struct.unpack_from("<I", flash, address)[0]
+
+    result = []
+    for (mode, offset, flags, _), expected in zip(INITIALIZERS, tops):
+        pc = anchor + offset
+        instruction = word(pc)
+        if (
+            instruction & 0xFFFFF000 != 0xE59FD000
+            or word(pc - 8) != 0xE3801000 | flags
+            or word(pc - 4) != 0xE12FF001
+        ):
+            raise ValueError(f"unrecognized boot mode/SP initializer at {pc:#x}")
+        literal = pc + 8 + (instruction & 0xFFF)
+        top = word(literal)
+        if top != expected:
+            raise ValueError(f"unrecognized boot stack top for mode {mode}")
+        result.append(dict(mode=mode, pc=pc, literal=literal, top=top))
+    return dict(
+        initializers=result,
+        scope="Static boot initializer decoding only; no observed coverage or reserved capacity.",
+    )
+
+
 def verify(model, flash, trace):
     def word(address):
         if address < 0 or address % 4 or address + 4 > len(flash):
@@ -127,9 +167,13 @@ def main():
     parser.add_argument("--model", choices=ANCHORS, required=True)
     parser.add_argument("--flash", type=Path, required=True)
     parser.add_argument("--trace", type=Path, required=True)
+    parser.add_argument("--include-boot-layout", action="store_true")
     args = parser.parse_args()
     try:
-        result = verify(args.model, args.flash.read_bytes(), args.trace.read_bytes())
+        flash = args.flash.read_bytes()
+        result = verify(args.model, flash, args.trace.read_bytes())
+        if args.include_boot_layout:
+            result["boot_layout"] = boot_initializers(args.model, flash)
     except (OSError, ValueError) as error:
         parser.exit(1, f"native stack initializer check failed: {error}\n")
     print(json.dumps(result, indent=2))

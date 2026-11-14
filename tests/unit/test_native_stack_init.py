@@ -124,5 +124,44 @@ class NativeStackInitTest(unittest.TestCase):
         self.assertEqual(len(self.check()["observations"]), 6)
 
 
+class BootStackInitTest(unittest.TestCase):
+    def fixture(self, model):
+        flash = bytearray(2048)
+        anchor, tops = CHECK.BOOT_LAYOUTS[model]
+        for i, ((_, offset, flags, _), top) in enumerate(zip(CHECK.INITIALIZERS, tops)):
+            pc, literal = anchor + offset, 1024 + i * 4
+            for address, value in (
+                (pc - 8, 0xE3801000 | flags),
+                (pc - 4, 0xE12FF001),
+                (pc, 0xE59FD000 | (literal - pc - 8)),
+                (literal, top),
+            ):
+                struct.pack_into("<I", flash, address, value)
+        return flash
+
+    def test_all_models_static_only(self):
+        for model in CHECK.BOOT_LAYOUTS:
+            with self.subTest(model=model):
+                result = CHECK.boot_initializers(model, self.fixture(model))
+                self.assertEqual(len(result["initializers"]), 5)
+                self.assertIn("no observed coverage", result["scope"])
+                self.assertNotIn("observations", result)
+                self.assertNotEqual(result["initializers"][0]["top"], CHECK.INITIALIZERS[0][3])
+
+    def test_wrong_model_and_corruption_reject(self):
+        flash = self.fixture("hp50g")
+        for model in ("hp39gplus", "hp49gplus"):
+            with self.assertRaises(ValueError):
+                CHECK.boot_initializers(model, flash)
+        for offset in (0xC0, 0xC4, 0xC8, 1024):
+            with self.subTest(offset=offset):
+                flash[offset] ^= 1
+                with self.assertRaises(ValueError):
+                    CHECK.boot_initializers("hp50g", flash)
+                flash[offset] ^= 1
+        with self.assertRaises(ValueError):
+            CHECK.boot_initializers("hp50g", flash[:1024])
+
+
 if __name__ == "__main__":
     unittest.main()
