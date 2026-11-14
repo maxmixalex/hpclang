@@ -218,6 +218,19 @@ pointers into a freeing C++ owner. For example, copy into application storage
 before formatting the next value; retaining two returned pointers does not
 create two independent strings.
 
+Historical window strings have distinct lifetimes. `win_text_get_text` returns
+internal text valid until the next window call; copy it before retaining it,
+and never free it or put it in a freeing C++ owner. In-place edits cannot grow
+the string; use `win_text_set_text` for growth. The checker reports `HP014`.
+
+`win_choose_add` and `win_choose_add_with_label` borrow the caller's option and
+label pointers. Keep their storage alive while the control or application uses
+them; a temporary string or a returning function's local array is insufficient.
+`win_choose_get_choice` returns that borrowed option without transferring
+ownership. Copy results that must outlive the original storage. These calls
+receive `HP015`; the lexical checker cannot determine whether storage actually
+expires, so literals and already-safe code also receive review hints.
+
 In C++, use `owned_object` from `hpclang/object.hpp` and the directory/iterator
 owners from `hpclang/object-store.hpp`. Move to transfer ownership; borrow with
 `get()`. Use a temporary owner and swap after a successful replacement, or

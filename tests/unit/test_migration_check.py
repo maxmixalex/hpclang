@@ -20,6 +20,27 @@ SPEC.loader.exec_module(CHECK)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_window_borrowing_distinguishes_internal_text_and_caller_strings(self):
+        source = (
+            "copy(win_text_get_text(w));\n"
+            "win_choose_add(w, local);\n"
+            "win_choose_add_with_label(w, option, label);\n"
+            "copy(win_choose_get_choice(w));\n"
+            "// win_text_get_text(w);\n"
+            'const char *s = R"(win_choose_add(w, option);)";\n'
+            "my_win_text_get_text(w); win_choose_additional(w);\n"
+            "win_text_get_\\\ntext /* comment */ (w);\n"
+        )
+        rows = CHECK.scan(source, "widgets.cpp")
+        self.assertEqual(
+            [(r["rule"], r["line"], r["column"]) for r in rows],
+            [("HP014", 1, 6), ("HP015", 2, 1), ("HP015", 3, 1), ("HP015", 4, 6), ("HP014", 8, 1)],
+        )
+        self.assertIn("next window call", rows[0]["message"])
+        self.assertIn("use win_text_set_text for growth", rows[0]["message"])
+        self.assertIn("rather than copying", rows[1]["message"])
+        self.assertIn("does not transfer ownership", rows[3]["message"])
+
     def test_raw_address_translation_requires_design_review(self):
         rows = CHECK.scan("sys_map_v2p(ptr);\nsys_map_p2v(address);\n", "legacy.c")
         self.assertEqual(

@@ -5885,3 +5885,18 @@ build directories are removed. Concise reports and migration diffs are in
 /work/nov14-combined-compat-source. The accepted HPG, tone, RTC and window commits
 listed in the acceptance map were independently rechecked as main ancestors.
 The M8.4 integration/final acceptance gate remains open while #43 awaits CI.
+
+### 2026-11-14 — Window string lifetime migration hints
+
+HP014 identifies borrowed win_text_get_text results: no free/adoption, copy
+before the next window call, and use set_text for growth. HP015 distinguishes
+chooser options/labels retained from the caller and non-owning get_choice
+results. The hints follow the installed headers and implementation; they are
+lexical review requests, not a finding that every call dangles.
+
+Twenty-one migration tests, Ruff and strict docs pass. The actual installed and
+relocated CLI finds all four new call spellings while preserving input bytes,
+existing source-encoding behavior and earlier diagnostics. Temporary SDK/build
+directories are removed; report: /work/nov14-migration-window-lifetime.json.
+The maintained SDK gate includes these cases. This follow-up is local and does
+not change window runtime behavior or complete M8.5 acceptance.

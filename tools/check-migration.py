@@ -24,6 +24,16 @@ TOKENS = re.compile(
 )
 RULES = (
     (
+        "HP014",
+        r"\bwin_text_get_text\s*\(",
+        "Review borrowed widget text: win_text_get_text returns internal storage valid until the next window call. Do not free or adopt it into a C++ owner; copy retained text before calling window APIs again. In-place edits must not extend the current length; use win_text_set_text for growth.",
+    ),
+    (
+        "HP015",
+        r"\b(?:win_choose_add|win_choose_add_with_label|win_choose_get_choice)\s*\(",
+        "Review borrowed chooser strings: win_choose_add and win_choose_add_with_label retain the caller's option/label pointers rather than copying them. Keep that storage alive while referenced by the control or application; temporary/local strings can dangle. win_choose_get_choice does not transfer ownership. Copy retained results when their original storage will expire.",
+    ),
+    (
         "HP013",
         r"\b(?:sys_map_v2p|sys_map_p2v)\s*\(",
         "Review raw address translation: these HPGCC MMU helpers are not public hpclang APIs. Do not replace them with casts or a fixed address offset. Keep buffers within their owning service and use display surfaces, storage streams or object snapshots as appropriate; custom physical-memory access needs a separate design. A borrowed pointer does not establish physical-address validity or lifetime.",

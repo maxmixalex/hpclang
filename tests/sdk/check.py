@@ -148,6 +148,8 @@ def check_migration_tool(package, work, env):
         "void audio() { kos_beep(880, 10, 0); kos_CheckBeepEnd(); }\n"
         "void addresses() { sys_map_v2p(pointer); sys_map_p2v(address); }\n"
         "void text() { hpg_draw_text(dynamic, 0, 0); hpg_draw_letter_on(g, ch, 0, 0); }\n"
+        "void widgets() { win_text_get_text(w); win_choose_add(w, option); "
+        "win_choose_add_with_label(w, option, label); win_choose_get_choice(w); }\n"
     )
     source.write_text(original)
     result = subprocess.run(
@@ -181,6 +183,10 @@ def check_migration_tool(package, work, env):
         "HP013",
         "HP012",
         "HP012",
+        "HP014",
+        "HP015",
+        "HP015",
+        "HP015",
     ]:
         raise AssertionError(f"Unexpected migration findings: {report}")
     if source.read_text() != original:
