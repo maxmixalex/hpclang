@@ -12,9 +12,10 @@ import tempfile
 
 def check(toolchain):
     source = Path(__file__).resolve().parent
-    inputs = ("build.py", "entry.S", "probe.c", "link.ld")
+    inputs = {name: source / name for name in ("build.py", "entry.S", "probe.c", "link.ld")}
+    inputs["bootstrap-sync.S"] = source.parents[2] / "runtime/bootstrap/sync.S"
     outputs = ("program.HP", "probe.bin", "probe.elf", "metadata.json", "build.json")
-    hashes = {name: hashlib.sha256((source / name).read_bytes()).hexdigest() for name in inputs}
+    hashes = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in inputs.items()}
     with tempfile.TemporaryDirectory(prefix="hpclang-entry-build-") as temporary:
         root = Path(temporary)
         builds = []
@@ -22,7 +23,7 @@ def check(toolchain):
             copy = root / name / "source"
             copy.mkdir(parents=True)
             for filename in inputs:
-                shutil.copyfile(source / filename, copy / filename)
+                shutil.copyfile(inputs[filename], copy / filename)
             output = copy.parent / "output"
             subprocess.run(
                 [
@@ -30,6 +31,8 @@ def check(toolchain):
                     str(copy / "build.py"),
                     "--toolchain",
                     str(toolchain),
+                    "--bootstrap-sync",
+                    str(copy / "bootstrap-sync.S"),
                     "--output",
                     str(output),
                 ],
@@ -49,7 +52,7 @@ def check(toolchain):
                 raise ValueError(f"independent build differs: {name}")
             comparisons[name] = hashlib.sha256(original).hexdigest()
         for name, expected in hashes.items():
-            if hashlib.sha256((source / name).read_bytes()).hexdigest() != expected:
+            if hashlib.sha256(inputs[name].read_bytes()).hexdigest() != expected:
                 raise ValueError(f"source changed during check: {name}")
     return dict(
         inputs=hashes,

@@ -36,11 +36,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True, help="LLVM bin directory")
     parser.add_argument("--output", type=Path, required=True, help="new output directory")
+    parser.add_argument("--bootstrap-sync", type=Path, help="shared runtime/bootstrap/sync.S")
     args = parser.parse_args()
     root = args.output.resolve()
     root.mkdir(parents=True, exist_ok=False)
     tool = args.toolchain.resolve()
     source = Path(__file__).resolve().parent
+    sync = args.bootstrap_sync or Path(__file__).resolve().parents[3] / "runtime/bootstrap/sync.S"
+    inputs = {name: source / name for name in ("entry.S", "probe.c", "link.ld", "build.py")}
+    inputs["bootstrap-sync.S"] = sync
     common = [
         str(tool / "clang"),
         "--target=arm-none-eabi",
@@ -50,9 +54,10 @@ def main():
         "-fno-builtin",
         "-Oz",
     ]
-    for name in ("entry.S", "probe.c"):
+    for name in ("entry.S", "probe.c", "bootstrap-sync.S"):
         subprocess.run(
-            common + ["-c", str(source / name), "-o", str(root / (name + ".o"))], check=True
+            common + ["-c", str(inputs[name]), "-o", str(root / (name + ".o"))],
+            check=True,
         )
     subprocess.run(
         common
@@ -61,6 +66,7 @@ def main():
             "-Wl,-T," + str(source / "link.ld"),
             str(root / "entry.S.o"),
             str(root / "probe.c.o"),
+            str(root / "bootstrap-sync.S.o"),
             "-o",
             str(root / "probe.elf"),
         ],
@@ -122,8 +128,7 @@ def main():
     manifest = {
         "scope": "HP50g independent entry and return only",
         "inputs": {
-            name: hashlib.sha256((source / name).read_bytes()).hexdigest()
-            for name in ("entry.S", "probe.c", "link.ld", "build.py")
+            name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in inputs.items()
         },
         "compiler": subprocess.check_output([str(tool / "clang"), "--version"], text=True),
         "outputs": {

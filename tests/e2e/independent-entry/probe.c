@@ -4,8 +4,11 @@ struct workspace
     u32 marker, checksum, local_address, sp, base, end;
     u32 values[128];
 };
-__attribute__((noinline)) void exercise(struct workspace *out)
+__attribute__((noinline)) void exercise(struct workspace *out, volatile u32 *control)
 {
+    u32 cpsr;
+    __asm__ volatile("mrs %0, cpsr" : "=r"(cpsr));
+    control[1] = cpsr;
     volatile u32 local[32];
     u32 sum = 0x12345678u, stack;
     __asm__ volatile("mov %0, sp" : "=r"(stack));

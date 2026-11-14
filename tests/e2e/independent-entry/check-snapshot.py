@@ -9,9 +9,7 @@ import argparse
 spec = importlib.util.spec_from_file_location("verify", Path(__file__).with_name("verify.py"))
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
-parser = argparse.ArgumentParser(
-    description="Verify a real snapshot and reject six corrupted copies."
-)
+parser = argparse.ArgumentParser(description="Verify a real snapshot and reject corrupted copies.")
 for name in ("state", "artifact", "baseline", "report"):
     parser.add_argument("--" + name, type=Path, required=True)
 args = parser.parse_args()
@@ -21,6 +19,10 @@ meta = json.loads((artifact / "metadata.json").read_text())
 start = result["payload_physical"] - 0x08000000
 symbols = meta["symbols"]
 cases = {
+    "caller-control": ("sram", start + symbols["control"]),
+    "c-control": ("sram", start + symbols["control"] + 4),
+    "restored-control": ("sram", start + symbols["control"] + 8),
+    "restored-vector": ("sram", start + symbols["control"] + 16),
     "workspace-value": ("sram", start + symbols["workspace"] + 24),
     "stack-pointer": ("sram", start + symbols["workspace"] + 12),
     "low-guard": ("sram", start + symbols["guard_low"]),

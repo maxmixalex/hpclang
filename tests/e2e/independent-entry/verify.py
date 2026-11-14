@@ -53,13 +53,19 @@ def no_toolbox(ram, flash):
     nib, word = mapping(ram, flash)
     count = word(0x8611D, 3)
     require(count < 128, "invalid library catalog count")
-    require(all(word(0x86120 + 16 * i, 3) != 275 for i in range(count)), "library 275 present")
+    require(
+        all(word(0x86120 + 16 * i, 3) != 275 for i in range(count)),
+        "library 275 present",
+    )
     return nib, word, count
 
 
 def verify(artifact, root, baseline):
     flash = (root / "flash").read_bytes()
-    require(hashlib.sha256(flash[:0x140000]).hexdigest() == ROM_SHA256, "unqualified HP50g ROM")
+    require(
+        hashlib.sha256(flash[:0x140000]).hexdigest() == ROM_SHA256,
+        "unqualified HP50g ROM",
+    )
     no_toolbox((baseline / "sram").read_bytes(), (baseline / "flash").read_bytes())
     ram = (root / "sram").read_bytes()
     nib, word, _ = no_toolbox(ram, flash)
@@ -103,7 +109,8 @@ def verify(artifact, root, baseline):
     require(result[1] == checksum, "result[1] == checksum")
     low, high = (physical + symbols["stack_start"], physical + symbols["stack_end"])
     require(
-        low <= result[2] and result[2] + 128 <= high, "low <= result[2] and result[2] + 128 <= high"
+        low <= result[2] and result[2] + 128 <= high,
+        "low <= result[2] and result[2] + 128 <= high",
     )
     require(
         low <= result[3] <= result[2] and result[3] % 8 == 0,
@@ -113,9 +120,16 @@ def verify(artifact, root, baseline):
         result[4] == physical + symbols["workspace"] and result[5] == result[4] + 536,
         "result[4] == physical + symbols['workspace'] and result[5] == result[4] + 536",
     )
+    control = struct.unpack_from("<5I", ram, start + symbols["control"])
+    require(control[0] & 0xFF == 0x10, "expected unmasked user-mode caller")
+    require(control[1] & 0xFF == 0xD0, "C exercise did not mask IRQ/FIQ")
+    require(control[2] & 0xFF == control[0] & 0xFF, "caller control not restored")
+    require(control[3] != 0 and control[3] == control[4], "SWI vector not restored")
     actual = ram[start : start + meta["size"]]
     require(len(actual) == len(expected) == meta["size"], "truncated payload")
     for index, (before, after) in enumerate(zip(expected, actual)):
+        if symbols["control"] <= index < symbols["control"] + 20:
+            continue
         if symbols["workspace"] <= index < symbols["workspace"] + 536:
             continue
         if symbols["stack_start"] <= index < symbols["stack_end"]:
@@ -137,13 +151,16 @@ def verify(artifact, root, baseline):
     ]
     require(len(owners) == 1, "len(owners) == 1")
     require(
-        flash == (baseline / "flash").read_bytes(), "flash == (baseline / 'flash').read_bytes()"
+        flash == (baseline / "flash").read_bytes(),
+        "flash == (baseline / 'flash').read_bytes()",
     )
     return {
         "complete": True,
         "scope": "HP50g entry/return snapshot",
         "payload_physical": physical,
         "owned_stack_bytes": high - low,
+        "cpsr_control": [value & 0xFF for value in control[:3]],
+        "swi_vector": list(control[3:]),
         "program_sha256": hashlib.sha256((artifact / "program.HP").read_bytes()).hexdigest(),
         "state_sha256": {
             name: hashlib.sha256((root / name).read_bytes()).hexdigest()

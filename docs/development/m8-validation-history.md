@@ -4809,3 +4809,52 @@ Long HP39 transfer waits resolved within the same runs without retries. The
 current formatted emulator supersedes the previous single-model experiment's
 binary; the earlier experiment remains historical evidence. No claim closes
 other allocation paths, native exception-stack bounds or whole-system peaks.
+
+
+## 2026-11-14 — Independent entry runs a bounded HPC1 program
+
+A local experimental HP50g program embeds a 380-byte Thumb HPC1 payload and
+uses the existing common bootstrap/MMU/cache implementation. All six backing
+pages (code, page tables, boot/data/stack) are inside the RPL program's owned
+reserved storage. On a copied, fingerprint-checked baseline without library
+275, the application returns 42 and writes model 6, 16384 RW bytes and its
+expected data marker. Independent snapshot checks confirm payload/code guards,
+object containment, exact data, RPL return 124275, unchanged Flash, restored
+L1 slots and SWI vector, and unchanged caller CPSR control bits.
+
+Evidence: `/work/nov14-independent-hpc1-live/verified.json`; reproducible local
+build/run/verifier drivers are `research/nov14-independent-hpc1-*.py`.
+This is a bounded embedded HPC1 experiment, not an arbitrary-app loader,
+service-coexistence proof, other-family acceptance or a released launcher.
+
+The experiment exposes a defect in the earlier independent-entry description:
+its outer direct MSR executes in user mode. Recorded CPSR control is 0x10 before
+and after the common bootstrap call, so the outer attempt does not mask IRQ/FIQ.
+The common bootstrap uses its SWI-based save/disable/restore path during HPC1
+execution, but the standalone entry's claimed C-call masking requires a real
+fix and native revalidation. No hardware run is authorized by this finding.
+
+
+## 2026-11-14 — Independent entry masks IRQ/FIQ through shared SWI helpers
+
+The maintained entry now links `runtime/bootstrap/sync.S` and uses its existing
+save/disable/restore routines. A 20-byte owned observation record captures
+caller, C-call and restored CPSR control plus the original/restored SWI vector.
+Fresh HP50g Stock USB execution records `0x10 -> 0xd0 -> 0x10`, both vectors
+`0x0003f568`, valid owned workspace/stack/guards, RPL return 124275 and unchanged
+Flash without library 275. All ten corrupt-snapshot checks reject their inputs.
+Two independent source copies include the shared assembly and produce identical
+artifacts. After formatting-only build-script changes, the final build retains
+identical program/ELF/binary/metadata and passes verification against the actual
+executed snapshot. Program SHA-256:
+`bb5db8b714920e939855894caf952406e54d2ae66370e0ca331d34a792e28234`.
+
+The bounded embedded HPC1 experiment passes a fresh run with the corrected
+entry too: application result 42, expected model/data, owned pages, restored
+L1 mappings/vector, RPL return and unchanged Flash. Outer C control is now
+`0xd0` before/after common bootstrap; entry caller control restores to `0x10`.
+This closes the observed entry defect, not general launcher/service acceptance.
+Reports: `/work/nov14-independent-entry-swi-live/verified-final.json`,
+`/work/nov14-independent-entry-swi-live/negative.json` and
+`/work/nov14-independent-hpc1-swi-live/verified.json`.
+The fix is locally validated; existing #40 CI still tests head 5476624d.
