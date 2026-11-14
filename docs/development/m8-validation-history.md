@@ -5782,3 +5782,21 @@ tests, Ruff and strict docs pass. Temporary installations and archives are
 removed; no ROM or external ARMToolbox binaries enter the archive. Report:
 `/work/nov14-sdk-distribution.json`. This accepts the local archive/installation
 path, not the pending main integration, native resource bounds or all of M8.6.
+
+
+### 2026-11-14 — SDK distribution and ownership integration rehearsal
+
+Local merge 4dd9da7e combines #43 b92a15ee and #40 e5b87c44. The SDK-check
+conflict retains both parent functions unchanged: distribution extraction runs
+before independent C++ header/profile validation. Runtime, include, platform
+and example Git trees remain identical to #43. Both validation-history tails
+are retained and the current roadmap comes from the synchronized board.
+
+The combined full SDK gate passes: 4,117 archived files, two identical ZIPs,
+nine standalone C++ headers/profile checks, migration and assembly checks,
+613 byte-identical release outputs, all six model-specific Notebook builds and
+all three HP39 C/C++ Aplet families. Packaging unit tests, Ruff and strict docs
+also pass. Source hashes remain unchanged and temporary SDK/build directories
+are removed. Report: `/work/nov14-sdk-owners-integration.json`; parent-function
+and source-tree checks: `research/nov14-sdk-integration-preservation.json`.
+This is a prepared local integration, not remote CI or main acceptance.
