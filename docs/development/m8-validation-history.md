@@ -6565,3 +6565,26 @@ Long HP39 transfer waits resolved within the same runs without retries. The
 current formatted emulator supersedes the previous single-model experiment's
 binary; the earlier experiment remains historical evidence. No claim closes
 other allocation paths, native exception-stack bounds or whole-system peaks.
+
+
+## 2026-11-14 — Owned-tail Port1 edit regression
+
+The object-mutation fixture now exercises internal Port1 same-size replacement,
+growth, contraction and removal on two fresh tail records. A refusing guard
+must leave the chain unchanged; successful edits preserve the following owned
+record and restore the original chain length and prefix. The guard is valid
+only for records created by this invocation and never exposed to resumed Stock.
+It does not supply the production live-reference collector or enable public edits.
+
+The probe is compiled for hp4950/all only. HP48gII builds with the probe excluded;
+its temporary build was removed after dependency checks. ARM static analysis
+passes. HP49g+ and HP50g each report the three expected lifecycle phases and
+settled return. Independent audit confirms all six phases, settled return and unchanged sealed
+inputs/artifacts: `/work/nov14-port1-owned-edit-native-v2/independent-audit.json`.
+
+The first local attempt used the SD harness without installing Stock fixtures
+and failed the existing PORTONE read at 0xb4, before entering the new probe.
+The corrected run uses the maintained USB fixture installation. Reports:
+`/work/nov14-port1-owned-edit-native-v2/result.json` and
+`/work/nov14-port1-hp48-build/result.json`. This is local validation, not CI or
+M8.0 acceptance.

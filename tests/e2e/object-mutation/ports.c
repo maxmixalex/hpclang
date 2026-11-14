@@ -5,6 +5,10 @@
 #include <hpclang/port.h>
 #include <hpclang/target.h>
 
+#ifdef HPCLANG_E2E_PORT1_EDITS
+uint32_t hpclang_e2e_port1_owned_edits(void);
+#endif
+
 uint32_t hpclang_e2e_port_lifecycle(uint32_t *phase)
 {
     static const uint8_t name[] = "PORTKEEP";
@@ -52,6 +56,11 @@ uint32_t hpclang_e2e_port_lifecycle(uint32_t *phase)
             hpclang_object_release(next);
             if (result)
                 return 0xb8;
+#ifdef HPCLANG_E2E_PORT1_EDITS
+            uint32_t edit_result = hpclang_e2e_port1_owned_edits();
+            if (edit_result)
+                return edit_result;
+#endif
         }
         next = hpclang_port_backup_get(1, made, sizeof(made) - 1);
         int64_t integer;
