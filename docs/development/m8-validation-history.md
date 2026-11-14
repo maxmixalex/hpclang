@@ -9,11 +9,13 @@ the launcher verifier still accepts only the original fields. The repair
 validates the optional subset and rejects unknown/malformed fields while
 retaining the launcher stack geometry and 4 KiB limit. No runtime changes.
 Eleven UI-memory tests pass, including null/populated subsets and invalid
-metadata. Replaying the actual failed CI artifact passes pixels, application
-SP, launcher SP (3240/4096 bytes), pool and allocation checks; the old verifier
-rejects the same artifact. This is report replay, not new native execution or
+metadata. All six Stock UI jobs subsequently fail at the same schema check.
+Replaying their actual CI artifacts passes pixels, application SP, launcher SP
+(3240/4096 bytes on each model), pool and allocation checks; the old verifier
+rejects every artifact. This is report replay, not new native execution or
 whole-system memory qualification. Ruff and formatting pass. Local report:
-`/work/nov14-ui-ci-schema-replay.json`; new-head CI acceptance remains pending.
+`/work/nov14-ui-ci-schema-replay.json` and model-suffixed variants; new-head CI
+acceptance remains pending.
 
 ### 2026-11-14 — Independent HPC1 isolated-build dependency repair
 
