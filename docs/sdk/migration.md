@@ -156,7 +156,7 @@ The legacy grammar is different: `%g` counts fractional places; 64-bit integers
 use `%L`/`%U`; standard length modifiers, `*`, `+`, `#` and `%n` are rejected.
 Precision is capped at 15 and historical malformed carry/zero-precision outputs
 are corrected. Audit each format string before opting in; see the
-[formatting contract and original-source comparisons](../development/hpgcc-compat.md#historical-console-output).
+[online formatting contract and original-source comparisons](https://maxmixalex.github.io/hpclang/development/hpgcc-compat/#historical-console-output).
 
 Legacy HPG text and the default compatibility console use calculator bytes.
 The clean `hpclang_surface_draw_text` and `hpclang_surface_draw_utf8` functions

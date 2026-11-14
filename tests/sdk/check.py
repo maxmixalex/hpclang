@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from urllib.parse import unquote, urlsplit
 import zipfile
 import zlib
 
@@ -102,6 +103,38 @@ def check_sdk_archive(root, prefix, sdk, work, env):
     print(
         f"SDK distribution: {len(manifest['files'])} files, identical archives, extracted build input"
     )
+
+
+def check_public_docs(package):
+    """Check the inline local links used by the installed Markdown guides."""
+    docs = package / "docs"
+    required = {
+        "getting-started.md",
+        "api-conventions.md",
+        "migration.md",
+        "declarative-ui.md",
+        "memory.md",
+        "licensing.md",
+    }
+    if not all((docs / name).is_file() for name in required):
+        raise AssertionError("SDK is missing a public guide or licensing document")
+    checked = 0
+    for page in sorted(docs.glob("*.md")):
+        source = page.read_text(encoding="utf-8")
+        # Examples contain C++ subscripts/lambdas, not Markdown hyperlinks.
+        source = re.sub(r"(?ms)^```[^\n]*\n.*?^```\s*$", "", source)
+        source = re.sub(r"`+[^`\n]*`+", "code", source)
+        for target in re.findall(r"\[[^\]\n]+\]\(([^)\n]+)\)", source):
+            url = urlsplit(target.strip().strip("<>"))
+            if url.scheme or url.netloc or not url.path:
+                continue
+            path = (page.parent / unquote(url.path)).resolve()
+            if not path.is_relative_to(package.resolve()) or not path.is_file():
+                raise AssertionError(
+                    f"Broken installed documentation link: {page.name} -> {target}"
+                )
+            checked += 1
+    print(f"Installed SDK: public guides and {checked} local documentation links PASS")
 
 
 def check_migration_tool(package, work, env):
@@ -296,6 +329,7 @@ def main():
         check_sdk_archive(root, prefix, sdk, work, env)
         package = sdk / "share/hpclang"
         check_cpp_headers(package, work, env)
+        check_public_docs(package)
         check_migration_tool(package, work, env)
         check_interworking(package, work, env)
         application = work / "external application"

@@ -5824,3 +5824,18 @@ Reports: `/work/nov14-fsystem-acceptance-source-audit.json` and
 `/work/nov14-fsystem-native-provenance.json`. Current #41 CI still has eight
 queued workflows, ten queued jobs and one running job, with no reported failure;
 CI and final stage acceptance remain pending.
+### 2026-11-14 — Installed public documentation links
+
+The migration guide linked to an uninstalled development document. Its optional
+historical comparison now links to the online documentation; the public guide
+retains the formatting instructions. The SDK gate checks required public guides
+and their inline local file links after archive extraction, rejecting missing
+files and targets outside the installation while ignoring code examples.
+
+Actual CMake installation and extraction of the 4,111-file SDK pass all thirteen
+local documentation links. Three focused regression tests, Ruff and strict docs
+pass. Temporary installation/archive outputs are removed. Report:
+`/work/nov14-installed-docs.json`. This focused documentation check does not rerun
+application or native gates and does not complete M8.6. The preceding submitted
+e5b87c44 has two pending and five queued workflows, eleven queued jobs and no
+reported failure; the documentation fix remains local pending submission.
