@@ -6,6 +6,7 @@ permissions:
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "runtime/libc/storage.c"
       - "runtime/libc/kos-call.S"

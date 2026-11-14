@@ -188,6 +188,15 @@ validation of the fast-forwarded main head.
 
 ## Quality and workflow responsibilities
 
+Core runtime, Runtime, Storage, Objects, Font Gallery and Quality run automatically
+for matching pull-request changes and pushes to `main`. This avoids two full
+matrices for the same development-branch commit while retaining PR merge-context
+checks and post-merge regression. Their path filters and job matrices are unchanged.
+Branches without a PR can use each workflow's manual dispatch entry. FatFs vendor,
+font generation, documentation publishing and maintenance keep their separate
+trigger contracts. Already queued runs are not cancelled by this trigger change.
+
+
 Quality runs three real gates: Ruff/ShellCheck, full owned-source formatting,
 and Clang static analysis. Formatting uses the pinned ATfE clang-format plus
 pinned Ruff. It never rewrites sources in CI. Vendor and generated font sources
