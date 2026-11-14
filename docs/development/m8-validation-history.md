@@ -5900,3 +5900,105 @@ existing source-encoding behavior and earlier diagnostics. Temporary SDK/build
 directories are removed; report: /work/nov14-migration-window-lifetime.json.
 The maintained SDK gate includes these cases. This follow-up is local and does
 not change window runtime behavior or complete M8.5 acceptance.
+
+
+## 2026-11-14 — Separate low-SRAM stack observations
+
+The region observer retains full 1 MiB summaries and additionally records SP
+assignments in `[0x08000000, 0x08001000)` by CPU mode. This avoids treating a
+switch to borrowed SRAM as consumption of all intervening addresses. The
+initializer verifier validates optional window geometry/counts and stack-top
+coverage; old traces remain readable without gaining new window evidence.
+Twenty observer, initializer and UI-memory tests, Ruff, fresh emulator build
+and strict docs pass.
+
+HP50g and HP39gs Stock UI runs pass pixels, resources and settled return with
+explicit region capture. Independent verification confirms sealed inputs,
+twelve shared firmware hashes, all five initializers/model and trace identity.
+Observed IRQ/FIQ/SVC downward extents are 200/36/104 bytes on HP50g and
+176/0/104 on HP39gs. Zero means no descent observed, not zero required capacity.
+Evidence: `/work/nov14-native-stack-window-live-v2/independent-audit.json`.
+Two local setup omissions (firmware inputs, then the region-capture switch)
+were corrected before this successful matrix. Other models retain earlier
+full-region evidence; fresh low-window runs have not been claimed for them.
+
+This is local executed-path observation, not a reservation proof, whole-system
+transient-memory admission, physical-device qualification or M8 completion.
+
+
+## 2026-11-14 — Six-model low-SRAM stack observations
+
+All six Stock UI runs pass application pixels, resources and settled return.
+The independent replay verifies each completed status, all sealed inputs,
+twelve shared firmware hashes, five ROM bank initializers per model and the
+qualified allocator traces. The current formatted verifier reproduces all six
+saved stack reports. The native observer and existing UI payload are unchanged;
+this is new observer coverage, not a rebuild of the application.
+
+| Model | Observed IRQ/FIQ/SVC downward extent, bytes | Minimum sampled native usable bytes |
+| --- | --- | --- |
+| HP39g+ | 120 / 0 / 112 | 1928 |
+| HP39gs | 176 / 0 / 104 | 1256 |
+| HP40gs | 176 / 0 / 104 | 1256 |
+| HP48gII | 200 / 36 / 104 | 1256 |
+| HP49g+ | 200 / 36 / 104 | 1672 |
+| HP50g | 200 / 36 / 104 | 1672 |
+
+Zero means no downward excursion was observed in this window. Neither these
+extents nor the sampled heap minima establish reserved capacities or bounds
+on unobserved paths/allocators. Native stack reservations and whole-system
+transient-memory admission remain open. Combined report:
+`/work/nov14-native-stack-window-remaining/independent-audit.json`.
+Formatting-only follow-up 4d2dd3fd is submitted in #44; CI remains pending.
+
+
+## 2026-11-14 — Saved user-stack observation
+
+The ordinary translated-register SP observer missed ARM LDM user-bank loads.
+The HP50g ROM task restore at 0x3f3e0 uses this instruction. The preparation
+patch now emits an optional host-only observation after loading register 13,
+with the instruction PC and user-bank mode 16, without changing guest state.
+Other registers and disabled/empty tracing emit no observer. Four emitted-code
+checks and eighteen existing observer tests pass, as do a fresh emulator build,
+Ruff and strict docs.
+
+Fresh HP50g Stock UI execution passes pixels, resources and settled return.
+Independent source/artifact/firmware, native heap and initializer checks pass.
+The user-bank SRAM maximum now includes 134344700 at PC 0x3f3e0, eight bytes above
+the old recorded maximum; this is concrete previously missed saved-bank evidence,
+not increased active-stack consumption. Application stack remains 2432/8192.
+Report: /work/nov14-user-stack-live/hp50-independent-audit.json.
+HP39gs subsequently passes on the same sealed inputs. The two-model independent
+audit passes source/artifact/firmware identity, pixels/resources/settled return,
+native heap profiles and ROM initializer reconciliation. Report:
+/work/nov14-user-stack-live/independent-audit.json.
+This closes one observer coverage gap, not native reservation bounds or
+whole-system transient-memory admission. The change remains local.
+
+
+### 2026-11-14 — Separate cold-boot and runtime stack layouts
+
+The optional maintained boot-layout decoder validates all thirty mode/SP
+initializers in six original ROMs. Seven focused tests pass, including wrong
+bootloader/layout, mode, SP-load, literal and truncation rejection. Runtime
+trace reconciliation retains its previous output unless the option is selected.
+This adds static boot coverage only; native stack reservation and whole-system
+transient-memory requirements remain open. Evidence:
+`/work/nov14-boot-stack-layout.json`.
+
+### 2026-11-14 — Corrected stack observer completes all six Stock models
+
+The remaining HP39g+, HP40gs, HP48gII and HP49g+ runs pass on the same sealed UI
+artifact with the corrected LDM user-bank SP observer. Together with the earlier
+HP39gs/HP50g runs, independent replay verifies all six input/artifact/firmware
+identities, UI pixels, stack observations, native heap profiles, ROM runtime
+initializers and settled returns. Application peaks are 2424/8192 bytes on
+HP39g+/HP40gs and 2432/8192 on HP48gII/HP49g+.
+
+Observed low-SRAM IRQ/FIQ/SVC downward spans are 120/0/112 bytes on HP39g+,
+176/0/104 on HP39gs/HP40gs, and 200/36/104 on HP48gII/HP49g+/HP50g. These are
+observations below decoded runtime tops, not reserved capacities; a zero span
+does not prove a handler cannot use its stack. Whole-system admission and native
+stack reservation bounds remain open. Report:
+`/work/nov14-user-stack-remaining/independent-audit.json`. This closes the
+corrected observer's six-model regression coverage, not all M8.2/M8.3 acceptance.

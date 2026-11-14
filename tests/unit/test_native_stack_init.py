@@ -40,7 +40,9 @@ class NativeStackInitTest(unittest.TestCase):
 
     def check(self):
         return CHECK.verify(
-            "hp50g", self.flash, "\n".join(json.dumps(row) for row in self.rows).encode()
+            "hp50g",
+            self.flash,
+            "\n".join(json.dumps(row) for row in self.rows).encode(),
         )
 
     def test_reconciliation_is_not_reservation(self):
@@ -81,6 +83,31 @@ class NativeStackInitTest(unittest.TestCase):
                 self.check()
             self.rows[0][key] = old
 
+    def test_low_sram_excludes_borrowed_stack(self):
+        for row in self.rows:
+            row["low_sram"] = {
+                k: row[k] for k in ("writes", "minimum", "maximum", "minimum_pc", "maximum_pc")
+            }
+            row["maximum"] = 0x08007000
+            row["writes"] += 100
+        result = self.check()
+        self.assertTrue(all(x["low_sram"]["writes"] == 2 for x in result["initializers"]))
+        original = self.rows[0]["low_sram"]
+        for bad in (
+            None,
+            {},
+            dict(original, minimum=0x07FFFFFF),
+            dict(original, maximum=0x08001000),
+            dict(original, writes=103),
+            dict(original, writes=True),
+            dict(original, minimum_pc=-1),
+            dict(original, maximum=original["maximum"] - 1),
+        ):
+            self.rows[0]["low_sram"] = bad
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                self.check()
+        self.rows[0]["low_sram"] = original
+
     def test_other_regions_remain_visible(self):
         self.rows.append(
             dict(
@@ -95,6 +122,45 @@ class NativeStackInitTest(unittest.TestCase):
             )
         )
         self.assertEqual(len(self.check()["observations"]), 6)
+
+
+class BootStackInitTest(unittest.TestCase):
+    def fixture(self, model):
+        flash = bytearray(2048)
+        anchor, tops = CHECK.BOOT_LAYOUTS[model]
+        for i, ((_, offset, flags, _), top) in enumerate(zip(CHECK.INITIALIZERS, tops)):
+            pc, literal = anchor + offset, 1024 + i * 4
+            for address, value in (
+                (pc - 8, 0xE3801000 | flags),
+                (pc - 4, 0xE12FF001),
+                (pc, 0xE59FD000 | (literal - pc - 8)),
+                (literal, top),
+            ):
+                struct.pack_into("<I", flash, address, value)
+        return flash
+
+    def test_all_models_static_only(self):
+        for model in CHECK.BOOT_LAYOUTS:
+            with self.subTest(model=model):
+                result = CHECK.boot_initializers(model, self.fixture(model))
+                self.assertEqual(len(result["initializers"]), 5)
+                self.assertIn("no observed coverage", result["scope"])
+                self.assertNotIn("observations", result)
+                self.assertNotEqual(result["initializers"][0]["top"], CHECK.INITIALIZERS[0][3])
+
+    def test_wrong_model_and_corruption_reject(self):
+        flash = self.fixture("hp50g")
+        for model in ("hp39gplus", "hp49gplus"):
+            with self.assertRaises(ValueError):
+                CHECK.boot_initializers(model, flash)
+        for offset in (0xC0, 0xC4, 0xC8, 1024):
+            with self.subTest(offset=offset):
+                flash[offset] ^= 1
+                with self.assertRaises(ValueError):
+                    CHECK.boot_initializers("hp50g", flash)
+                flash[offset] ^= 1
+        with self.assertRaises(ValueError):
+            CHECK.boot_initializers("hp50g", flash[:1024])
 
 
 if __name__ == "__main__":

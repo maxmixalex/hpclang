@@ -2272,6 +2272,23 @@ All six models now pass: HP40gs adds eight snapshots, HP48gII 14, and HP49g+
 `/work/oct26-resource-snapshot-matrix/final-audit.json` fingerprints the evidence.
 These successful sampled runs do not establish a transient peak bound.
 
+### Cold-boot stack layout
+
+`verify-native-stack-init.py --include-boot-layout` additionally decodes the
+reviewed cold-boot mode/SP sequence, without requiring that a restored Stock
+snapshot executed it. Boot tops differ from the later runtime tops:
+
+| Bootloader family | Undefined / Abort / IRQ / FIQ / Supervisor stack tops |
+| --- | --- |
+| HP39g+, HP49g+ | `08006D7C / 08006E7C / 08006F7C / 08006FFC / 08006CFC` |
+| HP39gs, HP40gs, HP48gII, HP50g | `08006450 / 080064A0 / 080065AC / 0800662C / 08006400` |
+
+The checker validates mode changes, SP-load instructions and literal values
+against each model's reviewed layout. Six original ROMs pass all thirty
+initializers. These are static tops, not lower bounds or reserved capacities;
+restored-state UI runs do not establish cold-boot stack usage. Existing dynamic
+runtime reconciliation is unchanged. Report: `/work/nov14-boot-stack-layout.json`.
+
 ### UI resource measurements
 
 The `ui_demo_lifecycle` sanitizer test executes the shipped declarative-UI
@@ -2319,9 +2336,26 @@ modes remain separate; their address distance is not stack consumption. A
 region boundary crossing produces separate records and must not be discarded
 when checking a known stack reservation. The original application-only trace
 can run alongside it. Both outputs refuse to overwrite existing evidence.
-This diagnostic uses host memory only and is disabled by default. It does not
-observe implicit bank switches or SP updates outside the translated register
-store path, and it does not itself certify a stack bound or memory admission.
+This diagnostic uses host memory only and is disabled by default. It also records ARM `LDM ...^` writes to the saved user SP, attributed to
+mode 16 and the actual load instruction address. This covers the ROM task-restore
+path that bypasses the ordinary translated register-store helper. Such saved-bank
+assignments are not active supervisor-stack use. Implicit bank switches and other
+SP updates outside these two paths remain separate, and these observations do not
+by themselves certify a stack bound or memory admission.
+
+For SRAM region 128, new records also include `low_sram`: independent counts,
+extrema and instruction addresses for SP values in `[0x08000000, 0x08001000)`,
+or `null` if no assignment falls in that window. This separates the fixed low
+ROM stack initializers from borrowed stacks elsewhere in the same SRAM region;
+the full-region observations are retained. The 4 KiB window is an observation
+partition, not a reserved stack arena. A stack leaving it remains visible in
+the full-region record. Its address range must not be used as a capacity limit.
+
+The initializer verifier checks the optional window's geometry, counts and
+coverage of each expected stack top. Legacy traces without this field remain
+readable and produce no low-window evidence. Enable `HPCLANG_X50NG_STACK_REGIONS`
+explicitly when running the harness outside CI; application-only
+`HPCLANG_E2E_CAPTURE_STACK_POINTER=1` does not request this trace.
 
 For a Stock UI run, save that trace as `build/<model>-frame-stack-regions.jsonl`
 and pass `--stage-stack --pool --artifact /path/to/ui-artifact` to the UI verifier.
