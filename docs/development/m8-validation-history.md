@@ -6002,3 +6002,17 @@ does not prove a handler cannot use its stack. Whole-system admission and native
 stack reservation bounds remain open. Report:
 `/work/nov14-user-stack-remaining/independent-audit.json`. This closes the
 corrected observer's six-model regression coverage, not all M8.2/M8.3 acceptance.
+
+### 2026-11-14 — UI observer joins the combined release candidate
+
+Local merge 76fd9c57 integrates #44's corrected stack observer and six-model
+validation record with the compatibility/C++/SDK branch and HP014/HP015 migration
+hints. All six changed observer files match the validated parent exactly.
+Runtime, public headers, platform, examples and CMake trees remain identical to
+the full-SDK/native-tested ad929ac9 base; C/C++ unit sources are unchanged.
+The only changed SDK-check function is the separately installed/relocated-tested
+migration follow-up. No new native execution is inferred from this merge.
+
+All 295 Python regressions, focused Ruff and strict docs pass. Preservation
+report: research/nov14-ui-combined-preservation.json. Remote CI/main acceptance,
+native stack reservations and whole-system resource admission remain open.
