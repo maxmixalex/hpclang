@@ -174,8 +174,151 @@ static void test_cpu_capture(void)
     assert(!memcmp(&output, &sentinel, sizeof output));
 }
 
+static void set_word(struct fixture *f, unsigned at, uint32_t value)
+{
+    for (unsigned i = 0; i < 4; ++i)
+        f->bytes[at + i] = (uint8_t)(value >> (8 * i));
+}
+
+static void test_config(void)
+{
+    struct fixture f = {0}, output = {0}, expected, original;
+    set_word(&f, 0xb9c, 3);
+    expected = f;
+    set_word(&expected, 0xb9c, 35);
+    assert(!hpclang_rpl_config_predict(f.bytes, 0xdeadbeef, output.bytes));
+    assert(!memcmp(output.bytes, expected.bytes, sizeof f.bytes));
+    set_word(&f, 0xb9c, 0);
+    assert(!hpclang_rpl_config_predict(f.bytes, 0xfffabcde, output.bytes));
+    assert(word(&output, 0xb9c) == 1 && word(&output, 0xba0) == (0xabcdeu >> 6));
+    for (unsigned i = 0; i < 256; ++i) {
+        set_word(&f, 4 * i, 0x08000000 + 0x800 * i);
+        set_word(&f, 0x404 + 4 * i, 0x09000000 + 0x800 * i);
+    }
+    f.bytes[0x808 + 64] = 5;
+    set_word(&f, 0xb9c, 33);
+    set_word(&f, 0xbac, 16);
+    set_word(&f, 0xbd4, 0x08030000);
+    set_word(&f, 0xc48, 64);
+    set_word(&f, 0xc5c, 0x08030000);
+    set_word(&f, 0xc50, 0xa5);
+    set_word(&f, 0xc58, 0x5a);
+    assert(!hpclang_rpl_config_predict(f.bytes, 65u << 12, output.bytes));
+    assert(word(&output, 0xb9c) == 3 && word(&output, 0xba8) == 65);
+    assert(word(&output, 64 * 4) == 0x08030000 && word(&output, 65 * 4) == 0x08030800);
+    assert(word(&output, 0xc4c) == word(&f, 64 * 4));
+    assert(word(&output, 0xc54) == word(&f, 0x404 + 64 * 4));
+    assert(word(&output, 0xc50) == 0xa5 && word(&output, 0xc58) == 0x5a);
+    assert(output.bytes[0x808 + 64] == 5 && output.bytes[0x808 + 65] == 5);
+    assert(word(&output, 0x400) == word(&f, 0) && word(&output, 0x804) == word(&f, 0x404));
+    original = f;
+    assert(!hpclang_rpl_config_predict(f.bytes, 65u << 12, f.bytes));
+    assert(!memcmp(f.bytes, output.bytes, sizeof f.bytes));
+    f = original;
+    memset(output.bytes, 0xa5, sizeof output.bytes);
+    expected = output;
+    for (unsigned bad = 0; bad < 3; ++bad) {
+        f = original;
+        uint32_t c = 65u << 12;
+        if (bad == 0)
+            set_word(&f, 0xbac, 257);
+        if (bad == 1) {
+            set_word(&f, 0xbac, 7);
+            c = 255u << 12;
+        }
+        if (bad == 2)
+            set_word(&f, 0xc48, 255);
+        assert(hpclang_rpl_config_predict(f.bytes, c, output.bytes) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(output.bytes, expected.bytes, sizeof output.bytes));
+        struct fixture before = f;
+        assert(hpclang_rpl_config_predict(f.bytes, c, f.bytes) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(f.bytes, before.bytes, sizeof f.bytes));
+    }
+    f = original;
+    set_word(&f, 0xbac, 0);
+    set_word(&f, 0xc48, UINT32_MAX);
+    assert(!hpclang_rpl_config_predict(f.bytes, 65u << 12, output.bytes));
+    assert(word(&output, 0x400) == word(&f, 0) && word(&output, 0xc4c) == word(&f, 0xc4c));
+    for (unsigned flags = 62; flags < 66; ++flags) {
+        set_word(&f, 0xb9c, flags);
+        assert(!hpclang_rpl_config_predict(f.bytes, 0xffffffff, output.bytes));
+        assert(!memcmp(f.bytes, output.bytes, sizeof f.bytes));
+    }
+    assert(hpclang_rpl_config_predict(NULL, 0, output.bytes) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_config_predict(f.bytes, 0, NULL) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
+static void test_bank_write(void)
+{
+    struct fixture f = {0};
+    set_word(&f, 0xba0, UINT32_MAX);
+    set_word(&f, 0xbb0, 0x7f);
+    for (unsigned offset = 0; offset < 4096; ++offset) {
+        unsigned lower = (offset >> 5) & 3, upper = (offset >> 1) & 15;
+        set_word(&f, 0xbcc, lower);
+        set_word(&f, 0xbd0, upper);
+        struct hpclang_rpl_bank_write result;
+        assert(!hpclang_rpl_bank_write_inspect(f.bytes, 0x7f000 + offset, &result));
+        assert(result.lower == lower && result.upper == upper && result.unchanged);
+        set_word(&f, 0xbd0, upper ^ 1);
+        assert(!hpclang_rpl_bank_write_inspect(f.bytes, 0x7f000 + offset, &result));
+        assert(!result.unchanged);
+        set_word(&f, 0xbd0, upper);
+        set_word(&f, 0xbcc, lower ^ 1);
+        assert(!hpclang_rpl_bank_write_inspect(f.bytes, 0x7f000 + offset, &result));
+        assert(!result.unchanged);
+    }
+    const struct hpclang_rpl_bank_write saved = {91, 92, 93};
+    struct hpclang_rpl_bank_write result = saved;
+    set_word(&f, 0xba0, 0x7f024 >> 6);
+    assert(hpclang_rpl_bank_write_inspect(f.bytes, 0x7f024, &result) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&saved, &result, sizeof result));
+    set_word(&f, 0xba0, UINT32_MAX);
+    assert(hpclang_rpl_bank_write_inspect(f.bytes, 0x80000, &result) < 0);
+    assert(hpclang_rpl_bank_write_inspect(f.bytes, 0x100000, &result) < 0);
+    assert(hpclang_rpl_bank_write_inspect(NULL, 0x7f024, &result) < 0);
+    assert(hpclang_rpl_bank_write_inspect(f.bytes, 0x7f024, NULL) < 0);
+    assert(!memcmp(&saved, &result, sizeof result));
+}
+
+static void test_unconfig(void)
+{
+    struct fixture f = {0};
+    set_word(&f, 0xba0, 0x7f000 >> 6);
+    for (unsigned offset = 0; offset < 4096; ++offset) {
+        set_word(&f, 0xba8, 0x7f);
+        set_word(&f, 0xbb8, 0x7f);
+        set_word(&f, 0xbc4, 0x7f);
+        set_word(&f, 0xbb0, 0x7f);
+        const unsigned flags[] = {31, 29, 21, 5, 0xffffffff};
+        const unsigned kinds[] = {HPCLANG_RPL_UNCONFIG_RAM, HPCLANG_RPL_UNCONFIG_ERAM,
+                                  HPCLANG_RPL_UNCONFIG_PORT, HPCLANG_RPL_UNCONFIG_BANK,
+                                  HPCLANG_RPL_UNCONFIG_RAM};
+        for (unsigned i = 0; i < 5; ++i) {
+            set_word(&f, 0xb9c, flags[i]);
+            struct hpclang_rpl_unconfig effect;
+            assert(!hpclang_rpl_unconfig_inspect(f.bytes, 0xabf7f000 + offset, &effect));
+            assert(effect.kind == (offset >= 64 ? kinds[i] : HPCLANG_RPL_UNCONFIG_IO));
+            assert(effect.rebuild == (offset >= 64 && i != 3));
+            assert(effect.clear_field == (offset >= 64 ? i == 3 ? 0xbb0u : 0u : 0xba0u));
+        }
+    }
+    set_word(&f, 0xb9c, 0xffffffc0);
+    struct hpclang_rpl_unconfig effect;
+    assert(!hpclang_rpl_unconfig_inspect(f.bytes, 0x80000, &effect));
+    assert(!effect.kind && effect.flags == 0xffffffc0 && !effect.clear_field && !effect.rebuild);
+    struct hpclang_rpl_unconfig saved = effect;
+    assert(hpclang_rpl_unconfig_inspect(NULL, 0, &effect) < 0);
+    assert(!memcmp(&effect, &saved, sizeof effect));
+    assert(hpclang_rpl_unconfig_inspect(f.bytes, 0, NULL) < 0);
+}
+
 int main(void)
 {
+    test_bank_write();
+    test_unconfig();
+    test_config();
     test_cpu_capture();
     test_cpu();
     test_capture();

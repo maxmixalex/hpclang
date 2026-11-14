@@ -331,7 +331,7 @@ static void test_versioned_native_root_masks(void)
 {
     struct hpclang_rpl_memory_bounds saved = fake_bounds;
     const uint32_t versions[] = {HPCLANG_RPL_BOUNDS_MAGIC_V2, HPCLANG_RPL_BOUNDS_MAGIC,
-                                 HPCLANG_RPL_BOUNDS_MAGIC_V4};
+                                 HPCLANG_RPL_BOUNDS_MAGIC_V4, HPCLANG_RPL_BOUNDS_MAGIC_V5};
     for (unsigned v = 0; v < 3; ++v) {
         prepare_one_real();
         uint32_t root = 0xabc84010, *roots[] = {&root};

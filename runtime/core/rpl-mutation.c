@@ -845,6 +845,7 @@ struct catalog_edit
 {
     uint32_t field, expected, value, width;
     uint32_t *native;
+    uint32_t native_mask;
 };
 
 struct catalog_edits
@@ -887,18 +888,32 @@ static int catalog_add_edit(struct catalog_edits *plan, const struct catalog_edi
             return HPCLANG_RPL_MUTATION_MALFORMED;
     }
     for (size_t i = 0; i < plan->count; ++i) {
-        const struct catalog_edit *old = &plan->items[i];
+        struct catalog_edit *old = &plan->items[i];
         if (edit->native || old->native) {
             if (!edit->native || edit->native != old->native)
                 continue;
+            if (old->expected != edit->expected ||
+                ((old->value ^ edit->value) & old->native_mask & edit->native_mask))
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            old->value = (old->value & ~edit->native_mask) | (edit->value & edit->native_mask);
+            old->native_mask |= edit->native_mask;
+            return 0;
         } else if (edit->field >= old->field + old->width ||
                    old->field >= edit->field + edit->width) {
             continue;
         }
-        return old->field == edit->field && old->width == edit->width &&
-                       old->expected == edit->expected && old->value == edit->value
-                   ? 0
-                   : HPCLANG_RPL_MUTATION_MALFORMED;
+        /* A normalized source digit may already be covered by a complete
+         * discovered root (or a boundary published last). Reuse that edit;
+         * never add an early write to a contained geometry field. */
+        if (edit->field >= old->field && edit->field + edit->width <= old->field + old->width) {
+            unsigned shift = 4 * (edit->field - old->field);
+            uint32_t mask = (1u << (4 * edit->width)) - 1;
+            return ((old->expected >> shift) & mask) == edit->expected &&
+                           ((old->value >> shift) & mask) == edit->value
+                       ? 0
+                       : HPCLANG_RPL_MUTATION_MALFORMED;
+        }
+        return HPCLANG_RPL_MUTATION_MALFORMED;
     }
     if (plan->count == plan->capacity)
         return HPCLANG_RPL_MUTATION_NOMEM;
@@ -929,7 +944,7 @@ static int catalog_capture_root(void *context, uint32_t slot, uint32_t value, ui
     uint32_t expected = native ? *native : value;
     if (native)
         replacement |= expected & ~mask;
-    const struct catalog_edit edit = {slot, expected, replacement, 5, native};
+    const struct catalog_edit edit = {slot, expected, replacement, 5, native, mask};
     return catalog_add_edit(plan, &edit);
 }
 
@@ -994,9 +1009,11 @@ static int catalog_resize_repaired(const struct hpclang_rpl_mutation_io *io, uin
         if (nibble > 15u)
             return HPCLANG_RPL_MUTATION_MALFORMED;
     }
-    if (position < RPL_AVMEM + 5 || (repairs && ((repairs->edit_count && !repairs->edits) ||
-                                                 (repairs->guard_count && !repairs->guards) ||
-                                                 (repairs->register_count && !repairs->registers))))
+    if (position < RPL_AVMEM + 5 ||
+        (repairs &&
+         ((repairs->edit_count && !repairs->edits) || (repairs->guard_count && !repairs->guards) ||
+          (repairs->register_count && !repairs->registers) ||
+          (repairs->native_edit_count && !repairs->native_edits))))
         return HPCLANG_RPL_MUTATION_MALFORMED;
     size_t capacity = 4;
     struct pointer_scan_request request = {
@@ -1013,16 +1030,20 @@ static int catalog_resize_repaired(const struct hpclang_rpl_mutation_io *io, uin
     if (register_count > SIZE_MAX / sizeof(struct catalog_edit) - capacity)
         return HPCLANG_RPL_MUTATION_NOMEM;
     capacity += register_count;
+    size_t native_count = repairs ? repairs->native_edit_count : 0;
+    if (native_count > SIZE_MAX / sizeof(struct catalog_edit) - capacity)
+        return HPCLANG_RPL_MUTATION_NOMEM;
+    capacity += native_count;
     struct catalog_edits plan = {
         malloc(capacity * sizeof(struct catalog_edit)), 0, capacity, first, rstk, delta};
     if (!plan.items)
         return HPCLANG_RPL_MUTATION_NOMEM;
     int committing = 0;
     const struct catalog_edit boundaries[] = {
-        {RPL_TEMPBOTTOM, bottom, (uint32_t)((int64_t)bottom + delta), 5, NULL},
-        {RPL_TEMPTOP, top, (uint32_t)((int64_t)top + delta), 5, NULL},
-        {RPL_RSKTOP, rstk, new_rstk, 5, NULL},
-        {RPL_AVMEM, avmem, new_avmem, 5, NULL},
+        {RPL_TEMPBOTTOM, bottom, (uint32_t)((int64_t)bottom + delta), 5, NULL, 0},
+        {RPL_TEMPTOP, top, (uint32_t)((int64_t)top + delta), 5, NULL, 0},
+        {RPL_RSKTOP, rstk, new_rstk, 5, NULL, 0},
+        {RPL_AVMEM, avmem, new_avmem, 5, NULL, 0},
     };
     for (unsigned i = 0; i < 4; ++i) {
         result = catalog_add_edit(&plan, &boundaries[i]);
@@ -1042,8 +1063,8 @@ static int catalog_resize_repaired(const struct hpclang_rpl_mutation_io *io, uin
             result = HPCLANG_RPL_MUTATION_MALFORMED;
             goto done;
         }
-        const struct catalog_edit edit = {source->field, source->expected, source->value,
-                                          source->width, NULL};
+        const struct catalog_edit edit = {
+            source->field, source->expected, source->value, source->width, NULL, 0};
         result = catalog_add_edit(&plan, &edit);
         if (result)
             goto done;
@@ -1062,7 +1083,21 @@ static int catalog_resize_repaired(const struct hpclang_rpl_mutation_io *io, uin
         }
         if (address >= first && address < rstk)
             replacement = (source->expected & 0xfff00000u) | (uint32_t)((int64_t)address + delta);
-        const struct catalog_edit edit = {0, source->expected, replacement, 5, source->word};
+        const struct catalog_edit edit = {0, source->expected, replacement,
+                                          5, source->word,     0xfffffu};
+        result = catalog_add_edit(&plan, &edit);
+        if (result)
+            goto done;
+    }
+    for (size_t i = 0; i < native_count; ++i) {
+        const struct hpclang_rpl_native_edit *source = &repairs->native_edits[i];
+        if (!source->word || (uintptr_t)source->word % _Alignof(uint32_t) || !source->mask ||
+            ((source->expected ^ source->value) & ~source->mask)) {
+            result = HPCLANG_RPL_MUTATION_MALFORMED;
+            goto done;
+        }
+        const struct catalog_edit edit = {0, source->expected, source->value,
+                                          5, source->word,     source->mask};
         result = catalog_add_edit(&plan, &edit);
         if (result)
             goto done;
@@ -1070,8 +1105,8 @@ static int catalog_resize_repaired(const struct hpclang_rpl_mutation_io *io, uin
     for (uint32_t i = 0; repairs && i < repairs->guard_count; ++i) {
         const struct hpclang_rpl_reference_guard *guard = &repairs->guards[i];
         uint32_t value;
-        if (!guard->width || guard->width > 5 || guard->field > 0x100000u - guard->width ||
-            guard->expected >> (4 * guard->width)) {
+        if (!guard->width || guard->width > 8 || guard->field > 0x100000u - guard->width ||
+            (guard->width < 8 && guard->expected >> (4 * guard->width))) {
             result = HPCLANG_RPL_MUTATION_MALFORMED;
             goto done;
         }

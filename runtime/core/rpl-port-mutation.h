@@ -79,6 +79,20 @@ int hpclang_rpl_port0_remove_backup(const struct hpclang_rpl_mutation_io *io, co
 
 struct hpclang_rpl_catalog_insertion;
 struct hpclang_rpl_library_binding;
+struct hpclang_rpl_library_registration;
+/* Bind an existing Port 0 library to its catalog entry without executing its
+ * configuration or attaching it to HOME. Re-read the actual Port 0 root and
+ * complete source/catalog chains, then match the expected source geometry.
+ * Port objects must lie above the catalog growth arena and remain stationary.
+ * Caller retains exclusive mappings/IRQ ownership and supplies COMPLETE data
+ * and execution repairs; this is not a public authorization boundary. Expected
+ * plan and repair buffers must remain stable/disjoint from native writes.
+ * Preflight errors do not write; INCOMPLETE requires retaining ownership and
+ * halting, as for catalog_insert_repaired. No rollback or retry is promised. */
+int hpclang_rpl_port0_register_library_repaired(
+    const struct hpclang_rpl_mutation_io *io, uint32_t number,
+    const struct hpclang_rpl_library_registration *expected,
+    const struct hpclang_rpl_catalog_repairs *repairs);
 /* Internal catalog commit, not public registration authorization. Revalidate
  * the strictly ordered catalog and the expected insertion plan before writes.
  * binding uses FINAL post-move coordinates, independently proven by the caller;

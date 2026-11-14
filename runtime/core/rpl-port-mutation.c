@@ -478,6 +478,52 @@ int hpclang_rpl_catalog_insert_repaired(const struct hpclang_rpl_mutation_io *io
     return HPCLANG_RPL_MUTATION_OK;
 }
 
+int hpclang_rpl_port0_register_library_repaired(
+    const struct hpclang_rpl_mutation_io *io, uint32_t number,
+    const struct hpclang_rpl_library_registration *expected,
+    const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    if (!io || !io->read_nibble || !io->write_nibble || !expected)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (io->library_table < 0x80000u || io->library_table > 0xffffdu || number > 0xfffu)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t port = 0, arena_end = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        uint8_t a, b;
+        if (!io->read_nibble(io->context, 0x80716u + i, &a) ||
+            !io->read_nibble(io->context, 0x806f3u + i, &b))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (a > 15 || b > 15)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        port |= (uint32_t)a << (4 * i);
+        arena_end |= (uint32_t)b << (4 * i);
+    }
+    if (port < 0x80000u || arena_end < io->library_table || port < arena_end)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    struct hpclang_rpl_library_registration plan;
+    int result =
+        hpclang_rpl_library_registration_plan(&reader, port, 0x100000u, &reader, io->library_table,
+                                              0x100000u - io->library_table, number, &plan);
+    if (result != 1)
+        return result == 0   ? HPCLANG_RPL_MUTATION_NOT_FOUND
+               : result == 2 ? HPCLANG_RPL_MUTATION_EXISTS
+                             : parse_error(result);
+    const struct hpclang_rpl_port_entry *a = &plan.source, *b = &expected->source;
+    if (plan.header != expected->header || a->address != b->address || a->span != b->span ||
+        a->prologue != b->prologue || a->value_address != b->value_address ||
+        a->value_span != b->value_span || a->library_number != b->library_number ||
+        a->name_length != b->name_length || memcmp(a->name, b->name, a->name_length) ||
+        plan.insertion.slot != expected->insertion.slot ||
+        plan.insertion.end != expected->insertion.end ||
+        plan.insertion.count != expected->insertion.count)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    /* Port 0 records stay put while the lower catalog/TEMP arena grows. The
+     * binding is derived from the validated source, never a caller address. */
+    const struct hpclang_rpl_library_binding binding = {plan.header, 0, 0};
+    return hpclang_rpl_catalog_insert_repaired(io, number, &binding, &plan.insertion, repairs);
+}
+
 struct port0_commit_observer
 {
     const struct hpclang_rpl_mutation_io *source;

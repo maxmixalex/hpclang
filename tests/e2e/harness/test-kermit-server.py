@@ -16,6 +16,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 PARAMETERS = b"~* @-#Y3"
+# CI can deschedule the server during its 50 ms pause (one observed pause
+# lasted 4.719 s). Allow scheduling slack for packet arrival, independently
+# of the explicit 30 ms turnaround and 15 s backoff assertions below.
+PACKET_WAIT_SECONDS = 10.0
 
 
 def check_bytes(body: bytes, kind: int) -> bytes:
@@ -62,7 +66,7 @@ class Peer:
         while wire:
             wire = wire[os.write(self.descriptor, wire) :]
 
-    def receive(self, timeout: float = 3.0) -> bytes:
+    def receive(self, timeout: float = PACKET_WAIT_SECONDS) -> bytes:
         deadline = time.monotonic() + timeout
         while True:
             if b"\r" in self.buffer:
@@ -88,7 +92,9 @@ class Peer:
             self.send(packet(b"Y", sequence=wire[2] - 32, check=3))
             wire = self.receive()
         if not wire:
-            raise AssertionError(f"server did not send {kind!r} within 3 seconds")
+            raise AssertionError(
+                f"server did not send {kind!r} within {PACKET_WAIT_SECONDS:g} seconds"
+            )
         if wire[2:4] != bytes([sequence + 32]) + kind:
             raise AssertionError(f"unexpected packet: {wire!r}")
         if wire[-check - 1 : -1] != check_bytes(wire[1 : -check - 1], check):

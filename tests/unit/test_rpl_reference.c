@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <string.h>
 
+void test_execution_plans(void);
+
 struct image
 {
     uint8_t data[128];
@@ -831,7 +833,7 @@ static void metadata_guards(void)
     images.reads = 0;
     guards[3].width = 0;
     assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) == HPCLANG_RPL_SPAN_MALFORMED);
-    guards[3].width = 6;
+    guards[3].width = 9;
     assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) == HPCLANG_RPL_SPAN_MALFORMED);
     guards[3].width = 3;
     guards[3].expected = 0x1000;
@@ -846,13 +848,26 @@ static void metadata_guards(void)
     assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) == HPCLANG_RPL_SPAN_MALFORMED);
     assert(hpclang_rpl_reference_guards_validate(NULL, guards, 4) == HPCLANG_RPL_SPAN_UNAVAILABLE);
     assert(hpclang_rpl_reference_guards_validate(&reader, NULL, 4) == HPCLANG_RPL_SPAN_UNAVAILABLE);
-    for (uint32_t width = 1; width <= 5; ++width) {
-        struct hpclang_rpl_reference_guard guard = {0, 0, (1u << (4 * width)) - 1, width};
+    for (uint32_t width = 1; width <= 8; ++width) {
+        struct hpclang_rpl_reference_guard guard = {
+            0, 0, width == 8 ? UINT32_MAX : (1u << (4 * width)) - 1, width};
         put(&images.banks[0], 0, guard.expected, width);
         assert(!hpclang_rpl_reference_guards_validate(&reader, &guard, 1));
-        ++guard.expected;
-        assert(hpclang_rpl_reference_guards_validate(&reader, &guard, 1) ==
-               HPCLANG_RPL_SPAN_BOUNDS);
+        for (uint32_t j = 0; j < width; ++j) {
+            images.banks[0].data[j] ^= 1;
+            assert(hpclang_rpl_reference_guards_validate(&reader, &guard, 1) ==
+                   HPCLANG_RPL_SPAN_MALFORMED);
+            images.banks[0].data[j] ^= 1;
+            images.banks[0].fail = j;
+            assert(hpclang_rpl_reference_guards_validate(&reader, &guard, 1) ==
+                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+            images.banks[0].fail = UINT32_MAX;
+        }
+        if (width < 8) {
+            ++guard.expected;
+            assert(hpclang_rpl_reference_guards_validate(&reader, &guard, 1) ==
+                   HPCLANG_RPL_SPAN_BOUNDS);
+        }
     }
 }
 
@@ -1397,17 +1412,17 @@ static void catalog_executable_switches(void)
 
 static void compact_guard_observations(void)
 {
-    struct hpclang_rpl_reference_guard storage[6];
+    struct hpclang_rpl_reference_guard storage[9];
     struct hpclang_rpl_reference_guard_builder builder;
-    /* Every order of five contiguous observations must preserve the complete
+    /* Every order of eight contiguous observations must preserve the complete
      * nibble sequence. Include duplicates while the builder is populated. */
-    for (unsigned permutation = 0; permutation < 120; ++permutation) {
-        assert(!hpclang_rpl_reference_guards_begin(&builder, storage, 5));
-        unsigned remaining[] = {0, 1, 2, 3, 4}, code = permutation;
+    for (unsigned permutation = 0; permutation < 40320; ++permutation) {
+        assert(!hpclang_rpl_reference_guards_begin(&builder, storage, 8));
+        unsigned remaining[] = {0, 1, 2, 3, 4, 5, 6, 7}, code = permutation;
         uint32_t expected = 0;
-        for (unsigned i = 0; i < 5; ++i)
+        for (unsigned i = 0; i < 8; ++i)
             expected |= ((i * 7 + 3) & 15u) << (4 * i);
-        for (unsigned left = 5; left; --left) {
+        for (unsigned left = 8; left; --left) {
             unsigned chosen = code % left, at = remaining[chosen];
             code /= left;
             uint8_t value = (uint8_t)((at * 7 + 3) & 15);
@@ -1419,9 +1434,17 @@ static void compact_guard_observations(void)
                 remaining[i] = remaining[i + 1];
         }
         assert(builder.count == 1 && !builder.error);
-        assert(storage[0].mapping == 9 && storage[0].field == 100 && storage[0].width == 5);
+        assert(storage[0].mapping == 9 && storage[0].field == 100 && storage[0].width == 8);
         assert(storage[0].expected == expected);
     }
+    assert(!hpclang_rpl_reference_guards_observe(&builder, 9, 108, 15));
+    assert(builder.count == 2 && storage[0].width == 8 && storage[1].width == 1);
+    assert(storage[1].field == 108 && storage[1].expected == 15);
+    assert(!hpclang_rpl_reference_guards_begin(&builder, storage, 1));
+    for (uint32_t i = 0; i < 8; ++i)
+        assert(!hpclang_rpl_reference_guards_observe(&builder, 0, 0xfffff - i, 15));
+    assert(builder.count == 1 && storage[0].width == 8 && storage[0].field == 0xffff8);
+    assert(storage[0].expected == UINT32_MAX);
     assert(!hpclang_rpl_reference_guards_begin(&builder, storage, 2));
     storage[2] = (struct hpclang_rpl_reference_guard){123, 456, 789, 1};
     assert(!hpclang_rpl_reference_guards_observe(&builder, 0, 2, 2));
@@ -1449,6 +1472,98 @@ static void compact_guard_observations(void)
     assert(hpclang_rpl_reference_guards_begin(&builder, NULL, 1) == HPCLANG_RPL_SPAN_MALFORMED);
     assert(hpclang_rpl_reference_guards_begin(NULL, storage, 1) == HPCLANG_RPL_SPAN_MALFORMED);
     assert(hpclang_rpl_reference_guards_observe(NULL, 0, 0, 0) == HPCLANG_RPL_SPAN_MALFORMED);
+}
+
+static void packed_reference_edits(void)
+{
+    /* Compare every inserted range with an independent per-cell oracle across
+     * shuffled insertion orders, duplicates, partial overlaps and mappings. */
+    for (unsigned seed = 1; seed <= 64; ++seed) {
+        struct hpclang_rpl_reference_edit storage[40];
+        struct hpclang_rpl_reference_edit_builder builder;
+        assert(!hpclang_rpl_reference_edits_begin_packed(&builder, storage, 40));
+        unsigned seen[2][20] = {{0}}, random = seed;
+        for (unsigned step = 0; step < 100; ++step) {
+            random = random * 1664525u + 1013904223u;
+            unsigned mapping = (random >> 8) & 1, start = (random >> 12) % 20;
+            unsigned width = 1 + (random >> 24) % 5;
+            if (width > 20 - start)
+                width = 20 - start;
+            struct hpclang_rpl_reference_edit edit = {mapping ? UINT32_MAX : 0, 0x100 + start, 0, 0,
+                                                      width};
+            for (unsigned i = 0; i < width; ++i) {
+                edit.expected |= ((start + i) & 15) << (4 * i);
+                edit.value |= ((start + i + seed) & 15) << (4 * i);
+                seen[mapping][start + i] = 1;
+            }
+            assert(!hpclang_rpl_reference_edits_add(&builder, &edit));
+            assert(!hpclang_rpl_reference_edits_add(&builder, &edit));
+            unsigned actual[2][20] = {{0}};
+            for (unsigned n = 0; n < builder.count; ++n) {
+                const struct hpclang_rpl_reference_edit *e = &storage[n];
+                unsigned m = e->mapping != 0;
+                assert(e->width && e->width <= 5 && e->field >= 0x100 &&
+                       e->field + e->width <= 0x114);
+                for (unsigned i = 0; i < e->width; ++i) {
+                    unsigned at = e->field - 0x100 + i;
+                    assert(!actual[m][at]++);
+                    assert(((e->expected >> (4 * i)) & 15) == (at & 15));
+                    assert(((e->value >> (4 * i)) & 15) == ((at + seed) & 15));
+                }
+            }
+            assert(!memcmp(seen, actual, sizeof seen));
+        }
+        for (unsigned m = 0; m < 2; ++m)
+            for (unsigned at = 0; at < 20; ++at)
+                if (seen[m][at])
+                    for (unsigned value_fault = 0; value_fault < 2; ++value_fault) {
+                        struct hpclang_rpl_reference_edit_builder rejected = builder;
+                        struct hpclang_rpl_reference_edit conflict = {
+                            m ? UINT32_MAX : 0, 0x100 + at, at & 15, (at + seed) & 15, 1};
+                        if (value_fault)
+                            conflict.value ^= 1;
+                        else
+                            conflict.expected ^= 1;
+                        assert(hpclang_rpl_reference_edits_add(&rejected, &conflict) < 0);
+                        assert(!rejected.count && rejected.error);
+                    }
+    }
+    struct hpclang_rpl_reference_edit storage[2];
+    struct hpclang_rpl_reference_edit_builder builder;
+    assert(!hpclang_rpl_reference_edits_begin_packed(&builder, storage, 2));
+    const struct hpclang_rpl_reference_edit left = {0, 0xffffb, 0x21, 0x43, 2};
+    const struct hpclang_rpl_reference_edit right = {0, 0xffffe, 0x65, 0x87, 2};
+    const struct hpclang_rpl_reference_edit bridge = {0, 0xffffd, 3, 5, 1};
+    assert(!hpclang_rpl_reference_edits_add(&builder, &left));
+    assert(!hpclang_rpl_reference_edits_add(&builder, &right));
+    assert(!hpclang_rpl_reference_edits_add(&builder, &bridge));
+    assert(builder.count == 1 && storage[0].width == 5 && storage[0].expected == 0x65321 &&
+           storage[0].value == 0x87543);
+    assert(!hpclang_rpl_reference_edits_add(&builder, &storage[0])); /* Input aliases output. */
+    struct hpclang_rpl_reference_edit edge = {0, 0xfffff, 6, 8, 2};
+    assert(hpclang_rpl_reference_edits_add(&builder, &edge) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!builder.count);
+    assert(!hpclang_rpl_reference_edits_begin_packed(&builder, storage, 1));
+    assert(!hpclang_rpl_reference_edits_add(&builder, &left));
+    assert(hpclang_rpl_reference_edits_add(&builder, &right) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!builder.count && builder.error);
+    assert(!hpclang_rpl_reference_edits_begin(&builder, storage, 2) && !builder.packed);
+    for (unsigned fault = 0; fault < 4; ++fault) {
+        assert(!hpclang_rpl_reference_edits_begin_packed(&builder, storage, 2));
+        assert(!hpclang_rpl_reference_edits_add(&builder, &left));
+        if (fault == 0)
+            storage[0].width = 0;
+        if (fault == 1)
+            storage[0].width = 6;
+        if (fault == 2)
+            storage[0].value = 0x100;
+        if (fault == 3)
+            builder.packed = 2;
+        assert(hpclang_rpl_reference_edits_add(&builder, &bridge) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!builder.count && builder.error);
+    }
+    assert(hpclang_rpl_reference_edits_begin_packed(NULL, storage, 2) < 0);
+    assert(hpclang_rpl_reference_edits_begin_packed(&builder, NULL, 2) < 0);
 }
 
 static void merge_reference_edits(void)
@@ -2000,7 +2115,7 @@ static void flashptr_guard_composition(unsigned special)
     fixture.data[2][3] = 2; /* DOFLASHP 0x26ac. */
     fixture.data[2][5] = 1;
     fixture.data[2][8] = 1;
-    unsigned required = special ? 22 : 23;
+    unsigned required = special ? 15 : 16;
     for (unsigned capacity = required - 1; capacity <= required; ++capacity) {
         assert(!hpclang_rpl_reference_guards_begin(&fixture.builder, guards, capacity));
         struct hpclang_rpl_flashptr pointer;
@@ -2206,6 +2321,7 @@ static void mapped_graph_traversal(void)
 
 int main(void)
 {
+    test_execution_plans();
     mapped_graph_traversal();
     flashptr_guard_composition(0);
     flashptr_guard_composition(1);
@@ -2216,6 +2332,7 @@ int main(void)
     code_operand_replay();
     cached_command_program();
     merge_reference_edits();
+    packed_reference_edits();
     nested_unresolved();
     compact_guard_observations();
     catalog_relocation_plan();

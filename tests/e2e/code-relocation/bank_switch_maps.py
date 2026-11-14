@@ -292,9 +292,11 @@ for index in range(17):
         (word >> (4 * j)) & 15 for word in (0x02BAA, 0x7327E, switch) for j in range(5)
     ]
     source_reader = Reader(source_nibble, None)
-    combined = (Guard * 20)()
+    # Fifteen adjacent source nibbles pack into two 32-bit guards; the
+    # seventeen separated ROM table entries still need one guard each.
+    combined = (Guard * 19)()
     combined_builder = GuardBuilder()
-    assert lib.hpclang_rpl_reference_guards_begin(c.byref(combined_builder), combined, 20) == 0
+    assert lib.hpclang_rpl_reference_guards_begin(c.byref(combined_builder), combined, 19) == 0
     source_observed, table_observed = [], []
 
     @Dependency
@@ -329,7 +331,15 @@ for index in range(17):
         == 1
     )
     assert (resolved.bank.kind, resolved.bank.index) == (binding.kind, binding.index)
-    assert resolved.offset == 0x3327E and combined_builder.count == 20
+    assert resolved.offset == 0x3327E and combined_builder.count == 19, (
+        index,
+        hex(resolved.offset),
+        combined_builder.count,
+    )
+    assert [(g.field, g.width) for g in combined if g.mapping == 2] == [
+        (0x26BBB, 8),
+        (0x26BC3, 7),
+    ]
     assert source_observed == list(range(0x26BBB, 0x26BBB + 15))
     assert table_observed == observed
     assert (

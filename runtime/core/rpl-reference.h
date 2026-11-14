@@ -337,6 +337,7 @@ struct hpclang_rpl_reference_edit_builder
     struct hpclang_rpl_reference_edit *edits;
     uint32_t capacity, count;
     int error;
+    uint32_t packed;
 };
 
 /* Merge independently discovered 1..5-nibble edits into a sorted, nonoverlapping batch.
@@ -351,6 +352,16 @@ int hpclang_rpl_reference_edits_begin(struct hpclang_rpl_reference_edit_builder 
 int hpclang_rpl_reference_edits_add(struct hpclang_rpl_reference_edit_builder *builder,
                                     const struct hpclang_rpl_reference_edit *edit);
 
+/* Opt in to pointwise constraints: consistent overlaps are accepted and adjacent
+ * cells share records of at most five nibbles. Both expected and replacement
+ * values must agree at every overlap, including unchanged cells. Mapping IDs
+ * remain distinct; callers normalize aliases. Errors invalidate the whole batch.
+ * Record boundaries/count are not source boundaries and can change on insertion.
+ * Ordinary edits_begin retains its strict overlap contract. No IO/allocation. */
+int hpclang_rpl_reference_edits_begin_packed(struct hpclang_rpl_reference_edit_builder *builder,
+                                             struct hpclang_rpl_reference_edit *edits,
+                                             uint32_t capacity);
+
 struct hpclang_rpl_reference_reader
 {
     int (*read_nibble)(void *context, uint32_t mapping, uint32_t address, uint8_t *value);
@@ -358,7 +369,7 @@ struct hpclang_rpl_reference_reader
 };
 
 /* Read-only dependencies of a relocation plan, including short native count,
- * ID and flag fields. Width is 1..5 nibbles. Overlap is allowed: guards do not
+ * ID and flag fields. Width is 1..8 nibbles. Overlap is allowed: guards do not
  * write. Validate alongside edits while retaining exclusive ownership through
  * commit; neither validation supplies synchronization or discovers omissions. */
 struct hpclang_rpl_reference_guard
@@ -374,7 +385,7 @@ struct hpclang_rpl_reference_guard_builder
 };
 
 /* Bounded accumulation of observed nibbles into sorted, nonoverlapping guards.
- * Merge adjacent observations up to five nibbles; never include an unobserved
+ * Merge adjacent observations up to eight nibbles; never include an unobserved
  * cell. Repeated identical observations use no extra space. Conflicting values,
  * invalid input or insufficient capacity latch an error and invalidate count.
  * Start a new stream with begin after any failure. Only successful complete

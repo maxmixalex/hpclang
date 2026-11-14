@@ -104,6 +104,27 @@ struct hpclang_rpl_catalog_removal
     struct hpclang_rpl_library_binding binding;
 };
 
+struct hpclang_rpl_library_registration
+{
+    struct hpclang_rpl_port_entry source;
+    struct hpclang_rpl_catalog_insertion insertion;
+    uint32_t header; /* Library ID address in the source's CURRENT mapping. */
+};
+
+/* Prepare RAM-port registration from separately mapped port/catalog readers.
+ * Validate the complete port chain and catalog; duplicate source IDs are
+ * malformed. Return 1 ready, 0 source absent, 2 already registered, or a
+ * negative span result. Only ready publishes a plan. No bank switching, writes
+ * or configuration execution occur. Callers retain both mappings/ownership,
+ * prove reference repairs and translate header to FINAL coordinates before
+ * catalog commit; this plan alone does not authorize registration. Flash uses
+ * a different record format and is not accepted as a RAM-port chain. */
+int hpclang_rpl_library_registration_plan(const struct hpclang_rpl_reader *port_reader,
+                                          uint32_t first, uint32_t end,
+                                          const struct hpclang_rpl_reader *catalog_reader,
+                                          uint32_t catalog, uint32_t catalog_limit, uint32_t number,
+                                          struct hpclang_rpl_library_registration *plan);
+
 /* Inspect the native HOME attachment prefix (DORRP, count, 13-nibble records).
  * Caller supplies the proven HOME address and readable extent. Validate every
  * encoded record, including records after a match. Return 1 attached, 0 absent

@@ -173,6 +173,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             remote_commands=[
                 "-95 CF HOME CLEAR",
                 "\"0\" 1 7 START DUP + NEXT 'ENTRYOBS' STO",
+                "\"0\" 1 7 START DUP + NEXT 1 124 SUB 'EXECOBS' STO",
                 "'CALLROOT' RCL",
             ],
         )
@@ -216,6 +217,28 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         read = native_words((state / "sram").read_bytes(), flash)
         observation = home_string(read, b"ENTRYOBS")
         words = verify_entry(observation, (build / "launchers" / f"{args.model}.bin").read_bytes())
+        execution = struct.unpack("<31I", home_string(read, b"EXECOBS"))
+        if (
+            execution[0:3] != (30, 1, 271)
+            or execution[3] != 0x2911
+            or execution[4] != 125
+            or not 0 < execution[5] <= 1152
+            or not execution[6]
+            or not execution[7]
+            or execution[8] < 256
+            or execution[9] != 8
+            or execution[10] != words[2]
+            or execution[11] != 0x45584543
+            or execution[12:15] != (3, 0x806F3, 0xFFFF1)
+            or execution[15] != 6
+            or execution[16:20] != (3, 1, 0x2900, 7)
+            or execution[20:22] != (125, 506)
+            or not 0 < execution[22] <= execution[21]
+            or execution[23:25] != (32, 2)
+            or execution[25:29] != (20, 85, 85, 1)
+            or execution[29:31] != (2, 2)
+        ):
+            raise ValueError("Native execution collection/guard observation is incomplete")
         (case / "entry.json").write_text(
             json.dumps(
                 dict(
@@ -234,6 +257,33 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                     saved_ip=words[11],
                     saved_registers=list(words[12:22]),
                     stage0_prefix=observation[88:120].hex(),
+                    execution_collection=dict(
+                        stop="bounded_after_simulated_store",
+                        steps=execution[2],
+                        pc=execution[3],
+                        address_uses=execution[4],
+                        guards=execution[5],
+                        observations=list(execution[6:10]),
+                        derived_uses=execution[12],
+                        derived_source=execution[13],
+                        final_adjustment=execution[14],
+                        generated_uses=execution[15],
+                        expressions=execution[16],
+                        expression_uses=execution[17],
+                        expression_pc=execution[18],
+                        expression_sources=execution[19],
+                        planned_uses=execution[20],
+                        source_cells=execution[21],
+                        changed_cells=execution[22],
+                        branches=execution[23],
+                        rejected_plans=execution[24],
+                        simulated_stores=execution[25],
+                        stored_sources=execution[26],
+                        verified_shadow_cells=execution[27],
+                        derived_d0_uses=execution[28],
+                        native_saves=execution[29],
+                        scan_reads=execution[30],
+                    ),
                 ),
                 indent=2,
             )

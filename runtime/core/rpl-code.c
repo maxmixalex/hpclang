@@ -1,5 +1,1650 @@
 #include "rpl-code.h"
 
+static int read_word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned width,
+                     uint32_t *value);
+
+static uint64_t data_mask(unsigned nibbles)
+{
+    return nibbles == 16 ? UINT64_MAX : (UINT64_C(1) << (4 * nibbles)) - 1;
+}
+
+int hpclang_rpl_code_native_push_inspect(const struct hpclang_rpl_reader *instructions,
+                                         uint32_t limit,
+                                         const struct hpclang_rpl_code_execution *state,
+                                         struct hpclang_rpl_code_native_push *effect)
+{
+    if (!instructions || !instructions->read_nibble || !state || !effect)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    uint32_t pc = state->control.pc;
+    if (pc > 0xffffb || limit < 5 || limit > 0x100000 - pc)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(instructions, pc, 5, &opcode);
+    if (result)
+        return result;
+    if (opcode != 0x04b08)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (state->values.registers[HPCLANG_RPL_CODE_P] > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint64_t d = state->values.registers[HPCLANG_RPL_CODE_D];
+    struct hpclang_rpl_code_native_push next = {
+        .instruction = pc,
+        .length = 5,
+        .a = (state->values.registers[HPCLANG_RPL_CODE_A] & ~UINT64_C(0xfffff)) | 0x3ac0,
+        .d = (d & ~UINT64_C(0xffffffff)) | (uint32_t)((uint32_t)d - 1u),
+        .d1 = state->values.registers[HPCLANG_RPL_CODE_D1]};
+    if (!(d & 0xfffff)) {
+        next.exception_target = 0x3a9b;
+    } else {
+        if (next.d1 < 5 || next.d1 > 0xfffff)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        next.d1 -= 5;
+        next.stores = 1;
+        next.store_address = (uint32_t)next.d1;
+        next.store_value = 0x3ac0;
+    }
+    *effect = next;
+    return 0;
+}
+
+static int scan_word(const struct hpclang_rpl_reader *data, uint32_t address, uint32_t limit,
+                     uint32_t *reads, uint32_t *value, uint32_t kind,
+                     hpclang_rpl_code_scan_read_fn observe, void *context)
+{
+    if (*reads >= limit || address > 0xffffb)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    int result = read_word(data, address, 5, value);
+    if (!result && observe) {
+        const struct hpclang_rpl_code_scan_read read = {kind, address, *value};
+        result = observe(context, &read);
+        if (result > 0)
+            result = HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    if (!result)
+        ++*reads;
+    return result;
+}
+
+int hpclang_rpl_code_native_scan_observed(const struct hpclang_rpl_reader *instructions,
+                                          const struct hpclang_rpl_reader *data, uint32_t limit,
+                                          const struct hpclang_rpl_code_execution *state,
+                                          uint32_t max_reads, hpclang_rpl_code_scan_read_fn observe,
+                                          void *context,
+                                          struct hpclang_rpl_code_native_scan *output)
+{
+    if (!instructions || !instructions->read_nibble || !data || !data->read_nibble || !state ||
+        !output)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    uint32_t pc = state->control.pc;
+    if (pc > 0xffffc || limit < 4 || limit > 0x100000 - pc || !max_reads)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (state->values.registers[HPCLANG_RPL_CODE_P])
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (state->values.registers[HPCLANG_RPL_CODE_D0] > 0xfffff ||
+        state->values.registers[HPCLANG_RPL_CODE_D1] > 0xfffff || state->control.cursor >= 8 ||
+        state->control.carry > 1 || state->values.carry != state->control.carry ||
+        state->values.decimal > 1)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t opcode;
+    int result = read_word(instructions, pc, 4, &opcode);
+    if (result)
+        return result;
+    if (opcode != 0xab18)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_code_native_scan next = {
+        .b = state->values.registers[HPCLANG_RPL_CODE_B],
+        .instruction = pc,
+        .d0 = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_D0],
+        .d1 = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_D1],
+        .saved_b = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_B],
+        .saved_d1 = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_D1],
+        .cursor = state->control.cursor,
+        .carry = state->control.carry};
+    uint32_t depth = 0, pointer = (uint32_t)state->values.registers[HPCLANG_RPL_CODE_A] & 0xfffff;
+    unsigned from_a = (state->status & 2) != 0;
+    for (;;) {
+        if (!from_a) {
+            /* Native increments the full word. Do not admit an intermediate
+             * D0 outside this evaluator's canonical 20-bit contract. */
+            if (next.d0 > 0xffffa)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            result = scan_word(data, next.d0, max_reads, &next.reads, &pointer,
+                               HPCLANG_RPL_CODE_SCAN_POINTER, observe, context);
+            if (result)
+                return result;
+            next.d0 += 5;
+        }
+        from_a = 0;
+        uint32_t tag;
+        result = scan_word(data, pointer, max_reads, &next.reads, &tag, HPCLANG_RPL_CODE_SCAN_TAG,
+                           observe, context);
+        if (result)
+            return result;
+        if (tag == 0x28fc) {
+            if (pointer < 5)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            result = scan_word(data, pointer - 5, max_reads, &next.reads, &next.target,
+                               HPCLANG_RPL_CODE_SCAN_TARGET, observe, context);
+            if (result)
+                return result;
+            if (next.target != 0x3077) {
+                next.b = (next.b & UINT64_C(0xffffffff00000000)) | depth;
+                next.d1 = pointer;
+                *output = next;
+                return 0;
+            }
+            if (depth == UINT32_MAX)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            ++depth;
+            continue;
+        }
+        if (tag == 0x3130) {
+            if (!depth) {
+                if (next.d0 < 5)
+                    return HPCLANG_RPL_SPAN_BOUNDS;
+                next.d0 -= 5;
+                break;
+            }
+            --depth;
+        }
+        if (!depth)
+            break;
+    }
+    next.cursor = (next.cursor + 7) & 7;
+    next.target = state->control.stack[next.cursor];
+    if (next.target > 0xfffff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    next.carry = 0;
+    next.returns = 1;
+    *output = next;
+    return 0;
+}
+
+int hpclang_rpl_code_native_scan_inspect(const struct hpclang_rpl_reader *instructions,
+                                         const struct hpclang_rpl_reader *data, uint32_t limit,
+                                         const struct hpclang_rpl_code_execution *state,
+                                         uint32_t max_reads,
+                                         struct hpclang_rpl_code_native_scan *output)
+{
+    return hpclang_rpl_code_native_scan_observed(instructions, data, limit, state, max_reads, 0, 0,
+                                                 output);
+}
+
+int hpclang_rpl_code_predicate_inspect(const struct hpclang_rpl_reader *reader,
+                                       uint32_t instruction, uint32_t limit,
+                                       const struct hpclang_rpl_code_values *values,
+                                       struct hpclang_rpl_code_predicate *predicate)
+{
+    if (!reader || !reader->read_nibble || !values || !predicate)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000 || !limit || limit > 0x100000 - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(reader, instruction, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode != 9 && opcode != 8)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (opcode == 8) {
+        if (limit < 2)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t kind;
+        result = read_word(reader, instruction + 1, 1, &kind);
+        if (result)
+            return result;
+        if (kind != 10 && kind != 11)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    if (limit < 5)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t encoded;
+    result = read_word(reader, instruction + 1, 4, &encoded);
+    if (result)
+        return result;
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    unsigned field = encoded & 7, operation = (encoded >> 4) & 15;
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    static const unsigned firsts[8] = {0, 0, 2, 0, 15, 3, 0, 0};
+    static const unsigned widths[8] = {1, 1, 1, 3, 1, 12, 2, 16};
+    static const unsigned lefts[4] = {0, 1, 2, 3}, rights[4] = {1, 2, 0, 2};
+    struct hpclang_rpl_code_predicate next = {.instruction = instruction,
+                                              .first = opcode == 8 ? 0
+                                                       : field     ? firsts[field]
+                                                                   : p,
+                                              .nibbles = opcode == 8  ? 5
+                                                         : field == 1 ? p + 1
+                                                                      : widths[field],
+                                              .left = lefts[operation & 3],
+                                              .right = rights[operation & 3],
+                                              .displacement = encoded >> 8};
+    if (opcode == 8 ? (encoded & 15) == 11 : (encoded & 8) != 0)
+        next.relation = HPCLANG_RPL_CODE_GREATER + operation / 4;
+    else {
+        next.relation = (operation & 4) ? HPCLANG_RPL_CODE_UNEQUAL : HPCLANG_RPL_CODE_EQUAL;
+        if (operation & 8)
+            next.right = HPCLANG_RPL_CODE_CONSTANT;
+    }
+    next.left_value = (values->registers[next.left] >> (4 * next.first)) & data_mask(next.nibbles);
+    next.right_value =
+        next.right == HPCLANG_RPL_CODE_CONSTANT
+            ? 0
+            : (values->registers[next.right] >> (4 * next.first)) & data_mask(next.nibbles);
+    switch (next.relation) {
+    case HPCLANG_RPL_CODE_EQUAL:
+        next.taken = next.left_value == next.right_value;
+        break;
+    case HPCLANG_RPL_CODE_UNEQUAL:
+        next.taken = next.left_value != next.right_value;
+        break;
+    case HPCLANG_RPL_CODE_GREATER:
+        next.taken = next.left_value > next.right_value;
+        break;
+    case HPCLANG_RPL_CODE_LESS:
+        next.taken = next.left_value < next.right_value;
+        break;
+    case HPCLANG_RPL_CODE_GREATER_EQUAL:
+        next.taken = next.left_value >= next.right_value;
+        break;
+    default:
+        next.taken = next.left_value <= next.right_value;
+        break;
+    }
+    *predicate = next;
+    return 0;
+}
+
+int hpclang_rpl_code_sum_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                 uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                 struct hpclang_rpl_code_sum *sum)
+{
+    if (!reader || !reader->read_nibble || !values || !sum)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000 || !limit || limit > 0x100000 - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int status = read_word(reader, instruction, 1, &opcode);
+    if (status)
+        return status;
+    if (opcode != 12 && opcode != 10)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned length = opcode == 12 ? 2 : 3;
+    if (limit < length)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t tail;
+    status = read_word(reader, instruction + 1, length - 1, &tail);
+    if (status)
+        return status;
+    unsigned field = opcode == 12 ? 8 : tail & 15;
+    unsigned operation = opcode == 12 ? tail : tail >> 4;
+    if (operation >= 12 || (opcode == 10 && field >= 8))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->decimal > 1)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    static const unsigned lefts[12] = {0, 1, 2, 3, 0, 1, 2, 3, 1, 2, 0, 2};
+    static const unsigned rights[12] = {1, 2, 0, 2, 0, 1, 2, 3, 0, 1, 2, 3};
+    static const unsigned firsts[9] = {0, 0, 2, 0, 15, 3, 0, 0, 0};
+    static const unsigned widths[9] = {1, 1, 1, 3, 1, 12, 2, 16, 5};
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    struct hpclang_rpl_code_sum next = {.instruction = instruction,
+                                        .length = length,
+                                        .left = lefts[operation],
+                                        .right = rights[operation],
+                                        .destination = lefts[operation],
+                                        .first = field ? firsts[field] : p,
+                                        .nibbles = field == 1 ? p + 1 : widths[field],
+                                        .decimal = values->decimal,
+                                        .p = p};
+    next.left_value = values->registers[next.left];
+    next.right_value = values->registers[next.right];
+    next.result = next.left_value;
+    unsigned radix = next.decimal ? 10 : 16;
+    for (unsigned i = next.first; i < next.first + next.nibbles; ++i) {
+        unsigned left = (next.left_value >> (4 * i)) & 15;
+        unsigned right = (next.right_value >> (4 * i)) & 15;
+        if (left >= radix || right >= radix)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        unsigned digit = left + right + next.carry;
+        next.carry = digit >= radix;
+        if (next.carry)
+            digit -= radix;
+        next.result = (next.result & ~(UINT64_C(15) << (4 * i))) | ((uint64_t)digit << (4 * i));
+    }
+    *sum = next;
+    return 0;
+}
+
+int hpclang_rpl_code_unit_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                  uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                  struct hpclang_rpl_code_unit *unit)
+{
+    if (!reader || !reader->read_nibble || !values || !unit)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000 || !limit || limit > 0x100000 - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(reader, instruction, 1, &opcode);
+    if (result)
+        return result;
+    if (!opcode) {
+        if (limit < 2)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(reader, instruction + 1, 1, &opcode);
+        if (result)
+            return result;
+        if (opcode != 12 && opcode != 13)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+        if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->decimal > 1)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        struct hpclang_rpl_code_unit next = {.instruction = instruction,
+                                             .length = 2,
+                                             .reg = HPCLANG_RPL_CODE_P,
+                                             .nibbles = 1,
+                                             .decrement = opcode == 13,
+                                             .decimal = values->decimal,
+                                             .p = p,
+                                             .before = p,
+                                             .after = (p + (opcode == 12 ? 1u : 15u)) & 15,
+                                             .carry = p == (opcode == 12 ? 15u : 0u)};
+        *unit = next;
+        return 0;
+    }
+    if (opcode != 8 && opcode != 10 && opcode != 11)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (limit < 3)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t fields;
+    result = read_word(reader, instruction + 1, 2, &fields);
+    if (result)
+        return result;
+    unsigned field = fields & 15, operation = fields >> 4, decrement = opcode == 10;
+    unsigned length = 3, amount = 1, reg;
+    if (opcode == 8) {
+        if (fields != 0x81)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (limit < 6)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(reader, instruction + 3, 3, &fields);
+        if (result)
+            return result;
+        field = fields & 15;
+        operation = (fields >> 4) & 15;
+        if ((field >= 8 && field != 15) || (operation & 7) > 3)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        decrement = operation >> 3;
+        reg = operation & 3;
+        amount = (fields >> 8) + 1;
+        length = 6;
+    } else {
+        if (field >= 8 || (decrement ? operation < 12 : operation < 4 || operation > 7))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        reg = operation - (decrement ? 12 : 4);
+    }
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->decimal > 1)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    static const unsigned firsts[8] = {0, 0, 2, 0, 15, 3, 0, 0},
+                          widths[8] = {1, 1, 1, 3, 1, 12, 2, 16};
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    struct hpclang_rpl_code_unit next = {.instruction = instruction,
+                                         .length = length,
+                                         .reg = reg,
+                                         .first = field == 15 ? 0
+                                                  : field     ? firsts[field]
+                                                              : p,
+                                         .nibbles = field == 15  ? 5
+                                                    : field == 1 ? p + 1
+                                                                 : widths[field],
+                                         .decrement = decrement,
+                                         .decimal = values->decimal,
+                                         .carry = amount,
+                                         .p = p};
+    next.before = next.after = values->registers[next.reg];
+    /* 818frk uses binary arithmetic even when Saturn decimal mode is set. */
+    unsigned radix = opcode != 8 && next.decimal ? 10 : 16;
+    for (unsigned i = next.first; i < next.first + next.nibbles; ++i) {
+        unsigned digit = (next.before >> (4 * i)) & 15;
+        if (digit >= radix)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (decrement) {
+            unsigned borrow = digit < next.carry;
+            digit += radix * borrow;
+            digit -= next.carry;
+            next.carry = borrow;
+        } else {
+            digit += next.carry;
+            next.carry = digit >= radix;
+            if (next.carry)
+                digit -= radix;
+        }
+        next.after = (next.after & ~(UINT64_C(15) << (4 * i))) | ((uint64_t)digit << (4 * i));
+    }
+    *unit = next;
+    return 0;
+}
+
+int hpclang_rpl_code_logical_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                     uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                     struct hpclang_rpl_code_logical *logical)
+{
+    if (!reader || !reader->read_nibble || !values || !logical)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000 || !limit || limit > 0x100000 - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(reader, instruction, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (limit < 2)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = read_word(reader, instruction + 1, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode != 14)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (limit < 4)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = read_word(reader, instruction + 2, 2, &opcode);
+    if (result)
+        return result;
+    unsigned field = opcode & 15, operation = opcode >> 4;
+    if (field > 7 && field != 15)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->carry > 1 || values->decimal > 1)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    static const unsigned lefts[8] = {0, 1, 2, 3, 1, 2, 0, 2};
+    static const unsigned rights[8] = {1, 2, 0, 2, 0, 1, 2, 3};
+    static const unsigned firsts[8] = {0, 0, 2, 0, 15, 3, 0, 0};
+    static const unsigned widths[8] = {1, 1, 1, 3, 1, 12, 2, 16};
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    struct hpclang_rpl_code_logical next = {.instruction = instruction,
+                                            .length = 4,
+                                            .left = lefts[operation & 7],
+                                            .right = rights[operation & 7],
+                                            .first = field == 15 ? 0
+                                                     : field     ? firsts[field]
+                                                                 : p,
+                                            .nibbles = field == 15  ? 5
+                                                       : field == 1 ? p + 1
+                                                                    : widths[field],
+                                            .disjunction = operation >> 3,
+                                            .p = p};
+    next.left_value = values->registers[next.left];
+    next.right_value = values->registers[next.right];
+    uint64_t mask = data_mask(next.nibbles) << (4 * next.first);
+    uint64_t combined =
+        next.disjunction ? next.left_value | next.right_value : next.left_value & next.right_value;
+    next.result = (next.left_value & ~mask) | (combined & mask);
+    *logical = next;
+    return 0;
+}
+
+int hpclang_rpl_code_bitshift_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                      uint32_t limit, const struct hpclang_rpl_code_values *values,
+                                      struct hpclang_rpl_code_bitshift *shift)
+{
+    if (!reader || !reader->read_nibble || !values || !shift)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000 || !limit || limit > 0x100000 - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(reader, instruction, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode != 8)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (limit < 2)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = read_word(reader, instruction + 1, 1, &opcode);
+    if (result)
+        return result;
+    if (opcode != 1)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (limit < 3)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = read_word(reader, instruction + 2, 1, &opcode);
+    if (result)
+        return result;
+    unsigned field = 7, reg, length = 3;
+    if (opcode >= 12) {
+        reg = opcode - 12;
+    } else if (opcode == 9) {
+        if (limit < 5)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t tail;
+        result = read_word(reader, instruction + 3, 2, &tail);
+        if (result)
+            return result;
+        field = tail & 15;
+        reg = tail >> 4;
+        length = 5;
+        if (reg > 3 || (field > 7 && field != 15))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    } else {
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->carry > 1 || values->decimal > 1)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    static const unsigned firsts[8] = {0, 0, 2, 0, 15, 3, 0, 0};
+    static const unsigned widths[8] = {1, 1, 1, 3, 1, 12, 2, 16};
+    struct hpclang_rpl_code_bitshift next = {.instruction = instruction,
+                                             .length = length,
+                                             .reg = reg,
+                                             .first = field == 15 ? 0
+                                                      : field     ? firsts[field]
+                                                                  : p,
+                                             .nibbles = field == 15  ? 5
+                                                        : field == 1 ? p + 1
+                                                                     : widths[field],
+                                             .p = p,
+                                             .before = values->registers[reg]};
+    uint64_t mask = data_mask(next.nibbles), selected = (next.before >> (4 * next.first)) & mask;
+    next.after =
+        (next.before & ~(mask << (4 * next.first))) | ((selected >> 1) << (4 * next.first));
+    next.lost_bit = selected & 1;
+    *shift = next;
+    return 0;
+}
+
+static void origin_overwrite(struct hpclang_rpl_code_origins *state, unsigned reg, uint32_t digits)
+{
+    if (!(digits & 31u))
+        return;
+    if (state->adjustment[reg])
+        for (unsigned digit = 0; digit < 5; ++digit)
+            state->registers[reg][digit] = 0;
+    state->adjustment[reg] = 0;
+}
+
+static int data_step(const struct hpclang_rpl_reader *instructions,
+                     const struct hpclang_rpl_reader *data, uint32_t instruction, uint32_t limit,
+                     struct hpclang_rpl_code_values *values,
+                     struct hpclang_rpl_code_origins *origins, hpclang_rpl_code_token_fn token,
+                     void *context, uint32_t *length, hpclang_rpl_code_derive_fn derive,
+                     hpclang_rpl_code_constant_fn constant, hpclang_rpl_code_unit_fn unit,
+                     hpclang_rpl_code_sum_fn sum, hpclang_rpl_code_logical_fn logical)
+{
+    if (!instructions || !instructions->read_nibble || !values || !origins || !token || !length)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (values->registers[HPCLANG_RPL_CODE_P] > 15 || values->carry > 1 || values->decimal > 1 ||
+        values->registers[HPCLANG_RPL_CODE_D0] > 0xfffff ||
+        values->registers[HPCLANG_RPL_CODE_D1] > 0xfffff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned reg = 0; reg <= HPCLANG_RPL_CODE_D1; ++reg)
+        if (origins->adjustment[reg] > 0xfffff)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    unsigned p = (unsigned)values->registers[HPCLANG_RPL_CODE_P];
+    struct hpclang_rpl_code_values next = *values;
+    struct hpclang_rpl_code_origins sources = *origins;
+    struct hpclang_rpl_code_literal literal;
+    struct hpclang_rpl_code_assignment assignment;
+    struct hpclang_rpl_code_exchange exchange;
+    struct hpclang_rpl_code_memory memory;
+    struct hpclang_rpl_code_address_adjust adjust;
+    uint32_t tokens[16] = {0}, size;
+    int result = hpclang_rpl_code_literal_inspect(instructions, instruction, limit, p, &literal);
+    if (!result) {
+        for (unsigned i = 0; i < literal.nibbles; ++i) {
+            unsigned digit = literal.destination == HPCLANG_RPL_CODE_D0 ||
+                                     literal.destination == HPCLANG_RPL_CODE_D1
+                                 ? i
+                                 : (p + i) & 15u;
+            result = token(context, 0, literal.field + i,
+                           (uint8_t)((literal.value >> (4 * digit)) & 15), &tokens[i]);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
+        next.registers[literal.destination] =
+            (next.registers[literal.destination] & ~literal.mask) | literal.value;
+        result = hpclang_rpl_code_origins_literal(&sources, &literal, p, tokens, literal.nibbles);
+        size = literal.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    result = hpclang_rpl_code_assignment_inspect(instructions, instruction, limit, p, &assignment);
+    if (!result) {
+        uint64_t value = assignment.source == HPCLANG_RPL_CODE_CONSTANT ||
+                                 assignment.source == HPCLANG_RPL_CODE_NEXT_PC
+                             ? assignment.constant
+                             : next.registers[assignment.source];
+        uint64_t mask = data_mask(assignment.nibbles);
+        value = (value >> (4 * assignment.source_first)) & mask;
+        next.registers[assignment.destination] = (next.registers[assignment.destination] &
+                                                  ~(mask << (4 * assignment.destination_first))) |
+                                                 (value << (4 * assignment.destination_first));
+        result = hpclang_rpl_code_origins_assign(&sources, &assignment, tokens);
+        if (!result && assignment.source == HPCLANG_RPL_CODE_CONSTANT && constant) {
+            const struct hpclang_rpl_code_constant fact = {
+                assignment, p, origins->registers[HPCLANG_RPL_CODE_P][0],
+                origins->adjustment[HPCLANG_RPL_CODE_P]};
+            result = constant(context, &fact, tokens);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            for (unsigned i = 0; i < assignment.nibbles; ++i) {
+                if (!tokens[i])
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+                sources.registers[assignment.destination][assignment.destination_first + i] =
+                    tokens[i];
+            }
+        }
+        size = assignment.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    struct hpclang_rpl_code_logical_source combination = {0};
+    result = hpclang_rpl_code_logical_inspect(instructions, instruction, limit, &next,
+                                              &combination.logical);
+    if (!result) {
+        combination.p_origin = origins->registers[HPCLANG_RPL_CODE_P][0];
+        combination.p_adjustment = origins->adjustment[HPCLANG_RPL_CODE_P];
+        const unsigned regs[2] = {combination.logical.left, combination.logical.right};
+        for (unsigned operand = 0; operand < 2; ++operand) {
+            combination.adjustment[operand] = origins->adjustment[regs[operand]];
+            for (unsigned digit = 0; digit < 16; ++digit)
+                combination.origins[operand][digit] = origins->registers[regs[operand]][digit];
+        }
+        if (logical && (result = logical(context, &combination, tokens)))
+            return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        unsigned reg = combination.logical.left, first = combination.logical.first;
+        unsigned count = combination.logical.nibbles;
+        origin_overwrite(&sources, reg, ((1u << count) - 1) << first);
+        for (unsigned i = 0; i < count; ++i) {
+            if (logical && !tokens[i])
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            sources.registers[reg][first + i] = logical ? tokens[i] : 0;
+        }
+        next.registers[reg] = combination.logical.result;
+        size = combination.logical.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    struct hpclang_rpl_code_sum_source addition = {0};
+    result = hpclang_rpl_code_sum_inspect(instructions, instruction, limit, &next, &addition.sum);
+    if (!result) {
+        addition.p_origin = origins->registers[HPCLANG_RPL_CODE_P][0];
+        addition.p_adjustment = origins->adjustment[HPCLANG_RPL_CODE_P];
+        unsigned registers[2] = {addition.sum.left, addition.sum.right};
+        for (unsigned operand = 0; operand < 2; ++operand) {
+            addition.adjustment[operand] = origins->adjustment[registers[operand]];
+            for (unsigned i = 0; i < 16; ++i)
+                addition.origins[operand][i] = origins->registers[registers[operand]][i];
+        }
+        if (sum) {
+            result = sum(context, &addition, tokens);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
+        unsigned reg = addition.sum.destination;
+        origin_overwrite(&sources, reg, ((1u << addition.sum.nibbles) - 1) << addition.sum.first);
+        for (unsigned i = 0; i < addition.sum.nibbles; ++i) {
+            if (sum && !tokens[i])
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            sources.registers[reg][addition.sum.first + i] = sum ? tokens[i] : 0;
+        }
+        next.registers[reg] = addition.sum.result;
+        next.carry = addition.sum.carry;
+        size = addition.sum.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    struct hpclang_rpl_code_unit arithmetic;
+    result = hpclang_rpl_code_unit_inspect(instructions, instruction, limit, &next, &arithmetic);
+    if (!result) {
+        arithmetic.p_origin = origins->registers[HPCLANG_RPL_CODE_P][0];
+        arithmetic.p_adjustment = origins->adjustment[HPCLANG_RPL_CODE_P];
+        arithmetic.adjustment = origins->adjustment[arithmetic.reg];
+        for (unsigned i = 0; i < 16; ++i)
+            arithmetic.origins[i] = origins->registers[arithmetic.reg][i];
+        if (unit) {
+            result = unit(context, &arithmetic, tokens);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
+        origin_overwrite(&sources, arithmetic.reg,
+                         ((1u << arithmetic.nibbles) - 1) << arithmetic.first);
+        for (unsigned i = 0; i < arithmetic.nibbles; ++i) {
+            if (unit && !tokens[i])
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            sources.registers[arithmetic.reg][arithmetic.first + i] = unit ? tokens[i] : 0;
+        }
+        next.registers[arithmetic.reg] = arithmetic.after;
+        next.carry = arithmetic.carry;
+        size = arithmetic.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    result = hpclang_rpl_code_exchange_inspect(instructions, instruction, limit, p, &exchange);
+    if (!result) {
+        uint64_t mask = data_mask(exchange.nibbles) << (4 * exchange.first);
+        uint64_t left = next.registers[exchange.left], right = next.registers[exchange.right];
+        next.registers[exchange.left] = (left & ~mask) | (right & mask);
+        next.registers[exchange.right] = (right & ~mask) | (left & mask);
+        result = hpclang_rpl_code_origins_exchange(&sources, &exchange);
+        size = exchange.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    result = hpclang_rpl_code_memory_inspect(instructions, instruction, limit, p, &memory);
+    if (!result) {
+        if (!memory.load)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (!data || !data->read_nibble)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        uint32_t address = (uint32_t)next.registers[memory.address];
+        if (address > 0x100000u - memory.nibbles)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint64_t value = 0;
+        for (unsigned i = 0; i < memory.nibbles; ++i) {
+            uint8_t nibble;
+            if (!data->read_nibble(data->context, address + i, &nibble))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (nibble > 15)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            result = token(context, 1, address + i, nibble, &tokens[i]);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            value |= (uint64_t)nibble << (4 * i);
+        }
+        uint64_t mask = data_mask(memory.nibbles) << (4 * memory.first);
+        next.registers[memory.data] =
+            (next.registers[memory.data] & ~mask) | (value << (4 * memory.first));
+        result = hpclang_rpl_code_origins_memory(&sources, &memory, tokens, memory.nibbles);
+        size = memory.length;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    result = hpclang_rpl_code_address_adjust_inspect(instructions, instruction, limit, &adjust);
+    if (result == HPCLANG_RPL_SPAN_UNSUPPORTED) {
+        uint32_t opcode;
+        result = read_word(instructions, instruction, 2, &opcode);
+        if (result)
+            return result;
+        size = 2;
+        if (opcode == 0xae || ((opcode & 15u) == 11 && (opcode >> 4) < 8)) {
+            /* EA / BfA: A=A-C in the address / selected field. Computed
+             * result digits require an expression, never original-cell tokens. */
+            unsigned address_field = opcode == 0xae;
+            if (!address_field) {
+                uint32_t operation;
+                if (limit < 3)
+                    return HPCLANG_RPL_SPAN_BOUNDS;
+                result = read_word(instructions, instruction + 2, 1, &operation);
+                if (result)
+                    return result;
+                if (operation != 10)
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            }
+            static const unsigned firsts[] = {0, 0, 2, 0, 15, 3, 0, 0};
+            static const unsigned widths[] = {1, 1, 1, 3, 1, 12, 2, 16};
+            unsigned field = address_field ? 0 : opcode >> 4;
+            unsigned first = field == 0 ? p : firsts[field];
+            unsigned width = field == 1 ? p + 1 : widths[field];
+            if (address_field) {
+                first = 0;
+                width = 5;
+            }
+            uint64_t a = next.registers[HPCLANG_RPL_CODE_A];
+            uint64_t c = next.registers[HPCLANG_RPL_CODE_C];
+            unsigned borrow = 0, radix = next.decimal ? 10 : 16;
+            uint32_t written = ((1u << width) - 1u) << first;
+            origin_overwrite(&sources, HPCLANG_RPL_CODE_A, written);
+            for (unsigned i = first; i < first + width; ++i) {
+                unsigned left = (a >> (4 * i)) & 15u;
+                unsigned right = (c >> (4 * i)) & 15u;
+                if (left >= radix || right >= radix)
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+                int digit = (int)left - (int)right - (int)borrow;
+                borrow = digit < 0;
+                if (borrow)
+                    digit += radix;
+                a = (a & ~(UINT64_C(15) << (4 * i))) | ((uint64_t)digit << (4 * i));
+                sources.registers[HPCLANG_RPL_CODE_A][i] = 0;
+            }
+            next.registers[HPCLANG_RPL_CODE_A] = a;
+            next.carry = borrow;
+            if (derive && first + width <= 5) {
+                struct hpclang_rpl_execution_subtraction expression = {.first = first,
+                                                                       .nibbles = width,
+                                                                       .decimal = next.decimal,
+                                                                       .value =
+                                                                           (uint32_t)a & 0xfffffu,
+                                                                       .carry = borrow};
+                struct hpclang_rpl_execution_value *operands[] = {&expression.left,
+                                                                  &expression.right};
+                for (unsigned operand = 0; operand < 2; ++operand) {
+                    unsigned reg = operand ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A;
+                    operands[operand]->value = (uint32_t)values->registers[reg] & 0xfffffu;
+                    operands[operand]->adjustment = origins->adjustment[reg];
+                    for (unsigned digit = 0; digit < 5; ++digit)
+                        operands[operand]->origins[digit] = origins->registers[reg][digit];
+                }
+                result = derive(context, instruction, &expression, tokens);
+                if (result)
+                    return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+                for (unsigned digit = 0; digit < 5; ++digit) {
+                    if (!tokens[digit])
+                        return HPCLANG_RPL_SPAN_MALFORMED;
+                    sources.registers[HPCLANG_RPL_CODE_A][digit] = tokens[digit];
+                }
+                sources.adjustment[HPCLANG_RPL_CODE_A] = 0;
+            }
+            size = address_field ? 2 : 3;
+        } else if (opcode == 0x40 || opcode == 0x50) {
+            next.decimal = opcode == 0x50;
+        } else if (((opcode & 15u) == 14 && (opcode >> 4) >= 4 && (opcode >> 4) <= 7) ||
+                   ((opcode & 15u) == 12 && (opcode >> 4) >= 12)) {
+            /* E4..E7 / CC..CF: increment/decrement A..D's address field.
+             * Hex arithmetic retains source + modular offset, including
+             * expression sources. BCD needs a different relation; leave its
+             * computed digits unknown rather than invent a binary offset. */
+            unsigned decrement = (opcode & 15u) == 12;
+            unsigned reg = (opcode >> 4) - (decrement ? 12u : 4u);
+            uint32_t old = (uint32_t)next.registers[reg] & 0xfffffu;
+            uint32_t value = 0, carry = 1;
+            for (unsigned i = 0; i < 5; ++i) {
+                unsigned digit = (old >> (4 * i)) & 15u;
+                if (next.decimal && digit > 9)
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+                unsigned radix = next.decimal ? 10u : 16u;
+                if (decrement) {
+                    unsigned borrow = digit < carry;
+                    digit = digit + (borrow ? radix : 0) - carry;
+                    carry = borrow;
+                } else {
+                    digit += carry;
+                    carry = digit >= radix;
+                    if (carry)
+                        digit = 0;
+                }
+                value |= digit << (4 * i);
+                if (next.decimal)
+                    sources.registers[reg][i] = 0;
+            }
+            next.registers[reg] = (next.registers[reg] & ~UINT64_C(0xfffff)) | value;
+            next.carry = carry;
+            sources.adjustment[reg] =
+                next.decimal ? 0
+                             : (sources.adjustment[reg] + (decrement ? 0xfffffu : 1u)) & 0xfffffu;
+        } else {
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        }
+        goto done;
+    }
+    if (result)
+        return result;
+    int64_t address = (int64_t)next.registers[adjust.address] + adjust.delta;
+    next.registers[adjust.address] = (uint32_t)address & 0xfffffu;
+    next.carry = address < 0 || address > 0xfffff;
+    result = hpclang_rpl_code_origins_adjust(&sources, &adjust);
+    size = adjust.length;
+done:
+    if (result)
+        return result;
+    *values = next;
+    *origins = sources;
+    *length = size;
+    return 0;
+}
+
+int hpclang_rpl_code_data_step(const struct hpclang_rpl_reader *instructions,
+                               const struct hpclang_rpl_reader *data, uint32_t instruction,
+                               uint32_t limit, struct hpclang_rpl_code_values *values,
+                               struct hpclang_rpl_code_origins *origins,
+                               hpclang_rpl_code_token_fn token, void *context, uint32_t *length)
+{
+    return data_step(instructions, data, instruction, limit, values, origins, token, context,
+                     length, 0, 0, 0, 0, 0);
+}
+
+static void execution_use(struct hpclang_rpl_code_step_uses *uses, unsigned kind, uint32_t value,
+                          const uint32_t *origins, uint32_t adjustment)
+{
+    struct hpclang_rpl_code_address_use *use = &uses->addresses[uses->count++];
+    use->kind = kind;
+    use->value = value;
+    use->adjustment = adjustment;
+    use->generated = 0;
+    for (unsigned i = 0; i < 5; ++i)
+        use->origins[i] = origins[i];
+}
+
+static int native_word_observe(const struct hpclang_rpl_code_callbacks *callbacks, void *context,
+                               const struct hpclang_rpl_code_execution *before,
+                               struct hpclang_rpl_code_execution *next, uint32_t reg, int32_t delta)
+{
+    if (!callbacks || !callbacks->native_word)
+        return 0;
+    struct hpclang_rpl_code_native_word word = {.instruction = before->control.pc,
+                                                .reg = reg,
+                                                .before = (uint32_t)before->values.registers[reg],
+                                                .after = (uint32_t)next->values.registers[reg],
+                                                .adjustment = before->origins.adjustment[reg],
+                                                .delta = delta};
+    if (word.adjustment > 0xfffff || word.after != word.before + (uint32_t)delta)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned digit = 0; digit < 8; ++digit)
+        word.origins[digit] = before->origins.registers[reg][digit];
+    uint32_t tokens[8] = {0};
+    int result = callbacks->native_word(context, &word, tokens);
+    if (result)
+        return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned digit = reg == HPCLANG_RPL_CODE_B ? 5 : 0; digit < 8; ++digit) {
+        if (!tokens[digit])
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        next->origins.registers[reg][digit] = tokens[digit];
+    }
+    return 0;
+}
+
+static int execution_native_next(const struct hpclang_rpl_reader *data,
+                                 struct hpclang_rpl_code_execution *next,
+                                 hpclang_rpl_code_token_fn token, void *context,
+                                 struct hpclang_rpl_code_step_uses *observed)
+{
+    /* Native-ROM 81B1: A.A=read5(D0), PC=read5(A.A), D0+=5.
+     * The ROM increments the full native D0 word; reject a result
+     * outside the canonical 20-bit state instead of wrapping it. */
+    if (!data || !data->read_nibble)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    uint32_t d0 = (uint32_t)next->values.registers[HPCLANG_RPL_CODE_D0];
+    if (next->values.registers[HPCLANG_RPL_CODE_D0] > 0xffffa)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (next->origins.adjustment[HPCLANG_RPL_CODE_D0] > 0xfffff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t address = d0, sources[5];
+    for (unsigned digit = 0; digit < 5; ++digit)
+        sources[digit] = next->origins.registers[HPCLANG_RPL_CODE_D0][digit];
+    for (unsigned load = 0; load < 2; ++load) {
+        execution_use(observed, HPCLANG_RPL_CODE_USE_LOAD_ADDRESS, address, sources,
+                      load ? 0 : next->origins.adjustment[HPCLANG_RPL_CODE_D0]);
+        if (address > 0xffffb)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t value;
+        int result = read_word(data, address, 5, &value);
+        if (result)
+            return result;
+        for (unsigned digit = 0; digit < 5; ++digit) {
+            result =
+                token(context, 1, address + digit, (value >> (4 * digit)) & 15, &sources[digit]);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
+        if (!load) {
+            next->values.registers[HPCLANG_RPL_CODE_A] =
+                (next->values.registers[HPCLANG_RPL_CODE_A] & ~UINT64_C(0xfffff)) | value;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                next->origins.registers[HPCLANG_RPL_CODE_A][digit] = sources[digit];
+            next->origins.adjustment[HPCLANG_RPL_CODE_A] = 0;
+        }
+        address = value;
+    }
+    execution_use(observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, address, sources, 0);
+    next->values.registers[HPCLANG_RPL_CODE_D0] = d0 + 5;
+    next->origins.adjustment[HPCLANG_RPL_CODE_D0] =
+        (next->origins.adjustment[HPCLANG_RPL_CODE_D0] + 5) & 0xfffff;
+    next->control.pc = address;
+    return 0;
+}
+
+int hpclang_rpl_code_execution_step_observed(const struct hpclang_rpl_reader *instructions,
+                                             const struct hpclang_rpl_reader *data, uint32_t limit,
+                                             struct hpclang_rpl_code_execution *state,
+                                             hpclang_rpl_code_token_fn token,
+                                             const struct hpclang_rpl_code_callbacks *callbacks,
+                                             void *context, struct hpclang_rpl_code_step_uses *uses)
+{
+    const hpclang_rpl_code_derive_fn derive = callbacks ? callbacks->derive : 0;
+    const hpclang_rpl_code_store_fn store = callbacks ? callbacks->store : 0;
+    const hpclang_rpl_code_config_fn config = callbacks ? callbacks->config : 0;
+    const hpclang_rpl_code_predicate_fn predicate = callbacks ? callbacks->predicate : 0;
+
+    if (!state || !uses || !token)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (state->values.carry != state->control.carry || state->control.cursor >= 8)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned slot = 0; slot < 8; ++slot)
+        if (state->control.stack_generated[slot] > 0x100000 ||
+            state->stack_adjustment[slot] > 0xfffff ||
+            (state->stack_adjustment[slot] && state->control.stack_generated[slot]))
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_code_execution next = *state;
+    struct hpclang_rpl_code_step_uses observed = {0};
+    uint32_t pc = next.control.pc, length;
+    int result = data_step(instructions, data, pc, limit, &next.values, &next.origins, token,
+                           context, &length, derive, callbacks ? callbacks->constant : 0,
+                           callbacks ? callbacks->unit : 0, callbacks ? callbacks->sum : 0,
+                           callbacks ? callbacks->logical : 0);
+    if (!result) {
+        struct hpclang_rpl_code_memory memory;
+        int load = hpclang_rpl_code_memory_inspect(
+            instructions, pc, limit, (unsigned)state->values.registers[HPCLANG_RPL_CODE_P],
+            &memory);
+        if (!load)
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_LOAD_ADDRESS,
+                          (uint32_t)state->values.registers[memory.address],
+                          state->origins.registers[memory.address],
+                          state->origins.adjustment[memory.address]);
+        else if (load != HPCLANG_RPL_SPAN_UNSUPPORTED)
+            return load;
+        next.control.pc = (pc + length) & 0xfffffu;
+        next.control.carry = next.values.carry;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    if (store) {
+        struct hpclang_rpl_code_memory memory;
+        result = hpclang_rpl_code_memory_inspect(
+            instructions, pc, limit, (unsigned)state->values.registers[HPCLANG_RPL_CODE_P],
+            &memory);
+        if (!result && !memory.load) {
+            uint32_t address = (uint32_t)state->values.registers[memory.address];
+            if (address > 0x100000u - memory.nibbles)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_STORE_ADDRESS, address,
+                          state->origins.registers[memory.address],
+                          state->origins.adjustment[memory.address]);
+            struct hpclang_rpl_code_store effect = {.instruction = pc,
+                                                    .first = memory.first,
+                                                    .nibbles = memory.nibbles,
+                                                    .address = observed.addresses[0],
+                                                    .value = state->values.registers[memory.data],
+                                                    .adjustment =
+                                                        state->origins.adjustment[memory.data]};
+            for (unsigned digit = 0; digit < 16; ++digit)
+                effect.origins[digit] = state->origins.registers[memory.data][digit];
+            next.control.pc = (pc + memory.length) & 0xfffffu;
+            result = store(context, &effect);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            goto done;
+        }
+        if (result && result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+            return result;
+    }
+    uint32_t opcode;
+    result = read_word(instructions, pc, 2, &opcode);
+    if (result)
+        return result;
+    unsigned status_test = opcode == 0x68 || opcode == 0x78;
+    if (status_test || (opcode & 15) == 9 || opcode == 0xa8 || opcode == 0xb8) {
+        struct hpclang_rpl_code_predicate condition = {0};
+        if (status_test) {
+            if (limit < 5)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            uint32_t tail;
+            result = read_word(instructions, pc + 2, 3, &tail);
+            if (result)
+                return result;
+            condition.taken = ((next.status >> (tail & 15)) & 1) == (opcode == 0x78);
+            condition.displacement = tail >> 4;
+        } else {
+            if (!predicate)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            result = hpclang_rpl_code_predicate_inspect(instructions, pc, limit, &next.values,
+                                                        &condition);
+            if (result)
+                return result;
+        }
+        next.values.carry = next.control.carry = condition.taken;
+        if (condition.displacement) {
+            result = hpclang_rpl_code_branch_inspect(instructions, pc, limit, &observed.branch);
+            if (result)
+                return result;
+            observed.has_branch = 1;
+            next.control.pc = condition.taken ? observed.branch.target : (pc + 5) & 0xfffff;
+        } else if (!condition.taken) {
+            next.control.pc = (pc + 5) & 0xfffff;
+        } else {
+            unsigned slot = (next.control.cursor + 7) & 7;
+            uint32_t target = next.control.stack[slot],
+                     generated = next.control.stack_generated[slot];
+            if (target > 0xfffff)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                if (generated && next.control.stack_origins[slot][digit])
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_RETURN_TARGET, target,
+                          next.control.stack_origins[slot], next.stack_adjustment[slot]);
+            observed.addresses[0].generated = generated;
+            next.control.cursor = slot;
+            next.control.pc = target;
+            next.control.stack[slot] = next.control.stack_generated[slot] =
+                next.stack_adjustment[slot] = 0;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                next.control.stack_origins[slot][digit] = 0;
+        }
+        if (!status_test) {
+            result = predicate(context, &condition, state);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        }
+        goto done;
+    }
+    if (opcode == 0x08 && limit >= 3) {
+        uint32_t operation;
+        result = read_word(instructions, pc + 2, 1, &operation);
+        if (result)
+            return result;
+        if (operation == 11 && callbacks && callbacks->native_push) {
+            struct hpclang_rpl_code_native_push effect;
+            result = hpclang_rpl_code_native_push_inspect(instructions, limit, state, &effect);
+            if (result)
+                return result;
+            if (next.origins.adjustment[HPCLANG_RPL_CODE_D] > 0xfffff ||
+                (effect.stores && next.origins.adjustment[HPCLANG_RPL_CODE_D1] > 0xfffff))
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            if (effect.stores && !store)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            struct hpclang_rpl_code_push_origins origins = {0};
+            result = callbacks->native_push(context, &effect, state, &origins);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            if (!origins.p)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            for (unsigned digit = 0; digit < 5; ++digit) {
+                if (!origins.a[digit] || (!effect.stores && !origins.target[digit]))
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+                next.origins.registers[HPCLANG_RPL_CODE_A][digit] = origins.a[digit];
+            }
+            for (unsigned digit = 0; digit < 8; ++digit) {
+                if (!origins.d[digit])
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+                next.origins.registers[HPCLANG_RPL_CODE_D][digit] = origins.d[digit];
+            }
+            next.values.registers[HPCLANG_RPL_CODE_A] = effect.a;
+            next.values.registers[HPCLANG_RPL_CODE_D] = effect.d;
+            next.values.registers[HPCLANG_RPL_CODE_P] = effect.p;
+            next.origins.adjustment[HPCLANG_RPL_CODE_A] = 0;
+            next.origins.adjustment[HPCLANG_RPL_CODE_D] = 0;
+            next.origins.adjustment[HPCLANG_RPL_CODE_P] = 0;
+            for (unsigned digit = 0; digit < 16; ++digit)
+                next.origins.registers[HPCLANG_RPL_CODE_P][digit] = digit ? 0 : origins.p;
+            if (!effect.stores) {
+                next.control.pc = effect.exception_target;
+                execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, next.control.pc,
+                              origins.target, 0);
+                goto done;
+            }
+            next.values.registers[HPCLANG_RPL_CODE_D1] = effect.d1;
+            next.origins.adjustment[HPCLANG_RPL_CODE_D1] =
+                (next.origins.adjustment[HPCLANG_RPL_CODE_D1] - 5u) & 0xfffff;
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_STORE_ADDRESS, effect.store_address,
+                          next.origins.registers[HPCLANG_RPL_CODE_D1],
+                          next.origins.adjustment[HPCLANG_RPL_CODE_D1]);
+            struct hpclang_rpl_code_store write = {.instruction = pc,
+                                                   .nibbles = 5,
+                                                   .address = observed.addresses[0],
+                                                   .value = effect.a};
+            for (unsigned digit = 0; digit < 16; ++digit)
+                write.origins[digit] = next.origins.registers[HPCLANG_RPL_CODE_A][digit];
+            result = store(context, &write);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            result = execution_native_next(data, &next, token, context, &observed);
+            if (result)
+                return result;
+            goto done;
+        }
+        if (operation == 4 || operation == 5) {
+            hpclang_rpl_code_config_fn action = operation == 5 ? config
+                                                : callbacks    ? callbacks->unconfig
+                                                               : 0;
+            if (!action)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            struct hpclang_rpl_code_configuration effect = {
+                .instruction = pc,
+                .value = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C] & 0xfffff,
+                .adjustment = next.origins.adjustment[HPCLANG_RPL_CODE_C]};
+            for (unsigned digit = 0; digit < 5; ++digit)
+                effect.origins[digit] = next.origins.registers[HPCLANG_RPL_CODE_C][digit];
+            result = action(context, &effect);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            next.control.pc = (pc + 3) & 0xfffff;
+            goto done;
+        }
+    }
+    if (opcode == 0x18) {
+        struct hpclang_rpl_code_bitshift_source fact = {0};
+        result =
+            hpclang_rpl_code_bitshift_inspect(instructions, pc, limit, &state->values, &fact.shift);
+        if (!result) {
+            unsigned reg = fact.shift.reg, first = fact.shift.first, count = fact.shift.nibbles;
+            fact.p_origin = state->origins.registers[HPCLANG_RPL_CODE_P][0];
+            fact.p_adjustment = state->origins.adjustment[HPCLANG_RPL_CODE_P];
+            fact.adjustment = state->origins.adjustment[reg];
+            for (unsigned i = 0; i < 16; ++i)
+                fact.origins[i] = state->origins.registers[reg][i];
+            uint32_t tokens[16] = {0};
+            hpclang_rpl_code_bitshift_fn observe = callbacks ? callbacks->bitshift : 0;
+            if (observe && (result = observe(context, &fact, tokens)))
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            uint32_t affected = ((1u << count) - 1) << first;
+            if (fact.adjustment && first < 5)
+                affected |= 31u;
+            origin_overwrite(&next.origins, reg, affected);
+            for (unsigned i = 0; i < 16; ++i) {
+                if (!(affected & (1u << i)))
+                    continue;
+                if (observe && !tokens[i])
+                    return HPCLANG_RPL_SPAN_UNSUPPORTED;
+                next.origins.registers[reg][i] = observe ? tokens[i] : 0;
+            }
+            next.values.registers[reg] = fact.shift.after;
+            next.hst |= fact.shift.lost_bit << 1;
+            next.control.pc = (pc + fact.shift.length) & 0xfffff;
+            goto done;
+        }
+        if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+            return result;
+    }
+    if (opcode == 0x18 && limit >= 3) {
+        uint32_t operation;
+        result = read_word(instructions, pc + 2, 1, &operation);
+        if (result)
+            return result;
+        if (operation < 8) {
+            unsigned reg = operation & 3, right = operation >> 2;
+            uint64_t value = next.values.registers[reg];
+            uint32_t origins[16];
+            for (unsigned i = 0; i < 16; ++i)
+                origins[i] =
+                    next.origins.adjustment[reg] && i < 5 ? 0 : next.origins.registers[reg][i];
+            /* Rotation is a digit permutation, not a 20-bit affine operation.
+             * Preserve exact sources; invalidate digits still represented by
+             * a nonzero low-address adjustment before moving their positions. */
+            next.origins.adjustment[reg] = 0;
+            for (unsigned i = 0; i < 16; ++i)
+                next.origins.registers[reg][i] = origins[(i + (right ? 1 : 15)) & 15];
+            next.values.registers[reg] =
+                right ? (value >> 4) | (value << 60) : (value << 4) | (value >> 60);
+            /* The qualified HP49g+/HP50g native interpreters preserve HST
+             * for both directions, unlike hardware Saturn's documented SB
+             * update on right wrap. Do not manufacture that side effect. */
+            next.control.pc = (pc + 3) & 0xfffff;
+            goto done;
+        }
+    }
+    if (opcode == 0x48 || opcode == 0x58) {
+        uint32_t bit;
+        if (limit < 3)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(instructions, pc + 2, 1, &bit);
+        if (result)
+            return result;
+        if (opcode == 0x48)
+            next.status &= ~(UINT32_C(1) << bit);
+        else
+            next.status |= UINT32_C(1) << bit;
+        next.control.pc = (pc + 3) & 0xfffff;
+        goto done;
+    }
+    if (opcode == 0x28) {
+        uint32_t mask;
+        if (limit < 3)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(instructions, pc + 2, 1, &mask);
+        if (result)
+            return result;
+        next.hst &= ~mask;
+        next.control.pc = (pc + 3) & 0xfffff;
+        goto done;
+    }
+    if (opcode == 0x60 || opcode == 0x70) {
+        unsigned slot = next.control.cursor;
+        uint32_t *reg = next.origins.registers[HPCLANG_RPL_CODE_C];
+        if (opcode == 0x60) {
+            next.control.stack_generated[slot] = 0;
+            next.control.stack[slot] =
+                (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C] & 0xfffffu;
+            for (unsigned i = 0; i < 5; ++i)
+                next.control.stack_origins[slot][i] = reg[i];
+            next.stack_adjustment[slot] = next.origins.adjustment[HPCLANG_RPL_CODE_C];
+            next.control.cursor = (slot + 1) & 7u;
+        } else {
+            slot = (slot + 7) & 7u;
+            next.values.registers[HPCLANG_RPL_CODE_C] =
+                (next.values.registers[HPCLANG_RPL_CODE_C] & ~UINT64_C(0xfffff)) |
+                (next.control.stack[slot] & 0xfffffu);
+            for (unsigned i = 0; i < 5; ++i) {
+                reg[i] = next.control.stack_origins[slot][i];
+                next.control.stack_origins[slot][i] = 0;
+            }
+            next.control.stack[slot] = 0;
+            next.control.stack_generated[slot] = 0;
+            next.control.cursor = slot;
+            next.origins.adjustment[HPCLANG_RPL_CODE_C] = next.stack_adjustment[slot];
+            next.stack_adjustment[slot] = 0;
+        }
+        next.control.pc = (pc + 2) & 0xfffffu;
+        goto done;
+    }
+    if (opcode == 0x18) {
+        uint32_t extended;
+        if (limit < 4)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(instructions, pc, 4, &extended);
+        if (result)
+            return result;
+        if (extended == 0xab18 && callbacks && callbacks->native_scan) {
+            struct hpclang_rpl_code_native_scan effect;
+            result = hpclang_rpl_code_native_scan_inspect(
+                instructions, data, limit, state, callbacks->native_scan_max_reads, &effect);
+            if (result != HPCLANG_RPL_SPAN_UNSUPPORTED) {
+                if (result)
+                    return result;
+                if (next.origins.adjustment[HPCLANG_RPL_CODE_D0] > 0xfffff)
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+                struct hpclang_rpl_code_scan_origins origins = {0};
+                result = callbacks->native_scan(context, &effect, state, &origins);
+                if (result)
+                    return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+                next.origins.adjustment[HPCLANG_RPL_CODE_D0] =
+                    (next.origins.adjustment[HPCLANG_RPL_CODE_D0] + effect.d0 -
+                     (uint32_t)next.values.registers[HPCLANG_RPL_CODE_D0]) &
+                    0xfffff;
+                next.values.registers[HPCLANG_RPL_CODE_D0] = effect.d0;
+                if (effect.returns) {
+                    unsigned slot = effect.cursor;
+                    uint32_t generated = next.control.stack_generated[slot];
+                    for (unsigned digit = 0; digit < 5; ++digit)
+                        if (generated && next.control.stack_origins[slot][digit])
+                            return HPCLANG_RPL_SPAN_MALFORMED;
+                    execution_use(&observed, HPCLANG_RPL_CODE_USE_RETURN_TARGET, effect.target,
+                                  next.control.stack_origins[slot], next.stack_adjustment[slot]);
+                    observed.addresses[0].generated = generated;
+                    next.control.stack[slot] = next.control.stack_generated[slot] =
+                        next.stack_adjustment[slot] = 0;
+                    for (unsigned digit = 0; digit < 5; ++digit)
+                        next.control.stack_origins[slot][digit] = 0;
+                } else {
+                    if (origins.d1_adjustment > 0xfffff || origins.target_adjustment > 0xfffff)
+                        return HPCLANG_RPL_SPAN_MALFORMED;
+                    for (unsigned digit = 0; digit < 8; ++digit) {
+                        if (!origins.b[digit])
+                            return HPCLANG_RPL_SPAN_MALFORMED;
+                        next.origins.registers[HPCLANG_RPL_CODE_B][digit] = origins.b[digit];
+                    }
+                    for (unsigned digit = 0; digit < 16; ++digit) {
+                        if (digit < 5 && (!origins.d1[digit] || !origins.target[digit]))
+                            return HPCLANG_RPL_SPAN_MALFORMED;
+                        next.origins.registers[HPCLANG_RPL_CODE_D1][digit] =
+                            digit < 5 ? origins.d1[digit] : 0;
+                    }
+                    next.values.registers[HPCLANG_RPL_CODE_B] = effect.b;
+                    next.values.registers[HPCLANG_RPL_CODE_D1] = effect.d1;
+                    next.origins.adjustment[HPCLANG_RPL_CODE_B] = 0;
+                    next.origins.adjustment[HPCLANG_RPL_CODE_D1] = origins.d1_adjustment;
+                    execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, effect.target,
+                                  origins.target, origins.target_adjustment);
+                }
+                next.control.pc = effect.target;
+                next.control.cursor = effect.cursor;
+                next.control.carry = next.values.carry = effect.carry;
+                goto done;
+            }
+        }
+        if (extended == 0xeb18) {
+            /* Qualified HP49g+/HP50g ROM 81BE. The store precedes both
+             * dependent reads, so the callback must update the scratch view. */
+            if (next.values.carry) {
+                const uint32_t unknown[5] = {0};
+                next.control.pc = 0x2e15;
+                /* This target lives in the native ROM profile, not in the
+                 * instruction's Saturn operand cells. Do not invent origins. */
+                execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, next.control.pc,
+                              unknown, 0);
+                goto done;
+            }
+            if (!store)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            if (!data || !data->read_nibble)
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            uint32_t b = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_B];
+            uint32_t d0 = ((uint32_t)next.values.registers[HPCLANG_RPL_CODE_A] + 5) & 0xfffff;
+            if ((b & 0xfffff) > 0xffffb || d0 > 0xffffa ||
+                next.values.registers[HPCLANG_RPL_CODE_D0] > 0xfffff)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_STORE_ADDRESS, b & 0xfffff,
+                          next.origins.registers[HPCLANG_RPL_CODE_B],
+                          next.origins.adjustment[HPCLANG_RPL_CODE_B]);
+            struct hpclang_rpl_code_store effect = {
+                .instruction = pc,
+                .nibbles = 5,
+                .address = observed.addresses[0],
+                .value = next.values.registers[HPCLANG_RPL_CODE_D0],
+                .adjustment = next.origins.adjustment[HPCLANG_RPL_CODE_D0]};
+            for (unsigned digit = 0; digit < 16; ++digit)
+                effect.origins[digit] = next.origins.registers[HPCLANG_RPL_CODE_D0][digit];
+            result = store(context, &effect);
+            if (result)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            next.values.registers[HPCLANG_RPL_CODE_B] =
+                (next.values.registers[HPCLANG_RPL_CODE_B] & ~UINT64_C(0xffffffff)) |
+                (uint32_t)(b + 5);
+            next.origins.adjustment[HPCLANG_RPL_CODE_B] =
+                (next.origins.adjustment[HPCLANG_RPL_CODE_B] + 5) & 0xfffff;
+            for (unsigned digit = 5; digit < 8; ++digit)
+                next.origins.registers[HPCLANG_RPL_CODE_B][digit] = 0;
+            result = native_word_observe(callbacks, context, state, &next, HPCLANG_RPL_CODE_B, 5);
+            if (result)
+                return result;
+            next.values.registers[HPCLANG_RPL_CODE_D0] = d0;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                next.origins.registers[HPCLANG_RPL_CODE_D0][digit] =
+                    next.origins.registers[HPCLANG_RPL_CODE_A][digit];
+            next.origins.adjustment[HPCLANG_RPL_CODE_D0] =
+                (next.origins.adjustment[HPCLANG_RPL_CODE_A] + 5) & 0xfffff;
+        }
+        if (extended == 0x1b18 || extended == 0xeb18) {
+            result = execution_native_next(data, &next, token, context, &observed);
+            if (result)
+                return result;
+            goto done;
+        }
+        if (extended == 0xdb18) {
+            /* Qualified native-ROM 81BD: three dependent reads, not a
+             * fallthrough. Retain B's source and accumulated 20-bit offset;
+             * the computed digits are not directly stored source digits. */
+            if (!data || !data->read_nibble)
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            uint32_t b = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_B] - 5u;
+            uint32_t d = (uint32_t)next.values.registers[HPCLANG_RPL_CODE_D] + 1u;
+            uint32_t address = b & 0xfffffu, sources[5], pointer_sources[5], pointer = 0;
+            uint32_t adjustment = (next.origins.adjustment[HPCLANG_RPL_CODE_B] - 5u) & 0xfffffu;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                sources[digit] = next.origins.registers[HPCLANG_RPL_CODE_B][digit];
+            for (unsigned load = 0; load < 3; ++load) {
+                execution_use(&observed, HPCLANG_RPL_CODE_USE_LOAD_ADDRESS, address, sources,
+                              load ? 0 : adjustment);
+                if (address > 0xffffbu)
+                    return HPCLANG_RPL_SPAN_BOUNDS;
+                uint32_t value;
+                result = read_word(data, address, 5, &value);
+                if (result)
+                    return result;
+                for (unsigned digit = 0; digit < 5; ++digit) {
+                    result = token(context, 1, address + digit, (value >> (4 * digit)) & 15,
+                                   &sources[digit]);
+                    if (result)
+                        return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+                }
+                if (load == 0) {
+                    pointer = value;
+                    if (pointer > 0xffffau)
+                        return HPCLANG_RPL_SPAN_BOUNDS;
+                    for (unsigned digit = 0; digit < 5; ++digit)
+                        pointer_sources[digit] = sources[digit];
+                } else if (load == 1) {
+                    next.values.registers[HPCLANG_RPL_CODE_A] =
+                        (next.values.registers[HPCLANG_RPL_CODE_A] & ~UINT64_C(0xfffff)) | value;
+                    for (unsigned digit = 0; digit < 5; ++digit)
+                        next.origins.registers[HPCLANG_RPL_CODE_A][digit] = sources[digit];
+                }
+                address = value;
+            }
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, address, sources, 0);
+            next.values.registers[HPCLANG_RPL_CODE_B] =
+                (next.values.registers[HPCLANG_RPL_CODE_B] & ~UINT64_C(0xffffffff)) | b;
+            next.values.registers[HPCLANG_RPL_CODE_D] =
+                (next.values.registers[HPCLANG_RPL_CODE_D] & ~UINT64_C(0xffffffff)) | d;
+            next.values.registers[HPCLANG_RPL_CODE_D0] = pointer + 5;
+            next.origins.adjustment[HPCLANG_RPL_CODE_A] = 0;
+            next.origins.adjustment[HPCLANG_RPL_CODE_B] = adjustment;
+            next.origins.adjustment[HPCLANG_RPL_CODE_D] = 0;
+            next.origins.adjustment[HPCLANG_RPL_CODE_D0] = 5;
+            for (unsigned digit = 0; digit < 8; ++digit) {
+                if (digit >= 5)
+                    next.origins.registers[HPCLANG_RPL_CODE_B][digit] = 0;
+                next.origins.registers[HPCLANG_RPL_CODE_D][digit] = 0;
+            }
+            result = native_word_observe(callbacks, context, state, &next, HPCLANG_RPL_CODE_B, -5);
+            if (!result)
+                result =
+                    native_word_observe(callbacks, context, state, &next, HPCLANG_RPL_CODE_D, 1);
+            if (result)
+                return result;
+            for (unsigned digit = 0; digit < 5; ++digit)
+                next.origins.registers[HPCLANG_RPL_CODE_D0][digit] = pointer_sources[digit];
+            next.control.pc = address;
+            goto done;
+        }
+    }
+    struct hpclang_rpl_code_pc_exchange exchange;
+    result = HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (opcode == 0x18)
+        result = hpclang_rpl_code_pc_exchange_inspect(
+            instructions, pc, limit, (uint32_t)next.values.registers[HPCLANG_RPL_CODE_A],
+            (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C], &exchange);
+    if (!result) {
+        unsigned reg = exchange.capture.destination;
+        execution_use(&observed, HPCLANG_RPL_CODE_USE_REGISTER_TARGET, exchange.target,
+                      next.origins.registers[reg], next.origins.adjustment[reg]);
+        next.values.registers[reg] =
+            (next.values.registers[reg] & ~UINT64_C(0xfffff)) | exchange.capture.constant;
+        for (unsigned i = 0; i < 5; ++i)
+            next.origins.registers[reg][i] = 0;
+        next.origins.adjustment[reg] = 0;
+        next.control.pc = exchange.target;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    struct hpclang_rpl_code_indirect jump;
+    if (opcode == 0x18 || opcode == 0x08)
+        result = hpclang_rpl_code_indirect_inspect(
+            instructions, data, pc, limit, (uint32_t)next.values.registers[HPCLANG_RPL_CODE_A],
+            (uint32_t)next.values.registers[HPCLANG_RPL_CODE_C], &jump);
+    if (!result) {
+        unsigned reg = jump.register_c ? HPCLANG_RPL_CODE_C : HPCLANG_RPL_CODE_A;
+        execution_use(&observed, HPCLANG_RPL_CODE_USE_REGISTER_TARGET, jump.register_value,
+                      next.origins.registers[reg], next.origins.adjustment[reg]);
+        if (jump.via_memory) {
+            uint32_t origins[5] = {0};
+            for (unsigned i = 0; i < 5; ++i) {
+                result = token(context, 1, jump.register_value + i,
+                               (uint8_t)((jump.target >> (4 * i)) & 15u), &origins[i]);
+                if (result)
+                    return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+            }
+            execution_use(&observed, HPCLANG_RPL_CODE_USE_MEMORY_TARGET, jump.target, origins, 0);
+        }
+        next.control.pc = jump.target;
+        goto done;
+    }
+    if (result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+        return result;
+    struct hpclang_rpl_code_return_use returned;
+    result = hpclang_rpl_code_control_step(instructions, limit, &next.control, &returned);
+    if (result)
+        return result;
+    next.values.carry = next.control.carry;
+    if (returned.present) {
+        execution_use(&observed, HPCLANG_RPL_CODE_USE_RETURN_TARGET, returned.target,
+                      returned.origins, next.stack_adjustment[next.control.cursor]);
+        next.stack_adjustment[next.control.cursor] = 0;
+        observed.addresses[observed.count - 1].generated = returned.generated;
+    } else {
+        result = hpclang_rpl_code_branch_inspect(instructions, pc, limit, &observed.branch);
+        if (result && result != HPCLANG_RPL_SPAN_UNSUPPORTED)
+            return result;
+        observed.has_branch = result == 0;
+        if (observed.has_branch && observed.branch.call)
+            next.stack_adjustment[state->control.cursor] = 0;
+    }
+done:
+    *state = next;
+    *uses = observed;
+    return 0;
+}
+
+int hpclang_rpl_code_origins_plan(const uint32_t *tokens, uint32_t current, uint32_t replacement,
+                                  hpclang_rpl_code_origin_resolve_fn resolve, void *context,
+                                  struct hpclang_rpl_reference_edit *edits, unsigned *count)
+{
+    if (!tokens || !resolve || !edits || !count)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (current >= 0x100000u || replacement >= 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct hpclang_rpl_reference_edit plan[5];
+    unsigned used = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        if (!tokens[i])
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        struct hpclang_rpl_code_origin_cell cell = {0};
+        int result = resolve(context, tokens[i], &cell);
+        if (result)
+            return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        if (cell.field >= 0x100000u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t expected = (current >> (4 * i)) & 15u;
+        uint32_t value = (replacement >> (4 * i)) & 15u;
+        if (cell.expected != expected)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        unsigned at = 0;
+        while (at < used && (plan[at].mapping < cell.mapping ||
+                             (plan[at].mapping == cell.mapping && plan[at].field < cell.field)))
+            ++at;
+        if (at < used && plan[at].mapping == cell.mapping && plan[at].field == cell.field) {
+            if (plan[at].expected != expected || plan[at].value != value)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            continue;
+        }
+        for (unsigned j = used; j > at; --j)
+            plan[j] = plan[j - 1];
+        plan[at] =
+            (struct hpclang_rpl_reference_edit){cell.mapping, cell.field, expected, value, 1};
+        ++used;
+    }
+    unsigned packed = 0;
+    for (unsigned i = 0; i < used; ++i) {
+        if (packed && plan[packed - 1].mapping == plan[i].mapping &&
+            plan[packed - 1].field + plan[packed - 1].width == plan[i].field) {
+            struct hpclang_rpl_reference_edit *previous = &plan[packed - 1];
+            previous->expected |= plan[i].expected << (4 * previous->width);
+            previous->value |= plan[i].value << (4 * previous->width);
+            ++previous->width;
+        } else {
+            plan[packed++] = plan[i];
+        }
+    }
+    for (unsigned i = 0; i < packed; ++i)
+        edits[i] = plan[i];
+    *count = packed;
+    return 0;
+}
+
 struct instruction_cursor
 {
     const struct hpclang_rpl_reader *reader;
@@ -158,6 +1803,10 @@ static int instruction_size(struct instruction_cursor *cursor, unsigned *size)
         case 0x26:
         case 0x31:
         case 0x33:
+        /* Native selector 0x04 at table 0x41440: wrapper 0x2f0a8,
+         * prefix through 0x2f084, then store/threaded-next or error 0x3a9b.
+         * The five-nibble frame does not qualify those effects. */
+        case 0x40:
         case 0x41:
         case 0x43:
         case 0x50:
@@ -496,8 +2145,12 @@ int hpclang_rpl_code_origins_literal(struct hpclang_rpl_code_origins *state,
     if (literal->mask != mask || (literal->value & ~mask))
         return HPCLANG_RPL_SPAN_MALFORMED;
     uint32_t source[16];
+    uint32_t digits = 0;
     for (unsigned i = 0; i < count; ++i)
         source[i] = encoded[i];
+    for (unsigned i = 0; i < count; ++i)
+        digits |= 1u << ((first + i) & 15);
+    origin_overwrite(state, literal->destination, digits);
     for (unsigned i = 0; i < count; ++i)
         state->registers[literal->destination][(first + i) & 15] = source[i];
     return 0;
@@ -526,13 +2179,23 @@ int hpclang_rpl_code_origins_assign(struct hpclang_rpl_code_origins *state,
         return HPCLANG_RPL_SPAN_MALFORMED;
     }
     uint32_t source[16];
+    uint32_t adjustment = assignment->source == HPCLANG_RPL_CODE_CONSTANT ||
+                                  assignment->source == HPCLANG_RPL_CODE_NEXT_PC
+                              ? 0
+                              : state->adjustment[assignment->source];
+    int whole = !assignment->source_first && !assignment->destination_first && count >= 5;
     for (unsigned i = 0; i < count; ++i)
-        source[i] = assignment->source == HPCLANG_RPL_CODE_CONSTANT ? 0
-                    : assignment->source == HPCLANG_RPL_CODE_NEXT_PC
-                        ? next_pc[i]
+        source[i] = assignment->source == HPCLANG_RPL_CODE_CONSTANT  ? 0
+                    : assignment->source == HPCLANG_RPL_CODE_NEXT_PC ? next_pc[i]
+                    : adjustment && !whole && assignment->source_first + i < 5
+                        ? 0
                         : state->registers[assignment->source][assignment->source_first + i];
+    origin_overwrite(state, assignment->destination,
+                     ((1u << count) - 1) << assignment->destination_first);
     for (unsigned i = 0; i < count; ++i)
         state->registers[assignment->destination][assignment->destination_first + i] = source[i];
+    if (whole)
+        state->adjustment[assignment->destination] = adjustment;
     return 0;
 }
 
@@ -545,13 +2208,27 @@ int hpclang_rpl_code_origins_exchange(struct hpclang_rpl_code_origins *state,
         !origin_field_valid(exchange->right, exchange->first, exchange->nibbles))
         return HPCLANG_RPL_SPAN_MALFORMED;
     uint32_t left[16], right[16];
+    uint32_t left_adjust = state->adjustment[exchange->left];
+    uint32_t right_adjust = state->adjustment[exchange->right];
+    int whole = !exchange->first && exchange->nibbles >= 5;
     for (unsigned i = 0; i < exchange->nibbles; ++i) {
-        left[i] = state->registers[exchange->left][exchange->first + i];
-        right[i] = state->registers[exchange->right][exchange->first + i];
+        left[i] = left_adjust && !whole && exchange->first + i < 5
+                      ? 0
+                      : state->registers[exchange->left][exchange->first + i];
+        right[i] = right_adjust && !whole && exchange->first + i < 5
+                       ? 0
+                       : state->registers[exchange->right][exchange->first + i];
     }
+    uint32_t digits = ((1u << exchange->nibbles) - 1) << exchange->first;
+    origin_overwrite(state, exchange->left, digits);
+    origin_overwrite(state, exchange->right, digits);
     for (unsigned i = 0; i < exchange->nibbles; ++i) {
         state->registers[exchange->left][exchange->first + i] = right[i];
         state->registers[exchange->right][exchange->first + i] = left[i];
+    }
+    if (whole) {
+        state->adjustment[exchange->left] = right_adjust;
+        state->adjustment[exchange->right] = left_adjust;
     }
     return 0;
 }
@@ -570,7 +2247,11 @@ int hpclang_rpl_code_origins_memory(struct hpclang_rpl_code_origins *state,
     uint32_t source[16];
     uint32_t *registers = state->registers[transfer->data] + transfer->first;
     for (unsigned i = 0; i < count; ++i)
-        source[i] = transfer->load ? memory[i] : registers[i];
+        source[i] = transfer->load                                                 ? memory[i]
+                    : state->adjustment[transfer->data] && transfer->first + i < 5 ? 0
+                                                                                   : registers[i];
+    if (transfer->load)
+        origin_overwrite(state, transfer->data, ((1u << count) - 1) << transfer->first);
     for (unsigned i = 0; i < count; ++i)
         if (transfer->load)
             registers[i] = source[i];
@@ -587,8 +2268,10 @@ int hpclang_rpl_code_origins_adjust(struct hpclang_rpl_code_origins *state,
     if ((adjust->address != HPCLANG_RPL_CODE_D0 && adjust->address != HPCLANG_RPL_CODE_D1) ||
         !adjust->delta || adjust->delta < -16 || adjust->delta > 16)
         return HPCLANG_RPL_SPAN_MALFORMED;
-    for (unsigned i = 0; i < 5; ++i)
-        state->registers[adjust->address][i] = 0;
+    if (state->adjustment[adjust->address] > 0xfffffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    state->adjustment[adjust->address] =
+        (state->adjustment[adjust->address] + (uint32_t)adjust->delta) & 0xfffffu;
     return 0;
 }
 
@@ -656,6 +2339,85 @@ static int read_word(const struct hpclang_rpl_reader *reader, uint32_t at, unsig
             return HPCLANG_RPL_SPAN_MALFORMED;
         *value |= (uint32_t)nibble << (4 * i);
     }
+    return 0;
+}
+
+int hpclang_rpl_code_control_step(const struct hpclang_rpl_reader *instructions, uint32_t limit,
+                                  struct hpclang_rpl_code_control *state,
+                                  struct hpclang_rpl_code_return_use *use)
+{
+    if (!instructions || !instructions->read_nibble || !state || !use)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (state->carry > 1 || state->cursor >= 8)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    for (unsigned slot = 0; slot < 8; ++slot)
+        if (state->stack_generated[slot] > 0x100000u)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    if (state->pc > 0xffffe || limit < 2 || limit > 0x100000u - state->pc)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(instructions, state->pc, 2, &opcode);
+    if (result)
+        return result;
+    struct hpclang_rpl_code_control next = *state;
+    struct hpclang_rpl_code_return_use consumed = {0};
+    int pop = opcode == 0x10 || opcode == 0x20 || opcode == 0x30;
+    if (pop) {
+        if (opcode != 0x10)
+            next.carry = opcode == 0x20;
+    } else if ((opcode & 15u) == 4 || (opcode & 15u) == 5) {
+        if (limit < 3)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t displacement;
+        result = read_word(instructions, state->pc + 1, 2, &displacement);
+        if (result)
+            return result;
+        if (state->carry != ((opcode & 15u) == 4)) {
+            next.pc = (state->pc + 3) & 0xfffffu;
+        } else if (!displacement) {
+            pop = 1;
+        } else {
+            int32_t delta =
+                displacement < 128 ? (int32_t)displacement : (int32_t)displacement - 256;
+            next.pc = (uint32_t)((int32_t)state->pc + 1 + delta) & 0xfffffu;
+        }
+    } else {
+        /* Other predicates need state not represented by this contract. */
+        if ((opcode & 15u) != 6 && (opcode & 15u) != 7 && opcode != 0xc8 && opcode != 0xd8 &&
+            opcode != 0xe8 && opcode != 0xf8)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        struct hpclang_rpl_code_branch branch;
+        result = hpclang_rpl_code_branch_inspect(instructions, state->pc, limit, &branch);
+        if (result)
+            return result;
+        if (branch.call) {
+            next.stack[next.cursor] = (state->pc + branch.length) & 0xfffffu;
+            next.stack_generated[next.cursor] = state->pc + 1;
+            for (unsigned i = 0; i < 5; ++i)
+                next.stack_origins[next.cursor][i] = 0;
+            next.cursor = (next.cursor + 1) & 7u;
+        }
+        next.pc = branch.target;
+    }
+    if (pop) {
+        next.cursor = (next.cursor + 7) & 7u;
+        if (next.stack[next.cursor] > 0xfffff)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        next.pc = next.stack[next.cursor];
+        consumed.present = 1;
+        consumed.target = next.pc;
+        consumed.generated = next.stack_generated[next.cursor];
+        for (unsigned i = 0; i < 5; ++i) {
+            if (consumed.generated && next.stack_origins[next.cursor][i])
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            consumed.origins[i] = next.stack_origins[next.cursor][i];
+            next.stack_origins[next.cursor][i] = 0;
+        }
+        next.stack[next.cursor] = 0;
+        next.stack_generated[next.cursor] = 0;
+    }
+    *state = next;
+    *use = consumed;
     return 0;
 }
 
@@ -1023,4 +2785,101 @@ int hpclang_rpl_code_pointer_plan_shift(const struct hpclang_rpl_reader *reader,
                                         struct hpclang_rpl_code_patch *patch)
 {
     return plan_shift(reader, instruction, limit, mappings, first, end, delta, patch, 1);
+}
+
+int hpclang_rpl_code_generated_return_plan(const struct hpclang_rpl_reader *instructions,
+                                           const struct hpclang_rpl_code_address_use *use,
+                                           const struct hpclang_rpl_reference_mappings *mappings,
+                                           uint32_t first, uint32_t end, int32_t delta,
+                                           uint32_t replacement,
+                                           struct hpclang_rpl_code_patch *patch)
+{
+    if (!instructions || !instructions->read_nibble || !use || !mappings || !patch)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!use->generated)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (use->kind != HPCLANG_RPL_CODE_USE_RETURN_TARGET || use->adjustment)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (use->generated > 0x100000u || use->value > 0xfffff || replacement > 0xfffff)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    for (unsigned digit = 0; digit < 5; ++digit)
+        if (use->origins[digit])
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t instruction = use->generated - 1;
+    struct hpclang_rpl_code_branch call;
+    int result =
+        hpclang_rpl_code_branch_inspect(instructions, instruction, 0x100000u - instruction, &call);
+    if (result)
+        return result;
+    if (!call.call || ((instruction + call.length) & 0xfffffu) != use->value)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_code_patch operand;
+    result = hpclang_rpl_code_branch_plan_shift(instructions, instruction, 0x100000u - instruction,
+                                                mappings, first, end, delta, &operand);
+    if (result < 0)
+        return result;
+    int moves = mappings->field == mappings->moving && instruction >= first && instruction < end;
+    uint32_t fallthrough =
+        (uint32_t)((int64_t)instruction + call.length + (moves ? delta : 0)) & 0xfffffu;
+    if (replacement != fallthrough)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (result)
+        *patch = operand;
+    return result;
+}
+
+int hpclang_rpl_code_execution_step_derived(const struct hpclang_rpl_reader *instructions,
+                                            const struct hpclang_rpl_reader *data, uint32_t limit,
+                                            struct hpclang_rpl_code_execution *state,
+                                            hpclang_rpl_code_token_fn token,
+                                            hpclang_rpl_code_derive_fn derive, void *context,
+                                            struct hpclang_rpl_code_step_uses *uses)
+{
+    return hpclang_rpl_code_execution_step_effects(instructions, data, limit, state, token, derive,
+                                                   0, context, uses);
+}
+
+int hpclang_rpl_code_execution_step(const struct hpclang_rpl_reader *instructions,
+                                    const struct hpclang_rpl_reader *data, uint32_t limit,
+                                    struct hpclang_rpl_code_execution *state,
+                                    hpclang_rpl_code_token_fn token, void *context,
+                                    struct hpclang_rpl_code_step_uses *uses)
+{
+    return hpclang_rpl_code_execution_step_derived(instructions, data, limit, state, token, 0,
+                                                   context, uses);
+}
+
+int hpclang_rpl_code_execution_step_effects(const struct hpclang_rpl_reader *instructions,
+                                            const struct hpclang_rpl_reader *data, uint32_t limit,
+                                            struct hpclang_rpl_code_execution *state,
+                                            hpclang_rpl_code_token_fn token,
+                                            hpclang_rpl_code_derive_fn derive,
+                                            hpclang_rpl_code_store_fn store, void *context,
+                                            struct hpclang_rpl_code_step_uses *uses)
+{
+    return hpclang_rpl_code_execution_step_native(instructions, data, limit, state, token, derive,
+                                                  store, 0, context, uses);
+}
+
+int hpclang_rpl_code_execution_step_native(
+    const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
+    uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
+    hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
+    hpclang_rpl_code_config_fn config, void *context, struct hpclang_rpl_code_step_uses *uses)
+{
+    return hpclang_rpl_code_execution_step_predicates(instructions, data, limit, state, token,
+                                                      derive, store, config, 0, context, uses);
+}
+
+int hpclang_rpl_code_execution_step_predicates(
+    const struct hpclang_rpl_reader *instructions, const struct hpclang_rpl_reader *data,
+    uint32_t limit, struct hpclang_rpl_code_execution *state, hpclang_rpl_code_token_fn token,
+    hpclang_rpl_code_derive_fn derive, hpclang_rpl_code_store_fn store,
+    hpclang_rpl_code_config_fn config, hpclang_rpl_code_predicate_fn predicate, void *context,
+    struct hpclang_rpl_code_step_uses *uses)
+{
+    const struct hpclang_rpl_code_callbacks callbacks = {
+        .derive = derive, .store = store, .config = config, .predicate = predicate};
+    return hpclang_rpl_code_execution_step_observed(instructions, data, limit, state, token,
+                                                    &callbacks, context, uses);
 }
