@@ -4894,3 +4894,20 @@ trace reconciliation retains its previous output unless the option is selected.
 This adds static boot coverage only; native stack reservation and whole-system
 transient-memory requirements remain open. Evidence:
 `/work/nov14-boot-stack-layout.json`.
+
+### 2026-11-14 — Corrected stack observer completes all six Stock models
+
+The remaining HP39g+, HP40gs, HP48gII and HP49g+ runs pass on the same sealed UI
+artifact with the corrected LDM user-bank SP observer. Together with the earlier
+HP39gs/HP50g runs, independent replay verifies all six input/artifact/firmware
+identities, UI pixels, stack observations, native heap profiles, ROM runtime
+initializers and settled returns. Application peaks are 2424/8192 bytes on
+HP39g+/HP40gs and 2432/8192 on HP48gII/HP49g+.
+
+Observed low-SRAM IRQ/FIQ/SVC downward spans are 120/0/112 bytes on HP39g+,
+176/0/104 on HP39gs/HP40gs, and 200/36/104 on HP48gII/HP49g+/HP50g. These are
+observations below decoded runtime tops, not reserved capacities; a zero span
+does not prove a handler cannot use its stack. Whole-system admission and native
+stack reservation bounds remain open. Report:
+`/work/nov14-user-stack-remaining/independent-audit.json`. This closes the
+corrected observer's six-model regression coverage, not all M8.2/M8.3 acceptance.
