@@ -37,6 +37,28 @@ installation rejects an unresolved Git LFS pointer. Application builds do not
 parse that archive. Font redistribution remains subject to the selected face's
 terms; see the installed `docs/licensing.md` and `runtime/fonts/fonts.zip`.
 
+## Distribute or unpack the SDK
+
+After installation, create a reproducible archive from its prefix:
+
+```sh
+python3 tools/package-sdk.py --prefix /path/to/sdk --output hpclang-sdk.zip
+python3 -m zipfile -e hpclang-sdk.zip /path/to/unpacked-sdk
+```
+
+Use `/path/to/unpacked-sdk` as the prefix in the build commands below. The
+archive contains `share/hpclang` and `hpclang-sdk-manifest.json`, which lists
+file sizes, SHA-256 hashes and normalized file modes. The packer prints the
+archive SHA-256. It excludes the checkout and build directories, uses fixed
+entry timestamps and stores entries without ZIP recompression so archive bytes
+do not depend on source timestamps, installation path or zlib version. The
+bundled font archive remains compressed. Symbolic links in an installation are
+rejected; package a normal `cmake --install` output.
+
+The SDK acceptance check compares two archives after changing the installed
+prefix and timestamps, validates the manifest, removes the original installation
+and builds the external examples from the unpacked distribution.
+
 ## Build the C and C++ examples
 
 Copy `share/hpclang/examples/hello` from the installation to a separate

@@ -4911,3 +4911,21 @@ claiming a replacement. Future rollout tests are distinguished from evaluation
 deliverables. Release resource acceptance, documentation/integration and M8.6
 remote acceptance remain open; no original requirement is removed. Strict docs
 pass.
+
+
+### 2026-11-14 — Reproducible SDK distribution archive
+
+The maintained packer exports an installed source SDK as a deterministic ZIP,
+with normalized timestamps/modes and a complete file-size/SHA-256 manifest.
+The SDK gate now packages twice after relocating the prefix and changing file
+timestamps, checks byte equality and the manifest, then deletes the original
+installation and builds from the unpacked archive. Core CI includes the new
+tool in its path filters.
+
+On the #40 base e3879545, all 4,111 SDK files pass archive verification. The full
+external gate passes C/C++, fonts, 581 byte-identical release outputs, six-model
+Notebook builds and three HP39 C/C++ Aplet families. Three packaging regression
+tests, Ruff and strict docs pass. Temporary installations and archives are
+removed; no ROM or external ARMToolbox binaries enter the archive. Report:
+`/work/nov14-sdk-distribution.json`. This accepts the local archive/installation
+path, not the pending main integration, native resource bounds or all of M8.6.

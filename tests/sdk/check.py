@@ -1,6 +1,7 @@
 """Build external examples after relocating an installed SDK."""
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 import zlib
 
 
@@ -16,6 +18,45 @@ def run(*args, env):
     result = subprocess.run(args, env=env, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
+
+
+def check_sdk_archive(root, prefix, sdk, work, env):
+    archives = [work / "sdk-first.zip", work / "sdk-second.zip"]
+    moved = work / "repacked prefix"
+    for index, location in enumerate((prefix, moved)):
+        if index:
+            prefix.rename(moved)
+            for path in moved.rglob("*"):
+                if path.is_file():
+                    os.utime(path, (1700000000, 1700000000))
+        run(
+            sys.executable,
+            str(root / "tools/package-sdk.py"),
+            "--prefix",
+            str(location),
+            "--output",
+            str(archives[index]),
+            env=env,
+        )
+    if archives[0].read_bytes() != archives[1].read_bytes():
+        raise AssertionError("Nonreproducible SDK distribution archive")
+    with zipfile.ZipFile(archives[0]) as archive:
+        manifest = json.loads(archive.read("hpclang-sdk-manifest.json"))
+        if set(archive.namelist()) != set(manifest["files"]) | {"hpclang-sdk-manifest.json"}:
+            raise AssertionError("SDK archive manifest does not cover every entry")
+        for name, entry in manifest["files"].items():
+            data = archive.read(name)
+            if len(data) != entry["size"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
+                raise AssertionError("SDK archive content mismatch: " + name)
+        archive.extractall(sdk)
+    # Subsequent compilation must use the distributed package, with neither
+    # original installed prefix available as a hidden build dependency.
+    shutil.rmtree(moved)
+    for path in archives:
+        path.unlink()
+    print(
+        f"SDK distribution: {len(manifest['files'])} files, identical archives, extracted build input"
+    )
 
 
 def check_migration_tool(package, work, env):
@@ -204,7 +245,7 @@ def main():
             str(prefix),
             env=env,
         )
-        prefix.rename(sdk)
+        check_sdk_archive(root, prefix, sdk, work, env)
         package = sdk / "share/hpclang"
         check_migration_tool(package, work, env)
         check_interworking(package, work, env)
