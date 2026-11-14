@@ -4733,3 +4733,79 @@ Four fresh setup-runtime tests and strict docs pass. Existing six-model Direct
 and Stock evidence is retained; no redundant application rebuild is claimed.
 Identity audit: research/nov06-allocation-main-identity.json. The integration
 requires new exact-head CI; this is not broader M8.2/M8.3/M8.5 completion.
+
+
+### Native heap observation core — local, 2026-11-13
+
+M8.2/M8.3 whole-system transient admission remains open. Existing lifecycle
+snapshots cannot establish intermediate peaks. The new host-only observation
+core validates both native free lists, including flags, reciprocal links,
+footers, bounds and cross-heap overlap. It accumulates the lowest combined free
+capacity from a single observed event, retaining both heaps from that event;
+it does not add independent minima that never coexisted. Rejected observations
+are counted and cannot overwrite the last valid state or minimum.
+
+The ROM profile extractor qualifies the existing allocator fingerprints and
+their common return instruction at entry + 0x88 for all six model fixtures.
+The planned live hook must execute before that return, after list updates,
+and delimit the lifecycle being measured. These profiles alone do not prove
+that live allocator events have been captured or that every native memory
+owner is accounted for.
+
+The C core passes ASan/UBSan tests covering an intermediate capacity reduction
+hidden by equal initial/final capacity, independent-heap minima, corrupt and
+overlapping lists, read failure and exhausted heaps. Nine existing snapshot
+verifier tests pass. Its decoding matches the independent Python verifier on
+79 retained snapshots across all six models; six modified allocator return
+instructions are rejected. No emulator rerun or new full SRAM copy was needed.
+Report: /work/nov06-sum/native-heap-replay/report.json; temporary replay binaries
+were removed. The live emulator hook, phase coverage and actual transient
+resource acceptance remain required before this can close an admission gate.
+
+
+### 2026-11-13 — Native heap live observation, local integration
+
+The qualified allocator-return hook now links into x50ng and receives Stock
+lifecycle phase marks independently of full SRAM snapshots. An actual HP50g
+Stock UI run passes execution, settled return and independent input/report/profile
+checks. Its 20 phases contain seven accepted observations, zero rejected and
+three failed allocation returns. The ARMToolbox launch interval reaches 1,672
+combined usable bytes; the minimum retains both heaps from the same event.
+Report: `/work/nov06-sum/native-heap-live-qualified/independent-audit.json`.
+
+Five sanitizer-backed trace tests pass (disabled observation, phase minima,
+rejected samples, invalid phase ordering and invalid profile settings). Fresh
+QEMU compilation exposed a missing exported-function prototype, now fixed;
+the rebuilt emulator and actual run pass. This is local validation only, with
+remaining models pending. Empty phases are unsampled, not zero free capacity.
+One allocation function does not establish whole-system transient admission
+or native exception-stack reservations. Rotate to other M8 deliveries before
+the next bounded UI coverage batch.
+
+
+### 2026-11-13 — Six-model live native heap observations
+
+The formatted observer/Stock frontend emulator completes all six original-Stock
+UI executions and settled returns in one uninterrupted matrix (session 45058,
+exit 0). Independent input, artifact, ROM profile, status and trace checks pass;
+four altered-trace/status negatives per model are rejected. The maintained
+verifier has five tests, alongside five sanitizer-backed trace tests. Reports:
+`/work/nov06-sum/native-heap-matrix/independent-audit.json` (`complete=true`).
+
+| Model | Accepted allocator returns | Failed allocation returns | Minimum sampled usable bytes |
+| --- | ---: | ---: | ---: |
+| HP39g+ | 44 | 37 | 1928 |
+| HP39gs | 44 | 37 | 1256 |
+| HP40gs | 44 | 37 | 1256 |
+| HP48gII | 52 | 37 | 1256 |
+| HP49g+ | 7 | 3 | 1672 |
+| HP50g | 16 | 3 | 1672 |
+
+All observations have zero rejected samples. Allocation failures are null
+allocator returns, not failed application runs. Counts may vary with Stock
+activity; no count is a universal bound. The reused UI-owner application is
+sealed by artifact hashes, not claimed as a fresh build from this branch.
+Long HP39 transfer waits resolved within the same runs without retries. The
+current formatted emulator supersedes the previous single-model experiment's
+binary; the earlier experiment remains historical evidence. No claim closes
+other allocation paths, native exception-stack bounds or whole-system peaks.
