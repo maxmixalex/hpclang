@@ -38,6 +38,9 @@ def main():
     parser.add_argument("--output", type=Path, required=True, help="new output directory")
     parser.add_argument("--bootstrap-sync", type=Path, help="shared runtime/bootstrap/sync.S")
     parser.add_argument("--probe-source", type=Path, help="alternative bounded experiment body")
+    parser.add_argument(
+        "--stock-state", action="store_true", help="pass original Saturn state to probe"
+    )
     args = parser.parse_args()
     root = args.output.resolve()
     root.mkdir(parents=True, exist_ok=False)
@@ -57,6 +60,8 @@ def main():
         "-fno-builtin",
         "-Oz",
     ]
+    if args.stock_state:
+        common.append("-DHPCLANG_PROBE_STOCK_STATE")
     for name in ("entry.S", "probe.c", "bootstrap-sync.S"):
         subprocess.run(
             common + ["-c", str(inputs[name]), "-o", str(root / (name + ".o"))],

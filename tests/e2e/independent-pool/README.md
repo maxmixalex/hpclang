@@ -36,3 +36,33 @@ additional heap headroom. Thus this baseline does not support a KOS-only pool
 for that application. Further work must combine an owned RPL memory source or
 another demonstrated allocation strategy with Stock service fences and cleanup.
 Production launchers remain in use.
+
+## Paused RPL page borrow
+
+`rpl-probe.c` uses the original ARMSYS Saturn state, enabled with the explicit
+`--stock-state` build switch. The default entry package remains byte-identical.
+It reads the native RSKTOP/DSKTOP bounds and live Read map, retains 4 KiB below
+and 256 bytes above the candidate pool, validates whole unique 4 KiB pages,
+and tests/restores their first and last words. Stock stays suspended and IRQ/FIQ
+remain masked throughout; no native service or allocator runs during the borrow.
+The RPL bounds are checked unchanged before returning.
+
+```sh
+python3 tests/e2e/independent-entry/build.py --toolchain "$ATFE/bin" --stock-state \
+  --probe-source tests/e2e/independent-pool/rpl-probe.c --output /tmp/rpl-pool
+python3 tests/e2e/independent-pool/verify.py --rpl --artifact /tmp/rpl-pool \
+  --baseline /path/to/baseline --state /path/to/result/state \
+  --report /tmp/rpl-pool-result.json
+```
+
+A fresh HP50g original-ROM execution on 2026-11-14 borrows/restores 28 pages
+(112 KiB), with entry/return checks and ten corrupted-report negatives passing.
+The verifier independently checks each reported page against the saved Read map.
+The package is 5,904 bytes before its RPL wrapper/reserve. Evidence:
+`/work/nov14-independent-rpl-pool-live/verified.json`.
+
+This establishes a paused-borrow path, not a lease across native object calls.
+Do not add these 28 pages to the separate KOS run and claim a Notebook budget:
+the full application changes RPL occupancy, and combined ownership/fences still
+need qualification. No raw free gap may remain borrowed while Stock allocation
+or garbage collection resumes without the corresponding service contract.

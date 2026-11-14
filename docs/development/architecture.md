@@ -145,7 +145,14 @@ unchanged Flash pass the independent snapshot verifier. Ten corrupted results
 are rejected. Report: `/work/nov14-independent-pool-live/verified.json`.
 This is one baseline, not a universal KOS capacity bound. It does not provide the
 32-page HP50g Notebook minimum, so the next step is an owned RPL-backed pool or
-another demonstrated allocation source, with matching failure/return cleanup. Then
+another demonstrated allocation source, with matching failure/return cleanup.
+The follow-up `rpl-probe.c` now borrows and restores 28 main-RPL pages (112 KiB)
+while Stock execution and interrupts remain paused. Each page is checked against
+the saved native Read map, page-end contents are restored, and entry/return plus
+ten corruption negatives pass. Its optional state argument leaves the default
+entry package unchanged. This small-entry baseline does not establish combined
+KOS/RPL availability with the full Notebook resident, or a lease across native
+allocation/GC. Report: `/work/nov14-independent-rpl-pool-live/verified.json`. Then
 connect the captured Stock context and service fences to a service-capable
 HP49/50 Notebook prototype, followed by HP48gII entry/allocation and the HP39
 Aplet data boundary. Compare identical application

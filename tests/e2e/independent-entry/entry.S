@@ -20,6 +20,9 @@ entry:
  ldr r2, workspace_offset
  add r0, r6, r2
  mov r1, r7
+#ifdef HPCLANG_PROBE_STOCK_STATE
+ ldr r2, [r4, #4] /* Optional third argument: original ARMSYS Saturn state. */
+#endif
  bl exercise
  mov r0, r5
  bl hpclang_irq_restore

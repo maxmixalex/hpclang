@@ -30,9 +30,7 @@ def mapping(ram, flash):
             require(0 <= index < len(words), "mapping table out of bounds")
             physical = words[index] + (addr & 4095) // 2
             data, offset = (
-                (ram, physical - 0x08000000)
-                if physical >= 0x08000000
-                else (flash, physical)
+                (ram, physical - 0x08000000) if physical >= 0x08000000 else (flash, physical)
             )
             require(0 <= offset < len(data), "mapped byte out of bounds")
             return (data[offset] >> (4 * (addr & 1))) & 15
@@ -122,8 +120,7 @@ def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check
             "low <= result[3] <= result[2] and result[3] % 8 == 0",
         )
         require(
-            result[4] == physical + symbols["workspace"]
-            and result[5] == result[4] + 536,
+            result[4] == physical + symbols["workspace"] and result[5] == result[4] + 536,
             "result[4] == physical + symbols['workspace'] and result[5] == result[4] + 536",
         )
     control = struct.unpack_from("<5I", ram, start + symbols["control"])
@@ -167,9 +164,7 @@ def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check
         "owned_stack_bytes": high - low,
         "cpsr_control": [value & 0xFF for value in control[:3]],
         "swi_vector": list(control[3:]),
-        "program_sha256": hashlib.sha256(
-            (artifact / "program.HP").read_bytes()
-        ).hexdigest(),
+        "program_sha256": hashlib.sha256((artifact / "program.HP").read_bytes()).hexdigest(),
         "state_sha256": {
             name: hashlib.sha256((root / name).read_bytes()).hexdigest()
             for name in ("flash", "sram")

@@ -199,6 +199,9 @@ jobs:
           python3 tests/e2e/independent-entry/build.py --toolchain "$ATFE/bin" \
             --probe-source tests/e2e/independent-pool/probe.c \
             --output "$RUNNER_TEMP/independent-pool"
+          python3 tests/e2e/independent-entry/build.py --toolchain "$ATFE/bin" --stock-state \
+            --probe-source tests/e2e/independent-pool/rpl-probe.c \
+            --output "$RUNNER_TEMP/independent-rpl-pool"
 
       - name: Verify independent HPC1 build reproducibility
         run: |
