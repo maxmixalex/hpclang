@@ -9,9 +9,12 @@ ARMv4T Thumb soft-float `-Os` reports 344 bytes before and 56 after. The storage
 metadata suite passes under ASan/UBSan, including opening an existing read-only
 file with `O_RDONLY | O_CREAT` and rejecting exclusive creation of that file.
 Report: `/work/nov14-open-stack-check/result.json`; temporary builds are removed.
-This is local validation, not CI acceptance or a new native peak measurement.
-Notebook export retains its previously measured 6656/8192-byte stack usage
-until native revalidation of this follow-up.
+Fresh HP49g+/HP50g Stock export/relaunch passes all four launches. Independent
+source/artifact identity, raw-card contents, pixels and settled return checks
+pass in `/work/nov14-open-stack-native/independent-audit.json`. Both models
+retain 6656/8192 bytes on export; relaunch decreases from 3944 to 3712 bytes.
+Heap remains 12412/245504 bytes. This is local native validation, not CI
+acceptance or proof of complete whole-system transient-memory bounds.
 
 ### 2026-11-05 — Backup stack gate and export resource integration
 
