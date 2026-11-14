@@ -7,21 +7,24 @@ This page records the M7/M8 source-compatibility inventory. Historical names are
 The five original [M8.4 requirements](roadmap-history.md#m84-historical-source-compatibility)
 remain the acceptance scope. The component narratives below preserve earlier
 checkpoints; their old “pending” statements do not override later accepted
-deliveries. This map distinguishes those deliveries from the current filesystem
-integration, which is still awaiting CI.
+deliveries. **M8.4 is accepted complete on main `38e9472a` through #43.**
+The final audit reconciles all five requirements with the accepted implementation,
+original-source checks and native regression evidence.
 
 | Original requirement | Current implementation/evidence | Remaining gate |
 | --- | --- | --- |
-| Common 59-function HPG surface; maintained keyboard, console/text, system, filesystem and object groups; four-generation ledger | The capability and declaration tables on this page retain source/implementation/evidence links. HPG is accepted at `1e46aa3d`; keyboard, console, numeric, system and object groups retain their individual acceptance records. Filesystem lifecycle, handle, mode and case adapters are implemented in #41, including pinned 2.0/3 inventories and C11/C++17 checks of all 39/41 covered source signatures. | #41's current main integration is not CI accepted. Source signature checks do not establish binary ABI or runtime semantics; those retain separate application/native gates. |
+| Common 59-function HPG surface; maintained keyboard, console/text, system, filesystem and object groups; four-generation ledger | The capability and declaration tables on this page retain source/implementation/evidence links. HPG is accepted at `1e46aa3d`; keyboard, console, numeric, system and object groups retain their individual acceptance records. Filesystem lifecycle, handle, mode and case adapters are implemented in #41, including pinned 2.0/3 inventories and C11/C++17 checks of all 39/41 covered source signatures. | #41 is accepted through #43. Preserve source-signature checks and separate application/native gates; source compatibility does not promise historical binary ABI. |
 | Compile representative original applications with every source edit recorded | Pinned original 1.1 window and 2.0 filesystem programs have extraction, migration-diff/reversal and relocated-SDK gates; HPGCC3 graphics programs have a separate maintained source gate. The retained roadmap records the representative-source compilation criterion complete. | Preserve these regressions and model limits; do not relabel M7 behavioral ports as original-source tests. |
 | Owned asynchronous `kos_beep`/`kos_CheckBeepEnd`, flags, preemption, busy completion and exit restoration | Accepted in #25 (`752b8999`, main merge `3c484673`); the tone record retains normal/exit/_Exit and Stock interrupt-isolation evidence. | No new tone implementation gap is established by the filesystem work. |
 | RTC tick period, pending/coalescing, query/restore and exit ownership | Accepted at `413e5891`, including six-model Direct/Stock timing and restoration checks. | Retain the documented ownership and model/context contracts. |
 | Useful `win*` adapters where semantics fit; explicit raw KOS/Saturn/MMU migration and unsupported-context errors | Window controls and their native source/geometry/return gates were merged through #11/#12 (`69c2b831`/`67b8e26d`). The persistent event/widget bridge coexists with declarative C UI; raw access is mapped to clean services in the migration guide rather than silent stubs. | The distinct HPGCC3 C++ GUI is not made source-compatible by `win*`; preserve the capability/migration boundaries in the API reference. |
 
 The accepted HPG, tone, RTC and window commits above are ancestors of main
-`2c2477f5`. This is a requirements/evidence reconciliation, not a new native
-execution or blanket historical ABI claim. M8.4 remains open while #41 and the
-final acceptance review are pending. The physical SD-card exercise remains the
+`38e9472a`. Exact accepted head `712e60c6` passes all seven workflows, including
+Storage and the configured Direct/Stock HPGCC, window, formatting, RTC and
+normal/exit/immediate-exit sound gates. Original application source checks and
+recorded native filesystem runs retain their distinct scopes. This final audit
+is not new native execution or a blanket historical ABI claim. The physical SD-card exercise remains the
 previously approved nonblocking follow-up; it is not a newly introduced gate.
 
 ## Sources and method

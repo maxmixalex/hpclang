@@ -1,5 +1,34 @@
 # M8 validation history
 
+## M8.4 final acceptance — 2026-11-14
+
+M8.4 is accepted complete on main `38e9472a` through #43. The five original
+requirements are mapped in [the compatibility inventory](hpgcc-compat.md#current-m84-acceptance-map):
+common graphics and maintained adapter groups with a four-generation ledger;
+original applications with recorded edits; asynchronous KOS sound; owned RTC
+ticks; and useful window adapters with explicit raw-hardware migration limits.
+The accepted HPG, tone, RTC and window commits are main ancestors.
+
+Accepted head `712e60c6` passes all seven workflows (201 jobs, three configured
+skips). Runtime covers the configured Direct/Stock console, format, system,
+window and dialog cases, plus normal/exit/immediate-exit system services.
+Storage passes its three Direct families and HP49g+/HP50g Stock gates.
+The actual KOS fixture checks modes, overlap/preemption, busy-loop autonomous
+stop and foreign-owner rejection; RTC fixtures check selector/query, timing,
+latch consumption and restoration. These are emulator results.
+
+Original-source evidence remains `/work/nov14-combined-compat-source`;
+filesystem native provenance checks 4,386 inputs, eight saved run reports and
+two raw cards in `/work/nov14-fsystem-native-provenance.json`. The earlier source
+check is not relabeled a current-head native run: its compatibility fixtures,
+filesystem header and KOS/RTC adapters are unchanged, while launch/Port plumbing
+and file-open stack reduction changed and have separate accepted integration CI.
+The source gate records every filesystem edit, including fixing the original
+string over-read; packaging for six models does not imply SD support on all six.
+Physical SD remains the approved follow-up. No blanket binary ABI, arbitrary
+raw KOS/MMU access or HPGCC3 C++ GUI compatibility is claimed. M8.0 and M8.6 remain open.
+
+
 
 ## M8.5 final acceptance — 2026-11-14
 
