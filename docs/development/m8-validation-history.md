@@ -4877,6 +4877,9 @@ The user-bank SRAM maximum now includes 134344700 at PC 0x3f3e0, eight bytes abo
 the old recorded maximum; this is concrete previously missed saved-bank evidence,
 not increased active-stack consumption. Application stack remains 2432/8192.
 Report: /work/nov14-user-stack-live/hp50-independent-audit.json.
-HP39gs is still running on the same sealed inputs; the two-model gate is pending.
+HP39gs subsequently passes on the same sealed inputs. The two-model independent
+audit passes source/artifact/firmware identity, pixels/resources/settled return,
+native heap profiles and ROM initializer reconciliation. Report:
+/work/nov14-user-stack-live/independent-audit.json.
 This closes one observer coverage gap, not native reservation bounds or
 whole-system transient-memory admission. The change remains local.
