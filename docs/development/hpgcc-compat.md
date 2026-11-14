@@ -918,9 +918,17 @@ python3 tests/compat/check-fsystem-interface.py --release 3 --archive /path/to/h
 ```
 
 The JSON lists each covered name and the reviewed header hash. Missing public
-declarations or implementations fail the check. This is a lexical inventory,
-not a signature, binary-layout, semantic or hardware-equivalence certificate;
-the original application comparisons and native behavior tests remain required.
+declarations or implementations fail the check. Add `--cc cc --cxx c++` to
+compile every covered original declaration alongside the current adapter header
+in C11 and C++17. Both compilers are required: C++ also detects argument changes
+hidden by historical C declarations with empty parameter lists. These checks
+pass for all 39/41 covered declarations. Regression tests reject changed return
+types, pointer qualifiers and formerly parameterless functions.
+
+Without compiler arguments this remains a lexical inventory. Even with them,
+the check does not establish historical structure layouts, binary ABI, runtime
+semantics or hardware equivalence; original application and native behavior
+tests remain required.
 No historical source is bundled or added as a normal SDK dependency.
 
 ### Changing an open file's mode

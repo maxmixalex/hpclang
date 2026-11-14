@@ -1,10 +1,11 @@
-"""Inventory pinned original filesystem declarations; not ABI/semantic proof."""
+"""Check pinned filesystem declarations and optional C/C++ source signatures."""
 
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
 import tarfile
 
 
@@ -29,10 +30,56 @@ def clean(source):
 
 
 def names(source, ending):
-    return set(re.findall(r"\b(FS[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*" + ending, clean(source)))
+    return set(
+        re.findall(r"\b(FS[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*" + ending, clean(source))
+    )
 
 
-def audit(release, archive, root):
+def check_signatures(original, required, root, cc, cxx):
+    declarations = {}
+    pattern = (
+        r"\b(?:extern\s+)?(?:int|void|char\s*\*)\s*(FS[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*;"
+    )
+    for match in re.finditer(pattern, clean(original)):
+        name = match.group(1)
+        if name in required:
+            if name in declarations:
+                raise ValueError("duplicate original declaration: " + name)
+            declarations[name] = match.group(0)
+    if set(declarations) != required:
+        raise ValueError("unsupported original declaration syntax")
+    source = '#include <fsystem.h>\n#ifdef __cplusplus\nextern "C" {\n#endif\n'
+    source += "\n".join(declarations[name] for name in sorted(required))
+    source += "\n#ifdef __cplusplus\n}\n#endif\n"
+    for compiler, language, standard in ((cc, "c", "c11"), (cxx, "c++", "c++17")):
+        result = subprocess.run(
+            [
+                compiler,
+                "-x",
+                language,
+                "-std=" + standard,
+                "-Werror",
+                "-fsyntax-only",
+                "-I",
+                str(root / "include"),
+                "-",
+            ],
+            input=source,
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode:
+            raise ValueError(
+                language + " original declaration conflict:\n" + result.stderr
+            )
+    return dict(
+        declarations=len(declarations),
+        languages=["C11", "C++17"],
+        scope="Original function redeclarations compile with the adapter header; not binary layout or semantics.",
+    )
+
+
+def audit(release, archive, root, cc=None, cxx=None):
     member, expected, count = RELEASES[release]
     with tarfile.open(archive) as package:
         with package.extractfile(member) as stream:
@@ -52,7 +99,7 @@ def audit(release, archive, root):
         raise ValueError("missing maintained adapters: " + ", ".join(missing))
     if INTERNAL & exposed:
         raise ValueError("internal controller operations unexpectedly exposed")
-    return dict(
+    result = dict(
         release=release,
         member=member,
         original_sha256=expected,
@@ -61,16 +108,32 @@ def audit(release, archive, root):
         internal=sorted(INTERNAL),
         scope="Lexical declaration/definition inventory only; not signatures, ABI, semantics or hardware acceptance.",
     )
+    if bool(cc) != bool(cxx):
+        raise ValueError("provide both --cc and --cxx for declaration checks")
+    if cc:
+        result["signatures"] = check_signatures(
+            original.decode("latin1"), required, root, cc, cxx
+        )
+        result["scope"] = (
+            "Declaration/definition inventory and C/C++ source signature compatibility; not ABI, semantics or hardware acceptance."
+        )
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release", choices=RELEASES, required=True)
     parser.add_argument("--archive", type=Path, required=True)
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument(
+        "--root", type=Path, default=Path(__file__).resolve().parents[2]
+    )
+    parser.add_argument(
+        "--cc", help="C compiler executable for optional source signature checks"
+    )
+    parser.add_argument("--cxx", help="C++ compiler executable; required with --cc")
     args = parser.parse_args()
     try:
-        result = audit(args.release, args.archive, args.root)
+        result = audit(args.release, args.archive, args.root, args.cc, args.cxx)
     except (OSError, KeyError, ValueError, tarfile.TarError) as error:
         parser.exit(1, f"filesystem interface audit failed: {error}\n")
     print(json.dumps(result, indent=2))
