@@ -16,6 +16,9 @@ struct stack_region_observation
 };
 
 static struct stack_region_observation *stack_regions;
+/* An observation window, not a reservation: distinguish the ROM's low SRAM
+ * stack initializers from borrowed stacks elsewhere in the same 1 MiB region. */
+static struct stack_region_observation stack_low_sram[32];
 static FILE *stack_region_file;
 static int stack_region_initialized;
 
@@ -27,13 +30,27 @@ static void stack_region_finish(void)
     for (unsigned mode = 0; mode < 32; ++mode) {
         for (unsigned region = 0; region < 4096; ++region) {
             const struct stack_region_observation *s = &stack_regions[mode * 4096 + region];
-            if (s->writes)
+            if (s->writes) {
                 failed |= fprintf(stack_region_file,
                                   "{\"version\":1,\"mode\":%u,\"region\":%u,\"writes\":%llu,"
                                   "\"minimum\":%u,\"maximum\":%u,\"minimum_pc\":%u,"
-                                  "\"maximum_pc\":%u}\n",
+                                  "\"maximum_pc\":%u",
                                   mode, region, (unsigned long long)s->writes, s->minimum,
                                   s->maximum, s->minimum_pc, s->maximum_pc) < 0;
+                if (region == 128) {
+                    const struct stack_region_observation *low = &stack_low_sram[mode];
+                    if (low->writes)
+                        failed |=
+                            fprintf(stack_region_file,
+                                    ",\"low_sram\":{\"writes\":%llu,\"minimum\":%u,\"maximum\":%u,"
+                                    "\"minimum_pc\":%u,\"maximum_pc\":%u}",
+                                    (unsigned long long)low->writes, low->minimum, low->maximum,
+                                    low->minimum_pc, low->maximum_pc) < 0;
+                    else
+                        failed |= fputs(",\"low_sram\":null", stack_region_file) < 0;
+                }
+                failed |= fputs("}\n", stack_region_file) < 0;
+            }
         }
     }
     failed |= fclose(stack_region_file) != 0;
@@ -44,6 +61,19 @@ static void stack_region_finish(void)
         fputs("stack region trace write failed\n", stderr);
         _Exit(1);
     }
+}
+
+static void stack_region_update(struct stack_region_observation *s, uint32_t sp, uint32_t pc)
+{
+    if (!s->writes || sp < s->minimum) {
+        s->minimum = sp;
+        s->minimum_pc = pc;
+    }
+    if (!s->writes || sp > s->maximum) {
+        s->maximum = sp;
+        s->maximum_pc = pc;
+    }
+    ++s->writes;
 }
 
 static void stack_region_observe(uint32_t sp, uint32_t pc, uint32_t mode)
@@ -62,15 +92,8 @@ static void stack_region_observe(uint32_t sp, uint32_t pc, uint32_t mode)
     }
     if (!stack_region_file)
         return;
-    struct stack_region_observation *s = &stack_regions[(mode & 31u) * 4096u + (sp >> 20)];
-    if (!s->writes || sp < s->minimum) {
-        s->minimum = sp;
-        s->minimum_pc = pc;
-    }
-    if (!s->writes || sp > s->maximum) {
-        s->maximum = sp;
-        s->maximum_pc = pc;
-    }
-    ++s->writes;
+    stack_region_update(&stack_regions[(mode & 31u) * 4096u + (sp >> 20)], sp, pc);
+    if (sp >= 0x08000000u && sp < 0x08001000u)
+        stack_region_update(&stack_low_sram[mode & 31u], sp, pc);
 }
 #endif

@@ -1692,7 +1692,7 @@ The core must **not** freeze visual policy. Style identifiers are renderer/theme
 
 A canvas/custom-paint escape hatch is part of the boundary: declarative layout owns the node and its bounds, while application/backend code performs specialized drawing only when the node revision changes or its region is damaged. Historical HPGCC `win*` compatibility may later target this engine where useful, but the legacy widget model does not define the canonical UI API.
 
-Public C names, node storage limits, layout units, focus traversal rules, and renderer ABI remain deliberately unfrozen until a focused design/fixture slice begins.
+The C declaration, layout, focus and renderer contracts below are accepted for M8.2/M8.3 after the 2026-11-14 supported-workload audit. Cross-version binary layout remains outside this source/API contract.
 
 ### Declarative application contract
 
@@ -1759,7 +1759,7 @@ The 2026-10-23 technical review uses the installed
 `app.h` model and `main.c` event loop. This is executable ordinary C, built
 from a relocated SDK, rather than a second illustrative API that could drift
 from the implementation. The review preserves the application contract above.
-Public names remain provisional until UI milestone acceptance.
+The reviewed public C names are accepted for M8.2/M8.3 after the 2026-11-14 audit.
 
 | Original requirement | Public sketch | Independent evidence |
 | --- | --- | --- |
@@ -1789,10 +1789,147 @@ alternative; jumping into a scope or using `longjmp` across it is unsupported.
 The caller retains responsibility for commit/abort and error propagation.
 
 This review finds the six application patterns represented in the public C
-surface. It does not freeze names, claim pointer hardware or faithful HP39
-native styling, or close physical-memory/performance acceptance. The simulated
+surface. The subsequent supported-workload resource audit closes M8.2/M8.3
+under the approved scope; it does not claim pointer hardware, faithful HP39
+native styling, physical-device deadlines or universal Stock memory bounds. The simulated
 provider, renderer palette/font choices and keyboard-only interaction are the
 documented target adaptations, not removed application requirements.
+
+### Independent-launcher assessment and migration proposal
+
+The retained M8.6 requirement is an evaluation with an HPC1-connected prototype
+and an explicit migration/acceptance plan. It does not equate an entry probe
+with a replacement launcher. The proposal is to keep the existing launchers as
+the supported default while developing an optional independent path. No
+historical dependency is retired by this proposal. The source and packaging
+evaluation below supports retaining the current default; the separate rollout
+criteria describe what a future replacement would still have to prove.
+
+**Concrete benefit:** a qualified independent package could remove library-275
+installation and launcher-version coupling on classic models. Sharing the
+existing HPC1 ABI and bootstrap would preserve application source and virtual
+layout. These are expected packaging benefits, not measured savings: embedding
+startup code and reserving storage inside each RPL object can increase package
+size and peak memory. HP39 also needs an Aplet package and native service bridge;
+removing a classic RPL library dependency alone does not replace that path.
+
+A same-input packaging comparison now measures that tradeoff. Both classic
+prototype images have 380 code bytes, 12 static bytes and exactly 16 KiB of
+application RW. The current SDK packages those same HPC1 files, without altering
+them, using the existing launchers. The other-family rows use the same image
+only to measure layout/packaging; they are not execution claims for that image.
+
+| Package/layout | Serialized transfer bytes | Required pool layout |
+| --- | ---: | --- |
+| Existing HP49g+/HP50g wrapper | 15,540 | 12 pages / 49,152 bytes |
+| Independent HP49g+/HP50g prototype | 71,148 | Six backing pages inside the RPL object's reserved copy; separate 4 KiB entry stack already included in that copy |
+| Existing HP48gII wrapper, layout only | 15,540 | 12 pages / 49,152 bytes |
+| Existing HP39 wrappers, before Aplet envelope | 15,588 | 14 pages / 57,344 bytes, including two native workspace pages |
+
+The independent transfer is 55,608 bytes larger for this bounded workload.
+It embeds its entry/loader and reserves copy/arena storage; the standard package
+compresses its embedded image. The table is not a whole-system peak comparison:
+the standard pool ledger excludes native allocation policy/overhead, stored
+objects and transfer staging, and the prototype's internal arena must not be
+added again to its containing RPL object. HP39 rows also exclude Aplet envelopes.
+Rebuilding the standard packages reproduces their bytes; source/input hashes
+remain unchanged. Report: `/work/nov14-launcher-comparison.json`.
+
+The current evidence separates three layers:
+
+- The maintained `tests/e2e/independent-entry` fixture proves HP50g Stock ARM/C
+  entry and RPL return without library 275, owned stack/storage and privileged
+  IRQ/FIQ masking/restoration. Two-copy builds and native corrupt-snapshot checks
+  are reproducible from the repository.
+- The maintained `tests/e2e/independent-hpc1` experiment uses `stage-image.c` validation and the
+  shared `runtime/bootstrap/{mmu.c,run.c,enter.S,sync.S}` implementation. A
+  380-byte Thumb payload returns 42, with expected boot/data contents, restored
+  L1 slots and SWI vector, RPL return and unchanged Flash. Its six backing pages
+  reside in the enclosing program's reserved storage. The package is 71,148
+  bytes; its copied ARM payload is 35,528 bytes, including a 28,672-byte alignment
+  arena and a separate 4,096-byte entry stack. The program also reserves 71,063
+  nibbles for that copy. These are experiment dimensions, not an application
+  memory budget or a claimed improvement over another program.
+- This experiment supplies zero `saturn_state` and `platform_cookie`. It therefore
+  has no production native mutation fence, HP39 portal or established relocation
+  roots. Successful compute-and-return execution does not qualify object/file/UI
+  service coexistence. The maintained builder reproduces the executed package
+  byte for byte; two isolated source copies reproduce all six artifacts and
+  their manifest. The maintained verifier accepts the matching native snapshot
+  and rejects fifteen corrupted copies. Core CI includes build reproducibility;
+  the native USB run remains a separate locally executed gate.
+
+The family assessment follows the existing implementation, rather than assuming
+that the HP50g entry addresses or page ownership transfer unchanged:
+
+| Family | Existing contract that an independent path must reproduce | Evaluation result / remaining proof |
+| --- | --- | --- |
+| HP39g+/39gs/40gs | `tools/package-hp39-aplet.sh` and `package-aplet.py` package model-specific Aplets. `stage0.S` leaves two Stock pool pages for native calls. `hp39_portal_configure` in `stage1.c` carries the saved Saturn/ARM context, Aplet arena and pinned cells; model-specific font pages are mapped separately. | Retain the Aplet boundary and custom-data ownership. Qualify independently owned backing pages and the portal's stable lifetime on all three models, including the smallest supported application's transfer/startup budget. No independent HP39 run is claimed. |
+| HP48gII | The existing ARMToolbox48 path supplies the pool and suspended Stock context. `stage1.c` checks stage/code/RW/stack admission, preserves the return trampoline and publishes native bounds. The physical SRAM limit is 256 KiB, as enforced by the resource snapshot verifier. | Do not reuse the HP50g 512 KiB address assumptions or SAVE/RESTORE constants. Establish HP48 entry/return and allocation ownership before testing its full application and native services. No independent HP48 run is claimed. |
+| HP49g+/HP50g | `stage1.c` publishes live Saturn context, hidden launcher/return roots and native mutation bounds. `port-memory.h` excludes every reserved ERAM pool page from Port1 growth. The wrapper's 240-byte native stack-growth request is a policy request, not the HPC1 RW arena size. | Both HP49g+ and HP50g now pass the bounded compute prototype using model-specific manifests and ROM fingerprints; HP49g+ uses a fresh baseline made with its own bootloader. Reproduce the live-context/return-root/fence contracts and verify each model's actual allocations, native service calls and release. |
+
+The shared bootstrap can remain unchanged if the independent launcher supplies
+valid owned code/RW pages, L2 workspace, model/context metadata and a live return
+path. `hpclang_bootstrap_run` installs temporary mappings with IRQ/FIQ masked,
+then restores mappings before restoring the caller interrupt state. It does not
+allocate those pages, establish native object ownership, or recover arbitrary
+launcher failures. The candidate must implement and validate those surrounding
+contracts explicitly.
+
+The evaluation conclusions by contract are:
+
+- **Allocation and smallest-model budget:** the prototype proves ownership of
+  its bounded classic-model arena, not a general allocator. Existing HP39 needs
+  the Aplet/native workspace split; HP48 has only 256 KiB SRAM, and the current
+  prototype's 512 KiB physical range check is unsuitable there. The measured
+  wrapper layout already needs 48 KiB of pool on HP48 and 56 KiB on HP39 before
+  the excluded costs. Therefore the current independent storage scheme provides
+  no demonstrated admission advantage for the smallest models.
+- **MMU and portability:** all paths can share the existing bootstrap contract,
+  but owned backing pages must come from the family-specific allocator. HP39
+  additionally needs model-specific NOR font mappings. The prototype qualifies
+  temporary map restoration on HP49g+/HP50g only; it is not a transferable HP39
+  or HP48 entry implementation.
+- **Relocation and native services:** the current launchers supply the hidden
+  return roots, native memory bounds and HP39 portal lifetime described above.
+  A zero native context in the prototype cannot satisfy those contracts. It is
+  suitable for the demonstrated bounded compute workload, not for replacing
+  the existing Notebook/object/file/UI launch path.
+- **Exit recovery:** common bootstrap mapping/IRQ restoration is reusable, while
+  the surrounding stage must still retain its Stock context and backing pages
+  through cleanup and return. Existing stage0/stage1 handle their family-specific
+  return/portal restoration; the prototype proves normal compute return only.
+  Failure and exit/_Exit with active native services remain rollout tests for
+  a future replacement, not behavior established by the compute experiment.
+
+**Migration decision:** retain all current launchers and dependencies as the
+supported default. Keep the independent fixture as a reproducible experimental
+path. This delivers the retained evaluation/prototype/decision locally; it does
+not approve retirement or claim a replacement implementation. M8.6 still needs
+its release/resource acceptance and remote integration gates.
+
+Before offering a future independent replacement for application use:
+
+1. Preserve a maintained HPC1-connected prototype with source/artifact manifests,
+   isolated reproducible builds and no-library-275 native execution evidence.
+2. Qualify each family's entry, owned allocation and return path. Account for
+   package storage, transfer staging, page tables, stage and application stacks,
+   and native workspace together; reject inadequate space before mutation.
+3. Integrate the real native context, relocation roots and mutation fences.
+   Exercise object persistence, UI/effects, timers and supported storage through
+   normal return, initialization failure, `exit` and `_Exit`; test restoration
+   before any backing storage is released.
+4. Preserve all six SDK targets, HPC1 ABI, HP39 Aplet packaging and documented
+   compatibility with the existing paths. Publish installation/migration and
+   fallback instructions before considering a default change or dependency
+   retirement. A default change requires its own explicit decision and evidence.
+
+Current experiment reports are
+`/work/nov14-independent-entry-swi-live/verified-final.json` and
+`/work/nov14-independent-hpc1-swi-live/verified.json`. The proposal and source
+assessment are evaluation deliverables, supported by the two-model prototype
+and measured packaging comparison. They do not mark a launcher replacement or
+M8.6 complete. HP49g+ evidence: `/work/nov14-hpc1-hp49-live-rpn/independent-audit.json`.
 
 ### Startup resource admission
 
@@ -2136,6 +2273,23 @@ All six models now pass: HP40gs adds eight snapshots, HP48gII 14, and HP49g+
 `/work/oct26-resource-snapshot-matrix/final-audit.json` fingerprints the evidence.
 These successful sampled runs do not establish a transient peak bound.
 
+### Cold-boot stack layout
+
+`verify-native-stack-init.py --include-boot-layout` additionally decodes the
+reviewed cold-boot mode/SP sequence, without requiring that a restored Stock
+snapshot executed it. Boot tops differ from the later runtime tops:
+
+| Bootloader family | Undefined / Abort / IRQ / FIQ / Supervisor stack tops |
+| --- | --- |
+| HP39g+, HP49g+ | `08006D7C / 08006E7C / 08006F7C / 08006FFC / 08006CFC` |
+| HP39gs, HP40gs, HP48gII, HP50g | `08006450 / 080064A0 / 080065AC / 0800662C / 08006400` |
+
+The checker validates mode changes, SP-load instructions and literal values
+against each model's reviewed layout. Six original ROMs pass all thirty
+initializers. These are static tops, not lower bounds or reserved capacities;
+restored-state UI runs do not establish cold-boot stack usage. Existing dynamic
+runtime reconciliation is unchanged. Report: `/work/nov14-boot-stack-layout.json`.
+
 ### UI resource measurements
 
 The `ui_demo_lifecycle` sanitizer test executes the shipped declarative-UI
@@ -2183,9 +2337,26 @@ modes remain separate; their address distance is not stack consumption. A
 region boundary crossing produces separate records and must not be discarded
 when checking a known stack reservation. The original application-only trace
 can run alongside it. Both outputs refuse to overwrite existing evidence.
-This diagnostic uses host memory only and is disabled by default. It does not
-observe implicit bank switches or SP updates outside the translated register
-store path, and it does not itself certify a stack bound or memory admission.
+This diagnostic uses host memory only and is disabled by default. It also records ARM `LDM ...^` writes to the saved user SP, attributed to
+mode 16 and the actual load instruction address. This covers the ROM task-restore
+path that bypasses the ordinary translated register-store helper. Such saved-bank
+assignments are not active supervisor-stack use. Implicit bank switches and other
+SP updates outside these two paths remain separate, and these observations do not
+by themselves certify a stack bound or memory admission.
+
+For SRAM region 128, new records also include `low_sram`: independent counts,
+extrema and instruction addresses for SP values in `[0x08000000, 0x08001000)`,
+or `null` if no assignment falls in that window. This separates the fixed low
+ROM stack initializers from borrowed stacks elsewhere in the same SRAM region;
+the full-region observations are retained. The 4 KiB window is an observation
+partition, not a reserved stack arena. A stack leaving it remains visible in
+the full-region record. Its address range must not be used as a capacity limit.
+
+The initializer verifier checks the optional window's geometry, counts and
+coverage of each expected stack top. Legacy traces without this field remain
+readable and produce no low-window evidence. Enable `HPCLANG_X50NG_STACK_REGIONS`
+explicitly when running the harness outside CI; application-only
+`HPCLANG_E2E_CAPTURE_STACK_POINTER=1` does not request this trace.
 
 For a Stock UI run, save that trace as `build/<model>-frame-stack-regions.jsonl`
 and pass `--stage-stack --pool --artifact /path/to/ui-artifact` to the UI verifier.
@@ -2212,8 +2383,9 @@ all observed regions. Output is JSON on stdout; success proves initializer
 reconciliation only. In particular, top minus observed minimum is not a reserved
 capacity, and adjacent bank tops do not establish ownership of the intervening
 memory. Six saved Stock UI runs pass locally, as do 132 real-input rejection
-variants and four unit tests. Native reservation bounds and whole-system
-transient-memory admission remain open.
+variants and four unit tests. Comprehensive native reservation bounds and whole-system worst-case
+transient-memory research are deferred by the 2026-11-14 user decision;
+supported-flow budgets, isolation and failure handling remain required.
 
 Before the launcher removes the mappings, the test requests a memory checkpoint.
 The shared Direct/Stock harness accepts a word-aligned descriptor within the

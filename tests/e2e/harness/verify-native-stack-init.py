@@ -27,6 +27,46 @@ INITIALIZERS = (
 )
 
 
+# Bootloader stacks precede the runtime initializer and can occupy another
+# SRAM interval. These are qualified tops, not inferred allocation boundaries.
+BOOT_LAYOUTS = {
+    "hp39gplus": (0xCC, (0x08006D7C, 0x08006E7C, 0x08006F7C, 0x08006FFC, 0x08006CFC)),
+    "hp49gplus": (0x88, (0x08006D7C, 0x08006E7C, 0x08006F7C, 0x08006FFC, 0x08006CFC)),
+}
+for _model in ("hp39gs", "hp40gs", "hp48gii", "hp50g"):
+    BOOT_LAYOUTS[_model] = (0xC8, (0x08006450, 0x080064A0, 0x080065AC, 0x0800662C, 0x08006400))
+
+
+def boot_initializers(model, flash):
+    """Decode the reviewed boot sequence without asserting dynamic coverage."""
+    anchor, tops = BOOT_LAYOUTS[model]
+
+    def word(address):
+        if address < 0 or address % 4 or address + 4 > len(flash):
+            raise ValueError("boot instruction/literal outside image")
+        return struct.unpack_from("<I", flash, address)[0]
+
+    result = []
+    for (mode, offset, flags, _), expected in zip(INITIALIZERS, tops):
+        pc = anchor + offset
+        instruction = word(pc)
+        if (
+            instruction & 0xFFFFF000 != 0xE59FD000
+            or word(pc - 8) != 0xE3801000 | flags
+            or word(pc - 4) != 0xE12FF001
+        ):
+            raise ValueError(f"unrecognized boot mode/SP initializer at {pc:#x}")
+        literal = pc + 8 + (instruction & 0xFFF)
+        top = word(literal)
+        if top != expected:
+            raise ValueError(f"unrecognized boot stack top for mode {mode}")
+        result.append(dict(mode=mode, pc=pc, literal=literal, top=top))
+    return dict(
+        initializers=result,
+        scope="Static boot initializer decoding only; no observed coverage or reserved capacity.",
+    )
+
+
 def verify(model, flash, trace):
     def word(address):
         if address < 0 or address % 4 or address + 4 > len(flash):
@@ -62,6 +102,19 @@ def verify(model, flash, trace):
         key = row["mode"], row["region"]
         if key in rows:
             raise ValueError("duplicate mode/region")
+        if "low_sram" in row:
+            low = row["low_sram"]
+            if row["region"] != 128:
+                raise ValueError("low SRAM observation outside SRAM region")
+            if low is not None and (
+                not isinstance(low, dict)
+                or any(type(low.get(k)) is not int for k in fields[3:])
+                or not 0 < low["writes"] <= row["writes"]
+                or not 0x08000000 <= low["minimum"] <= low["maximum"] < 0x08001000
+                or not row["minimum"] <= low["minimum"] <= low["maximum"] <= row["maximum"]
+                or any(not 0 <= low[k] < 2**32 for k in ("minimum_pc", "maximum_pc"))
+            ):
+                raise ValueError("invalid low SRAM observation")
         rows[key] = row
 
     anchor = ANCHORS[model]
@@ -82,6 +135,9 @@ def verify(model, flash, trace):
         observed = rows.get((mode, top >> 20))
         if observed is None or not observed["minimum"] <= top <= observed["maximum"]:
             raise ValueError(f"missing initializer coverage for mode {mode}")
+        low = observed.get("low_sram")
+        if "low_sram" in observed and (low is None or not low["minimum"] <= top <= low["maximum"]):
+            raise ValueError(f"missing low SRAM initializer coverage for mode {mode}")
         results.append(
             dict(
                 mode=mode,
@@ -91,6 +147,7 @@ def verify(model, flash, trace):
                 observed_minimum=observed["minimum"],
                 top_minus_observed_minimum=top - observed["minimum"],
                 observed_writes=observed["writes"],
+                low_sram=low,
             )
         )
     return dict(
@@ -110,9 +167,13 @@ def main():
     parser.add_argument("--model", choices=ANCHORS, required=True)
     parser.add_argument("--flash", type=Path, required=True)
     parser.add_argument("--trace", type=Path, required=True)
+    parser.add_argument("--include-boot-layout", action="store_true")
     args = parser.parse_args()
     try:
-        result = verify(args.model, args.flash.read_bytes(), args.trace.read_bytes())
+        flash = args.flash.read_bytes()
+        result = verify(args.model, flash, args.trace.read_bytes())
+        if args.include_boot_layout:
+            result["boot_layout"] = boot_initializers(args.model, flash)
     except (OSError, ValueError) as error:
         parser.exit(1, f"native stack initializer check failed: {error}\n")
     print(json.dumps(result, indent=2))

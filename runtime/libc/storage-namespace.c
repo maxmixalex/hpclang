@@ -251,6 +251,33 @@ int hpclang_namespace_stock_active(void)
     return !namespace_ready || namespace_lease.state == HPCLANG_NAMESPACE_STOCK;
 }
 
+int hpclang_namespace_owned_card_identity(uint8_t cid[16])
+{
+    if (cid == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (!hpclang_namespace_direct_active()) {
+        errno = EBUSY;
+        return -1;
+    }
+    if (disk_status(0u) & STA_NOINIT) {
+        /* Initializing SD solely to read CID must not make an old mounted FAT
+         * look live again. Unmount without flushing dirty objects first; even
+         * the same returning card requires a fresh filesystem generation. */
+        hpclang_storage_volumes_unmount(&namespace_volumes);
+        if (disk_initialize(0u) & STA_NOINIT) {
+            errno = ENODEV;
+            return -1;
+        }
+    }
+    uint8_t identity[16];
+    if (hpclang_hp4950_fatfs_card_identity(identity))
+        return -1;
+    memcpy(cid, identity, sizeof identity);
+    return 0;
+}
+
 static struct direct_fd_state *direct_fd_from_number(int fd)
 {
     if (fd < (int)DIRECT_FD_BASE || fd >= (int)(DIRECT_FD_BASE + DIRECT_FD_SLOTS))
@@ -345,8 +372,9 @@ int hpclang_namespace_open(const char *path, int flags)
      * FatFs' create method.
      */
     if (access == O_RDONLY && wants_create && !wants_exclusive) {
-        FILINFO info;
-        FRESULT stat_result = f_stat(path, &info);
+        /* Only existence matters. FatFs accepts NULL here; avoid reserving
+         * a long-filename result buffer in every open call's stack frame. */
+        FRESULT stat_result = f_stat(path, NULL);
         if (stat_result == FR_OK)
             method = FA_OPEN_EXISTING;
         else if (stat_result != FR_NO_FILE && stat_result != FR_NO_PATH) {
@@ -386,6 +414,30 @@ int hpclang_namespace_close(int fd)
     FRESULT fr = f_close(&slot->file);
     memset(slot, 0, sizeof(*slot));
     return fr == FR_OK ? 0 : set_fatfs_errno(fr);
+}
+
+int hpclang_namespace_change_mode(int fd, int writable, int append)
+{
+    /* f_open initializes the directory locator and data buffer even for read
+     * handles in this pinned writable FatFs build. Share-lock bookkeeping
+     * would require a different transition implementation if enabled. */
+    _Static_assert(!FF_FS_READONLY && !FF_FS_LOCK, "mode changes require writable, unlocked FatFs");
+    struct direct_fd_state *slot = direct_fd_from_number(fd);
+    if (slot == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+    if (!direct_file_ready(slot, writable))
+        return -1;
+    if (!writable && (slot->file.flag & FA_WRITE)) {
+        FRESULT result = f_sync(&slot->file);
+        if (result != FR_OK)
+            return set_fatfs_errno(result);
+    }
+    slot->file.flag =
+        (BYTE)((slot->file.flag & ~(FA_READ | FA_WRITE)) | FA_READ | (writable ? FA_WRITE : 0));
+    slot->append = writable && append;
+    return 0;
 }
 
 ssize_t hpclang_namespace_read(int fd, void *buffer, size_t count)
@@ -905,8 +957,8 @@ struct hpclang_stream_directory *hpclang_stream_directory_open(const char *path)
     return directory;
 }
 
-int hpclang_stream_directory_read(struct hpclang_stream_directory *directory,
-                                  struct hpclang_stream_directory_entry *entry)
+int hpclang_namespace_directory_read(struct hpclang_stream_directory *directory,
+                                     struct hpclang_stream_directory_entry *entry, char *short_name)
 {
     if (directory == NULL || entry == NULL) {
         errno = EFAULT;
@@ -943,7 +995,15 @@ int hpclang_stream_directory_read(struct hpclang_stream_directory *directory,
     entry->last_accessed = metadata.last_accessed;
     entry->time_validity = metadata.time_validity;
     memcpy(entry->name, info.fname, name_length + 1u);
+    if (short_name)
+        memcpy(short_name, info.altname, sizeof(info.altname));
     return 1;
+}
+
+int hpclang_stream_directory_read(struct hpclang_stream_directory *directory,
+                                  struct hpclang_stream_directory_entry *entry)
+{
+    return hpclang_namespace_directory_read(directory, entry, NULL);
 }
 
 int hpclang_stream_directory_close(struct hpclang_stream_directory *directory)

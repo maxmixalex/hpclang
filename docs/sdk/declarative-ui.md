@@ -1,14 +1,15 @@
 # Declarative UI: declaration core
 
-The current M8.2 slice provides bounded declaration storage, node identity,
+The accepted M8.2 core provides bounded declaration storage, node identity,
 row/column layout, button actions, focus traversal, controlled text edits and
 model-aware physical-key routing, revision-driven canvas callbacks and damage
 tracking and bounded asynchronous effects. A surface/font renderer and integrated
 loading/error/retry application passed six-model Direct and Stock acceptance,
 and its C implementation is integrated into main at `a7692b4b`. The C++ helpers
 and compact-storage changes below also pass formal CI and are integrated at `e6f04dbd`.
-The interface below is a working application sketch; its names are not yet a
-frozen UI API.
+The reviewed C interface is accepted for M8.2/M8.3 under the resource scope
+approved on 2026-11-14. This is source/API acceptance, not a cross-version
+binary-layout guarantee.
 
 Node metadata is selected by `kind`: read `capacity`, `cursor` and `anchor`
 for inputs; `paint`, `canvas_state` and `revision` for canvases; and `value`
@@ -353,8 +354,10 @@ On HP39g+, Direct/Stock frame maxima are 13,370/13,301 microseconds and input
 maxima are 614/489 microseconds; both use 18,892 bytes of heap and 2,424 bytes
 of touched application stack. These are measurements of the scripted emulator
 workload. They do not establish hardware deadlines, native exception-stack
-reservations or whole-system transient memory bounds; those retained acceptance
-items remain open. Host tests separately cover every renderer allocation failure
+reservations or whole-system transient memory bounds. Comprehensive Stock
+capacity and worst-case research is deferred; supported-flow memory budgets,
+isolation and failure handling remain acceptance requirements. Host tests
+separately cover every renderer allocation failure
 and the shipped application's cleanup/restart paths.
 
 The device-manager example budgets 48 nodes, 512 text bytes and one asynchronous
@@ -552,8 +555,9 @@ adding requested byte counts alone does not bound that extent or guarantee a
 physically contiguous span.
 Host allocation tests check the two-buffer cost at every size/level combination
 above, independently of host descriptor sizes, and retain allocation-failure
-and allocation-free frame checks. Peak whole-application memory and complete
-update-cost acceptance remain open.
+and allocation-free frame checks. The maintained workload
+passes the application-memory and update-cost gates above; comprehensive Stock
+worst-case memory research is deferred.
 
 ## Vertical scrolling
 
@@ -626,6 +630,18 @@ failure and retry on all six Direct and Stock targets; implementation acceptance
 is recorded in the roadmap.
 
 ## C++ declaration guards
+
+`<hpclang/ui-surface.hpp>` provides the C++17 `hpclang::owned_ui_surface`
+owner for a renderer returned by `hpclang_ui_surface_create`. It adds no
+allocation: move transfers destruction responsibility, `get()` borrows for C
+calls, and `release()` transfers that responsibility back to the caller.
+Destruction and `reset()` preserve `errno`. Fonts remain borrowed and must
+outlive the renderer; the owner does not acquire a display session or own the
+UI context. Do not destroy or replace it from its rendering callbacks.
+To retain a working renderer when replacement fails, create a candidate owner,
+check it, then `swap` only after success. Ordinary scope exit cleans up;
+`exit()` and `_Exit()` do not unwind automatic owners. The installed C++ counter
+example uses this owner alongside the lexical declaration guards below.
 
 `<hpclang/ui.hpp>` adds C++17 lexical guards over the same C context. They do
 not allocate, throw, commit implicitly or introduce a second state model.

@@ -100,9 +100,24 @@ extern "C"
         struct tm _hpclang_created_tm;
         struct tm _hpclang_accessed_tm;
         unsigned _hpclang_time_validity;
+        struct hpclang_hpgcc_fs_file *_hpclang_next;
+        int _hpclang_handle;
     } FS_FILE;
 
+    /* Init is implicit on first volume/path use. Restart/shutdown close all
+     * adapter-owned files/directories; their pointers must no longer be used.
+     * The shared hpclang SD controller lease remains owned until app return.
+     * Clean storage API handles are not closed by these adapter operations. */
+    int FSInit(void);
+    int FSShutdown(void);
+    int FSRestart(void);
+    /* Modes 0..3 follow FSCASE_*; invalid values are ignored. FSInit defaults
+     * to FSCASE_SENSHP. HP modes encode FAT case collisions with semicolons. */
+    void FSSetCaseMode(int casemode);
     int FSVolumeMounted(int volume);
+    /* Compare against the card mounted by FSInit, including a non-FAT
+     * replacement. FS_CHANGED persists until FSRestart or the original card
+     * returns. Matching CID never revives handles invalidated by removal. */
     int FSVolumeInserted(int volume);
     int FSSetCurrentVolume(int volume);
     int FSGetCurrentVolume(void);
@@ -119,6 +134,16 @@ extern "C"
 
     int FSCreate(char *name, int attr, FS_FILE **fileptr);
     int FSOpen(char *name, int mode, FS_FILE **fileptr);
+    /* Change an open file's mode without reopening, truncating or seeking.
+     * APPEND/MODIFY imply WRITE. Downgrading to READ flushes buffered writes;
+     * failure leaves the previous mode in force. */
+    int FSChMode(FS_FILE *file, int newmode);
+    /* HPGCC3 adapter handle numbers start at 3 and are local to each volume.
+     * Reverse lookup uses the current volume and leaves *file unchanged on
+     * failure. These are not POSIX descriptors. Close/restart/shutdown release
+     * the number, which a later open may reuse. Entry snapshots have no handle. */
+    int FSGetHandle(FS_FILE *file);
+    int FSGetFileFromHandle(int handle, FS_FILE **file);
     int FSClose(FS_FILE *file);
     int FSCloseAndDelete(FS_FILE *file);
     int FSSeek(FS_FILE *file, int offset, int position);

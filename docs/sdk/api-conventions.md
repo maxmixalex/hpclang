@@ -9,8 +9,17 @@ details, even though runtime sources accompany the source SDK.
 Build the application and runtime with one SDK and its matching toolchain.
 The common HPC1 launch ABI does not promise that opaque objects, C++ layouts or
 internal runtime structures can be exchanged between separately built SDK
-versions. Rebuild when changing SDK versions. UI names remain provisional until
-UI milestone acceptance; these usage conventions do not freeze those names.
+versions. Rebuild when changing SDK versions. The reviewed declarative C UI
+interface is accepted for M8.2/M8.3; this does not promise cross-version binary
+layout compatibility.
+
+The object, directory, Port, storage, timer and UI helper headers support C++17.
+`hpclang/display.hpp` requires C++20 because its borrowed drawing interfaces use
+`std::span`. Select the language level explicitly with CMake's
+`target_compile_features(your_app PRIVATE cxx_std_17)` or `cxx_std_20` as needed.
+Each public `.hpp` can be included on its own; applications need not supply an
+umbrella header or depend on another helper's incidental includes. The installed
+toolchain disables exceptions and RTTI for both language levels.
 
 ## Read the result before reading errno
 
@@ -78,16 +87,33 @@ contract, not a universal property of `hpclang_` calls.
 | `owned_object` | Owns an independent calculator-object snapshot, not a live native stack/store slot; `receive` preserves the old owner on failure |
 | `owned_object_store` | Owns a logical directory handle; names are resolved again when used |
 | `owned_object_store_iterator` | Owns copied metadata and may outlive the directory handle used to open it |
+| `owned_port_iterator` | Owns an independent native-port metadata snapshot; opening retains the C service's context and Port 2 recovery behavior |
 | `owned_stream`, `owned_stream_directory` | Own one close responsibility; destruction is best-effort cleanup, not proof that writes were saved |
 | `owned_surface` | Owns an offscreen image; `get()` and `view()` borrow it |
+| `owned_ui_surface` | Owns a UI renderer; styles are copied, fonts remain borrowed, and the UI context/display session remain independently managed |
 | `surface_ref`, `display_surface()` | Borrow a surface; do not destroy borrowed LCD pages or retain them past their display session |
 | `ui::declaration`, `ui::scope` | Borrow a UI context and manage lexical operations; they do not own or extend the context's lifetime |
+| `cooperative_timer` | Holds a foreground-polled schedule without a callback, interrupt or background thread; moving disarms the source |
 
 Move an owner to transfer responsibility. `get()` borrows; `release()` transfers
 responsibility to the caller. Never create two owners from the same pointer.
 Do not call `reset(owner.get())` on the `unique_ptr`-based directory owners.
 Keep a borrowed view within its owner's lifetime and reacquire it after owner
 replacement. A moved-from owner is empty; the moved-to owner keeps the resource.
+
+The iterator and renderer owners use `unique_ptr` semantics: create a candidate,
+check it, then swap if replacement must preserve the old resource on failure.
+Keep renderer fonts alive until renderer destruction, and never destroy or
+replace the renderer from its measure/render/canvas callbacks. The owner adds
+no allocation beyond the underlying C creation call.
+
+`cooperative_timer` is a value schedule rather than a pointer owner: it has no
+`get()` or `release()`. Poll it from the foreground loop; destruction cancels
+the schedule, and move assignment discards the destination's old schedule.
+Negative durations fail with `EINVAL`; clock/overflow failures preserve the
+schedule and poll output. An armed one-shot can already be due: `armed()` does
+not read the clock or consume an expiration. See the installed
+`examples/timer-cpp` for checked polling and normal scope cleanup.
 
 Close every `ui::scope` before committing its declaration. An uncommitted
 declaration aborts on ordinary scope exit; `commit()` consumes the guard even

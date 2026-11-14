@@ -12,6 +12,7 @@
 
 static int open_error, output_error, close_error, interrupted, zero_write;
 static int opens, closes;
+static int newline_error;
 static size_t exported_length;
 static char exported[NOTEBOOK_CAPACITY];
 
@@ -29,6 +30,10 @@ int open(const char *path, int flags, ...)
 ssize_t write(int fd, const void *bytes, size_t length)
 {
     assert(fd == 42);
+    if (newline_error && length == 1 && *(const char *)bytes == '\n') {
+        errno = ENOSPC;
+        return -1;
+    }
     if (interrupted) {
         interrupted = 0;
         errno = EINTR;
@@ -88,6 +93,14 @@ static void files(void)
     assert(notebook_export_file("/HPCNOTE.TXT", maximum) == 0);
     assert(exported_length == sizeof(exported) && exported[sizeof(exported) - 1] == '\n');
     assert(!memcmp(exported, maximum, sizeof(maximum) - 1));
+    exported_length = 0;
+    newline_error = 1;
+    close_error = EIO;
+    int previous_closes = closes;
+    assert(notebook_export_file("/HPCNOTE.TXT", "abc") == -1 && errno == ENOSPC);
+    assert(closes == previous_closes + 1);
+    assert(exported_length == 3 && !memcmp(exported, "abc", 3));
+    newline_error = close_error = 0;
 }
 
 struct hpclang_object

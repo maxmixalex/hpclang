@@ -22,7 +22,12 @@ It reports source locations and concrete advice for legacy umbrella includes,
 raw Saturn reads/writes, bounded line input, process-exit cleanup, tone units and
 application `errno` declarations, legacy decimal settings, borrowed formatting
 buffers, storage capability checks and KOS tone waiting/replacement semantics.
-It also locates HPG text/letter drawing calls for encoding and font review.
+It also locates HPG text/letter drawing calls for encoding and font review. `HP013`
+identifies the historical `sys_map_v2p` and `sys_map_p2v` address translators.
+These are not public hpclang APIs. Do not substitute casts or fixed address
+offsets: use the owning display, storage or object service, or redesign custom
+physical-memory access explicitly. A borrowed pointer alone does not prove a
+physical address or how long it remains valid.
 Comments and string/character literals are
 ignored. Directory scans include C/C++ sources and headers, excluding `.git`,
 `build`, `.cache` and `third_party`; explicitly named files are always checked.
@@ -151,7 +156,7 @@ The legacy grammar is different: `%g` counts fractional places; 64-bit integers
 use `%L`/`%U`; standard length modifiers, `*`, `+`, `#` and `%n` are rejected.
 Precision is capped at 15 and historical malformed carry/zero-precision outputs
 are corrected. Audit each format string before opting in; see the
-[formatting contract and original-source comparisons](../development/hpgcc-compat.md#historical-console-output).
+[online formatting contract and original-source comparisons](https://maxmixalex.github.io/hpclang/development/hpgcc-compat/#historical-console-output).
 
 Legacy HPG text and the default compatibility console use calculator bytes.
 The clean `hpclang_surface_draw_text` and `hpclang_surface_draw_utf8` functions
@@ -177,6 +182,27 @@ The hint also applies to ASCII literals: this lexical checker cannot prove which
 font is selected or which characters dynamic strings will contain. Explicitly
 include runtime characters in generated fonts and check missing-glyph behavior.
 
+## Enumerate native ports from C++
+
+`hpclang/port.hpp` provides `hpclang::owned_port_iterator`, an allocation-free
+owner for an independently allocated metadata snapshot. Open a candidate and
+swap after success when replacing an existing snapshot:
+
+```cpp
+hpclang::owned_port_iterator candidate{hpclang_port_iterator_open(port)};
+if (!candidate)
+    return -1;
+entries.swap(candidate); // entries is an owned_port_iterator; old snapshot closes hereafter.
+```
+
+Use `get()` with `hpclang_port_iterator_read`; initialize each entry's size and
+version as required by the C interface. Names remain raw calculator bytes.
+Moving transfers close responsibility, `release()` transfers it to the caller,
+and destruction/reset preserves errno. Ordinary scope exit closes the snapshot;
+`exit()` and `_Exit()` do not unwind automatic C++ objects. Opening Port 2 retains
+the C service's recovery behavior and can write recovery metadata. The owner
+does not change model/context availability or imply new port capabilities.
+
 ## Make ownership visible
 
 `ints`, `uints` and `sys_bcd2str` return borrowed formatting buffers. Copy a result
@@ -191,6 +217,19 @@ inside a copy operation still receives a review hint. Never adopt these
 pointers into a freeing C++ owner. For example, copy into application storage
 before formatting the next value; retaining two returned pointers does not
 create two independent strings.
+
+Historical window strings have distinct lifetimes. `win_text_get_text` returns
+internal text valid until the next window call; copy it before retaining it,
+and never free it or put it in a freeing C++ owner. In-place edits cannot grow
+the string; use `win_text_set_text` for growth. The checker reports `HP014`.
+
+`win_choose_add` and `win_choose_add_with_label` borrow the caller's option and
+label pointers. Keep their storage alive while the control or application uses
+them; a temporary string or a returning function's local array is insufficient.
+`win_choose_get_choice` returns that borrowed option without transferring
+ownership. Copy results that must outlive the original storage. These calls
+receive `HP015`; the lexical checker cannot determine whether storage actually
+expires, so literals and already-safe code also receive review hints.
 
 In C++, use `owned_object` from `hpclang/object.hpp` and the directory/iterator
 owners from `hpclang/object-store.hpp`. Move to transfer ownership; borrow with
@@ -218,6 +257,17 @@ Returning normally destroys automatic C++ owners. Calling `exit()` does not
 unwind those scopes; release local resources explicitly before that path.
 `_Exit()` skips language callbacks. SDK-owned hardware restoration does not
 substitute for saving application data or running application cleanup.
+
+For cooperative schedules, `<hpclang/timer.hpp>` provides the move-only C++17
+`cooperative_timer`. Pass `hpclang::microseconds` to `start(delay, period)` and
+call `poll(count)` from your loop; a zero period is one-shot. Moving disarms the
+source, while move assignment discards the destination's previous schedule.
+Failed start/poll calls retain the old schedule and failed polls leave `count`
+unchanged. Negative durations return `-1/EINVAL`; other errors follow the C
+timer/clock API. `armed()` observes the stored state without sampling time; a
+due one-shot remains armed until polled. No allocation or IRQ is involved.
+The installed `examples/timer-cpp` demonstrates periodic polling and moving.
+Use the C API when you need durations beyond signed chrono microseconds.
 
 The legacy `gets` / `_gets` aliases accept fixed character arrays with a known
 capacity. For a pointer or variable-length buffer, call

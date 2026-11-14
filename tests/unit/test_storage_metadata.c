@@ -7,6 +7,7 @@
 #include <string.h>
 #include <hpclang/device.h>
 #include <hpclang/target.h>
+#include <fsystem.h>
 #include "storage-namespace.h"
 #include "ff.h"
 #include "diskio.h"
@@ -22,11 +23,14 @@
         }                                                                                          \
     } while (0)
 static BYTE disk[SECTORS * 512u];
+/* Fixed-size host fixture: CHECK may return before the restore step. */
+static BYTE saved_disk[sizeof disk];
 static int protected_media;
 static int inserted_media;
 static int initialized_media;
 static unsigned media_writes;
 static unsigned controller_acquires;
+static int identity_error;
 static uint8_t card_identity = 0x37;
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 void test_stream_directory_cpp(void);
@@ -55,6 +59,11 @@ void hpclang_hp4950_fatfs_controller_release(void)
 int hpclang_hp4950_fatfs_card_identity(uint8_t cid[16])
 {
     assert(inserted_media && initialized_media);
+    if (identity_error) {
+        memset(cid, 0xff, 16);
+        errno = EIO;
+        return -1;
+    }
     memset(cid, card_identity, 16);
     return 0;
 }
@@ -156,6 +165,15 @@ static int partition_checks(void)
     CHECK(hpclang_stream_volume_query(1, &info) == 0 && info.partition == 3 &&
           info.first_sector == VOLUME_SECTORS * 3u);
     CHECK(info.storage.capacity_bytes == VOLUME_SECTORS * 512u);
+    FS_FILE *partition_file;
+    CHECK(FSCreate("E:/VOLUME.TST", 0, &partition_file) == FS_OK);
+    char *partition_name =
+        FSGetFileName(partition_file, FSNAME_HASVOL | FSNAME_VOLHP | FSNAME_ABSPATH);
+    int partition_named = partition_name && strcmp(partition_name, ":5:/VOLUME.TST") == 0;
+    free(partition_name);
+    CHECK(partition_named);
+    CHECK(FSCloseAndDelete(partition_file) == FS_OK && FSShutdown() == FS_OK);
+
     CHECK(hpclang_stream_volume_query(2, &info) == -1 && errno == ENODEV);
     CHECK(hpclang_namespace_open("2:/NEW.TXT", O_RDONLY) == -1 && errno == ENODEV);
     CHECK(hpclang_stream_directory_open("2:/") == NULL && errno == ENODEV);
@@ -268,6 +286,9 @@ int main(void)
     CHECK(hpclang_namespace_path_query("STAMP.TXT", &info) == 0);
     CHECK(info.attributes == (ro | hidden | HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE));
     CHECK(hpclang_namespace_open("STAMP.TXT", O_WRONLY) < 0 && errno == EACCES);
+    int read_created = hpclang_namespace_open("STAMP.TXT", O_RDONLY | O_CREAT);
+    CHECK(read_created >= 0 && hpclang_namespace_close(read_created) == 0);
+    CHECK(hpclang_namespace_open("STAMP.TXT", O_RDONLY | O_CREAT | O_EXCL) < 0 && errno == EEXIST);
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", 0, ro) == 0);
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", 0, 0x100u) < 0 && errno == EINVAL);
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", ro, hidden) < 0 && errno == EINVAL);
@@ -337,7 +358,218 @@ int main(void)
     protected_media = 0;
     CHECK(hpclang_namespace_write(fresh, "new", 3) == 3);
     CHECK(hpclang_namespace_close(fresh) == 0);
+    // Exercise the legacy case policy against the production FAT namespace.
+    CHECK(FSInit() == FS_OK);
+    FS_FILE *case_file = NULL;
+    CHECK(FSCreate("Case.txt", 0, &case_file) == FS_OK);
+    CHECK(FSWrite("A", 1, case_file) == 1 && FSClose(case_file) == FS_OK);
+    FSSetCaseMode(FSCASE_SENS);
+    CHECK(FSOpen("case.txt", FSMODE_READ, &case_file) == FS_NOTFOUND);
+    CHECK(FSCreate("case.txt", 0, &case_file) == FS_EXIST);
+    FSSetCaseMode(FSCASE_SENSHP);
+    CHECK(FSCreate("case.txt", 0, &case_file) == FS_OK);
+    CHECK(strcmp(case_file->Name, "/case.txt") == 0);
+    CHECK(FSWrite("B", 1, case_file) == 1 && FSClose(case_file) == FS_OK);
+    struct hpclang_stream_path_info case_info;
+    CHECK(hpclang_namespace_path_query("case.txt;", &case_info) == 0);
+    CHECK(FSOpen("case.txt;;;", FSMODE_READ, &case_file) == FS_OK);
+    char case_byte = 0;
+    CHECK(FSRead(&case_byte, 1, case_file) == 1 && case_byte == 'B');
+    CHECK(FSClose(case_file) == FS_OK);
+    FSSetCaseMode(FSCASE_INSENS);
+    CHECK(FSOpen("CASE.TXT", FSMODE_READ, &case_file) == FS_OK);
+    CHECK(FSRead(&case_byte, 1, case_file) == 1 && case_byte == 'A');
+    CHECK(FSClose(case_file) == FS_OK);
+    FSSetCaseMode(FSCASE_SENSHPTRUE);
+    FSSetCaseMode(-1);
+    FSSetCaseMode(4);
+    CHECK(FSOpen("case.txt", FSMODE_READ, &case_file) == FS_OK);
+    CHECK(strcmp(case_file->Name, "/case.txt;") == 0);
+    CHECK(FSClose(case_file) == FS_OK);
+    // Directory display follows the mode without losing the physical path.
+    for (int mode = FSCASE_SENSHP; mode <= FSCASE_SENSHPTRUE; mode += 2) {
+        FSSetCaseMode(mode);
+        FS_FILE *case_dir;
+        CHECK(FSOpenDir("/", &case_dir) == FS_OK);
+        FS_FILE case_entry;
+        int case_status, saw_case = 0;
+        while ((case_status = FSGetNextEntry(&case_entry, case_dir)) == FS_OK) {
+            const char *wanted = mode == FSCASE_SENSHP ? "case.txt" : "case.txt;";
+            if (strcmp(case_entry.Name, wanted) == 0)
+                saw_case = 1;
+            FSReleaseEntry(&case_entry);
+        }
+        CHECK(case_status == FS_EOF && saw_case);
+        CHECK(FSClose(case_dir) == FS_OK);
+    }
+    FSSetCaseMode(FSCASE_SENS);
+    CHECK(FSOpen("case.txt;", FSMODE_READ, &case_file) == FS_OK);
+    CHECK(FSClose(case_file) == FS_OK);
+    CHECK(FSOpen("Case.txt;", FSMODE_READ, &case_file) == FS_NOTFOUND);
+    FSSetCaseMode(FSCASE_INSENS);
+    CHECK(FSRestart() == FS_OK);
+    CHECK(FSOpen("cAsE.TxT", FSMODE_READ, &case_file) == FS_NOTFOUND);
+    FSSetCaseMode(FSCASE_SENSHP);
+    CHECK(FSMkdir("Folder") == FS_OK && FSMkdir("folder") == FS_OK);
+    CHECK(FSChdir("folder") == FS_OK);
+    CHECK(FSCreate("Child", 0, &case_file) == FS_OK);
+    char *case_name = FSGetFileName(case_file, FSNAME_HASPATH);
+    CHECK(case_name && strcmp(case_name, "Child") == 0);
+    free(case_name);
+    CHECK(FSCloseAndDelete(case_file) == FS_OK);
+    CHECK(FSChdir("/") == FS_OK);
+    CHECK(FSRmdir("folder") == FS_OK && FSRmdir("Folder") == FS_OK);
+    CHECK(FSOpen("case.txt", FSMODE_READ, &case_file) == FS_OK);
+    CHECK(FSCloseAndDelete(case_file) == FS_OK);
+    CHECK(hpclang_namespace_path_query("case.txt;", &case_info) < 0 && errno == ENOENT);
+    CHECK(FSDelete("Case.txt") == FS_OK);
+    // Mode changes retain the actual open FatFs object, its offset and extent.
+    FS_FILE *mode_file;
+    CHECK(FSCreate("MODE.TXT", 0, &mode_file) == FS_OK);
+    CHECK(FSGetHandle(mode_file) == 3);
+    FS_FILE *handle_file = NULL, *handle_dir;
+    CHECK(FSGetFileFromHandle(3, &handle_file) == FS_OK && handle_file == mode_file);
+    CHECK(FSOpenDir("/", &handle_dir) == FS_OK && FSGetHandle(handle_dir) == 4);
+    CHECK(FSGetFileFromHandle(4, &handle_file) == FS_OK && handle_file == handle_dir);
+    FS_FILE metadata_only = {0};
+    CHECK(FSGetHandle(NULL) == FS_INVHANDLE && FSGetHandle(&metadata_only) == FS_INVHANDLE);
+    CHECK(FSGetFileFromHandle(2, &handle_file) == FS_INVHANDLE && handle_file == handle_dir);
+    CHECK(FSGetFileFromHandle(-1, &handle_file) == FS_INVHANDLE && handle_file == handle_dir);
+    CHECK(FSGetFileFromHandle(1000000, &handle_file) == FS_INVHANDLE && handle_file == handle_dir);
+    CHECK(FSGetFileFromHandle(3, NULL) == FS_INVHANDLE);
+    CHECK(FSClose(handle_dir) == FS_OK);
+    handle_file = mode_file;
+    CHECK(FSGetFileFromHandle(4, &handle_file) == FS_INVHANDLE && handle_file == mode_file);
+    CHECK(FSOpen("MODE.TXT", FSMODE_READ, &handle_file) == FS_OK);
+    CHECK(FSGetHandle(handle_file) == 4 && FSGetHandle(mode_file) == 3);
+    CHECK(FSClose(handle_file) == FS_OK);
+    int mode_fd = mode_file->_hpclang_fd;
+    CHECK(FSWrite("abcdef", 6, mode_file) == 6);
+    CHECK(FSChMode(mode_file, FSMODE_READ) == FS_OK);
+    CHECK(mode_file->_hpclang_fd == mode_fd && FSTell(mode_file) == 6);
+    CHECK(FSFileLength(mode_file) == 6 && FSWrite("!", 1, mode_file) == 0);
+    CHECK(FSSeek(mode_file, 1, SEEK_SET) == FS_OK);
+    char mode_bytes[8] = {0};
+    CHECK(FSRead(mode_bytes, 2, mode_file) == 2 && !memcmp(mode_bytes, "bc", 2));
+    CHECK(FSChMode(mode_file, FSMODE_MODIFY) == FS_OK);
+    CHECK(mode_file->Mode == (FSMODE_WRITE | FSMODE_MODIFY) && FSTell(mode_file) == 3);
+    CHECK(FSWrite("WXYZ", 4, mode_file) == 3 && FSFileLength(mode_file) == 6);
+    CHECK(FSChMode(mode_file, FSMODE_APPEND) == FS_OK && FSTell(mode_file) == 6);
+    CHECK(mode_file->Mode == (FSMODE_WRITE | FSMODE_APPEND));
+    CHECK(FSSeek(mode_file, 0, SEEK_SET) == FS_OK);
+    CHECK(FSChMode(mode_file, FSMODE_APPEND | FSMODE_NOGROW) == FS_OK);
+    CHECK(FSWrite("!", 1, mode_file) == 0 && FSFileLength(mode_file) == 6);
+    CHECK(FSChMode(mode_file, FSMODE_APPEND) == FS_OK);
+    CHECK(FSWrite("!", 1, mode_file) == 1 && FSTell(mode_file) == 7);
+    CHECK(FSChMode(mode_file, FSMODE_WRITE) == FS_OK && FSFileLength(mode_file) == 7);
+    CHECK(FSSeek(mode_file, 2, SEEK_SET) == FS_OK && FSWrite("Q", 1, mode_file) == 1);
+    CHECK(FSFileLength(mode_file) == 3);
+    protected_media = 1;
+    CHECK(FSChMode(mode_file, FSMODE_READ) != FS_OK);
+    CHECK(mode_file->Mode == FSMODE_WRITE && FSTell(mode_file) == 3);
+    protected_media = 0;
+    CHECK(FSChMode(mode_file, FSMODE_READ) == FS_OK);
+    CHECK(FSSeek(mode_file, 0, SEEK_SET) == FS_OK);
+    CHECK(FSRead(mode_bytes, sizeof mode_bytes, mode_file) == 3);
+    CHECK(!memcmp(mode_bytes, "abQ", 3));
+    CHECK(FSChAttr(mode_file, FSATTR_RDONLY) == FS_OK);
+    CHECK(FSChMode(mode_file, FSMODE_MODIFY) == FS_CANTWRITE && mode_file->Mode == FSMODE_READ);
+    CHECK(FSChMode(mode_file, 0x4000) == FS_ERROR && mode_file->Mode == FSMODE_READ);
+    CHECK(FSChMode(NULL, FSMODE_WRITE) == FS_ERROR);
+    CHECK(FSChAttr(mode_file, 0) == FS_OK);
+    CHECK(FSClose(mode_file) == FS_OK && FSDelete("MODE.TXT") == FS_OK);
+    handle_file = &metadata_only;
+    CHECK(FSGetFileFromHandle(3, &handle_file) == FS_INVHANDLE && handle_file == &metadata_only);
+    // Identity-only replacement inspection must not mount/flush a new card.
+    // Exercise the actual namespace and FatFs with a blank replacement, then
+    // restore the original FAT bytes: old handles stay invalid in both cases.
+    CHECK(FSInit() == FS_OK && FSVolumeMounted(0) && !FSVolumeMounted(1));
+    CHECK(FSVolumeInserted(0) == FS_OK && FSVolumeInserted(4) == FS_BADVOLUME);
+    FS_FILE *compat_file, *compat_directory;
+    CHECK(FSOpen("NEW.TXT", FSMODE_MODIFY, &compat_file) == FS_OK);
+    CHECK(FSOpenDir("/", &compat_directory) == FS_OK);
+    memcpy(saved_disk, disk, sizeof disk);
+    CHECK(FSWrite("old", 3, compat_file) == 3);
+    fd = hpclang_namespace_open("NEW.TXT", O_RDWR);
+    old_directory = hpclang_stream_directory_open("/");
+    CHECK(fd >= 0 && old_directory != NULL);
+    CHECK(hpclang_namespace_write(fd, "old", 3) == 3);
+    uint8_t raw_identity[16];
+    memset(raw_identity, 0x22, sizeof raw_identity);
+    CHECK(hpclang_namespace_owned_card_identity(NULL) == -1 && errno == EFAULT);
+    identity_error = 1;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == EIO);
+    for (unsigned i = 0; i < sizeof raw_identity; ++i)
+        CHECK(raw_identity[i] == 0x22);
+    identity_error = 0;
+    before_removal = media_writes;
+    inserted_media = 0;
+    CHECK(FSVolumeInserted(0) == FS_NOCARD && FSVolumeMounted(0));
+    unsigned stale_mode = compat_file->Mode;
+    CHECK(FSChMode(compat_file, FSMODE_READ) == FS_INVHANDLE && compat_file->Mode == stale_mode);
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == ENODEV);
+    CHECK(raw_identity[0] == 0x22);
+    memset(disk, 0, sizeof disk);
+    card_identity = 0x91;
+    inserted_media = 1;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == 0);
+    CHECK(raw_identity[0] == 0x91 && raw_identity[15] == 0x91);
+    CHECK(FSVolumeInserted(0) == FS_CHANGED && FSVolumeInserted(0) == FS_CHANGED);
+    CHECK(FSInit() == FS_OK && FSVolumeInserted(0) == FS_CHANGED);
+    FS_FILE *rejected = compat_file;
+    CHECK(FSOpen("NEW.TXT", FSMODE_READ, &rejected) == FS_CHANGED && rejected == NULL);
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == 0);
+    CHECK(hpclang_namespace_read(fd, &old_byte, 1) == -1 && errno == EBADF);
+    CHECK(hpclang_namespace_write(fd, "bad", 3) == -1 && errno == EBADF);
+    CHECK(hpclang_stream_directory_read(old_directory, &dir_entry) == -1 && errno == EBADF);
+    CHECK(media_writes == before_removal);
+    unsigned volume_count = 99;
+    CHECK(hpclang_stream_volume_count(&volume_count) == -1 && errno == ENODEV);
+    CHECK(volume_count == 99);
+    inserted_media = 0;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == ENODEV);
+    memcpy(disk, saved_disk, sizeof disk);
+    inserted_media = 1;
+    card_identity = 0x58;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == 0 && raw_identity[0] == 0x58);
+    CHECK(FSVolumeInserted(0) == FS_OK);
+    char adapter_byte = '?';
+    CHECK(FSRead(&adapter_byte, 1, compat_file) == 0 && adapter_byte == '?');
+    CHECK(FSClose(compat_file) == FS_INVHANDLE);
+    CHECK(FSClose(compat_directory) == FS_INVHANDLE);
+    CHECK(hpclang_stream_volume_count(&volume_count) == 0 && volume_count == 1);
+    CHECK(hpclang_namespace_read(fd, &old_byte, 1) == -1 && errno == EBADF);
+    CHECK(hpclang_namespace_close(fd) == -1 && errno == EBADF);
+    CHECK(hpclang_stream_directory_close(old_directory) == -1 && errno == EBADF);
+    CHECK(media_writes == before_removal);
+    fresh = hpclang_namespace_open("NEW.TXT", O_RDONLY);
+    CHECK(fresh >= 0 && hpclang_namespace_read(fresh, persisted, 3) == 3);
+    CHECK(memcmp(persisted, "new", 3) == 0);
+    CHECK(hpclang_namespace_close(fresh) == 0);
+    // Restart adopts a replacement and closes only adapter resources. A clean
+    // descriptor survives an ordinary same-card restart; cwd returns to root.
+    fresh = hpclang_namespace_open("NEW.TXT", O_RDONLY);
+    CHECK(fresh >= 0);
+    CHECK(FSMkdir("SUB") == FS_OK && FSChdir("SUB") == FS_OK);
+    CHECK(FSOpen("/NEW.TXT", FSMODE_READ, &compat_file) == FS_OK);
+    CHECK(FSOpenDir("/", &compat_directory) == FS_OK);
+    CHECK(FSRestart() == FS_OK);
+    char *cwd = FSGetcwd(0);
+    CHECK(cwd && strcmp(cwd, "\\") == 0);
+    free(cwd);
+    CHECK(hpclang_namespace_read(fresh, persisted, 3) == 3);
+    CHECK(hpclang_namespace_close(fresh) == 0);
+    inserted_media = 0;
+    CHECK(FSVolumeInserted(0) == FS_NOCARD);
+    inserted_media = 1;
+    card_identity = 0xab;
+    CHECK(FSVolumeInserted(0) == FS_CHANGED);
+    CHECK(FSRestart() == FS_OK && FSVolumeInserted(0) == FS_OK);
+    CHECK(FSShutdown() == FS_OK && FSShutdown() == FS_OK);
     hpclang_storage_shutdown();
+    unsigned previous_acquires = controller_acquires;
+    CHECK(hpclang_namespace_owned_card_identity(raw_identity) == -1 && errno == EBUSY);
+    CHECK(controller_acquires == previous_acquires);
     CHECK(reset_calls > 0 && caller_irq_state == UINT32_C(0x60000010));
     unsigned previous_resets = reset_calls;
     caller_irq_state |= UINT32_C(0xc0);

@@ -6,10 +6,12 @@ permissions:
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "examples/declarative-ui/**"
       - "examples/declarative-ui-cpp/**"
       - "examples/notebook/**"
+      - "examples/timer-cpp/**"
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
@@ -60,6 +62,7 @@ on:
       - "examples/declarative-ui/**"
       - "examples/declarative-ui-cpp/**"
       - "examples/notebook/**"
+      - "examples/timer-cpp/**"
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"

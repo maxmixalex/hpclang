@@ -14,3 +14,7 @@ drawing a screen. `owned_object::receive()` accepts any ordinary C snapshot
 producer through a lambda; errors retain the old snapshot and `errno`.
 `object-store.hpp` supplies standard `unique_ptr` owners for directory handles
 and iterators. Their destruction closes the resource while preserving `errno`.
+
+`port.hpp` adds the same ownership pattern for native Port 0 metadata. The
+example enumerates its independent snapshot where available, without changing
+port objects. Errors other than unsupported context remain failures.

@@ -20,6 +20,39 @@ SPEC.loader.exec_module(CHECK)
 
 
 class MigrationTests(unittest.TestCase):
+    def test_window_borrowing_distinguishes_internal_text_and_caller_strings(self):
+        source = (
+            "copy(win_text_get_text(w));\n"
+            "win_choose_add(w, local);\n"
+            "win_choose_add_with_label(w, option, label);\n"
+            "copy(win_choose_get_choice(w));\n"
+            "// win_text_get_text(w);\n"
+            'const char *s = R"(win_choose_add(w, option);)";\n'
+            "my_win_text_get_text(w); win_choose_additional(w);\n"
+            "win_text_get_\\\ntext /* comment */ (w);\n"
+        )
+        rows = CHECK.scan(source, "widgets.cpp")
+        self.assertEqual(
+            [(r["rule"], r["line"], r["column"]) for r in rows],
+            [("HP014", 1, 6), ("HP015", 2, 1), ("HP015", 3, 1), ("HP015", 4, 6), ("HP014", 8, 1)],
+        )
+        self.assertIn("next window call", rows[0]["message"])
+        self.assertIn("use win_text_set_text for growth", rows[0]["message"])
+        self.assertIn("rather than copying", rows[1]["message"])
+        self.assertIn("does not transfer ownership", rows[3]["message"])
+
+    def test_raw_address_translation_requires_design_review(self):
+        rows = CHECK.scan("sys_map_v2p(ptr);\nsys_map_p2v(address);\n", "legacy.c")
+        self.assertEqual(
+            [(r["rule"], r["line"], r["column"]) for r in rows], [("HP013", 1, 1), ("HP013", 2, 1)]
+        )
+        self.assertTrue(all("not public hpclang APIs" in r["message"] for r in rows))
+        self.assertTrue(all("fixed address offset" in r["message"] for r in rows))
+
+    def test_address_translation_ignores_text_and_other_names(self):
+        source = '// sys_map_v2p(p);\n"sys_map_p2v(a)"; my_sys_map_v2p(p);\n'
+        self.assertEqual(CHECK.scan(source, "legacy.cpp"), [])
+
     def test_excluded_directories_are_not_entered(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

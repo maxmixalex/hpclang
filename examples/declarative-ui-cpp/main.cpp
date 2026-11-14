@@ -1,5 +1,5 @@
 #include "app.hpp"
-#include <hpclang/ui-surface.h>
+#include <hpclang/ui-surface.hpp>
 #include <hpclang/device.h>
 #include <hpclang/time.hpp>
 #include <cerrno>
@@ -67,16 +67,16 @@ int main()
     void *storage = std::malloc(bytes);
     auto *ui = storage ? hpclang_ui_init(storage, bytes, capacity) : nullptr;
     const hpclang_ui_surface_style style{&counter_font, 255, 0, 128, 255, 1, 1, 1, 0, 0, 0};
-    auto *renderer =
-        hpclang_ui_surface_create(device->display_width, device->display_height, 2, &style, 1, 0);
+    hpclang::owned_ui_surface renderer{
+        hpclang_ui_surface_create(device->display_width, device->display_height, 2, &style, 1, 0)};
     int result = 1;
     if (ui && renderer && hpclang_display_begin(2) == 0) {
-        result = run(ui, renderer, device);
+        result = run(ui, renderer.get(), device);
         hpclang_display_end();
     }
     if (ui)
         hpclang_ui_shutdown(ui);
-    hpclang_ui_surface_destroy(renderer);
+    renderer.reset();
     std::free(storage);
     return result;
 }

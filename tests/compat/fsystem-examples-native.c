@@ -16,9 +16,10 @@ int __real_FSClose(FS_FILE *file);
 int __real_FSCloseAndDelete(FS_FILE *file);
 int __real_FSRename(char *oldname, char *newname);
 int __real_FSGetNextEntry(FS_FILE *entry, FS_FILE *directory);
+int __real_FSShutdown(void);
 
 volatile uint32_t hpclang_e2e_result;
-static unsigned failure, phase, waits, pages, entries, writes, closes, deletes, renames;
+static unsigned failure, phase, waits, pages, entries, writes, closes, deletes, renames, shutdowns;
 static const char modified[] = "Hello HP49G+\nAppended string";
 
 static void require(int condition, unsigned code)
@@ -143,6 +144,13 @@ int __wrap_FSRename(char *oldname, char *newname)
     ++renames;
     return result;
 }
+int __wrap_FSShutdown(void)
+{
+    int result = __real_FSShutdown();
+    require((phase == 1 || phase == 2) && result == FS_OK, 30);
+    ++shutdowns;
+    return result;
+}
 int main(void)
 {
     if (mailbox(UINT32_C(0x46520032), UINT32_C(0x464b0032)))
@@ -175,6 +183,10 @@ int main(void)
     require(historical_write_main() == 0, 24);
     phase = 0;
     require(writes == 3 && closes == 2 && deletes == 1 && renames == 1 && waits == 4, 25);
+    require(shutdowns == 2, 31);
+    /* The original program has shut down and reset its current directory.
+     * Reinitialize only for independent post-program inspection. */
+    require(FSInit() == FS_OK && FSChdir("Test Dir") == FS_OK, 32);
     FS_FILE *file = NULL;
     require(FSOpen("Test file 1", FSMODE_READ, &file) == FS_NOTFOUND && file == NULL, 26);
     require(FSOpenDir("Subdir", &file) == FS_NOTFOUND && file == NULL, 27);

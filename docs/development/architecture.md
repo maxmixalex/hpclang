@@ -44,6 +44,58 @@ The common runtime owns language/runtime concerns: startup, initialized data and
 
 A platform implementation owns calculator-specific work: native packaging, physical-memory discovery, Saturn-to-ARM transition, MMU setup, boot-info construction, state restoration, stock-system integration, and low-level services.
 
+## Independent Stock launcher evaluation
+
+An owned launcher could remove the user's separate library-275 installation
+step. This is a concrete packaging benefit, especially for a first application;
+the existing library is shared, so its size is not a per-application cost.
+The application ABI and model-specific HPC1 builds would stay the same.
+
+The current transfer baseline has three different boundaries:
+
+| Family | Current external support | What independence would need to replace |
+| --- | --- | --- |
+| HP39g+/39gs/40gs | Aplet support library and external Aplet packaging assets/tool | ARM entry and allocation support, while preserving Aplet Start/Reset and custom-data persistence |
+| HP48gII | ARMToolbox48 library 275 | Stock-to-ARM entry, page-pool acquisition and matching release |
+| HP49g+/50g | ARMToolbox setup/library support | Stock-to-ARM entry, page-pool acquisition and matching release |
+
+For scale, the 2026-11-04 maintained Notebook entry packages contain a
+1,489-byte HP39gs `LIB275L.000`, a 2,404-byte HP48gII `L275_48`, and a
+7,673-byte HP49g+ `SETUP.BIN`. These are measured transfer artifacts, including
+their respective envelopes/installers, not comparable library bodies or
+resident-memory measurements. The bounded prototype below is not an equivalent
+Notebook package; these numbers do not establish a net size or RAM saving.
+
+Replacing the outer entry is insufficient. `hpclang_armtoolbox_stage1` currently
+consumes a preallocated page pool and coarse L2 table. Its return path also
+depends on captured Stock state, protected stage0 storage, relocation roots and
+main/Port1 allocation fences. An independent launcher must supply equivalent
+contracts and retain cleanup on rejected startup, ordinary exit and application
+failure. It would still depend on model-specific original-ROM entry and return
+behavior; removing a third-party library does not remove that portability work.
+The synthetic Direct path alone cannot qualify a Stock replacement.
+
+The packaging benefit warrants retaining this option. A useful comparison is
+the same Notebook application launched from a clean Stock state without
+library 275, measuring transferred files, resident and peak installation RAM,
+startup cost and settled return against the current packages. HP39 additionally
+needs save/relaunch and copied-Aplet isolation checks. A prototype must preserve
+the HPC1/application service contracts before replacing the current path.
+The repository now includes a bounded HP49g+/HP50g prototype in
+`tests/e2e/independent-hpc1`. It enters ARM from Stock RPL without library 275,
+loads an embedded Thumb HPC1 image through the common bootstrap and returns to
+Stock. The fixture documents model-specific native snapshot checks, including
+unchanged Flash, restored MMU/control state and stack guards. Its isolated
+build check runs in Core CI; build reproducibility alone does not establish
+native execution. This delivery is awaiting combined PR #43 acceptance.
+
+The prototype supplies no native-service context and is not a general
+application loader. HP39 Aplet integration, HP48gII entry and cross-family
+ownership/coexistence remain evaluation work. The migration decision is to
+retain the existing production launchers while evaluating the same Notebook
+application and cleanup contracts described above. No production replacement
+or retirement of the historical dependency is authorized by this prototype.
+
 ## Common bootstrap
 
 The common ARM bootstrap receives a small family-specific launch context, installs the HPC1 virtual layout, enters the application, restores the original mappings and privileged state, and returns to the calculator OS.

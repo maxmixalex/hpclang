@@ -1,6 +1,7 @@
 """Build external examples after relocating an installed SDK."""
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from urllib.parse import unquote, urlsplit
+import zipfile
 import zlib
 
 
@@ -16,6 +19,122 @@ def run(*args, env):
     result = subprocess.run(args, env=env, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
+
+
+def check_cpp_headers(package, work, env):
+    """Compile each installed public C++ header alone with the shipped profile."""
+    source = work / "public header client"
+    source.mkdir()
+    headers = sorted((package / "include/hpclang").glob("*.hpp"))
+    if not headers:
+        raise AssertionError("installed SDK has no public C++ headers")
+    lines = [
+        "cmake_minimum_required(VERSION 3.20)",
+        "project(public_headers LANGUAGES CXX)",
+    ]
+    for header in headers:
+        target = header.stem.replace("-", "_")
+        standard = 20 if header.name == "display.hpp" else 17
+        (source / (target + ".cpp")).write_text(
+            f"#include <hpclang/{header.name}>\n"
+            "#if defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(__GXX_RTTI)\n"
+            '#error "installed embedded profile must disable exceptions and RTTI"\n'
+            "#endif\n"
+            f"static_assert(__cplusplus == {202002 if standard == 20 else 201703}L);\n",
+            encoding="utf-8",
+        )
+        lines.extend(
+            [
+                f"add_library({target} OBJECT {target}.cpp)",
+                f'target_include_directories({target} PRIVATE "{package.as_posix()}/include")',
+                f"set_target_properties({target} PROPERTIES CXX_STANDARD {standard} "
+                "CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)",
+            ]
+        )
+    (source / "CMakeLists.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    build = work / "public header build"
+    run(
+        "cmake",
+        "-S",
+        str(source),
+        "-B",
+        str(build),
+        f"-DCMAKE_TOOLCHAIN_FILE={package / 'cmake/toolchains/hpclang-armv4t.cmake'}",
+        env=env,
+    )
+    run("cmake", "--build", str(build), "--parallel", "2", env=env)
+    print(f"Installed SDK: {len(headers)} standalone C++ headers/profile PASS")
+
+
+def check_sdk_archive(root, prefix, sdk, work, env):
+    archives = [work / "sdk-first.zip", work / "sdk-second.zip"]
+    moved = work / "repacked prefix"
+    for index, location in enumerate((prefix, moved)):
+        if index:
+            prefix.rename(moved)
+            for path in moved.rglob("*"):
+                if path.is_file():
+                    os.utime(path, (1700000000, 1700000000))
+        run(
+            sys.executable,
+            str(root / "tools/package-sdk.py"),
+            "--prefix",
+            str(location),
+            "--output",
+            str(archives[index]),
+            env=env,
+        )
+    if archives[0].read_bytes() != archives[1].read_bytes():
+        raise AssertionError("Nonreproducible SDK distribution archive")
+    with zipfile.ZipFile(archives[0]) as archive:
+        manifest = json.loads(archive.read("hpclang-sdk-manifest.json"))
+        if set(archive.namelist()) != set(manifest["files"]) | {"hpclang-sdk-manifest.json"}:
+            raise AssertionError("SDK archive manifest does not cover every entry")
+        for name, entry in manifest["files"].items():
+            data = archive.read(name)
+            if len(data) != entry["size"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
+                raise AssertionError("SDK archive content mismatch: " + name)
+        archive.extractall(sdk)
+    # Subsequent compilation must use the distributed package, with neither
+    # original installed prefix available as a hidden build dependency.
+    shutil.rmtree(moved)
+    for path in archives:
+        path.unlink()
+    print(
+        f"SDK distribution: {len(manifest['files'])} files, identical archives, extracted build input"
+    )
+
+
+def check_public_docs(package):
+    """Check the inline local links used by the installed Markdown guides."""
+    docs = package / "docs"
+    required = {
+        "getting-started.md",
+        "api-conventions.md",
+        "migration.md",
+        "declarative-ui.md",
+        "memory.md",
+        "licensing.md",
+    }
+    if not all((docs / name).is_file() for name in required):
+        raise AssertionError("SDK is missing a public guide or licensing document")
+    checked = 0
+    for page in sorted(docs.glob("*.md")):
+        source = page.read_text(encoding="utf-8")
+        # Examples contain C++ subscripts/lambdas, not Markdown hyperlinks.
+        source = re.sub(r"(?ms)^```[^\n]*\n.*?^```\s*$", "", source)
+        source = re.sub(r"`+[^`\n]*`+", "code", source)
+        for target in re.findall(r"\[[^\]\n]+\]\(([^)\n]+)\)", source):
+            url = urlsplit(target.strip().strip("<>"))
+            if url.scheme or url.netloc or not url.path:
+                continue
+            path = (page.parent / unquote(url.path)).resolve()
+            if not path.is_relative_to(package.resolve()) or not path.is_file():
+                raise AssertionError(
+                    f"Broken installed documentation link: {page.name} -> {target}"
+                )
+            checked += 1
+    print(f"Installed SDK: public guides and {checked} local documentation links PASS")
 
 
 def check_migration_tool(package, work, env):
@@ -27,7 +146,10 @@ def check_migration_tool(package, work, env):
         "void h() { copy(ints(12, 10)); uints(34, 10); sys_bcd2str(0x1234); }\n"
         "void storage() { FSOpen(name, mode, &file); sat_dir_open(); }\n"
         "void audio() { kos_beep(880, 10, 0); kos_CheckBeepEnd(); }\n"
+        "void addresses() { sys_map_v2p(pointer); sys_map_p2v(address); }\n"
         "void text() { hpg_draw_text(dynamic, 0, 0); hpg_draw_letter_on(g, ch, 0, 0); }\n"
+        "void widgets() { win_text_get_text(w); win_choose_add(w, option); "
+        "win_choose_add_with_label(w, option, label); win_choose_get_choice(w); }\n"
     )
     source.write_text(original)
     result = subprocess.run(
@@ -57,8 +179,14 @@ def check_migration_tool(package, work, env):
         "HP010",
         "HP011",
         "HP011",
+        "HP013",
+        "HP013",
         "HP012",
         "HP012",
+        "HP014",
+        "HP015",
+        "HP015",
+        "HP015",
     ]:
         raise AssertionError(f"Unexpected migration findings: {report}")
     if source.read_text() != original:
@@ -204,8 +332,10 @@ def main():
             str(prefix),
             env=env,
         )
-        prefix.rename(sdk)
+        check_sdk_archive(root, prefix, sdk, work, env)
         package = sdk / "share/hpclang"
+        check_cpp_headers(package, work, env)
+        check_public_docs(package)
         check_migration_tool(package, work, env)
         check_interworking(package, work, env)
         application = work / "external application"
@@ -225,6 +355,7 @@ def main():
         )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
         shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
+        shutil.copytree(package / "examples/timer-cpp", application / "timer-cpp")
         shutil.copytree(package / "examples/hpgcc-window", application / "window")
         shutil.copyfile(application / "window/main.c", application / "window.cpp")
         shutil.copytree(package / "examples/hpgcc-console", application / "console")
@@ -241,6 +372,7 @@ def main():
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
+                "add_subdirectory(timer-cpp)\n"
                 "add_subdirectory(notebook)\nadd_subdirectory(console)\nadd_subdirectory(devices)\n"
                 "hpclang_add_application(numeric_input numeric-input.cpp)\n"
                 "target_compile_features(numeric_input PRIVATE cxx_std_17)\n"
@@ -280,6 +412,7 @@ endforeach()
                 ("objects", "object_cpp"),
                 ("storage", "storage_cpp"),
                 ("timer", "hpgcc_timer"),
+                ("timer-cpp", "timer_cpp"),
                 ("window", "hpgcc_window"),
                 ("console", "hpgcc_console"),
                 ("notebook", "notebook"),
@@ -343,6 +476,7 @@ endforeach()
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
+            ("timer_cpp", build / "timer-cpp"),
             ("hpgcc_window", build / "window"),
             ("window_cpp", build),
             ("widget_c", build),
@@ -502,16 +636,31 @@ endforeach()
         # the same notebook source and packages only its matching launcher.
         for model in ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g"):
             selected = work / f"model-{model}"
+            selected_source = work / f"model-{model}-source"
+            shutil.copytree(package / "examples/notebook", selected_source)
+            aplet_options = []
+            if args.aplet_tool and model in ("hp39gplus", "hp39gs", "hp40gs"):
+                with (selected_source / "CMakeLists.txt").open("a") as source:
+                    source.write(
+                        "\nhpclang_target_aplet(notebook MODEL ${HPCLANG_BUILD_MODEL}"
+                        ' NAME "SDK example" AUTHOR hpclang'
+                        ' TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")\n'
+                    )
+                aplet_options = [
+                    f"-DAPLET_TOOL={args.aplet_tool.resolve()}",
+                    f"-DAPLET_ASSETS={args.aplet_assets.resolve()}",
+                ]
             run(
                 "cmake",
                 "-S",
-                str(package / "examples/notebook"),
+                str(selected_source),
                 "-B",
                 str(selected),
                 "-DCMAKE_BUILD_TYPE=MinSizeRel",
                 f"-DHPCLANG_BUILD_MODEL={model}",
                 f"-DCMAKE_PREFIX_PATH={sdk}",
                 f"-DCMAKE_TOOLCHAIN_FILE={package / 'cmake/toolchains/hpclang-armv4t.cmake'}",
+                *aplet_options,
                 env=env,
             )
             run("cmake", "--build", str(selected), "--parallel", "2", env=env)
@@ -524,7 +673,87 @@ endforeach()
                 >= (build / "notebook/notebook.hpc").stat().st_size
             ):
                 raise AssertionError("HP39 specialization did not reduce notebook code size")
+            # Model specialization changes code generation and packaging. The
+            # universal comparison above does not cover these release files.
+            repeated_source = work / f"model-{model}-second-source"
+            repeated = work / f"model-{model}-second-build"
+            shutil.copytree(selected_source, repeated_source)
+            run(
+                "cmake",
+                "-S",
+                str(repeated_source),
+                "-B",
+                str(repeated),
+                "-DCMAKE_BUILD_TYPE=MinSizeRel",
+                f"-DHPCLANG_BUILD_MODEL={model}",
+                f"-DCMAKE_PREFIX_PATH={sdk}",
+                f"-DCMAKE_TOOLCHAIN_FILE={package / 'cmake/toolchains/hpclang-armv4t.cmake'}",
+                *aplet_options,
+                env=env,
+            )
+            run("cmake", "--build", str(repeated), "--parallel", "2", env=env)
+            if {p.stem for p in (repeated / "notebook-launchers").glob("*.hp")} != {model}:
+                raise AssertionError(f"{model}: repeated build packaged other calculators")
+            outputs = {
+                Path("notebook.hpc"),
+                Path("notebook-launchers") / f"{model}.hp",
+                Path("notebook-launchers/memory.json"),
+            }
+            if aplet_options:
+                bundle = Path("notebook-aplet") / model
+                files = (
+                    "HPGCC000.000",
+                    "HPCRESET.000",
+                    "LIB275L.000",
+                    "HP39DIR.000",
+                    "HP39DIR.CUR",
+                )
+                outputs.update(bundle / name for name in (*files, "footprint.json"))
+                for directory in (selected, repeated):
+                    wrapped = (directory / "notebook-launchers" / f"{model}.hp").read_bytes()
+                    aplet = (directory / bundle / "HPGCC000.000").read_bytes()
+                    if (
+                        not aplet.startswith(b"HP39BinB\x0bSDK example")
+                        or aplet.count(wrapped[8:]) != 1
+                    ):
+                        raise AssertionError(
+                            f"{model}: specialized Aplet launcher identity mismatch"
+                        )
+                    sizes = {name: (directory / bundle / name).stat().st_size for name in files}
+                    footprint = json.loads((directory / bundle / "footprint.json").read_text())
+                    if (
+                        not all(sizes.values())
+                        or footprint["version"] != 1
+                        or footprint["files"] != sizes
+                        or footprint["input_launcher_file_bytes"] != len(wrapped)
+                        or footprint["embedded_launcher_bytes"] != len(wrapped) - 8
+                        or footprint["aplet_file_bytes"] != len(aplet)
+                        or footprint["aplet_non_launcher_bytes"] != len(aplet) - len(wrapped) + 8
+                        or footprint["bundle_file_bytes"] != sum(sizes.values())
+                        or not footprint["excludes"]
+                    ):
+                        raise AssertionError(f"{model}: specialized Aplet footprint mismatch")
+            font_sets = [
+                {
+                    p.relative_to(directory)
+                    for p in directory.rglob("*")
+                    if p.is_file() and "hpclang-fonts" in p.parts and p.suffix in (".c", ".h")
+                }
+                for directory in (selected, repeated)
+            ]
+            if not font_sets[0] or font_sets[0] != font_sets[1]:
+                raise AssertionError(f"{model}: generated font output sets differ or are empty")
+            for relative in sorted(outputs | font_sets[0]):
+                if (selected / relative).read_bytes() != (repeated / relative).read_bytes():
+                    raise AssertionError(f"{model}: nonreproducible release output {relative}")
+            # Keep the installed SDK for subsequent models; completed build
+            # trees are temporary and no longer needed after byte comparison.
+            shutil.rmtree(selected)
+            shutil.rmtree(repeated)
+            shutil.rmtree(repeated_source)
+            shutil.rmtree(selected_source)
         print("Installed SDK: all six model-specific notebook builds PASS")
+        print("Installed SDK: all six model-specific release outputs byte-identical PASS")
         rejected = work / "rejected model application"
         shutil.copytree(package / "examples/notebook", rejected)
         cmake_file = rejected / "CMakeLists.txt"

@@ -3,6 +3,7 @@ name: CI / Core runtime
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "CMakeLists.txt"
       - "examples/**"
@@ -20,6 +21,8 @@ on:
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
       - "tests/e2e/port-recovery/**"
+      - "tests/e2e/independent-entry/**"
+      - "tests/e2e/independent-hpc1/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -36,6 +39,7 @@ on:
       - "tools/package-hp39-aplet.sh"
       - "tools/package-aplet.py"
       - "tools/package-recovery.py"
+      - "tools/package-sdk.py"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
@@ -65,6 +69,8 @@ on:
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
       - "tests/e2e/port-recovery/**"
+      - "tests/e2e/independent-entry/**"
+      - "tests/e2e/independent-hpc1/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -81,6 +87,7 @@ on:
       - "tools/package-hp39-aplet.sh"
       - "tools/package-aplet.py"
       - "tools/package-recovery.py"
+      - "tools/package-sdk.py"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
@@ -181,6 +188,14 @@ jobs:
           clang -O2 .cache/hp39-aplet/sdk/src/hp2aplet.c -o "$host_tool/hp2aplet"
           python3 tests/sdk/check.py --aplet-tool "$host_tool/hp2aplet" \
             --aplet-assets .cache/hp39-aplet/sdk/data
+
+      - name: Verify independent HP50g entry build reproducibility
+        run: python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin"
+
+      - name: Verify independent HPC1 build reproducibility
+        run: |
+          python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp49gplus
+          python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp50g
 
       - name: Build hardware-validation E2E
         run: |

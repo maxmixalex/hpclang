@@ -37,6 +37,28 @@ installation rejects an unresolved Git LFS pointer. Application builds do not
 parse that archive. Font redistribution remains subject to the selected face's
 terms; see the installed `docs/licensing.md` and `runtime/fonts/fonts.zip`.
 
+## Distribute or unpack the SDK
+
+After installation, create a reproducible archive from its prefix:
+
+```sh
+python3 tools/package-sdk.py --prefix /path/to/sdk --output hpclang-sdk.zip
+python3 -m zipfile -e hpclang-sdk.zip /path/to/unpacked-sdk
+```
+
+Use `/path/to/unpacked-sdk` as the prefix in the build commands below. The
+archive contains `share/hpclang` and `hpclang-sdk-manifest.json`, which lists
+file sizes, SHA-256 hashes and normalized file modes. The packer prints the
+archive SHA-256. It excludes the checkout and build directories, uses fixed
+entry timestamps and stores entries without ZIP recompression so archive bytes
+do not depend on source timestamps, installation path or zlib version. The
+bundled font archive remains compressed. Symbolic links in an installation are
+rejected; package a normal `cmake --install` output.
+
+The SDK acceptance check compares two archives after changing the installed
+prefix and timestamps, validates the manifest, removes the original installation
+and builds the external examples from the unpacked distribution.
+
 ## Build the C and C++ examples
 
 Copy `share/hpclang/examples/hello` from the installation to a separate
@@ -227,6 +249,41 @@ return; explicitly reset owners before `exit()` or `_Exit()` if they must close
 before termination.
 Global-object destruction follows the runtime's ordinary exit handling.
 
+## Public API conventions
+
+Use the installed headers as the contract for the SDK revision you build with.
+The C interfaces use `hpclang_` names and opaque handles; C++ helpers live in
+`hpclang` and retain the underlying C service's model and launch requirements.
+Rebuild application sources against the installed SDK. Its source compatibility
+does not make historical HPGCC binaries or private runtime structures compatible.
+The reviewed declarative C UI interface is accepted for M8.2/M8.3; see the
+[UI guide](declarative-ui.md) for its supported behavior and resource scope.
+
+| Boundary | Application rule |
+| --- | --- |
+| Results | Follow each function's declared convention. Status calls commonly return zero or minus one; iterators can return one for an entry and zero for exhaustion. Pointer factories signal failure with null. Do not treat every nonzero result as failure. |
+| Errors | Read `errno` only after the operation signals failure, and save it before cleanup or another call if needed. Success need not clear an earlier error. Output preservation and rollback are guarantees only where the specific API documents them. |
+| Versioned records | Zero-initialize the record, then set its `size` to `sizeof record` and its `version` to that record's named version constant before calling the API. Follow that header's supported-version rules rather than assuming every record uses the same version. |
+| Ownership | Pair each owned C result with its documented release function, or adopt it into the matching C++ owner once. `get()` borrows; `release()` transfers cleanup responsibility. Borrowed callback data, fonts and surfaces must outlive every user. |
+| C++ execution | Use the SDK's C++17, no-exceptions/no-RTTI profile. Callbacks supplied to `noexcept` helpers must not throw. Normal scope exit runs destructors; `exit()` and `_Exit()` do not unwind automatic owners. Explicitly check operations such as stream close when cleanup success matters. |
+| Availability | Device capability queries and per-port operation masks describe implementation and launch context. They do not reserve memory, guarantee media or promise that the next operation succeeds. Check that operation's result, too. |
+
+For example, a port descriptor starts as:
+
+```c
+struct hpclang_port_info info = {0};
+info.size = sizeof info;
+info.version = HPCLANG_PORT_INFO_VERSION;
+if (hpclang_port_query(0, &info) != 0)
+    return -1;
+```
+
+Include `<hpclang/port.h>` for this example. A successful query can report an
+absent port with zero operation masks. Object and port names remain raw
+calculator bytes unless a particular API explicitly specifies UTF-8; ownership
+does not change their encoding. See the [migration guide](migration.md) for
+numeric, text and legacy-call boundaries.
+
 ## Migrate HPGCC source
 
 See the [migration guide](migration.md) for per-interface decisions, precision,
@@ -370,5 +427,15 @@ and HPC1/launcher output. It rejects compile commands referring to the source ch
 or the old install prefix. This establishes build/relocation acceptance;
 calculator launch and return have separate E2E gates.
 Core's installed-SDK gate also builds the historical host tool with Clang
-and verifies both external examples' installable Aplets for all three
+and verifies the external examples' installable Aplets for all three
 HP39 models. The SDK and E2E share both launcher and Aplet packaging tools.
+
+The release checks rebuild Notebook for each of the six models from two
+separate source/build directories. They compare the HPC1 image, matching
+launcher, memory report and generated font sources. When the Aplet tool/assets
+are supplied, the three HP39 model builds also compare their installable Aplet,
+Reset/library/directory companions and footprint report. Each Aplet must embed
+its matching launcher, and reported sizes must match the actual bundle files.
+These checks use the same toolchain and configuration; ELF/debug metadata are
+excluded. Reproducible packaging does not establish runtime resource limits
+or calculator startup/return correctness.

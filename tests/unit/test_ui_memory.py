@@ -228,9 +228,45 @@ class UiMemoryTests(unittest.TestCase):
         report = VERIFY.verify_stage_stack(self.prefix, "hp50g", artifact)
         self.assertEqual(report["observed_bytes"], 3152)
         self.assertEqual(report["stack_top"], top)
+        low = dict(
+            writes=2,
+            minimum=0x08000400,
+            maximum=0x080004FC,
+            minimum_pc=0x100,
+            maximum_pc=0x104,
+        )
+        native = dict(
+            row,
+            mode=19,
+            region=128,
+            minimum=0x08000400,
+            maximum=0x08010000,
+            low_sram=low,
+        )
+        for extra in (native, dict(native, low_sram=None)):
+            trace.write_text(json.dumps(row) + "\n" + json.dumps(extra) + "\n")
+            self.assertEqual(
+                VERIFY.verify_stage_stack(self.prefix, "hp50g", artifact)["observed_bytes"],
+                report["observed_bytes"],
+            )
         for rows in (
             [],
             [row, row],
+            [dict(row, low_sram=None)],
+            [dict(row, unknown=0)],
+            *(
+                [row, dict(native, low_sram=bad)]
+                for bad in (
+                    {},
+                    [],
+                    dict(low, writes=True),
+                    dict(low, writes=101),
+                    dict(low, minimum=0x080003FC),
+                    dict(low, maximum=0x08001000),
+                    dict(low, maximum_pc=-2),
+                    dict(low, unknown=0),
+                )
+            ),
             [dict(row, minimum=top - 4096)],
             [dict(row, maximum=top)],
             [dict(row, writes=0)],
@@ -377,6 +413,18 @@ class UiMemoryTests(unittest.TestCase):
                 VERIFY.verify_allocation(self.prefix, 6)
         invalid_pool = dict(pool, physical_pages=[0x08004000] + pool["physical_pages"][1:])
         save(allocation, invalid_pool)  # a mapped page overlaps only the footer
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_allocation(self.prefix, 6)
+        # An otherwise aligned pool must not claim Stock vectors/mode stacks.
+        invalid_pool = dict(pool, physical_pages=[0x08000000] + pool["physical_pages"][1:])
+        save(allocation, invalid_pool)
+        with self.assertRaises(AssertionError):
+            VERIFY.verify_allocation(self.prefix, 6)
+        # Even an unmapped allocation header cannot occupy that native page.
+        invalid = dict(
+            allocation, pointer=0x08001000, usable_bytes=0x3000, unmapped_usable_bytes=0x1000
+        )
+        save(invalid, dict(pool, native_os_block=invalid["pointer"]))
         with self.assertRaises(AssertionError):
             VERIFY.verify_allocation(self.prefix, 6)
         save(allocation)
