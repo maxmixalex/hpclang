@@ -1,5 +1,15 @@
 # M8 validation history
 
+### 2026-11-14 — Independent HPC1 isolated-build dependency repair
+
+Core CI job 132401987116 in run 43579804552 fails at head `00fb45ac`:
+the isolated fixture copies `abi.h` but omits its new `image-capabilities.h`
+dependency. The same HP49g+ command reproduces the missing-header failure locally.
+Adding the header to the hashed/copied INPUTS manifest fixes both maintained
+HP49g+ and HP50g checks: each compares seven outputs from two isolated source
+copies byte-for-byte. No runtime or launcher implementation changes. This is
+build reproducibility evidence, not new native execution.
+
 ### 2026-11-14 — M8.2/M8.3 accepted under approved resource scope
 
 The user deferred comprehensive Stock stack-capacity and whole-system worst-case

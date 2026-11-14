@@ -17,6 +17,7 @@ INPUTS = (
     "tests/e2e/independent-entry/build.py",
     "tests/e2e/independent-entry/entry.S",
     "include/hpclang/abi.h",
+    "include/hpclang/image-capabilities.h",
     "include/hpclang/bootstrap.h",
     "runtime/bootstrap/mmu.c",
     "runtime/bootstrap/run.c",
