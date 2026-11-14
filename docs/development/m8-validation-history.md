@@ -1,5 +1,26 @@
 # M8 validation history
 
+## Independent allocation follow-up and CI — 2026-11-14
+
+Local `6992505a` adds a paused main-RPL page borrow. HP50g original Stock
+without library 275 yields 28 pages (112 KiB); page-end trial writes are restored,
+RPL bounds stay unchanged, and independent saved-map/entry/return checks pass.
+Ten corrupted snapshots are rejected. The default entry package is byte-identical
+to its accepted native fixture; isolated build reproducibility passes. This is
+not a combined KOS/RPL Notebook budget or native-service coexistence claim.
+Report: `/work/nov14-independent-rpl-pool-live/verified.json`.
+
+Submitted #46 head `437d45f7` fails Quality because two Python files were formatted
+without the repository's 100-column configuration. Repository-configured checks
+now pass locally. Objects jobs 132481639649 and 132481639748 fail on HP39gs before
+application entry: directory transfer succeeds, then the payload has no acknowledged
+progress for 90 seconds (send windows 36 and 3 respectively). The downloaded
+Kermit gate/debug logs establish the transfer phase, not its root cause.
+Runtime/platform/tools and both object fixtures are unchanged from accepted main.
+Artifacts: `research/nov14-pr46-composite` and `research/nov14-pr46-catalog`.
+These failures remain unresolved observations; they are not application test passes.
+
+
 ## M8.4 final acceptance — 2026-11-14
 
 M8.4 is accepted complete on main `38e9472a` through #43. The five original
