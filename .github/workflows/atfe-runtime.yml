@@ -21,6 +21,7 @@ on:
       - "tests/e2e/main.c"
       - "tests/e2e/port-recovery/**"
       - "tests/e2e/independent-entry/**"
+      - "tests/e2e/independent-hpc1/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -67,6 +68,7 @@ on:
       - "tests/e2e/main.c"
       - "tests/e2e/port-recovery/**"
       - "tests/e2e/independent-entry/**"
+      - "tests/e2e/independent-hpc1/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -186,6 +188,9 @@ jobs:
 
       - name: Verify independent HP50g entry build reproducibility
         run: python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin"
+
+      - name: Verify independent HPC1 build reproducibility
+        run: python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin"
 
       - name: Build hardware-validation E2E
         run: |

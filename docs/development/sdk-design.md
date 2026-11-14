@@ -1817,7 +1817,7 @@ The current evidence separates three layers:
   entry and RPL return without library 275, owned stack/storage and privileged
   IRQ/FIQ masking/restoration. Two-copy builds and native corrupt-snapshot checks
   are reproducible from the repository.
-- The local HPC1-connected experiment uses `stage-image.c` validation and the
+- The maintained `tests/e2e/independent-hpc1` experiment uses `stage-image.c` validation and the
   shared `runtime/bootstrap/{mmu.c,run.c,enter.S,sync.S}` implementation. A
   380-byte Thumb payload returns 42, with expected boot/data contents, restored
   L1 slots and SWI vector, RPL return and unchanged Flash. Its six backing pages
@@ -1829,8 +1829,11 @@ The current evidence separates three layers:
 - This experiment supplies zero `saturn_state` and `platform_cookie`. It therefore
   has no production native mutation fence, HP39 portal or established relocation
   roots. Successful compute-and-return execution does not qualify object/file/UI
-  service coexistence. Its build/run drivers are still local research inputs;
-  promotion to a maintained HPC1 fixture is an outstanding reproducibility task.
+  service coexistence. The maintained builder reproduces the executed package
+  byte for byte; two isolated source copies reproduce all six artifacts and
+  their manifest. The maintained verifier accepts the matching native snapshot
+  and rejects fifteen corrupted copies. Core CI includes build reproducibility;
+  the native USB run remains a separate locally executed gate.
 
 The family assessment follows the existing implementation, rather than assuming
 that the HP50g entry addresses or page ownership transfer unchanged:

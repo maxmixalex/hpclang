@@ -17,8 +17,8 @@ def word(value, width=5):
 
 
 def code_for(size, offset):
-    if size < 8 or size % 8 or size > 32768:
-        raise ValueError("payload must contain 1..4096 complete eight-byte blocks")
+    if size < 8 or size % 8 or size > 65536:
+        raise ValueError("payload must contain 1..8192 complete eight-byte blocks")
     # HP50g SAVE, capture PC, then copy into the program object's reserved RAM.
     code = "8f" + word(0x679B) + "20" + "81b5"
     code += "da" + "34" + word(offset) + "c2" + "134"
