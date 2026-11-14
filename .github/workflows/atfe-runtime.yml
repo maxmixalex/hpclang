@@ -3,6 +3,7 @@ name: CI / Core runtime
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "CMakeLists.txt"
       - "examples/**"
