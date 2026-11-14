@@ -37,6 +37,7 @@ def main():
     parser.add_argument("--toolchain", type=Path, required=True, help="LLVM bin directory")
     parser.add_argument("--output", type=Path, required=True, help="new output directory")
     parser.add_argument("--bootstrap-sync", type=Path, help="shared runtime/bootstrap/sync.S")
+    parser.add_argument("--probe-source", type=Path, help="alternative bounded experiment body")
     args = parser.parse_args()
     root = args.output.resolve()
     root.mkdir(parents=True, exist_ok=False)
@@ -45,6 +46,8 @@ def main():
     sync = args.bootstrap_sync or Path(__file__).resolve().parents[3] / "runtime/bootstrap/sync.S"
     inputs = {name: source / name for name in ("entry.S", "probe.c", "link.ld", "build.py")}
     inputs["bootstrap-sync.S"] = sync
+    if args.probe_source:
+        inputs["probe.c"] = args.probe_source.resolve()
     common = [
         str(tool / "clang"),
         "--target=arm-none-eabi",

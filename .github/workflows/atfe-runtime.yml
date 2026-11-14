@@ -22,6 +22,7 @@ on:
       - "tests/e2e/main.c"
       - "tests/e2e/port-recovery/**"
       - "tests/e2e/independent-entry/**"
+      - "tests/e2e/independent-pool/**"
       - "tests/e2e/independent-hpc1/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
@@ -70,6 +71,7 @@ on:
       - "tests/e2e/main.c"
       - "tests/e2e/port-recovery/**"
       - "tests/e2e/independent-entry/**"
+      - "tests/e2e/independent-pool/**"
       - "tests/e2e/independent-hpc1/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
@@ -191,6 +193,12 @@ jobs:
 
       - name: Verify independent HP50g entry build reproducibility
         run: python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin"
+
+      - name: Build independent Stock allocation experiment
+        run: |
+          python3 tests/e2e/independent-entry/build.py --toolchain "$ATFE/bin" \
+            --probe-source tests/e2e/independent-pool/probe.c \
+            --output "$RUNNER_TEMP/independent-pool"
 
       - name: Verify independent HPC1 build reproducibility
         run: |

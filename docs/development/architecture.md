@@ -135,8 +135,17 @@ its arena is serialized inside that copied blob. Even the HP39 image plus the
 minimal 12 code + 4 RW + 1 MMU pages exceeds that copy limit, before entry code,
 alignment and its separate stack. HP50 code alone exceeds it. Simply expanding
 the fixture's one-code-page/four-RW-page constants cannot launch this application.
-The next bounded implementation step is to acquire the page pool outside the
-serialized/copied payload, with matching cleanup on failure and return. Then
+The first external-pool experiment is implemented in
+`tests/e2e/independent-pool`. A fresh HP50g Stock run without library 275 obtains
+8 and 16 aligned pages through KOS service 201 (heap `0x100`), writes/reads page
+ends, and releases each block through service 101. Requests for 135,167 bytes
+and 1 MiB fail normally; a subsequent small allocation reuses the first pointer.
+Original interrupt/control state, SWI vector, code/stack guards, RPL return and
+unchanged Flash pass the independent snapshot verifier. Ten corrupted results
+are rejected. Report: `/work/nov14-independent-pool-live/verified.json`.
+This is one baseline, not a universal KOS capacity bound. It does not provide the
+32-page HP50g Notebook minimum, so the next step is an owned RPL-backed pool or
+another demonstrated allocation source, with matching failure/return cleanup. Then
 connect the captured Stock context and service fences to a service-capable
 HP49/50 Notebook prototype, followed by HP48gII entry/allocation and the HP39
 Aplet data boundary. Compare identical application

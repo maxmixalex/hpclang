@@ -30,7 +30,9 @@ def mapping(ram, flash):
             require(0 <= index < len(words), "mapping table out of bounds")
             physical = words[index] + (addr & 4095) // 2
             data, offset = (
-                (ram, physical - 0x08000000) if physical >= 0x08000000 else (flash, physical)
+                (ram, physical - 0x08000000)
+                if physical >= 0x08000000
+                else (flash, physical)
             )
             require(0 <= offset < len(data), "mapped byte out of bounds")
             return (data[offset] >> (4 * (addr & 1))) & 15
@@ -60,7 +62,7 @@ def no_toolbox(ram, flash):
     return nib, word, count
 
 
-def verify(artifact, root, baseline):
+def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check=None):
     flash = (root / "flash").read_bytes()
     require(
         hashlib.sha256(flash[:0x140000]).hexdigest() == ROM_SHA256,
@@ -88,7 +90,7 @@ def verify(artifact, root, baseline):
     )
     meta = json.loads((artifact / "metadata.json").read_text())
     symbols = meta["symbols"]
-    marker = struct.pack("<I", 0x48504343)
+    marker = struct.pack("<I", marker_value)
     hits = [i for i in range(len(ram) - 3) if ram.startswith(marker, i)]
     candidates = []
     expected = bytes.fromhex(meta["blob"])
@@ -101,25 +103,29 @@ def verify(artifact, root, baseline):
     require(start % 4 == 0, "start % 4 == 0")
     physical = 0x08000000 + start
     result = struct.unpack_from("<134I", ram, start + symbols["workspace"])
-    checksum = 0x12345678
-    for i in range(128):
-        value = ((i % 32) * 0x10203 + 7) ^ (i * 0x01010101)
-        require(result[6 + i] == value, "result[6 + i] == value")
-        checksum = (checksum << 3 | checksum >> 29) & 0xFFFFFFFF ^ value
-    require(result[1] == checksum, "result[1] == checksum")
     low, high = (physical + symbols["stack_start"], physical + symbols["stack_end"])
-    require(
-        low <= result[2] and result[2] + 128 <= high,
-        "low <= result[2] and result[2] + 128 <= high",
-    )
-    require(
-        low <= result[3] <= result[2] and result[3] % 8 == 0,
-        "low <= result[3] <= result[2] and result[3] % 8 == 0",
-    )
-    require(
-        result[4] == physical + symbols["workspace"] and result[5] == result[4] + 536,
-        "result[4] == physical + symbols['workspace'] and result[5] == result[4] + 536",
-    )
+    if workspace_check is not None:
+        workspace_check(result)
+    else:
+        checksum = 0x12345678
+        for i in range(128):
+            value = ((i % 32) * 0x10203 + 7) ^ (i * 0x01010101)
+            require(result[6 + i] == value, "result[6 + i] == value")
+            checksum = (checksum << 3 | checksum >> 29) & 0xFFFFFFFF ^ value
+        require(result[1] == checksum, "result[1] == checksum")
+        require(
+            low <= result[2] and result[2] + 128 <= high,
+            "low <= result[2] and result[2] + 128 <= high",
+        )
+        require(
+            low <= result[3] <= result[2] and result[3] % 8 == 0,
+            "low <= result[3] <= result[2] and result[3] % 8 == 0",
+        )
+        require(
+            result[4] == physical + symbols["workspace"]
+            and result[5] == result[4] + 536,
+            "result[4] == physical + symbols['workspace'] and result[5] == result[4] + 536",
+        )
     control = struct.unpack_from("<5I", ram, start + symbols["control"])
     require(control[0] & 0xFF == 0x10, "expected unmasked user-mode caller")
     require(control[1] & 0xFF == 0xD0, "C exercise did not mask IRQ/FIQ")
@@ -161,7 +167,9 @@ def verify(artifact, root, baseline):
         "owned_stack_bytes": high - low,
         "cpsr_control": [value & 0xFF for value in control[:3]],
         "swi_vector": list(control[3:]),
-        "program_sha256": hashlib.sha256((artifact / "program.HP").read_bytes()).hexdigest(),
+        "program_sha256": hashlib.sha256(
+            (artifact / "program.HP").read_bytes()
+        ).hexdigest(),
         "state_sha256": {
             name: hashlib.sha256((root / name).read_bytes()).hexdigest()
             for name in ("flash", "sram")
