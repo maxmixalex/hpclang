@@ -5839,3 +5839,21 @@ pass. Temporary installation/archive outputs are removed. Report:
 application or native gates and does not complete M8.6. The preceding submitted
 e5b87c44 has two pending and five queued workflows, eleven queued jobs and no
 reported failure; the documentation fix remains local pending submission.
+
+### 2026-11-14 — Compatibility, ownership and SDK integration
+
+Local ad929ac9 combines filesystem #41 (70563299), the #43/#40 integration,
+and the installed-documentation fix. Changed filesystem runtime/header files
+match #41 exactly; C++ owner headers and all three SDK validation functions
+retain their parent implementations. Only documentation and validation-entry
+conflicts needed manual resolution.
+
+Twenty combined ASan/UBSan ownership, storage, UI, timer, Notebook and exit
+targets pass; the temporary build is removed. The initial driver named a
+nonexistent standalone filesystem-bridge target; that source belongs to the
+tested storage_metadata target. Report: /work/nov14-compat-owners-check/result.json.
+Three document-link regressions, Ruff and strict docs pass. The full SDK gate
+has passed archive identity (4,117 files), nine C++ headers, fourteen document
+links, migration and assembly checks; application builds are still running.
+Log: /work/nov14-sdk-compat-owners-integration.log. This is local integration,
+not completed full-SDK, remote CI, main or milestone acceptance.
