@@ -70,9 +70,7 @@ class StackRegionObserverTests(unittest.TestCase):
             env.pop(name, None)
             if enabled:
                 env[name] = str(path)
-        return subprocess.run(
-            [str(self.binary)], env=env, capture_output=True, text=True
-        )
+        return subprocess.run([str(self.binary)], env=env, capture_output=True, text=True)
 
     def test_native_calls_modes_and_boundaries(self):
         self.assertEqual(self.invoke().returncode, 0)
@@ -89,9 +87,7 @@ class StackRegionObserverTests(unittest.TestCase):
         )
         self.assertEqual(indexed[31, 18]["minimum"], 0x12FFFFC)
         irq = indexed[18, 128]
-        self.assertEqual(
-            (irq["minimum"], irq["maximum"], irq["writes"]), (0x8000664, 0x8007000, 4)
-        )
+        self.assertEqual((irq["minimum"], irq["maximum"], irq["writes"]), (0x8000664, 0x8007000, 4))
         self.assertEqual(
             irq["low_sram"],
             dict(

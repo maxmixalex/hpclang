@@ -46,9 +46,7 @@ def verify(model, flash, trace):
             "minimum_pc",
             "maximum_pc",
         )
-        if not isinstance(row, dict) or any(
-            type(row.get(k)) is not int for k in fields
-        ):
+        if not isinstance(row, dict) or any(type(row.get(k)) is not int for k in fields):
             raise ValueError("malformed stack-region observation")
         if (
             row["version"] != 1
@@ -73,10 +71,7 @@ def verify(model, flash, trace):
                 or any(type(low.get(k)) is not int for k in fields[3:])
                 or not 0 < low["writes"] <= row["writes"]
                 or not 0x08000000 <= low["minimum"] <= low["maximum"] < 0x08001000
-                or not row["minimum"]
-                <= low["minimum"]
-                <= low["maximum"]
-                <= row["maximum"]
+                or not row["minimum"] <= low["minimum"] <= low["maximum"] <= row["maximum"]
                 or any(not 0 <= low[k] < 2**32 for k in ("minimum_pc", "maximum_pc"))
             ):
                 raise ValueError("invalid low SRAM observation")
@@ -101,9 +96,7 @@ def verify(model, flash, trace):
         if observed is None or not observed["minimum"] <= top <= observed["maximum"]:
             raise ValueError(f"missing initializer coverage for mode {mode}")
         low = observed.get("low_sram")
-        if "low_sram" in observed and (
-            low is None or not low["minimum"] <= top <= low["maximum"]
-        ):
+        if "low_sram" in observed and (low is None or not low["minimum"] <= top <= low["maximum"]):
             raise ValueError(f"missing low SRAM initializer coverage for mode {mode}")
         results.append(
             dict(

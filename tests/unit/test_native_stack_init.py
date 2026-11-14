@@ -48,9 +48,7 @@ class NativeStackInitTest(unittest.TestCase):
     def test_reconciliation_is_not_reservation(self):
         result = self.check()
         self.assertEqual(len(result["initializers"]), 5)
-        self.assertTrue(
-            all(x["top_minus_observed_minimum"] == 16 for x in result["initializers"])
-        )
+        self.assertTrue(all(x["top_minus_observed_minimum"] == 16 for x in result["initializers"]))
         self.assertIn("not reserved capacities", result["scope"])
 
     def test_rom_mutations_reject(self):
@@ -88,15 +86,12 @@ class NativeStackInitTest(unittest.TestCase):
     def test_low_sram_excludes_borrowed_stack(self):
         for row in self.rows:
             row["low_sram"] = {
-                k: row[k]
-                for k in ("writes", "minimum", "maximum", "minimum_pc", "maximum_pc")
+                k: row[k] for k in ("writes", "minimum", "maximum", "minimum_pc", "maximum_pc")
             }
             row["maximum"] = 0x08007000
             row["writes"] += 100
         result = self.check()
-        self.assertTrue(
-            all(x["low_sram"]["writes"] == 2 for x in result["initializers"])
-        )
+        self.assertTrue(all(x["low_sram"]["writes"] == 2 for x in result["initializers"]))
         original = self.rows[0]["low_sram"]
         for bad in (
             None,
