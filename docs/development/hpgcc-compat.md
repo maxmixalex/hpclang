@@ -1,6 +1,28 @@
 # HPGCC compatibility inventory
 
-This page records the M7 source-compatibility inventory. Historical names are inputs to the compatibility layer, not automatically names for the hpclang core API. For current implementation status, see [API reference and HPGCC parity](api-reference.md).
+This page records the M7/M8 source-compatibility inventory. Historical names are inputs to the compatibility layer, not automatically names for the hpclang core API. For current implementation status, see [API reference and HPGCC parity](api-reference.md).
+
+## Current M8.4 acceptance map
+
+The five original [M8.4 requirements](roadmap-history.md#m84-historical-source-compatibility)
+remain the acceptance scope. The component narratives below preserve earlier
+checkpoints; their old “pending” statements do not override later accepted
+deliveries. This map distinguishes those deliveries from the current filesystem
+integration, which is still awaiting CI.
+
+| Original requirement | Current implementation/evidence | Remaining gate |
+| --- | --- | --- |
+| Common 59-function HPG surface; maintained keyboard, console/text, system, filesystem and object groups; four-generation ledger | The capability and declaration tables on this page retain source/implementation/evidence links. HPG is accepted at `1e46aa3d`; keyboard, console, numeric, system and object groups retain their individual acceptance records. Filesystem lifecycle, handle, mode and case adapters are implemented in #41, including a pinned 2.0/3 public-interface inventory. | #41's current main integration is not CI accepted. An interface inventory alone does not prove signatures, ABI or semantics. |
+| Compile representative original applications with every source edit recorded | Pinned original 1.1 window and 2.0 filesystem programs have extraction, migration-diff/reversal and relocated-SDK gates; HPGCC3 graphics programs have a separate maintained source gate. The retained roadmap records the representative-source compilation criterion complete. | Preserve these regressions and model limits; do not relabel M7 behavioral ports as original-source tests. |
+| Owned asynchronous `kos_beep`/`kos_CheckBeepEnd`, flags, preemption, busy completion and exit restoration | Accepted in #25 (`752b8999`, main merge `3c484673`); the tone record retains normal/exit/_Exit and Stock interrupt-isolation evidence. | No new tone implementation gap is established by the filesystem work. |
+| RTC tick period, pending/coalescing, query/restore and exit ownership | Accepted at `413e5891`, including six-model Direct/Stock timing and restoration checks. | Retain the documented ownership and model/context contracts. |
+| Useful `win*` adapters where semantics fit; explicit raw KOS/Saturn/MMU migration and unsupported-context errors | Window controls and their native source/geometry/return gates were merged through #11/#12 (`69c2b831`/`67b8e26d`). The persistent event/widget bridge coexists with declarative C UI; raw access is mapped to clean services in the migration guide rather than silent stubs. | The distinct HPGCC3 C++ GUI is not made source-compatible by `win*`; preserve the capability/migration boundaries in the API reference. |
+
+The accepted HPG, tone, RTC and window commits above are ancestors of main
+`2c2477f5`. This is a requirements/evidence reconciliation, not a new native
+execution or blanket historical ABI claim. M8.4 remains open while #41 and the
+final acceptance review are pending. The physical SD-card exercise remains the
+previously approved nonblocking follow-up; it is not a newly introduced gate.
 
 ## Sources and method
 
@@ -316,8 +338,9 @@ the maintained builds byte-for-byte. Eight planning tests, both ARM analysis
 configurations, verifier dispatch and missing-frame rejection pass. Both Stock
 processes 51945/76541 exit 0 with all six models passing for each group.
 Integrated SDK validation also passes (517 byte-identical outputs), including
-the C widget client using `win.h` and `wincore.h`. These are local results;
-CI acceptance remains open.
+the C widget client using `win.h` and `wincore.h`. These local results were
+subsequently accepted through #11/#12 and merged into main as `69c2b831` and
+`67b8e26d`. The merged window delivery does not complete the other M8 stages.
 
 The earlier component snapshots below retain their original validation stage.
 
@@ -1986,7 +2009,7 @@ presence and active-low GPD3 write protection. x50ng models the same pins.
 | --- | --- | --- | --- |
 | Query an absent card, insert it, retry before controller acquisition | HP49g+/HP50g: fresh GPIO sampling; no pin reconfiguration or repeated Stock `CHECKINSERT`. HP39/40 and HP48: `ENOSYS` | `FSVolumeInserted` uses the clean media query | Host register-transition and ownership tests; formal regression accepted on `256e8496` |
 | Observe write protection before acquisition | HP49g+/HP50g: GPD3 sampled per attempt; absent media does not require a protection read | Existing open/attribute/volume adapters inherit the mounted policy | Host polarity/change/error tests; formal regression accepted on `256e8496` |
-| Remove/replace a mounted card and recover stale handles | HP49g+/HP50g: observed absence or transfer failure invalidates the mount; new path operations remount and stale objects fail without flushing old data | Existing stream adapters inherit recovery; broad historical reinitialization adapters remain unimplemented | Host replacement/stale-handle/driver tests and six-model Direct plus HP49/50 Stock Storage pass; formal CI accepted on `56e4a9dd`. The EINT3 extension is accepted on `cada0f2e`: 68 host tests, HP49g+/HP50g Direct/Stock raw-image swap tests and all six CI workflows pass. A manual hardware-check package is provided, with physical execution nonblocking |
+| Remove/replace a mounted card and recover stale handles | HP49g+/HP50g: observed absence or transfer failure invalidates the mount; new path operations remount and stale objects fail without flushing old data | Stream adapters inherit recovery; #41 implements `FSInit`/`FSRestart`/`FSShutdown` and persistent `FS_CHANGED`, with current integration CI pending | Host replacement/stale-handle/driver tests and six-model Direct plus HP49/50 Stock Storage pass; formal CI accepted on `56e4a9dd`. The EINT3 extension is accepted on `cada0f2e`: 68 host tests, HP49g+/HP50g Direct/Stock raw-image swap tests and all six CI workflows pass. A manual hardware-check package is provided, with physical execution nonblocking |
 
 Pre-acquisition sampling and the owned removal latch are separate stages of
 the same media lifecycle. Emulator tests establish stale-handle rejection and
