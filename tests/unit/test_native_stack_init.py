@@ -40,13 +40,17 @@ class NativeStackInitTest(unittest.TestCase):
 
     def check(self):
         return CHECK.verify(
-            "hp50g", self.flash, "\n".join(json.dumps(row) for row in self.rows).encode()
+            "hp50g",
+            self.flash,
+            "\n".join(json.dumps(row) for row in self.rows).encode(),
         )
 
     def test_reconciliation_is_not_reservation(self):
         result = self.check()
         self.assertEqual(len(result["initializers"]), 5)
-        self.assertTrue(all(x["top_minus_observed_minimum"] == 16 for x in result["initializers"]))
+        self.assertTrue(
+            all(x["top_minus_observed_minimum"] == 16 for x in result["initializers"])
+        )
         self.assertIn("not reserved capacities", result["scope"])
 
     def test_rom_mutations_reject(self):
@@ -80,6 +84,34 @@ class NativeStackInitTest(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 self.check()
             self.rows[0][key] = old
+
+    def test_low_sram_excludes_borrowed_stack(self):
+        for row in self.rows:
+            row["low_sram"] = {
+                k: row[k]
+                for k in ("writes", "minimum", "maximum", "minimum_pc", "maximum_pc")
+            }
+            row["maximum"] = 0x08007000
+            row["writes"] += 100
+        result = self.check()
+        self.assertTrue(
+            all(x["low_sram"]["writes"] == 2 for x in result["initializers"])
+        )
+        original = self.rows[0]["low_sram"]
+        for bad in (
+            None,
+            {},
+            dict(original, minimum=0x07FFFFFF),
+            dict(original, maximum=0x08001000),
+            dict(original, writes=103),
+            dict(original, writes=True),
+            dict(original, minimum_pc=-1),
+            dict(original, maximum=original["maximum"] - 1),
+        ):
+            self.rows[0]["low_sram"] = bad
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                self.check()
+        self.rows[0]["low_sram"] = original
 
     def test_other_regions_remain_visible(self):
         self.rows.append(

@@ -4809,3 +4809,27 @@ Long HP39 transfer waits resolved within the same runs without retries. The
 current formatted emulator supersedes the previous single-model experiment's
 binary; the earlier experiment remains historical evidence. No claim closes
 other allocation paths, native exception-stack bounds or whole-system peaks.
+
+
+## 2026-11-14 — Separate low-SRAM stack observations
+
+The region observer retains full 1 MiB summaries and additionally records SP
+assignments in `[0x08000000, 0x08001000)` by CPU mode. This avoids treating a
+switch to borrowed SRAM as consumption of all intervening addresses. The
+initializer verifier validates optional window geometry/counts and stack-top
+coverage; old traces remain readable without gaining new window evidence.
+Twenty observer, initializer and UI-memory tests, Ruff, fresh emulator build
+and strict docs pass.
+
+HP50g and HP39gs Stock UI runs pass pixels, resources and settled return with
+explicit region capture. Independent verification confirms sealed inputs,
+twelve shared firmware hashes, all five initializers/model and trace identity.
+Observed IRQ/FIQ/SVC downward extents are 200/36/104 bytes on HP50g and
+176/0/104 on HP39gs. Zero means no descent observed, not zero required capacity.
+Evidence: `/work/nov14-native-stack-window-live-v2/independent-audit.json`.
+Two local setup omissions (firmware inputs, then the region-capture switch)
+were corrected before this successful matrix. Other models retain earlier
+full-region evidence; fresh low-window runs have not been claimed for them.
+
+This is local executed-path observation, not a reservation proof, whole-system
+transient-memory admission, physical-device qualification or M8 completion.

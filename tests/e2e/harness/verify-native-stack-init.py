@@ -46,7 +46,9 @@ def verify(model, flash, trace):
             "minimum_pc",
             "maximum_pc",
         )
-        if not isinstance(row, dict) or any(type(row.get(k)) is not int for k in fields):
+        if not isinstance(row, dict) or any(
+            type(row.get(k)) is not int for k in fields
+        ):
             raise ValueError("malformed stack-region observation")
         if (
             row["version"] != 1
@@ -62,6 +64,22 @@ def verify(model, flash, trace):
         key = row["mode"], row["region"]
         if key in rows:
             raise ValueError("duplicate mode/region")
+        if "low_sram" in row:
+            low = row["low_sram"]
+            if row["region"] != 128:
+                raise ValueError("low SRAM observation outside SRAM region")
+            if low is not None and (
+                not isinstance(low, dict)
+                or any(type(low.get(k)) is not int for k in fields[3:])
+                or not 0 < low["writes"] <= row["writes"]
+                or not 0x08000000 <= low["minimum"] <= low["maximum"] < 0x08001000
+                or not row["minimum"]
+                <= low["minimum"]
+                <= low["maximum"]
+                <= row["maximum"]
+                or any(not 0 <= low[k] < 2**32 for k in ("minimum_pc", "maximum_pc"))
+            ):
+                raise ValueError("invalid low SRAM observation")
         rows[key] = row
 
     anchor = ANCHORS[model]
@@ -82,6 +100,11 @@ def verify(model, flash, trace):
         observed = rows.get((mode, top >> 20))
         if observed is None or not observed["minimum"] <= top <= observed["maximum"]:
             raise ValueError(f"missing initializer coverage for mode {mode}")
+        low = observed.get("low_sram")
+        if "low_sram" in observed and (
+            low is None or not low["minimum"] <= top <= low["maximum"]
+        ):
+            raise ValueError(f"missing low SRAM initializer coverage for mode {mode}")
         results.append(
             dict(
                 mode=mode,
@@ -91,6 +114,7 @@ def verify(model, flash, trace):
                 observed_minimum=observed["minimum"],
                 top_minus_observed_minimum=top - observed["minimum"],
                 observed_writes=observed["writes"],
+                low_sram=low,
             )
         )
     return dict(

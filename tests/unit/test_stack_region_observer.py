@@ -31,6 +31,9 @@ class StackRegionObserverTests(unittest.TestCase):
             " observe(0x1300000, 0x7704, 31);\n"
             " observe(0x12ffffc, 0x7708, 31); /* crosses a region boundary */\n"
             " observe(0x8001000, 0x18, 18); /* IRQ stack remains separate */\n"
+            " observe(0x800072c, 0x100, 18); /* ROM low stack top */\n"
+            " observe(0x8000664, 0x104, 18); /* low-stack use */\n"
+            " observe(0x8007000, 0x108, 18); /* borrowed SRAM stack */\n"
             " observe(0, 0x10, 19); /* retain invalid-looking SP evidence */\n"
             " observe(0xffffffff, 0x14, 17);\n"
             " return 0; }\n"
@@ -67,7 +70,9 @@ class StackRegionObserverTests(unittest.TestCase):
             env.pop(name, None)
             if enabled:
                 env[name] = str(path)
-        return subprocess.run([str(self.binary)], env=env, capture_output=True, text=True)
+        return subprocess.run(
+            [str(self.binary)], env=env, capture_output=True, text=True
+        )
 
     def test_native_calls_modes_and_boundaries(self):
         self.assertEqual(self.invoke().returncode, 0)
@@ -83,6 +88,21 @@ class StackRegionObserverTests(unittest.TestCase):
             (0x1108000, 0x1109000, 0x7700, 2),
         )
         self.assertEqual(indexed[31, 18]["minimum"], 0x12FFFFC)
+        irq = indexed[18, 128]
+        self.assertEqual(
+            (irq["minimum"], irq["maximum"], irq["writes"]), (0x8000664, 0x8007000, 4)
+        )
+        self.assertEqual(
+            irq["low_sram"],
+            dict(
+                writes=2,
+                minimum=0x8000664,
+                maximum=0x800072C,
+                minimum_pc=0x104,
+                maximum_pc=0x100,
+            ),
+        )
+        self.assertNotIn("low_sram", indexed[31, 17])
         self.assertEqual(indexed[19, 0]["minimum"], 0)
         self.assertEqual(indexed[17, 4095]["maximum"], 0xFFFFFFFF)
         old = [json.loads(line) for line in self.application.read_text().splitlines()]
