@@ -5662,3 +5662,123 @@ SDK/build directories were removed. Ruff and strict docs pass. Report:
 existing owner lifecycle/native and full application SDK gates remain separate.
 The check is integrated into tests/sdk/check.py, but this local follow-up has
 not yet received remote CI. M8.5 remains open.
+
+
+## 2026-11-14 — Independent entry runs a bounded HPC1 program
+
+A local experimental HP50g program embeds a 380-byte Thumb HPC1 payload and
+uses the existing common bootstrap/MMU/cache implementation. All six backing
+pages (code, page tables, boot/data/stack) are inside the RPL program's owned
+reserved storage. On a copied, fingerprint-checked baseline without library
+275, the application returns 42 and writes model 6, 16384 RW bytes and its
+expected data marker. Independent snapshot checks confirm payload/code guards,
+object containment, exact data, RPL return 124275, unchanged Flash, restored
+L1 slots and SWI vector, and unchanged caller CPSR control bits.
+
+Evidence: `/work/nov14-independent-hpc1-live/verified.json`; reproducible local
+build/run/verifier drivers are `research/nov14-independent-hpc1-*.py`.
+This is a bounded embedded HPC1 experiment, not an arbitrary-app loader,
+service-coexistence proof, other-family acceptance or a released launcher.
+
+The experiment exposes a defect in the earlier independent-entry description:
+its outer direct MSR executes in user mode. Recorded CPSR control is 0x10 before
+and after the common bootstrap call, so the outer attempt does not mask IRQ/FIQ.
+The common bootstrap uses its SWI-based save/disable/restore path during HPC1
+execution, but the standalone entry's claimed C-call masking requires a real
+fix and native revalidation. No hardware run is authorized by this finding.
+
+
+## 2026-11-14 — Independent entry masks IRQ/FIQ through shared SWI helpers
+
+The maintained entry now links `runtime/bootstrap/sync.S` and uses its existing
+save/disable/restore routines. A 20-byte owned observation record captures
+caller, C-call and restored CPSR control plus the original/restored SWI vector.
+Fresh HP50g Stock USB execution records `0x10 -> 0xd0 -> 0x10`, both vectors
+`0x0003f568`, valid owned workspace/stack/guards, RPL return 124275 and unchanged
+Flash without library 275. All ten corrupt-snapshot checks reject their inputs.
+Two independent source copies include the shared assembly and produce identical
+artifacts. After formatting-only build-script changes, the final build retains
+identical program/ELF/binary/metadata and passes verification against the actual
+executed snapshot. Program SHA-256:
+`bb5db8b714920e939855894caf952406e54d2ae66370e0ca331d34a792e28234`.
+
+The bounded embedded HPC1 experiment passes a fresh run with the corrected
+entry too: application result 42, expected model/data, owned pages, restored
+L1 mappings/vector, RPL return and unchanged Flash. Outer C control is now
+`0xd0` before/after common bootstrap; entry caller control restores to `0x10`.
+This closes the observed entry defect, not general launcher/service acceptance.
+Reports: `/work/nov14-independent-entry-swi-live/verified-final.json`,
+`/work/nov14-independent-entry-swi-live/negative.json` and
+`/work/nov14-independent-hpc1-swi-live/verified.json`.
+The fix is locally validated; existing #40 CI still tests head 5476624d.
+
+
+## 2026-11-14 — Independent HPC1 prototype on HP49g+
+
+The maintained fixture now selects hp49gplus (model 5) or hp50g (model 6),
+records the target in its build manifest and checks the matching ROM fingerprint
+and boot metadata. Core CI builds both targets twice in isolated source copies.
+Both two-copy comparisons pass locally. The default HP50g transfer package
+remains byte-identical to the executed prototype and its native snapshot still
+passes. Cross-model artifact/snapshot pairings are rejected.
+
+A fresh HP49g+ baseline was booted with boot-49g+.bin and the original shared
+2.15 firmware, without library 275. The first transfer completed but the
+execution verifier rejected it: the factory baseline was in algebraic mode and
+EVAL entered an expression instead of executing the recalled program. The
+failed screen/snapshot remain in /work/nov14-hpc1-hp49-live. A new baseline
+explicitly selected RPN through the existing Stock MODE-form sequence.
+
+The corrected run passes model 5, app result 42, 16 KiB RW, owned six-page arena,
+RPL result 124275, absent library 275, unchanged Flash and restored MMU/SWI/CPSR.
+All fifteen corrupted snapshots reject. Program SHA-256:
+42ae935a06ff0823e300147f847bfd41e1d2abdf3a5c742a3129f8ad6e88f0bf.
+Inputs remain unchanged. Independent two-model/native/build/mismatch audit:
+/work/nov14-hpc1-hp49-live-rpn/independent-audit.json. Ruff and strict docs pass.
+This is local bounded-prototype qualification; arbitrary applications, native
+services and HP39/HP48 independent launch remain unqualified. M8.6 stays open.
+
+
+## 2026-11-14 — Independent-launcher evaluation decision
+
+Reconciled the original M8.6 wording: it requires a connected HPC1 prototype,
+three-family allocation/MMU/root/service/exit evaluation and an explicit
+migration decision/acceptance plan. It does not require retiring ARMToolbox or
+implementing a full independent replacement before the evaluation can finish.
+The retained prototype now has HP49g+/HP50g native evidence; the source-backed
+family assessment and future replacement gates remain in sdk-design.md.
+
+A fresh same-input comparison measures 15,540-byte existing classic transfer
+packages versus 71,148-byte independent packages. Both use the exact respective
+380-byte HPC1 image and 16 KiB application RW contract. The standard layout
+requires twelve pool pages on classic models; HP39 layout-only packages require
+fourteen, including two native pages, before Aplet envelopes. Repeated builds
+match and source/input hashes remain unchanged. These are serialized/layout
+measurements, not total peak-memory savings or new standard-package execution.
+Report: /work/nov14-launcher-comparison.json; temporary repeated builds removed.
+
+The local evaluation decision is to keep current launchers/dependencies as the
+supported default and retain the independent fixture for experiments. Missing
+native context, HP39 portal ownership and HP48 physical-range support prevent
+claiming a replacement. Future rollout tests are distinguished from evaluation
+deliverables. Release resource acceptance, documentation/integration and M8.6
+remote acceptance remain open; no original requirement is removed. Strict docs
+pass.
+
+
+### 2026-11-14 — Reproducible SDK distribution archive
+
+The maintained packer exports an installed source SDK as a deterministic ZIP,
+with normalized timestamps/modes and a complete file-size/SHA-256 manifest.
+The SDK gate now packages twice after relocating the prefix and changing file
+timestamps, checks byte equality and the manifest, then deletes the original
+installation and builds from the unpacked archive. Core CI includes the new
+tool in its path filters.
+
+On the #40 base e3879545, all 4,111 SDK files pass archive verification. The full
+external gate passes C/C++, fonts, 581 byte-identical release outputs, six-model
+Notebook builds and three HP39 C/C++ Aplet families. Three packaging regression
+tests, Ruff and strict docs pass. Temporary installations and archives are
+removed; no ROM or external ARMToolbox binaries enter the archive. Report:
+`/work/nov14-sdk-distribution.json`. This accepts the local archive/installation
+path, not the pending main integration, native resource bounds or all of M8.6.
