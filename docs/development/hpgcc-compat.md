@@ -12,7 +12,7 @@ integration, which is still awaiting CI.
 
 | Original requirement | Current implementation/evidence | Remaining gate |
 | --- | --- | --- |
-| Common 59-function HPG surface; maintained keyboard, console/text, system, filesystem and object groups; four-generation ledger | The capability and declaration tables on this page retain source/implementation/evidence links. HPG is accepted at `1e46aa3d`; keyboard, console, numeric, system and object groups retain their individual acceptance records. Filesystem lifecycle, handle, mode and case adapters are implemented in #41, including a pinned 2.0/3 public-interface inventory. | #41's current main integration is not CI accepted. An interface inventory alone does not prove signatures, ABI or semantics. |
+| Common 59-function HPG surface; maintained keyboard, console/text, system, filesystem and object groups; four-generation ledger | The capability and declaration tables on this page retain source/implementation/evidence links. HPG is accepted at `1e46aa3d`; keyboard, console, numeric, system and object groups retain their individual acceptance records. Filesystem lifecycle, handle, mode and case adapters are implemented in #41, including pinned 2.0/3 inventories and C11/C++17 checks of all 39/41 covered source signatures. | #41's current main integration is not CI accepted. Source signature checks do not establish binary ABI or runtime semantics; those retain separate application/native gates. |
 | Compile representative original applications with every source edit recorded | Pinned original 1.1 window and 2.0 filesystem programs have extraction, migration-diff/reversal and relocated-SDK gates; HPGCC3 graphics programs have a separate maintained source gate. The retained roadmap records the representative-source compilation criterion complete. | Preserve these regressions and model limits; do not relabel M7 behavioral ports as original-source tests. |
 | Owned asynchronous `kos_beep`/`kos_CheckBeepEnd`, flags, preemption, busy completion and exit restoration | Accepted in #25 (`752b8999`, main merge `3c484673`); the tone record retains normal/exit/_Exit and Stock interrupt-isolation evidence. | No new tone implementation gap is established by the filesystem work. |
 | RTC tick period, pending/coalescing, query/restore and exit ownership | Accepted at `413e5891`, including six-model Direct/Stock timing and restoration checks. | Retain the documented ownership and model/context contracts. |
@@ -923,7 +923,10 @@ compile every covered original declaration alongside the current adapter header
 in C11 and C++17. Both compilers are required: C++ also detects argument changes
 hidden by historical C declarations with empty parameter lists. These checks
 pass for all 39/41 covered declarations. Regression tests reject changed return
-types, pointer qualifiers and formerly parameterless functions.
+types, pointer qualifiers and formerly parameterless functions. The existing
+CMake `python_tools` test discovers these checks in CI; a local run of that
+complete Python suite passes all 276 tests without skips. The original archives
+remain caller-supplied inputs to the separate full declaration audit.
 
 Without compiler arguments this remains a lexical inventory. Even with them,
 the check does not establish historical structure layouts, binary ABI, runtime

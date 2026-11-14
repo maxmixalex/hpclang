@@ -30,16 +30,12 @@ def clean(source):
 
 
 def names(source, ending):
-    return set(
-        re.findall(r"\b(FS[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*" + ending, clean(source))
-    )
+    return set(re.findall(r"\b(FS[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*" + ending, clean(source)))
 
 
 def check_signatures(original, required, root, cc, cxx):
     declarations = {}
-    pattern = (
-        r"\b(?:extern\s+)?(?:int|void|char\s*\*)\s*(FS[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*;"
-    )
+    pattern = r"\b(?:extern\s+)?(?:int|void|char\s*\*)\s*(FS[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*;"
     for match in re.finditer(pattern, clean(original)):
         name = match.group(1)
         if name in required:
@@ -69,9 +65,7 @@ def check_signatures(original, required, root, cc, cxx):
             capture_output=True,
         )
         if result.returncode:
-            raise ValueError(
-                language + " original declaration conflict:\n" + result.stderr
-            )
+            raise ValueError(language + " original declaration conflict:\n" + result.stderr)
     return dict(
         declarations=len(declarations),
         languages=["C11", "C++17"],
@@ -111,9 +105,7 @@ def audit(release, archive, root, cc=None, cxx=None):
     if bool(cc) != bool(cxx):
         raise ValueError("provide both --cc and --cxx for declaration checks")
     if cc:
-        result["signatures"] = check_signatures(
-            original.decode("latin1"), required, root, cc, cxx
-        )
+        result["signatures"] = check_signatures(original.decode("latin1"), required, root, cc, cxx)
         result["scope"] = (
             "Declaration/definition inventory and C/C++ source signature compatibility; not ABI, semantics or hardware acceptance."
         )
@@ -124,12 +116,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release", choices=RELEASES, required=True)
     parser.add_argument("--archive", type=Path, required=True)
-    parser.add_argument(
-        "--root", type=Path, default=Path(__file__).resolve().parents[2]
-    )
-    parser.add_argument(
-        "--cc", help="C compiler executable for optional source signature checks"
-    )
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument("--cc", help="C compiler executable for optional source signature checks")
     parser.add_argument("--cxx", help="C++ compiler executable; required with --cc")
     args = parser.parse_args()
     try:
