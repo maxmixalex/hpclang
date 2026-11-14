@@ -353,8 +353,10 @@ On HP39g+, Direct/Stock frame maxima are 13,370/13,301 microseconds and input
 maxima are 614/489 microseconds; both use 18,892 bytes of heap and 2,424 bytes
 of touched application stack. These are measurements of the scripted emulator
 workload. They do not establish hardware deadlines, native exception-stack
-reservations or whole-system transient memory bounds; those retained acceptance
-items remain open. Host tests separately cover every renderer allocation failure
+reservations or whole-system transient memory bounds. Comprehensive Stock
+capacity and worst-case research is deferred; supported-flow memory budgets,
+isolation and failure handling remain acceptance requirements. Host tests
+separately cover every renderer allocation failure
 and the shipped application's cleanup/restart paths.
 
 The device-manager example budgets 48 nodes, 512 text bytes and one asynchronous
