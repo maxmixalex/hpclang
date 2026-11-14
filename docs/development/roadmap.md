@@ -9,7 +9,7 @@ Accepted main: `2a65079f` (#31 native execution-source/guarded repair foundation
 milestone completion are separate states. The [development board](https://github.com/maxmixalex/hpclang/issues/1)
 tracks current tasks; its compact body now matches independent readback.
 
-Container housekeeping (2026-11-14): /work measured 36,434,161,664 allocated bytes (33.93 GiB) before this batch. Removed 109 obsolete CMake intermediate directories containing 187,764,736 allocated file bytes (179.1 MiB), after confirming retained source/configuration and no external symlink or live-process dependencies. Linked outputs and concise reports remain; reconfigure before rebuilding these old directories. No archive was created. Report: /work/nov14-cmake-cleanup-result.json. Previous snapshot cleanup and runtime/HP39 cache deduplication remain recorded in their reports. Retain shared dependencies /work/oct7-next-probe/cpu/dist/runtime-lib and /work/oct25-watchdog-src/.cache/hp39-aplet. Earlier Windows download deletion remains blocked by execution policy.
+Container housekeeping (2026-11-14): removed 109 obsolete CMake intermediate directories (179.1 MiB), then three superseded host-test build directories (258.1 MiB), from inside the container. The latest 180-test ASan/UBSan suite passes. Source trees and concise current reports remain; no live-process or external-symlink dependencies were found and no archive was created. Old binaries require rebuilding. Reports: /work/nov14-cmake-cleanup-result.json and /work/nov14-old-host-cleanup-result.json. Retain shared dependencies /work/oct7-next-probe/cpu/dist/runtime-lib and /work/oct25-watchdog-src/.cache/hp39-aplet. Earlier Windows download deletion remains blocked by execution policy.
 
 Container cleanup (2026-11-13): removed /work/oct30-stage-stack-matrix/runner/build from inside the container after confirming its completed audit, current six-model replacement coverage and absence of active process/external symlink dependencies. Reclaimed 48,915,552 bytes without an archive; source scripts, concise reports, original inputs and shared emulators remain.
 
@@ -120,7 +120,7 @@ without expanding edge-case investigations. Other stages do not wait for
 complete Port2 qualification. Scope and original acceptance conditions remain
 unchanged; sound compatibility is independent of Port2.
 
-CI (2026-11-14): #43 / ba751cad has five successful and two unfinished workflows; 68 jobs pass, two skip, two run and 131 queue, with no reported failure. #45's complete CI-only patch is included in #43, preserving PR/manual and main checks. Thirty-three superseded runs are confirmed cancelled; twenty older HTTP 409 records remain unresolved. Cancellation is not acceptance. Reports: research/nov14-included-ci-cancel.json, nov14-dedup-included-cancel.json and earlier queue reports. #31 is accepted on main; #43 gates remain active.
+CI (2026-11-14): #43 / ba751cad has five successful and two unfinished workflows; 72 jobs pass, two skip, two run and 127 queue, with no reported failure. #45's complete CI-only patch is included in #43, preserving PR/manual and main checks. Thirty-three superseded runs are confirmed cancelled; twenty older HTTP 409 records remain unresolved. Cancellation is not acceptance. Reports: research/nov14-included-ci-cancel.json, nov14-dedup-included-cancel.json and earlier queue reports. #31 is accepted on main; #43 gates remain active.
 
 | Stage / delivery | Current evidence | Next gate |
 | --- | --- | --- |
