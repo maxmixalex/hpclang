@@ -1,5 +1,18 @@
 # M8 validation history
 
+### 2026-11-14 — File-open stack reduction
+
+The read-only create probe now calls FatFs `f_stat(path, NULL)`: it needs only
+existence, and the bundled implementation explicitly accepts a null result.
+This removes an unused long-filename result from the file-open stack frame.
+ARMv4T Thumb soft-float `-Os` reports 344 bytes before and 56 after. The storage
+metadata suite passes under ASan/UBSan, including opening an existing read-only
+file with `O_RDONLY | O_CREAT` and rejecting exclusive creation of that file.
+Report: `/work/nov14-open-stack-check/result.json`; temporary builds are removed.
+This is local validation, not CI acceptance or a new native peak measurement.
+Notebook export retains its previously measured 6656/8192-byte stack usage
+until native revalidation of this follow-up.
+
 ### 2026-11-05 — Backup stack gate and export resource integration
 
 Corrected maximum-length backup run 40278 terminates at the HP48gII resource

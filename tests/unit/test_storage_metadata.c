@@ -286,6 +286,10 @@ int main(void)
     CHECK(hpclang_namespace_path_query("STAMP.TXT", &info) == 0);
     CHECK(info.attributes == (ro | hidden | HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE));
     CHECK(hpclang_namespace_open("STAMP.TXT", O_WRONLY) < 0 && errno == EACCES);
+    int read_created = hpclang_namespace_open("STAMP.TXT", O_RDONLY | O_CREAT);
+    CHECK(read_created >= 0 && hpclang_namespace_close(read_created) == 0);
+    CHECK(hpclang_namespace_open("STAMP.TXT", O_RDONLY | O_CREAT | O_EXCL) < 0 &&
+          errno == EEXIST);
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", 0, ro) == 0);
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", 0, 0x100u) < 0 && errno == EINVAL);
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", ro, hidden) < 0 && errno == EINVAL);

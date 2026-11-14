@@ -372,8 +372,9 @@ int hpclang_namespace_open(const char *path, int flags)
      * FatFs' create method.
      */
     if (access == O_RDONLY && wants_create && !wants_exclusive) {
-        FILINFO info;
-        FRESULT stat_result = f_stat(path, &info);
+        /* Only existence matters. FatFs accepts NULL here; avoid reserving
+         * a long-filename result buffer in every open call's stack frame. */
+        FRESULT stat_result = f_stat(path, NULL);
         if (stat_result == FR_OK)
             method = FA_OPEN_EXISTING;
         else if (stat_result != FR_NO_FILE && stat_result != FR_NO_PATH) {
