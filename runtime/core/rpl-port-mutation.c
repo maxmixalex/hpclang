@@ -498,7 +498,9 @@ int hpclang_rpl_port0_register_library_repaired(
         port |= (uint32_t)a << (4 * i);
         arena_end |= (uint32_t)b << (4 * i);
     }
-    if (port < 0x80000u || arena_end < io->library_table || port < arena_end)
+    /* A catalog record occupies 16 nibbles. Keep the entire destination
+     * interval below the first stationary port record, including its header. */
+    if (port < 0x80000u || arena_end < io->library_table || port < arena_end + 16u)
         return HPCLANG_RPL_MUTATION_MALFORMED;
     const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
     struct hpclang_rpl_library_registration plan;

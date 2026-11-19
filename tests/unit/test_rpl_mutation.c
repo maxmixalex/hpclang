@@ -3280,7 +3280,7 @@ static void test_port0_registration_commit(void)
     const char *library = "04b2062000108510b7000000000000000000000d5c2";
     uint8_t *before = malloc(sizeof memory);
     assert(before);
-    for (unsigned scenario = 0; scenario < 8; ++scenario) {
+    for (unsigned scenario = 0; scenario < 10; ++scenario) {
         struct hpclang_rpl_mutation_io io = setup_catalog_growth();
         put_word(0x80716, 5, 0x93000);
         for (unsigned i = 0; i < 43; ++i)
@@ -3310,9 +3310,19 @@ static void test_port0_registration_commit(void)
             expected = HPCLANG_RPL_MUTATION_INCOMPLETE;
         } else if (scenario == 7)
             ++plan.source.address;
+        else if (scenario >= 8) {
+            /* Even when the source is outside the old arena, catalog growth
+             * must not reach it. Use the exact-fit case as a positive control. */
+            uint32_t port = 0x8300f + (scenario == 8 ? 15u : 16u);
+            memcpy(memory + port, memory + 0x93000, 48);
+            put_word(0x80716, 5, port);
+            assert(hpclang_rpl_library_registration_plan(
+                       &reader, port, 0x100000, &reader, io.library_table,
+                       0x100000 - io.library_table, 123, &plan) == 1);
+        }
         memcpy(before, memory, sizeof memory);
         int result = hpclang_rpl_port0_register_library_repaired(&io, 123, &plan, NULL);
-        if (scenario) {
+        if (scenario && scenario != 9) {
             assert(result == expected && !writes && !memcmp(before, memory, sizeof memory));
         } else {
             assert(!result && writes && get_word(io.library_table, 3) == 3);
@@ -3320,7 +3330,7 @@ static void test_port0_registration_commit(void)
             assert(hpclang_rpl_library_lookup(&reader, io.library_table,
                                               0x100000 - io.library_table, 123, &binding) == 1);
             assert(binding.address == plan.header && !binding.bank_switch && !binding.flags);
-            assert(!memcmp(before + 0x93000, memory + 0x93000, 48));
+            assert(!memcmp(before + plan.source.address, memory + plan.source.address, 48));
             assert(write_trace[writes - 1] == io.library_table + 2);
         }
     }
