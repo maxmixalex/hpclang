@@ -125,6 +125,8 @@ def transfer(
     package_name="recovery.hp",
     consume=False,
     execution_ms=17000,
+    actions="",
+    extra_files=(),
 ):
     if execution_ms < 2000:
         raise ValueError("Execution budget must allow the final checkpoint")
@@ -136,6 +138,8 @@ def transfer(
     send.mkdir()
     if not installed:
         shutil.copyfile(build / package_name, send / "RECOVERY.HP")
+    for file, _ in extra_files:
+        shutil.copyfile(build / file, send / file)
     if remote_commands is None:
         remote_commands = [f"-95 CF HOME '{name}' RCL" if execute else "-95 CF HOME"]
         if consume:
@@ -157,6 +161,7 @@ def transfer(
         "\n".join(prefix)
         + "\n500 capture deposited\n"
         + ("1000 tap eval\n" if execute else "")
+        + actions
         + f"{execution_ms - 2000} capture checkpoint\n{execution_ms} finish-install\n"
     )
     xtty, ktty = recovery / "x50-tty", recovery / "kermit-tty"
@@ -187,6 +192,7 @@ def transfer(
                     str(log),
                     *[token for command in remote_commands for token in ("--remote-host", command)],
                     *([] if installed else [f"RECOVERY.HP={name}"]),
+                    *[f"{file}={remote}" for file, remote in extra_files],
                 ],
                 os.environ,
                 recovery / "transfer.log",

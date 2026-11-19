@@ -256,6 +256,15 @@ exit with the frame leases still held. Evidence and per-launch frame hashes:
 `/work/nov19-save-context-run/audit.json`. Local fixture evidence only;
 production migration, other family qualification and release review remain open.
 
+The repository regression in `tests/e2e/independent-notebook` now reproduces
+this save and relaunch from a fresh HP50g firmware boot. In an offline clean
+container the installed SDK built the Notebook; both processes returned to
+Stock ROM, the native HOME bytes matched `hpclang-notebook/1\n20`, and the
+second editor showed `20` without retransferring the program. The GC witness,
+unchanged Port 1 region and stable Stock frames passed. The Core CI job runs
+the same firmware test and publishes the phase report. Local validation
+passed; remote CI acceptance is pending.
+
 HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
 12 RW and 7 stage/stack/MMU frames (4 KiB each). The 34 aligned RPL slots

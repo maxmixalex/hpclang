@@ -23,6 +23,9 @@ entry:
 #ifdef HPCLANG_PROBE_STOCK_STATE
  ldr r2, [r4, #4] /* Optional third argument: original ARMSYS Saturn state. */
 #endif
+#ifdef HPCLANG_PROBE_STOCK_FRAME
+ mov r3, r4
+#endif
  bl exercise
  mov r0, r5
  bl hpclang_irq_restore
