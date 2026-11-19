@@ -160,6 +160,25 @@ or a lease across Stock native calls. Local per-page audit:
 `/work/nov19-notebook-map/audit.json`; editor, ON exit and settled return passed.
 Evidence: `/work/nov19-notebook-occupancy/runner/build/hp50g-frame-memory-{1,2}.json`.
 
+Independent HP50g admission test (local original ROM without library 275):
+transferred the complete 79,168-byte plain Notebook HPC1 as `NBIMAGE` in HOME;
+the returned snapshot reproduces the installed-SDK image byte-for-byte.
+With that image resident, a fragmented KOS allocation trial held 8+8+4+1
+distinct aligned pages simultaneously (21/35). At peak ownership, RSKTOP
+555966 and DSKTOP 643021 permit only 9 aligned RPL candidates after reserves.
+Even treating all nine as disjoint and usable would leave a five-page deficit
+for this layout; no lease across Stock GC is inferred. Rejected admission
+released all four blocks in reverse order; a fresh eight-page allocation reused
+the first block. The probe returned to RPL with original control/SWI and Flash.
+Per-page owners and acquire/release order: `/work/nov19-resident-kos-gap/proof.json`.
+No Notebook code was entered: save, GC, application exit and reload are still
+open. Repeating with the production 59,210-byte HPCZ encoding (verified to
+expand to identical HPC1 bytes) keeps 21 KOS pages and exposes 14 distinct RPL
+frames at peak, disjoint from the KOS frames in the live Read/Write maps.
+This reaches 35 only numerically: no RPL frame is leased across a native
+service. Next qualify reservation and restoration of this RPL region under GC
+before entering the loader. Report: `/work/nov19-resident-kos-packed-map/proof.json`.
+
 HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
 12 RW and 7 stage/stack/MMU frames (4 KiB each). The 34 aligned RPL slots
