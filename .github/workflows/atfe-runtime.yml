@@ -120,6 +120,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
       - uses: ./.github/actions/setup-atfe
       - uses: ./.github/actions/setup-x50ng
       - name: Run original-ROM regression from fresh firmware

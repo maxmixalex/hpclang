@@ -263,7 +263,10 @@ Stock ROM, the native HOME bytes matched `hpclang-notebook/1\n20`, and the
 second editor showed `20` without retransferring the program. The GC witness,
 unchanged Port 1 region and stable Stock frames passed. The Core CI job runs
 the same firmware test and publishes the phase report. Local validation
-passed; remote CI acceptance is pending.
+passed. The first [#48 CI attempt](https://github.com/maxmixalex/hpclang/actions/runs/44549769224/job/135650047342)
+at `0c0fb778` stopped before the emulator: SDK install rejected the Git LFS
+pointer for the font bundle. The job now requests an LFS checkout; remote
+acceptance of that correction is pending.
 
 HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
@@ -277,6 +280,20 @@ workload budget is 29 with 9,924 heap bytes and the full 8 KiB stack reserved.
 The editor and settled return passed; a different allocator/entry layout
 requires its own ownership evidence. Local capture: `/work/nov19-hp48-map/raw.txt`;
 per-frame reconciliation: `/work/nov19-hp48-map/audit.json`.
+
+Independent HP48gII admission (local, no library 275): the HP50g address
+conversion copied the probe but jumped outside 256 KiB SRAM. Using the
+HP48gII Stock main RAM map, the same bounded ARM probe executed and
+returned `124275` to RPL, with caller control and the SWI vector restored.
+With the complete 47,417-byte compressed Notebook in HOME, the tested
+fragmented KOS requests acquired **one** aligned 4 KiB frame against the
+29-frame editor budget. Read/Write map and allocation checks exclude native
+aliases. The contiguous 29-frame request was refused; the probe verified
+the held data, released the block, reacquired it at the same address and
+released it again. The HOME image decompresses to the exact SDK build and
+Flash is unchanged. Report: `/work/nov19-hp48-entry-admission-mainmap/audit.json`.
+This is a bounded clean rejection, not a general KOS capacity limit. No
+Notebook entry or HOME mutation was attempted in this layout.
 
 HP39g+ Aplet boundary (local D1.55 original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook reached its editor and returned to settled Stock.
