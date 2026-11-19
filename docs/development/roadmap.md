@@ -179,6 +179,21 @@ This reaches 35 only numerically: no RPL frame is leased across a native
 service. Next qualify reservation and restoration of this RPL region under GC
 before entering the loader. Report: `/work/nov19-resident-kos-packed-map/proof.json`.
 
+HP50g GC gate (local original ROM, no library 275): a stack-rooted TEMP
+copy of the complete packed `NBIMAGE` does **not** pin physical frames.
+From copies of the post-KOS-release snapshot, the no-GC control retained
+its original address and payload at all 14 candidate frames. With Stock
+GARBAGECOL, the retained object moved from nibble `0x87f60` to `0x87871`;
+the updated root still read the complete original image, but all 13 whole
+payload pages changed at their former physical addresses. On the partial
+14th frame, 2,214 of 3,582 originally owned nibbles changed. DROP followed
+by GC restored the original data-stack depth (2) and top value; the HOME
+image and Flash matched the baseline. This tests release of the temporary
+root, not combined cleanup with KOS blocks still held. Per-frame evidence:
+`/work/nov19-root-lease-{control,gc}/pages.json`; release snapshot:
+`/work/nov19-root-lease-release/run/hp50g/state`. Reject TEMP-root pinning;
+full Notebook execution requires a GC-aware fence or a different page owner.
+
 HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
 12 RW and 7 stage/stack/MMU frames (4 KiB each). The 34 aligned RPL slots
