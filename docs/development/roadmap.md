@@ -141,6 +141,17 @@ CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 succ
 
 M8.0 / #47 (`310e8200`): HP49g+ and HP50g original-ROM emulator runs passed locally. Each ARM fixture first overrode only the arena-end read to present a 15-nibble gap; registration rejected before any other reads beyond the two root words or any write callback. It then used the real Stock mapping and completed library 123 registration. Saved-state replay verified catalog identity, unchanged existing bindings, Stock return and unchanged Flash on both models. This is an injected boundary case, not naturally exhausted RAM. Runtime blob matches the commit after line-ending normalization. Report: `/work/nov19-registration-stock/independent-audit.json` (two native cases). CI submitted; public registration and production reference collection remain open.
 
+M8.6 local (HP50g Stock, 2026-11-19): the full instrumented Notebook editor
+started and returned to settled Stock. Boot mapped 62 RW pages; heap reservation
+peaked at 13,660 bytes and touched stack at 1,880 of 8,192 bytes. For this run,
+20 code + 7 launcher/workspace + 8 RW pages cover the observed heap with the
+reserved stack (35 pages; the packaging minimum before heap is 32). Entry RPL
+bounds 560552..880707 leave 37 aligned virtual slots after the probe reserves.
+They are not verified available physical frames. Earlier separate KOS (16
+pages) and paused RPL (28 pages) experiments cannot be added. Next: verify
+physical ownership and exclusions with Notebook resident before borrowing.
+Evidence: `/work/nov19-notebook-occupancy/runner/build/hp50g-frame-memory-{1,2}.json`.
+
 | Stage / delivery | Current evidence | Next gate |
 | --- | --- | --- |
 | M8.0 / #31 | Internal Port0 registration and Port1 owned-tail edits pass local host/native gates. Accepted and merged as 2a65079f: exact head c662b236 passes all nine workflows, 219 jobs and three skips. This accepts the bounded implementation, not all M8.0 requirements. | Production reference collection, public library management and Port1 edits remain open. Test-owned-tail guards do not authorize existing-object edits; execution collection in call-roots.c also depends on fixture-specific ROM addresses and trace counts, so it cannot be promoted directly. This investigation is bounded here while other stages advance. Earlier HP39gs transfer failure passes exact replay, original cause unresolved. Evidence: /work/nov14-port1-owned-edit-native-v2/independent-audit.json. |
