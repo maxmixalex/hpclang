@@ -160,6 +160,19 @@ or a lease across Stock native calls. Local per-page audit:
 `/work/nov19-notebook-map/audit.json`; editor, ON exit and settled return passed.
 Evidence: `/work/nov19-notebook-occupancy/runner/build/hp50g-frame-memory-{1,2}.json`.
 
+HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
+the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
+12 RW and 7 stage/stack/MMU frames (4 KiB each). The 34 aligned RPL slots
+between the observed bounds 554930..845814 after reserves all alias that pool:
+16 code, 12 RW, 6 launcher, including one coarse-table frame. The separate
+6,144-byte native allocation `[0x080053ac,0x08006bac)` contains no whole
+aligned page. Neither source yields an additional exclusive frame. No other
+SRAM is assumed free. The pre-heap packaging minimum is 27 pages; the editor
+workload budget is 29 with 9,924 heap bytes and the full 8 KiB stack reserved.
+The editor and settled return passed; a different allocator/entry layout
+requires its own ownership evidence. Local capture: `/work/nov19-hp48-map/raw.txt`;
+per-frame reconciliation: `/work/nov19-hp48-map/audit.json`.
+
 M8.6 local release check (2026-11-19, SDK from `e45f8461`): an offline
 consumer container with no repository mount built plain and resource-observed
 Notebook packages using the installed SDK. The observer links the unchanged
