@@ -224,6 +224,22 @@ still requires preserving native backup integrity, preventing movement by Port
 edits, and safe teardown on failure. No general Port 1 lease API or independent
 Notebook run is accepted by this test.
 
+HP50g split-code entry (local original ROM, no 275): independently entered
+the plain installed-SDK Notebook (`_start`, VA `0x01220008`). Its 79,152-byte
+code image used 14 user-read-only Port 1 frames plus six user-read-only KOS
+frames, and eight KOS RW frames. This fixture stages the whole padded image
+in an enlarged Port 1 backup; only its first 14 frames are mapped from there.
+The first entry faulted on missing bootstrap table-view address `0x0121f010`.
+With the read-only table view restored, ON was accepted and Notebook returned
+zero. After restoring Stock mappings, GC moved a witness from `0x87f91` to
+`0x87871`; the second entry remapped and checked the entire code image
+(`0xd1729905`, FNV-1a). Snapshot verification passed the RPL return, unchanged
+backup, rejected allocation, four KOS release/reallocation checks and Port 1
+purge preserving earlier records. Report: `/work/nov19-split-enter-v2/audit.json`.
+This run used the captured Saturn state but no native mutation cookie. GC
+occurred between entries, not during an application save. Native save and
+relaunch/readback, and an independent settled Stock repaint check remain open.
+
 HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
 12 RW and 7 stage/stack/MMU frames (4 KiB each). The 34 aligned RPL slots
