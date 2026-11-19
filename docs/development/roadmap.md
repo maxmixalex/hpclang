@@ -173,6 +173,18 @@ The editor and settled return passed; a different allocator/entry layout
 requires its own ownership evidence. Local capture: `/work/nov19-hp48-map/raw.txt`;
 per-frame reconciliation: `/work/nov19-hp48-map/audit.json`.
 
+HP39g+ Aplet boundary (local D1.55 original-ROM emulator, 2026-11-19):
+the installed-SDK Notebook reached its editor and returned to settled Stock.
+The 37 physical frames comprise 12 code, 16 RW, 7 launcher/stack/MMU and
+2 native Aplet workspace pages. After reserves, all 36 aligned RPL slots
+alias these frames (12 code, 16 RW, 6 launcher including one coarse-table
+frame, 2 native workspace). The separate 6,144-byte native block contains
+no whole aligned page. Additional exclusive pages from those sources: zero.
+Packaging requires at least 25 pages before heap; this editor workload budgets
+27 including a 9,460-byte heap reservation and the full 8 KiB stack (1,384
+bytes touched). A different Aplet entry/allocation layout requires separate
+qualification. Per-slot evidence: `/work/nov19-hp39plus-map/audit.json`.
+
 M8.6 local release check (2026-11-19, SDK from `e45f8461`): an offline
 consumer container with no repository mount built plain and resource-observed
 Notebook packages using the installed SDK. The observer links the unchanged
