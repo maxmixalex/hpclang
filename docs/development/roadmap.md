@@ -139,7 +139,7 @@ unchanged. Sound compatibility is independent of Port2.
 
 CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 successes; Pages deploy and runtime evidence publication skipped by design). Merged as `e45f8461`; remote main verified. Earlier HP39gs transfer stalls remain unexplained. No post-merge run is claimed.
 
-M8.0 local: Port 0 registration must leave 16 nibbles between the old arena end and the first stationary record. A one-nibble overlap failed the new no-write regression on the previous implementation. The corrected host ASan/UBSan test passes both rejection and exact fit. Current-head Stock validation and production reference collection remain open.
+M8.0 / #47 (`310e8200`): HP49g+ and HP50g original-ROM emulator runs passed locally. Each ARM fixture first overrode only the arena-end read to present a 15-nibble gap; registration rejected before any other reads beyond the two root words or any write callback. It then used the real Stock mapping and completed library 123 registration. Saved-state replay verified catalog identity, unchanged existing bindings, Stock return and unchanged Flash on both models. This is an injected boundary case, not naturally exhausted RAM. Runtime blob matches the commit after line-ending normalization. Report: `/work/nov19-registration-stock/independent-audit.json` (two native cases). CI submitted; public registration and production reference collection remain open.
 
 | Stage / delivery | Current evidence | Next gate |
 | --- | --- | --- |
