@@ -296,8 +296,9 @@ HP48gII Stock main RAM map, the same bounded ARM probe executed and
 returned `124275` to RPL, with caller control and the SWI vector restored.
 With the complete 47,417-byte compressed Notebook in HOME, the tested
 fragmented KOS requests acquired **one** aligned 4 KiB frame against the
-29-frame editor budget. Read/Write map and allocation checks exclude native
-aliases. The contiguous 29-frame request was refused; the probe verified
+29-frame editor budget. The probe checked allocation ownership and direct
+address overlap; the later inventory also checks SRAM mirrors. The
+contiguous 29-frame request was refused; the probe verified
 the held data, released the block, reacquired it at the same address and
 released it again. The HOME image decompresses to the exact SDK build and
 Flash is unchanged. Report: `/work/nov19-hp48-entry-admission-mainmap/audit.json`.
@@ -306,14 +307,31 @@ Notebook entry or HOME mutation was attempted in this layout.
 
 HP48gII image-absent control: the same ROM, probe binary and key sequence,
 without transferring `NBIMAGE`, also yielded **one of 29 pages** (28 short).
-The sole frame (`0x08005000`) had no alias in the live Saturn Read/Write
-maps. The 122,879-byte contiguous allocation request was refused; all
+The sole frame (`0x08005000`) had no direct address match in the Saturn maps;
+the later physical audit found a mirror outside the RPL gap. The
+122,879-byte contiguous allocation request was refused; all
 4,096 bytes of the held page passed the probe's check. Stock released the
 only block, reacquired it at the same pointer and released it again before
 returning `124275` to RPL. The final HOME snapshot had no `NBIMAGE`; Flash and
 the SWI vector were unchanged. In this paired test, removing the HOME image
 did not improve KOS capacity. An application-sized page source remains open.
 Evidence: `/work/nov19-hp48-entry-admission-control/audit.json`.
+
+HP48gII read-only frame inventory: all 64 external SRAM frames are covered
+by the Stock Saturn map in both saved return states. Eight frames appear
+through the emulator's SRAM mirror, not a separate bank. In particular,
+`0x08045000` aliases the already-counted KOS frame `0x08005000`. The model
+has no Port 1 ERAM source. The observed TTBR and LCD buffer are in separate
+on-chip SRAM, which is not counted as application memory.
+
+After excluding observed native state, stacks, probe storage, allocator
+metadata and mappings outside the reserved gap, the RPL gap contains 36
+whole frames with `NBIMAGE` resident and 47 without it. Neither snapshot
+proves a lease across Stock allocation or GC. The inspected KOS free lists
+are also not a non-KOS owner. This read-only audit qualifies **zero additional
+exclusive frames**, so the 28-page deficit remains. Inventory and input
+hashes: `/work/nov19-hp48-page-ownership.json`. No emulator rerun, guest
+memory writes or new container were needed.
 
 HP39g+ Aplet boundary (local D1.55 original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook reached its editor and returned to settled Stock.

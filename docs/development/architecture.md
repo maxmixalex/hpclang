@@ -101,10 +101,10 @@ or retirement of the historical dependency is authorized by this prototype.
 #### Migration decision after the full Notebook measurements (2026-11-19)
 
 **Keep the installed SDK's current launchers.** Removing the separate support
-installation would simplify first use, but no family has yet run the full
-service-using Notebook with independently owned pages. Keep the replacement
-as an opt-in prototype until the following gates pass. This decision retains
-the migration work and does not close M8.6.
+installation would simplify first use. The HP50g fixture exercises a bounded
+Notebook save and relaunch, but does not qualify a general replacement. Keep
+the independent path experimental until the following gates pass. This
+decision retains the migration work and does not close M8.6.
 
 All page counts below use 4 KiB frames. “Minimum / editor” compares the
 production packaging floor before heap with a budget derived from the observed
@@ -114,8 +114,8 @@ neither a worst-case requirement nor the cost of a different launcher.
 | Family | Entry and page source | Stock services and exit | Next independent acceptance gate |
 | --- | --- | --- | --- |
 | HP39 (HP39g+ D1.55 measured) | Production Aplet: **25 / 27** pages. Its 37 frames include two native workspace pages. All 36 candidate RPL slots overlap these frames; the separate native block yields no aligned frame. Independent Aplet entry is unverified. | Production editor and ON return pass. Aplet data access depends on the action frame; no equivalent independent Start/Reset, data-slot or return contract is established. | From a clean Aplet install, enter without the support library; account for application and native workspace simultaneously. Verify save/relaunch, copied-Aplet isolation, Reset, rejected entry and settled return on all three HP39 profiles. |
-| HP48 (HP48gII) | Production ARMToolbox48: **27 / 29** pages. All 34 RPL candidates overlap the 35-frame pool; the 6,144-byte native block has no complete aligned page. A model-specific no-275 entry and RPL return pass locally. The same KOS probe supplied one aligned frame both with and without the full compressed image in HOME. | Production HOME save/retry, Port 0 and settled return have Stock evidence. Both independent admission cases refused the 29-frame request, released and reacquired the held block, and preserved HOME and Flash. | Acquire and release a disjoint application-sized pool on the 256 KiB machine. Exercise HOME/Port 0 with live roots and ownership bounds, verify a successful full launch and qualify cleanup on partial assembly and entry failures. |
-| HP49/50 (HP50g budget measured) | Both models enter, run a bounded HPC1 and return without library 275. HP50g production Notebook: **32 / 35** pages; all 37 candidate slots overlap app RW. Separate small probes obtained up to 16 KOS pages or borrowed 28 paused RPL pages. Those experiments cannot be added. | Bounded HPC1 restores MMU/control state and returns its checked result; it supplies no native-service context. Successful KOS release or paused-page restoration does not authorize a loan during native allocation/GC. | First run a service-capable Notebook on HP50g: prove ownership with the full package resident during a native save, GC and relaunch. Repeat with the HP49g+ ROM, package and measured budget; preserve HOME, Port and supported file operations. |
+| HP48 (HP48gII) | Production ARMToolbox48: **27 / 29** pages. A model-specific no-275 entry and RPL return pass locally. The KOS probe supplied one aligned frame. A read-only audit found 36 aligned RPL gap frames with the compressed image in HOME, but none has a verified Stock/GC lease. SRAM mirrors add no frames; HP48gII has no Port 1 ERAM. | Production HOME save/retry, Port 0 and settled return have Stock evidence. Both independent admission cases refused the 29-frame request, released and reacquired the held block, and preserved HOME and Flash. | Acquire and release a disjoint application-sized pool on the 256 KiB machine. Exercise HOME/Port 0 with live roots and ownership bounds, verify a successful full launch and qualify cleanup on partial assembly and entry failures. |
+| HP49/50 (HP50g budget measured) | Both models enter, run a bounded HPC1 and return without library 275. HP50g production Notebook: **32 / 35** pages. The independent HP50g fixture uses KOS and read-only Port 1 pages, not borrowed RPL gap frames. | HP50g local fixture passes HOME save/readback, settled return and GC after application exit while the frame leases are still live. This does not prove a general independent launcher or arbitrary Port mutation while pages are mapped. | Preserve the HP50g regression and qualify wider service coexistence. Repeat with the HP49g+ ROM, package and measured budget; preserve HOME, Port and supported file operations. |
 
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.
