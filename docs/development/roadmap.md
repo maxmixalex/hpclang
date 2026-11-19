@@ -350,6 +350,23 @@ throughout; observed `AVMEM` recovered from 8,539 to 61,277 (baseline
 RAM. Evidence: `/work/nov19-hp48-home-lease/comparison.json` and saved
 setup, allocation, GC-only and cleanup snapshots.
 
+HP48gII allocator-quota trial (local original ROM, no library 275):
+with `NBIMAGE` in HOME, a disposable snapshot marked all 28 validated gap
+frames and capped Stock `AVMEM` from 61,050 to 6,817 cells, below either
+side's margin to the reservation. No HOME object owned the marked pages.
+Stock did not preserve the cap: the USB-only control, with no HOME creation
+or explicit GC, already restored credit to 61,050, and only 26 of 28 page
+hashes matched. HOME creation and the separate GC replay also retained only
+26 hashes; all phases changed `0x08010000` and `0x08011000`. GC moved the
+TEMP witness from `0x87f1b` to `0x87828`. The USB-only control rules out
+attributing those changes specifically to HOME creation or GC. Reject the
+quota as a physical fence. Stock cleanup restored HOME/Port 0 bytes, stack
+values and the Saturn map, and recovered `AVMEM` to 61,277 (baseline 61,138).
+The harness then restored and checked all 28 original page contents in the
+disposable snapshot; original inputs, `NBIMAGE` and Flash were unchanged.
+No additional page is qualified. Per-phase hashes and cleanup evidence:
+`/work/nov19-hp48-boundary-lease/`.
+
 HP39g+ Aplet boundary (local D1.55 original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook reached its editor and returned to settled Stock.
 The 37 physical frames comprise 12 code, 16 RW, 7 launcher/stack/MMU and
