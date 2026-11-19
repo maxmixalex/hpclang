@@ -237,8 +237,24 @@ zero. After restoring Stock mappings, GC moved a witness from `0x87f91` to
 backup, rejected allocation, four KOS release/reallocation checks and Port 1
 purge preserving earlier records. Report: `/work/nov19-split-enter-v2/audit.json`.
 This run used the captured Saturn state but no native mutation cookie. GC
-occurred between entries, not during an application save. Native save and
-relaunch/readback, and an independent settled Stock repaint check remain open.
+occurred between entries, not during an application save.
+
+HP50g independent HOME save/relaunch (local, no library 275): the fixture
+now passes the live Saturn map, main-stack fences, saved post-ARMSYS PC and
+classified execution roots, and denies Port 1 edits. A direct HOME-program
+trial wrote the note but failed on restart. Using a Stock TEMP copy of the
+entry program (not as a backing store for application pages), physical keys
+entered `20` and activated Save. A fresh emulator process resumed the saved
+state and recalled the same program without retransferring the application.
+The initially empty editor displayed `20` on relaunch; both native HOME
+records matched `hpclang-notebook/1\n20` byte-for-byte. Both ON exits
+returned the RPL witness; the two Stock frame captures one second apart
+matched within each run. Both GC witnesses moved, the full code mapping
+checksum and four KOS release/reuse checks passed, and the Port 1 backup
+and Flash remained unchanged. GC was exercised **after** each application
+exit with the frame leases still held. Evidence and per-launch frame hashes:
+`/work/nov19-save-context-run/audit.json`. Local fixture evidence only;
+production migration, other family qualification and release review remain open.
 
 HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
