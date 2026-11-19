@@ -1,7 +1,8 @@
 # hpclang roadmap
 
 Current checkpoint: 2026-11-19. **M8 is incomplete; M8.1–M8.5 are accepted complete.**
-Accepted main: `e45f8461` (#46). Prior integration: `38e9472a` (#43), integrating compatibility, C++/migration, SDK
+Accepted main: `516231c5` (#47). Prior integrations: `e45f8461` (#46) and
+`38e9472a` (#43), integrating compatibility, C++/migration, SDK
 distribution, applications and UI observation fixes. Exact head `712e60c6` passed
 all seven workflows: 201 successful jobs and three configured skips. Remote main
 and merged PR were independently verified. Delivery acceptance does not by itself
@@ -139,7 +140,15 @@ unchanged. Sound compatibility is independent of Port2.
 
 CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 successes; Pages deploy and runtime evidence publication skipped by design). Merged as `e45f8461`; remote main verified. Earlier HP39gs transfer stalls remain unexplained. No post-merge run is claimed.
 
-M8.0 / #47 (`310e8200`): HP49g+ and HP50g original-ROM emulator runs passed locally. Each ARM fixture first overrode only the arena-end read to present a 15-nibble gap; registration rejected before any other reads beyond the two root words or any write callback. It then used the real Stock mapping and completed library 123 registration. Saved-state replay verified catalog identity, unchanged existing bindings, Stock return and unchanged Flash on both models. This is an injected boundary case, not naturally exhausted RAM. Runtime blob matches the commit after line-ending normalization. Report: `/work/nov19-registration-stock/independent-audit.json` (two native cases). CI submitted; public registration and production reference collection remain open.
+M8.0 / #47: merged as `516231c5`, whose tree matches accepted head `1cebf08d`.
+CI: 184 successful jobs, including both HP49g+ and HP50g Stock code-relocation
+jobs, and two configured publication skips. Local original-ROM runs at
+`310e8200` rejected an injected 15-nibble gap before writes, then registered
+library 123 using the real mapping. Native replay verified the new binding,
+unchanged existing bindings, Stock return and unchanged Flash on both models
+(`/work/nov19-registration-stock/independent-audit.json`). This accepts the
+boundary fix only; public registration and production reference collection
+remain open.
 
 M8.6 local (HP50g Stock, 2026-11-19): the full instrumented Notebook editor
 started and returned to settled Stock. Boot mapped 62 RW pages; heap reservation
@@ -294,6 +303,17 @@ released it again. The HOME image decompresses to the exact SDK build and
 Flash is unchanged. Report: `/work/nov19-hp48-entry-admission-mainmap/audit.json`.
 This is a bounded clean rejection, not a general KOS capacity limit. No
 Notebook entry or HOME mutation was attempted in this layout.
+
+HP48gII image-absent control: the same ROM, probe binary and key sequence,
+without transferring `NBIMAGE`, also yielded **one of 29 pages** (28 short).
+The sole frame (`0x08005000`) had no alias in the live Saturn Read/Write
+maps. The 122,879-byte contiguous allocation request was refused; all
+4,096 bytes of the held page passed the probe's check. Stock released the
+only block, reacquired it at the same pointer and released it again before
+returning `124275` to RPL. The final HOME snapshot had no `NBIMAGE`; Flash and
+the SWI vector were unchanged. In this paired test, removing the HOME image
+did not improve KOS capacity. An application-sized page source remains open.
+Evidence: `/work/nov19-hp48-entry-admission-control/audit.json`.
 
 HP39g+ Aplet boundary (local D1.55 original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook reached its editor and returned to settled Stock.
