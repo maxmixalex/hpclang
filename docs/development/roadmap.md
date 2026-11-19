@@ -194,6 +194,19 @@ root, not combined cleanup with KOS blocks still held. Per-frame evidence:
 `/work/nov19-root-lease-release/run/hp50g/state`. Reject TEMP-root pinning;
 full Notebook execution requires a GC-aware fence or a different page owner.
 
+A separate local no-275 HP50g run held four KOS blocks (8+8+4+1 aligned
+pages) while Stock GARBAGECOL moved a rooted witness from `0x87f8d` to
+`0x87871`. The second ARM entry validated every block's allocated header,
+footer and reciprocal links, the identity mapping and all 86,016 bytes of
+page-specific data before release. An extra 1 MiB request returned NULL;
+all four releases succeeded in reverse order. All four blocks were then
+reacquired simultaneously at the same addresses and released again. Returned
+RPL result, witness contents, packed HOME image and unchanged Flash were
+independently checked. Ledger: `/work/nov19-kos-gc-cycle-v2/audit.json`.
+KOS therefore covers 21 of the 35 editor-budget pages across this GC; the
+other 14 still lack a qualified owner. The initial transfer trial did not
+yield a verifiable completion marker and is excluded.
+
 HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
 12 RW and 7 stage/stack/MMU frames (4 KiB each). The 34 aligned RPL slots
