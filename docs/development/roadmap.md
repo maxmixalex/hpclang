@@ -160,6 +160,24 @@ or a lease across Stock native calls. Local per-page audit:
 `/work/nov19-notebook-map/audit.json`; editor, ON exit and settled return passed.
 Evidence: `/work/nov19-notebook-occupancy/runner/build/hp50g-frame-memory-{1,2}.json`.
 
+M8.6 local release check (2026-11-19, SDK from `e45f8461`): an offline
+consumer container with no repository mount built plain and resource-observed
+Notebook packages using the installed SDK. The observer links the unchanged
+application sources. Each observed package passed original-ROM editor pixels,
+ON exit and settled return. SHA-256 manifests checked before and after launch:
+`/work/nov19-clean-stock/outputs/checks.json`. Table values are bytes.
+
+| Family representative | Plain `.hp` bytes | Touched stack / reserved | Peak heap reservation / available |
+| --- | ---: | ---: | ---: |
+| HP 39gs | 48,404 | 1,384 / 8,192 | 9,460 / 48,024 |
+| HP 48gII | 62,828 | 1,744 / 8,192 | 9,924 / 35,736 |
+| HP 50g | 74,620 | 1,840 / 8,192 | 13,700 / 237,264 |
+
+This covers clean SDK consumption, model packaging and the measured entry/exit
+workload across three families. Resource measurements include observer overhead.
+Backup/export, failure recovery, independent-launcher evaluation and release
+documentation retain their own acceptance records; final release audit is open.
+
 | Stage / delivery | Current evidence | Next gate |
 | --- | --- | --- |
 | M8.0 / #31 | Internal Port0 registration and Port1 owned-tail edits pass local host/native gates. Accepted and merged as 2a65079f: exact head c662b236 passes all nine workflows, 219 jobs and three skips. This accepts the bounded implementation, not all M8.0 requirements. | Production reference collection, public library management and Port1 edits remain open. Test-owned-tail guards do not authorize existing-object edits; execution collection in call-roots.c also depends on fixture-specific ROM addresses and trace counts, so it cannot be promoted directly. This investigation is bounded here while other stages advance. Earlier HP39gs transfer failure passes exact replay, original cause unresolved. Evidence: /work/nov14-port1-owned-edit-native-v2/independent-audit.json. |
