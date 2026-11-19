@@ -147,9 +147,17 @@ peaked at 13,660 bytes and touched stack at 1,880 of 8,192 bytes. For this run,
 20 code + 7 launcher/workspace + 8 RW pages cover the observed heap with the
 reserved stack (35 pages; the packaging minimum before heap is 32). Entry RPL
 bounds 560552..880707 leave 37 aligned virtual slots after the probe reserves.
-They are not verified available physical frames. Earlier separate KOS (16
-pages) and paused RPL (28 pages) experiments cannot be added. Next: verify
-physical ownership and exclusions with Notebook resident before borrowing.
+Fresh emulator-side observation with the same instrumented application resolved
+all 37 slots. For `i=0..36`, Saturn nibble address `0x8c000+i*0x2000`
+maps to SRAM byte address `0x08046000+i*0x1000`. Read and Write agree on both
+halves. No duplicate frames or other Saturn slots alias them. **All 37 already
+back the application's live ARM RW mapping**. None overlap code, launcher-only
+pages, the checked low SRAM/exception stack page, Saturn state page or the
+three stage/application coarse tables. Additional capacity from these slots
+on this production launch: zero. Do not combine them with the separate KOS
+or paused RPL probe capacities. This does not establish a new launcher's layout
+or a lease across Stock native calls. Local per-page audit:
+`/work/nov19-notebook-map/audit.json`; editor, ON exit and settled return passed.
 Evidence: `/work/nov19-notebook-occupancy/runner/build/hp50g-frame-memory-{1,2}.json`.
 
 | Stage / delivery | Current evidence | Next gate |
