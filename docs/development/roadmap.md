@@ -178,6 +178,18 @@ workload across three families. Resource measurements include observer overhead.
 Backup/export, failure recovery, independent-launcher evaluation and release
 documentation retain their own acceptance records; final release audit is open.
 
+**M8.6 release reconciliation (2026-11-19).** Against the original
+[application and release checklist](roadmap-history.md#m86-application-and-release-acceptance):
+
+| Requirement | Evidence and remaining boundary |
+| --- | --- |
+| Integrated application and native backup | Six-model Stock primary persistence and three classic-model Port 0 backup/restore/replace/remove have historical CI evidence. The local backup audit covers nine launches; restoring an edit preserves the primary save. See `/work/nov14-final-notebook-backup-native/independent-audit.json`. |
+| Supported file export | HP49g+/HP50g original-ROM runs retain UTF-8 export across relaunch and refuse overwrite. Independent FAT image reads check the file and sentinel (`/work/nov14-open-stack-native/independent-audit.json`). Physical card testing remains a separate follow-up. |
+| Installation, assets and user instructions | From a second prefix and new client/build paths, the **installed** Notebook README's `CMAKE_PREFIX_PATH` configuration and default build succeeded offline for all three representatives. Generated font C, HPC1, raw and wrapped launchers and memory JSON matched the first plain build byte-for-byte (15/15, `/release/documented-rebuild/manifest.json` in the release container). HP39 Aplet envelopes are covered by the earlier SDK reproducibility gate. |
+| Resources, failures and restoration | The three-family table above covers normal Stock editor exit. Local sanitizer `notebook_store` and `notebook_ui` passed: host-injected read, allocation, storage-full and I/O failures, short writes, interruption and close errors have separate checks. This does not measure recovery from all those faults on Stock. Next integrated fault case: failed save with retained edit, retry and settled return. |
+| Public documentation | Installed Notebook README covers build, family-specific packaging, persistence ownership, error recovery and partial exports. SDK includes getting-started, memory, migration and licensing guides separately from internal history. Current documented build verified above; final release-wide documentation review remains. |
+| Independent launcher and migration decision | HP50g probes and the full Notebook mapping establish bounded results, including zero additional frames in the examined gap. Production ARMToolbox stays in use. Qualify cross-family ownership, native calls and cleanup, HP39 Aplet entry and smallest-model budget before the migration decision. |
+
 | Stage / delivery | Current evidence | Next gate |
 | --- | --- | --- |
 | M8.0 / #31 | Internal Port0 registration and Port1 owned-tail edits pass local host/native gates. Accepted and merged as 2a65079f: exact head c662b236 passes all nine workflows, 219 jobs and three skips. This accepts the bounded implementation, not all M8.0 requirements. | Production reference collection, public library management and Port1 edits remain open. Test-owned-tail guards do not authorize existing-object edits; execution collection in call-roots.c also depends on fixture-specific ROM addresses and trace counts, so it cannot be promoted directly. This investigation is bounded here while other stages advance. Earlier HP39gs transfer failure passes exact replay, original cause unresolved. Evidence: /work/nov14-port1-owned-edit-native-v2/independent-audit.json. |
