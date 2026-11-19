@@ -207,6 +207,23 @@ KOS therefore covers 21 of the 35 editor-budget pages across this GC; the
 other 14 still lack a qualified owner. The initial transfer trial did not
 yield a verifiable completion marker and is excluded.
 
+HP50g Port 1 plus KOS (local no-275 original ROM): Stock `STO` appended a
+named `:1:NBLSE` backup containing a 60 KiB test string after two existing
+records. Its payload contained 14 whole aligned ERAM frames `[0x08021000,
+0x0802f000)`. The same 14 frame addresses and SHA-256 hashes were found
+before and after a GC that moved the TEMP witness `0x87f8f` to `0x87871`.
+All 21 concurrently held KOS frames were disjoint and passed the live owner,
+identity mapping and 86,016-byte content checks. Thus 35 distinct frames
+were accounted for during this GC. After the rejected 1 MiB allocation, all
+KOS blocks were released and reacquired; a subsequent Stock `PURGE` removed
+the test backup and restored the prior Port 1 chain and terminator. HOME
+Notebook and Flash remained intact. Evidence: `/work/nov19-port1-lease/`
+(`setup-pages.json`, `trial-pages.json`, `kos-audit.json` and release snapshot).
+The ERAM payload stayed unchanged: using it as writable application memory
+still requires preserving native backup integrity, preventing movement by Port
+edits, and safe teardown on failure. No general Port 1 lease API or independent
+Notebook run is accepted by this test.
+
 HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
 12 RW and 7 stage/stack/MMU frames (4 KiB each). The 34 aligned RPL slots
