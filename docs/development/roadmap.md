@@ -333,6 +333,23 @@ exclusive frames**, so the 28-page deficit remains. Inventory and input
 hashes: `/work/nov19-hp48-page-ownership.json`. No emulator rerun, guest
 memory writes or new container were needed.
 
+HP48gII HOME-backed reservation trial (local original ROM, no library 275):
+with `NBIMAGE` resident, Stock stored four test strings with 28 distinct
+whole physical pages, of which only 16 overlap the 36 original gap
+candidates. Creating one small HOME variable moved all four strings by
+79 Saturn nibbles: **0 of 28** pages retained their contents at the original
+physical addresses, although every logical string remained byte-identical.
+A separate GC-only replay moved the rooted TEMP witness (`0x87f4e` to
+`0x87828`) but kept the HOME object addresses and all 28 page hashes.
+Reject this reservation mechanism for mixed Stock allocation and GC: no
+additional frames are qualified. After the rejection, dropping the GC
+witness and purging only test variables restored the original HOME/Port 0
+bytes, read/write map and both stack slots. `NBIMAGE` and Flash matched
+throughout; observed `AVMEM` recovered from 8,539 to 61,277 (baseline
+61,138). This is logical cleanup, not byte-for-byte restoration of unused
+RAM. Evidence: `/work/nov19-hp48-home-lease/comparison.json` and saved
+setup, allocation, GC-only and cleanup snapshots.
+
 HP39g+ Aplet boundary (local D1.55 original-ROM emulator, 2026-11-19):
 the installed-SDK Notebook reached its editor and returned to settled Stock.
 The 37 physical frames comprise 12 code, 16 RW, 7 launcher/stack/MMU and
