@@ -1,5 +1,78 @@
 # M8 validation history
 
+## Independent allocation follow-up and CI — 2026-11-14
+
+Local `6992505a` adds a paused main-RPL page borrow. HP50g original Stock
+without library 275 yields 28 pages (112 KiB); page-end trial writes are restored,
+RPL bounds stay unchanged, and independent saved-map/entry/return checks pass.
+Ten corrupted snapshots are rejected. The default entry package is byte-identical
+to its accepted native fixture; isolated build reproducibility passes. This is
+not a combined KOS/RPL Notebook budget or native-service coexistence claim.
+Report: `/work/nov14-independent-rpl-pool-live/verified.json`.
+
+Submitted #46 head `437d45f7` fails Quality because two Python files were formatted
+without the repository's 100-column configuration. Repository-configured checks
+now pass locally. Objects jobs 132481639649 and 132481639748 fail on HP39gs before
+application entry: directory transfer succeeds, then the payload has no acknowledged
+progress for 90 seconds (send windows 36 and 3 respectively). The downloaded
+Kermit gate/debug logs establish the transfer phase, not its root cause.
+Runtime/platform/tools and both object fixtures are unchanged from accepted main.
+Artifacts: `research/nov14-pr46-composite` and `research/nov14-pr46-catalog`.
+These failures remain unresolved observations; they are not application test passes.
+
+
+## M8.4 final acceptance — 2026-11-14
+
+M8.4 is accepted complete on main `38e9472a` through #43. The five original
+requirements are mapped in [the compatibility inventory](hpgcc-compat.md#current-m84-acceptance-map):
+common graphics and maintained adapter groups with a four-generation ledger;
+original applications with recorded edits; asynchronous KOS sound; owned RTC
+ticks; and useful window adapters with explicit raw-hardware migration limits.
+The accepted HPG, tone, RTC and window commits are main ancestors.
+
+Accepted head `712e60c6` passes all seven workflows (201 jobs, three configured
+skips). Runtime covers the configured Direct/Stock console, format, system,
+window and dialog cases, plus normal/exit/immediate-exit system services.
+Storage passes its three Direct families and HP49g+/HP50g Stock gates.
+The actual KOS fixture checks modes, overlap/preemption, busy-loop autonomous
+stop and foreign-owner rejection; RTC fixtures check selector/query, timing,
+latch consumption and restoration. These are emulator results.
+
+Original-source evidence remains `/work/nov14-combined-compat-source`;
+filesystem native provenance checks 4,386 inputs, eight saved run reports and
+two raw cards in `/work/nov14-fsystem-native-provenance.json`. The earlier source
+check is not relabeled a current-head native run: its compatibility fixtures,
+filesystem header and KOS/RTC adapters are unchanged, while launch/Port plumbing
+and file-open stack reduction changed and have separate accepted integration CI.
+The source gate records every filesystem edit, including fixing the original
+string over-read; packaging for six models does not imply SD support on all six.
+Physical SD remains the approved follow-up. No blanket binary ABI, arbitrary
+raw KOS/MMU access or HPGCC3 C++ GUI compatibility is claimed. M8.0 and M8.6 remain open.
+
+
+
+## M8.5 final acceptance — 2026-11-14
+
+M8.5 is accepted complete on main `38e9472a` after #43. Its tree exactly
+matches accepted head `712e60c6`: all seven workflows pass (201 successful
+jobs, three configured skips). This reconciles the three original requirements;
+it does not add a new native execution or complete other M8 stages.
+
+| Original requirement | Implementation and accepted validation |
+| --- | --- |
+| Owned C++ wrappers and composable UI helpers, embedded profile, C interoperability and destruction/exit | Public object/directory/port/storage/surface/UI/timer helpers retain C errors and ownership boundaries. Host owner and actual C++ example lifecycle tests cover moves, failure preservation, scope cleanup and allocation failures. `tests/e2e/cpp.cpp` and `tests/e2e/main.c` check the global destructor and ordered C exit callbacks; ordinary automatic scope cleanup remains distinct from `exit`/`_Exit`. `tests/sdk/check.py` independently includes all nine public helper headers and rejects enabled exceptions/RTTI. |
+| Actionable migration guidance and tooling | Installed `docs/migration.md` covers historical APIs, precision, ownership, capabilities, text/fonts and retired raw hardware access. The installed read-only checker and its tests cover actionable HP001–HP015 findings, legacy encoding and incomplete scans; the relocated SDK gate verifies findings and unchanged input. |
+| Published examples, public contracts and deterministic resources | Installed C and C++ examples, `docs/api-conventions.md`, and generated font/HPC1/launcher assets are consumed by the relocated external-application gate. Core run 43589087998, job 132429790934, passes unit tests and installed SDK verification. Earlier full local SDK evidence covers 4,121 manifest files, nine headers, fourteen links, 613 identical outputs, six Notebook builds and three HP39 Aplet families. |
+
+Source reconciliation and the requirement map are recorded in
+`research/nov14-m85-final-acceptance.json`; prior full SDK/host reports are
+`/work/nov14-final-integration-sdk.json` and
+`/work/nov14-final-integration-host/result.json`. The source and checked
+contracts are unchanged at the accepted main merge. These are emulator and SDK
+results, not additional physical-device validation. Keep the frozen roadmap's
+old unchecked boxes as historical checkpoints; the current roadmap records
+this final acceptance. M8.0, M8.4 final audit and M8.6 remain open.
+
 ### 2026-11-14 — UI stack-observer schema integration repair
 
 At `886a3fde`, Runtime job 132410119377 reaches HP49g+ application PASS and

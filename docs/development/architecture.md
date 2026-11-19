@@ -87,7 +87,7 @@ loads an embedded Thumb HPC1 image through the common bootstrap and returns to
 Stock. The fixture documents model-specific native snapshot checks, including
 unchanged Flash, restored MMU/control state and stack guards. Its isolated
 build check runs in Core CI; build reproducibility alone does not establish
-native execution. This delivery is awaiting combined PR #43 acceptance.
+native execution. This bounded delivery is accepted through #43 / `38e9472a`.
 
 The prototype supplies no native-service context and is not a general
 application loader. HP39 Aplet integration, HP48gII entry and cross-family
@@ -95,6 +95,73 @@ ownership/coexistence remain evaluation work. The migration decision is to
 retain the existing production launchers while evaluating the same Notebook
 application and cleanup contracts described above. No production replacement
 or retirement of the historical dependency is authorized by this prototype.
+
+### Source-level family assessment
+
+The current sources identify the following concrete replacement boundaries.
+This is an implementation assessment, not additional native execution evidence.
+
+| Family | Existing contract and consequence for an owned launcher |
+| --- | --- |
+| HP39g+/39gs/40gs | `runtime/core/hp39-aplet-frame.c` recognizes the Aplet `_Action` instruction sequence, including the library-275 `xPrRUN` ROMPTR, before exposing the custom-data slot. `tools/prepare-hp39-aplet.py` also installs Start/Reset views and restores the caller's program context around Reset. A new entry must provide an explicit equivalent Aplet data/return contract; replacing the ARM jump alone would leave persistence unavailable. Keep save/relaunch, copied-Aplet isolation and Reset in the comparison. |
+| HP48gII | `platform/armtoolbox/stage0.S` consumes the launcher's pool count and L2 table, rejects insufficient space before changing mappings, and releases its optional KOS allocation on both rejection and return. No HP48gII entry is established by the HP49/50 prototype. Qualification must start with a model-4 Stock entry and owned allocation/cleanup, then run the same Notebook within the existing small-model budget. |
+| HP49g+/HP50g | `tests/e2e/independent-hpc1/loader.c` supplies one code page and four RW pages from its fixed arena, but sets both `saturn_state` and `platform_cookie` to zero. It proves the common HPC1 bootstrap boundary, not the native object/port services used by Notebook. Supplying those services requires a captured Stock context and equivalent relocation/allocation boundaries before the application comparison is meaningful. |
+
+Across families, `platform/armtoolbox/stage1.c` derives main/Port1 allocation
+fences from the actual pool and publishes launcher and suspended-execution roots.
+The replacement must preserve these supported service contracts, not copy a
+fixture's fixed addresses into a general launcher. `stage0.S` restores the
+borrowed mapping and original stack before restoring interrupt state and
+releasing the optional KOS block; the independent path needs equivalent ordered
+cleanup, including rejected startup.
+
+Fresh unmodified Notebook builds on 2026-11-14 give the following sizing baseline
+(ATFE 22.1.0, MinSizeRel, model-specific builds):
+
+| Model | HPC1 code bytes | Static RW bytes | Minimum RW pages | Production minimum Stock pool pages | Production transfer bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HP39g+ | 45,456 | 1,048 | 4 | 25 | 48,396 |
+| HP48gII | 64,248 | 1,048 | 4 | 27 | 62,828 |
+| HP50g | 79,152 | 4,320 | 5 | 32 | 74,620 |
+
+Pages are 4 KiB. Minimum RW includes boot, static data and the 8 KiB stack;
+it is not a measured heap budget. Transfer sizes include the production wrapper
+and compressed payload, but exclude the separately installed support library
+and HP39 Aplet envelope. These are build measurements, not execution or peak
+Stock RAM measurements. Report: `/work/nov14-independent-notebook-budget/result.json`.
+
+The bounded independent entry copies at most 65,536 bytes (`code_for`), and
+its arena is serialized inside that copied blob. Even the HP39 image plus the
+minimal 12 code + 4 RW + 1 MMU pages exceeds that copy limit, before entry code,
+alignment and its separate stack. HP50 code alone exceeds it. Simply expanding
+the fixture's one-code-page/four-RW-page constants cannot launch this application.
+The first external-pool experiment is implemented in
+`tests/e2e/independent-pool`. A fresh HP50g Stock run without library 275 obtains
+8 and 16 aligned pages through KOS service 201 (heap `0x100`), writes/reads page
+ends, and releases each block through service 101. Requests for 135,167 bytes
+and 1 MiB fail normally; a subsequent small allocation reuses the first pointer.
+Original interrupt/control state, SWI vector, code/stack guards, RPL return and
+unchanged Flash pass the independent snapshot verifier. Ten corrupted results
+are rejected. Report: `/work/nov14-independent-pool-live/verified.json`.
+This is one baseline, not a universal KOS capacity bound. It does not provide the
+32-page HP50g Notebook minimum, so the next step is an owned RPL-backed pool or
+another demonstrated allocation source, with matching failure/return cleanup.
+The follow-up `rpl-probe.c` now borrows and restores 28 main-RPL pages (112 KiB)
+while Stock execution and interrupts remain paused. Each page is checked against
+the saved native Read map, page-end contents are restored, and entry/return plus
+ten corruption negatives pass. Its optional state argument leaves the default
+entry package unchanged. This small-entry baseline does not establish combined
+KOS/RPL availability with the full Notebook resident, or a lease across native
+allocation/GC. Report: `/work/nov14-independent-rpl-pool-live/verified.json`. Then
+connect the captured Stock context and service fences to a service-capable
+HP49/50 Notebook prototype, followed by HP48gII entry/allocation and the HP39
+Aplet data boundary. Compare identical application
+sources and configuration; record package transfer cost, supported-flow memory
+use, allocation failure and settled return. This does not require the deferred
+whole-system worst-case memory proof. Until those comparisons exist, the
+installation-step benefit is established but a net memory, size or startup-time
+benefit is not. Production launchers remain in use and this evaluation remains
+open.
 
 ## Common bootstrap
 
