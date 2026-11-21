@@ -1361,6 +1361,11 @@ static void catalog_offset_plans(void)
     assert(!edits[1].expected && !edits[1].value);
 }
 
+static int read_attachment_ram(void *context, uint32_t at, uint8_t *value)
+{
+    return at >= 0x80000u && read_nibble(context, at - 0x80000u, value);
+}
+
 /* HP49g+/HP50g Stock 2.15: PURGE of :1:BEFORE moves attached library 275
  * down by 50 nibbles. Its HOME record still points to the same two main-RAM
  * ACPTRs. Only their payload words move with the library. */
@@ -1395,6 +1400,26 @@ static void port1_attachment_relocation(void)
                                                        50 + 13671, -50, &patch) == 1);
         assert(patch.field == at + 5 && patch.value == relocated[i]);
     }
+    pointers.size = 43;
+    put(&pointers, 30, 275, 3);
+    put(&pointers, 33, 0x80000, 5);
+    put(&pointers, 38, 0x8000f, 5);
+    const struct hpclang_rpl_reader main_ram = {read_attachment_ram, &pointers};
+    struct hpclang_rpl_reference_patch pair[2];
+    assert(
+        !hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, &rom, 0, 112, 50, 13721, -50, pair));
+    assert(pair[0].field == 0x80005 && pair[0].value == relocated[0]);
+    assert(pair[1].field == 0x80014 && pair[1].value == relocated[1]);
+    struct hpclang_rpl_reference_patch saved[2];
+    memcpy(saved, pair, sizeof pair);
+    put(&pointers, 25, 0x1000, 5); /* Second selector chooses Flash at the same numeric address. */
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, &rom, 0, 112, 50, 13721, -49,
+                                             pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(saved, pair, sizeof pair));
+    put(&pointers, 38, 0x80000, 5);
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, &rom, 0, 112, 50, 13721, -50,
+                                             pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(saved, pair, sizeof pair));
 }
 
 static void catalog_executable_switches(void)
