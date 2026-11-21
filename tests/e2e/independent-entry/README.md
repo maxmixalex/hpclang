@@ -134,5 +134,12 @@ two named directories. Reset stored the Stock empty-list reference (0x05da2)
 in the copy. The original retained its marker throughout. Each snapshot also
 failed verification when given the opposite expected copy state.
 
+HP39gs and HP40gs also passed with their respective Stock 2.22 firmware and
+the same four-file bundle. The full named directories matched after initial
+ENTER, copy, confirmed Reset and relaunch on each model. When scripting USB
+reception for this bundle, use the model's Stock USB sequence and
+`tools/wait-hp39-kermit-fetch.py wait LOG MARKER --last-file HPCRESET.000`.
+This releases the payload gate after the named Reset program transfers.
+
 This probe exercises RPL Start, ENTER, Exit and copied-Aplet Reset. ARM entry, Notebook resource
-ownership and other HP39 profiles require separate execution checks.
+ownership and physical-device behavior require separate execution checks.

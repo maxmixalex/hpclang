@@ -17,11 +17,12 @@ Native installation and startup recovery remain open. The combined candidate's
 Quality job flagged test formatting on `de3e2a02`. The corrected reference test
 passed locally with CI's clang-format 22.1.0 and ASan/UBSan.
 
-On HP39g+ D1.55, a library-free RPL Aplet imported through Stock USB using
-the native attachment ID `0x7ff`. Start, ENTER and Exit persisted the marker
-in the named Aplet's custom data. The copied Aplet retained the marker, cleared it on confirmed Reset and saved it again after relaunch. The original retained its marker in all three SRAM snapshots. ID zero
-and 275 failed at import. The build and snapshot check are in
-`tests/e2e/independent-entry/`. Independent HP39 ARM entry remains open.
+On HP39g+ D1.55, HP39gs 2.22 and HP40gs 2.22, the same library-free RPL
+Aplet imported through Stock USB with attachment ID `0x7ff`. All three
+profiles passed Start, ENTER, Exit, copy, confirmed Reset and relaunch.
+Full SRAM directory checks found the original marker intact while the copy
+was cleared and then saved again. The zero and 275 attachment controls failed
+import on HP39g+. Independent HP39 ARM entry remains open.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN

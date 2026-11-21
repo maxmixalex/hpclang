@@ -2,7 +2,7 @@
 """Wait for the HP39/40 Stock serial-disk lazy fetch to finish.
 
 Synchronization uses acknowledged Kermit transactions for the directory and
-LIB275L.000. By the time Stock requests and completes that file, the larger
+the last expected file (normally LIB275L.000). By that point the larger
 HPGCC000.000 and its named-program dependencies have already completed.
 Acknowledged packet progress refreshes the idle watchdog; an independent
 absolute ceiling bounds the whole transfer. Neither limit paces UI actions.
@@ -48,13 +48,13 @@ class Completions:
         return completed
 
 
-def wait_for_fetch(log_path: Path, marker: Path) -> int:
+def wait_for_fetch(log_path: Path, marker: Path, last_file: str = TARGET_FILE) -> int:
     watchdog = Watchdog()
     position = 0
     parser = Completions()
     gates = {
         "HP39DIR.000": Path(f"{marker}.directory"),
-        TARGET_FILE: marker,
+        last_file: marker,
     }
     failed = Path(f"{marker}.failed")
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -82,7 +82,7 @@ def wait_for_fetch(log_path: Path, marker: Path) -> int:
             if name in gates:
                 gates[name].write_text("complete\n", encoding="ascii")
                 print(f"Kermit completed {name} transaction; released {gates[name]}", flush=True)
-                if name == TARGET_FILE:
+                if name == last_file:
                     return 0
         if reason := watchdog.failure():
             break
@@ -105,6 +105,12 @@ def main() -> int:
     wait_parser.add_argument("debug_log", type=Path)
     wait_parser.add_argument("marker", type=Path)
 
+    wait_parser.add_argument(
+        "--last-file",
+        choices=(TARGET_FILE, "HPCRESET.000"),
+        default=TARGET_FILE,
+        help="final expected transaction (HPCRESET.000 for the library-free probe)",
+    )
     args = parser.parse_args()
     if args.command == "timeout":
         print(TOTAL_SECONDS)
@@ -112,6 +118,7 @@ def main() -> int:
     return wait_for_fetch(
         args.debug_log,
         args.marker,
+        args.last_file,
     )
 
 
