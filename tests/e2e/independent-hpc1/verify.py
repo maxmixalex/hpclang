@@ -16,11 +16,7 @@ def verify(artifact, state, baseline):
     model = manifest.get("model", "hp50g")
     require(model in ("hp49gplus", "hp50g"), "unsupported fixture model")
     model_id = 5 if model == "hp49gplus" else 6
-    rom_hash = (
-        "894e146c3252191ad3700b17d24bc0669c6f3f0923e9307c1ed4f3d9857477d8"
-        if model_id == 5
-        else module["ROM_SHA256"]
-    )
+    rom_hash = module["ROM_SHA256_BY_MODEL"][model]
     for name, expected in manifest["outputs"].items():
         require(Path(name).name == name, "invalid artifact path")
         require(
@@ -34,7 +30,7 @@ def verify(artifact, state, baseline):
     )
     require(
         hashlib.sha256(flash[:1310720]).hexdigest() == rom_hash,
-        "hashlib.sha256(flash[:1310720]).hexdigest() == module['ROM_SHA256']",
+        f"unexpected {model} firmware",
     )
     module["no_toolbox"]((baseline / "sram").read_bytes(), flash)
     nib, word, count = module["no_toolbox"](ram, flash)
