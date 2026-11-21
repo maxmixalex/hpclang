@@ -4,10 +4,10 @@ Current checkpoint: 2026-11-22. **M8.1 through M8.5 are accepted complete. M8.0 
 
 Accepted main is `43d5aac9` (#55). Port 1 HOME cache relocation passed all five workflows on `771646cd`. The current integration candidate combines
 M8.0 library discovery (#49) and Port 1 cache relocation (#55) with M8.6
-independent Notebook (#54) and HP39/40 SDK packaging (#56). Local validation
-on `3604db84` passed all 180 host tests, three native Port sanitizer tests,
-the installed SDK on all six models (613 identical release outputs), the
-HP48gII independent Notebook save/relaunch and the strict documentation build.
+independent Notebook (#54) and HP39/40 SDK packaging (#56). Head `25b4963b`
+is submitted for CI. Local checks cover all 180 host tests, native Port
+sanitizers, the installed SDK on all six models (613 identical release
+outputs), HP48gII Notebook save/relaunch and strict documentation.
 [#49](https://github.com/maxmixalex/hpclang/pull/49) carries the combined CI gate.
 On `7e87d081`, [HP39gs Stock dialogs](https://github.com/maxmixalex/hpclang/actions/runs/44940273064/job/136957048225) stopped before application entry after 90 seconds without a Kermit ACK. A local replay with that job's emulator, SDK payload and transfer files passed through Stock return. The source of the transfer stall remains open.
 
@@ -41,9 +41,11 @@ library remain gated. Locally, the internal guarded Port 1 edit can move
 a header-only library. On copies of both models' ERAM, deleting the backup
 before library 123 matched Stock's resulting chain; moving executable library
 275 was refused before writes. The guarded edit fixture now checks live ERAM
-catalog bindings. It tracked both libraries before and after native PURGE on
-both models. Guarded backup replacement and deletion passed on both Stock 2.15
-ROMs, including two relaunches. Public edits still require other live roots.
+catalog bindings and both HOME attachment cache fields. On both models, the
+HOME check located both targets of library 275 before and after native PURGE.
+It vetoes possible ERAM overlaps even through a Flash switch or alias. Guarded
+edits and two relaunches passed locally on each Stock 2.15 ROM.
+Public edits still require other live roots, including suspended execution.
 The HP48gII Port 0 Notebook
 passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
 bundles matched the historical writer on all three models.

@@ -34,12 +34,15 @@ static int check_owned_tail(void *context, uint32_t first, uint32_t end)
         return HPCLANG_RPL_MUTATION_MALFORMED;
     /* These HP49g+/HP50g Stock 2.15 fixtures use the ROM ERAM switch at 0x26c39. */
     const struct hpclang_rpl_reader stock = {stock_nibble, NULL};
-    uint32_t selector = 0;
+    uint32_t selector = 0, home = 0;
     for (unsigned i = 0; i < 5; ++i) {
         uint8_t nibble;
         if (!stock_nibble(NULL, 0x26c39u + i, &nibble))
             return HPCLANG_RPL_MUTATION_IO;
         selector |= (uint32_t)nibble << (4 * i);
+        if (!stock_nibble(NULL, 0x80711u + i, &nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+        home |= (uint32_t)nibble << (4 * i);
     }
     if (selector != 0x23c21u)
         return HPCLANG_RPL_MUTATION_UNSUPPORTED;
@@ -47,7 +50,10 @@ static int check_owned_tail(void *context, uint32_t first, uint32_t end)
                                                     selector, first, end);
     if (overlap < 0)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
-    return owned->blocked || overlap ? HPCLANG_RPL_MUTATION_BUSY : HPCLANG_RPL_MUTATION_OK;
+    int cache = hpclang_rpl_port1_home_overlap(&stock, home, 0x100000u - home, first, end);
+    if (cache < 0)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    return owned->blocked || overlap || cache ? HPCLANG_RPL_MUTATION_BUSY : HPCLANG_RPL_MUTATION_OK;
 }
 
 static int chain_end(const struct hpclang_rpl_reader *reader, uint32_t *end)

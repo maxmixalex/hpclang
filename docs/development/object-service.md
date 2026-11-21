@@ -1096,7 +1096,16 @@ HP50g states, the check located library 123 at offset `0x42` before native purge
 and `0x10` afterward, and library 275 at `0x94` and `0x62` respectively. Adjacent
 ranges excluded those bindings. The fixture retains its separate proof that Stock
 has never seen the newly appended records. Public editing still requires coverage
-of other bank mappings, HOME caches and live execution references.
+of other bank mappings and live execution references.
+
+The edit guard also walks both cache fields of every HOME attachment. For each
+nonzero field it reads the 15-nibble ACPTR from fixed ROM or main RAM. It checks
+the target offset across all bank switches because ERAM can overlay the Flash
+window. A coincident Flash offset can therefore veto an edit. An unreadable
+later field or an unsupported wrapper vetoes the edit even after an earlier hit.
+On saved HP49g+ and HP50g Stock 2.15 states, this check picked out both library
+275 targets before and after native PURGE, excluded the adjacent offsets and
+rejected an injected read failure at the end of the attachment list.
 
 A combined replay on HP49g+ and HP50g Stock 2.15 moved library 275 and its
 terminator down 50 nibbles in an offline ERAM copy, then applied the C catalog
