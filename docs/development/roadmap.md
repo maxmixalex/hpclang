@@ -24,8 +24,9 @@ previously caused error 134 on all three. Each model now opens an empty
 editor after Reset, saves `20`, reopens it and returns to the Stock library.
 The checks cover the LCD, named Aplet in SRAM and native return state.
 The Core workflow now runs these cases with the installed SDK packages.
-D1.55 also preserved both notes when Stock rejected entry with a full-size
-copy resident. Editing a copy and GC during execution remain open. The
+Stock preserved both named notes on all three models, but the copied editor
+could not start. The two-Aplet stack gap was 67–70 KiB and the startup bitmap
+requires 112 KiB. Editing a copy and GC during execution remain open. The
 [launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
 records the Stock-owned bitmap and code staging.
 The HP48gII CI size check failed on `54f6642b` and passed on `0cdc1bc0`.
