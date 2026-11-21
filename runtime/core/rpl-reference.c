@@ -560,6 +560,42 @@ static int word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned c
     return 0;
 }
 
+int hpclang_rpl_port1_attachment_plan(const struct hpclang_rpl_reader *ram, uint32_t record,
+                                      const struct hpclang_rpl_reader *rom, uint32_t flash_table,
+                                      uint32_t eram_entry, uint32_t first, uint32_t end,
+                                      int32_t delta, struct hpclang_rpl_reference_patch patches[2])
+{
+    if (!ram || !ram->read_nibble || !rom || !rom->read_nibble || !patches)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (record < 0x80000u || record > 0x100000u - 13 || first >= end || end > 0x40000u ||
+        (int64_t)first + delta < 0 || (int64_t)end + delta > 0x40000)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct hpclang_rpl_reference_patch next[2];
+    for (unsigned i = 0; i < 2; ++i) {
+        uint32_t object;
+        int result = word(ram, record + 3 + 5 * i, 5, &object);
+        if (result)
+            return result;
+        if (object < 0x80000u || object > 0x100000u - 15 ||
+            (object < record + 13 && record < object + 15))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        struct hpclang_rpl_banked_target target;
+        result = hpclang_rpl_acptr_resolve(ram, object, 15, rom, flash_table, eram_entry, &target);
+        if (result < 0)
+            return result;
+        if (result != 1 || target.bank.kind != HPCLANG_RPL_BANK_ERAM || target.offset < first ||
+            target.offset >= end)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        next[i].field = object + 5;
+        next[i].value = (uint32_t)(0x40000 + (int64_t)target.offset + delta);
+    }
+    if (next[0].field < next[1].field + 15 && next[1].field < next[0].field + 15)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    patches[0] = next[0];
+    patches[1] = next[1];
+    return 0;
+}
+
 int hpclang_rpl_dispatch_reference_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
                                          uint32_t limit,
                                          const struct hpclang_rpl_dispatch_descriptor *descriptor,
