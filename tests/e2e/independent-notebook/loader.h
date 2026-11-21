@@ -102,7 +102,7 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame)
 
     if (!second) {
         volatile u32 *boot = (void *)0x01100000;
-        boot[0] = 6;
+        boot[0] = NOTEBOOK_MODEL;
         boot[1] = 32768;
         boot[2] = (u32)map;
         u32 lo, hi;
@@ -110,7 +110,7 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame)
             lo < 0x80000 || hi <= lo)
             for (;;) {
             }
-        /* On the qualified HP50g fixture the full Saturn main arena maps
+        /* The fixture requires the full Saturn main arena maps
            to upper SRAM; KOS blocks and ERAM records are entirely below it. */
         for (unsigned i = 128; i < 256; i++)
             if (map[i] != 0x08040000 + (i - 128) * 2048 || map[257 + i] != map[i])

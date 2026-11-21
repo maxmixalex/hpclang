@@ -1,4 +1,4 @@
-"""Build and run the HP50g no-library Notebook save/relaunch fixture."""
+"""Build and run the HP49g+/HP50g no-library Notebook save/relaunch fixture."""
 
 import argparse
 import hashlib
@@ -20,7 +20,8 @@ sys.path.insert(0, str(E2E / "port-recovery"))
 from run import emulator, completed, transfer  # noqa: E402
 from verify import home_string, require_stock_pc  # noqa: E402
 
-no_toolbox = runpy.run_path(str(E2E / "independent-entry/verify.py"))["no_toolbox"]
+entry_verifier = runpy.run_path(str(E2E / "independent-entry/verify.py"))
+no_toolbox = entry_verifier["no_toolbox"]
 ui = runpy.run_path(str(E2E / "notebook/verify.py"))
 
 
@@ -31,7 +32,7 @@ def pack(nibbles):
     )
 
 
-def build(dest, toolchain):
+def build(dest, toolchain, profile):
     env = dict(os.environ, PATH=str(toolchain) + os.pathsep + os.environ["PATH"])
     sdk = dest / "sdk"
     for cmd in [
@@ -47,7 +48,7 @@ def build(dest, toolchain):
             "-DCMAKE_PREFIX_PATH=" + str(sdk),
             "-DCMAKE_TOOLCHAIN_FILE="
             + str(sdk / "share/hpclang/cmake/toolchains/hpclang-armv4t.cmake"),
-            "-DHPCLANG_BUILD_MODEL=hp50g",
+            "-DHPCLANG_BUILD_MODEL=" + profile["target"],
         ],
         ["cmake", "--build", dest / "app", "--target", "notebook_launchers", "-j4"],
     ]:
@@ -69,7 +70,11 @@ def build(dest, toolchain):
     for phase in ("acquire", "check"):
         source = dest / (phase + ".c")
         source.write_text(
-            f'#define IMAGE_BYTES {size}u\n#define IMAGE_HASH {checksum}u\n#define ENTRY_OFFSET {offset}u\n#include "{(HERE / (phase + ".c")).as_posix()}"\n'
+            f"#define NOTEBOOK_MODEL {profile['model']}u\n"
+            f"#define IMAGE_BYTES {size}u\n"
+            f"#define IMAGE_HASH {checksum}u\n"
+            f"#define ENTRY_OFFSET {offset}u\n"
+            f'#include "{(HERE / (phase + ".c")).as_posix()}"\n'
         )
         subprocess.run(
             [
@@ -172,14 +177,17 @@ def main():
     parser.add_argument("--toolchain", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dist", type=Path, required=True)
-    parser.add_argument("--baseline", type=Path, help="optional local no-275 HP50g Stock snapshot")
+    parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
+    parser.add_argument(
+        "--baseline", type=Path, help="optional no-275 Stock snapshot for the selected model"
+    )
     args = parser.parse_args()
     dest = args.output.resolve()
     dest.mkdir(parents=True)
-    image = build(dest, args.toolchain.resolve())
-    profile = json.loads((E2E / "targets/hp50g.json").read_text())
+    profile = json.loads((E2E / "targets" / f"{args.model}.json").read_text())
+    image = build(dest, args.toolchain.resolve(), profile)
     spec = SimpleNamespace(
-        model="hp50g", profile=profile, dist=args.dist.resolve(), flash_busy_reads=0
+        model=args.model, profile=profile, dist=args.dist.resolve(), flash_busy_reads=0
     )
     baseline = args.baseline
     if baseline is None:
@@ -199,11 +207,13 @@ def main():
     ram = (baseline / "sram").read_bytes()
     flash = (baseline / "flash").read_bytes()
     _, read, _ = no_toolbox(ram, flash)
+    bootloader = (spec.dist / "firmware" / profile["bootloader"]).read_bytes()
+    expected_rom = entry_verifier["ROM_SHA256_BY_MODEL"][args.model]
     if (
-        hashlib.sha256(flash[:0x140000]).hexdigest()
-        != runpy.run_path(str(E2E / "independent-entry/verify.py"))["ROM_SHA256"]
+        not flash.startswith(bootloader)
+        or hashlib.sha256(flash[:0x140000]).hexdigest() != expected_rom
     ):
-        raise ValueError("unexpected HP50g ROM")
+        raise ValueError(f"unexpected {args.model} ROM or bootloader")
     try:
         home_string(read, b"HPCNOTE")
     except ValueError as exc:
@@ -271,7 +281,9 @@ def main():
             "settled_sha256": check_phase(dest / name, first, flash, staged[0x20000:0x35000], font),
         }
     (dest / "report.json").write_text(json.dumps(hashes, indent=2))
-    print("PASS independent HP50g Notebook HOME bytes, editor reload, GC and settled return")
+    print(
+        f"PASS independent {args.model} Notebook HOME bytes, editor reload, GC and settled return"
+    )
 
 
 if __name__ == "__main__":
