@@ -11,8 +11,10 @@ release acceptance.
 M8.6 local verification on HP49g+ and HP50g covers independent Notebook
 launch from original ROM, saving `20` in HOME, a low-memory application exit
 and normal relaunch from that state. Notebook exports the edit to a FAT16 card
-and backs it up to Port 0. Both contain `202` while HOME retains `20`. Both fixtures check lease
-release, GC and settled Stock return. The repository-built HP48gII entry also
+and backs it up to Port 0. Both contain `202` while HOME retains `20`.
+All 20 code pages map directly from Port 1, reducing aligned KOS usage from
+21 to nine pages on normal launch. Both fixtures check release, GC and settled
+Stock return. The repository-built HP48gII entry also
 returns successfully on the original ROM with its own 4 KiB stack. HP39 Aplet
 entry, HP48gII application-sized
 allocation and wider native services remain open.

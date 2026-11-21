@@ -17,8 +17,11 @@ fingerprint.
 
 The test boots firmware 2.15, checks that library 275 is absent, installs
 the SDK and builds its plain Notebook example. Stock creates a named Port 1
-backup containing the staged code. KOS allocations and the backup supply a
-fixture-specific split mapping. The loader receives the actual saved ARMSYS
+backup containing the staged code. All 20 code pages map read-only from that record.
+The normal entry requests nine aligned KOS pages (eight writable pages and one
+page for the two coarse page tables). The low-memory entry requests six
+(five writable pages and one table page). These counts exclude alignment
+slack and KOS allocator metadata. The loader receives the actual saved ARMSYS
 continuation and denies Port 1 edits. This fixed-layout emulator fixture is
 not a production launcher.
 

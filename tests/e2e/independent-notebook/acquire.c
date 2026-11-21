@@ -4,11 +4,12 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
     hpclang_irq_restore(control[0]);
     unsigned count = 0, total = 0;
     for (unsigned n = 8; n; n /= 2)
-        while (count < 12 && total + n <= 35) {
+        while (count < 12 && total + n <= POOL_PAGES) {
             unsigned ptr = stock_call(201, 0x100, n * 4096 + 4095);
             if (!ptr)
                 break;
-            if (!owner(ptr, n * 4096 + 4095))
+            /* Keep this allocation disjoint from the full ERAM record and main RPL RAM. */
+            if (!owner(ptr, n * 4096 + 4095) || ptr + n * 4096 + 4095 > 0x08020000)
                 for (;;) {
                 }
             out[8 + 2 * count] = ptr;
