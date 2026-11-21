@@ -202,6 +202,45 @@ static void fixture(void)
         memory[0xfffc0 + i] = (uint8_t)(hex[i] <= '9' ? hex[i] - '0' : hex[i] - 'a' + 10);
 }
 
+static void test_library_query(void)
+{
+    struct hpclang_boot_info saved_boot = boot;
+    struct hpclang_device_info saved_device = device;
+    const uint32_t catalog = 0x8611du, home = 0x90000u, id = 0x345u;
+    fixture();
+    put_word(0x80711u, home);
+    put_word(home, 0x2a96u);
+    put_word(home + 8, id);
+    put_word(catalog + 3, id);
+    for (uint32_t model = HPCLANG_MODEL_HP48GII; model <= HPCLANG_MODEL_HP50G; ++model) {
+        boot.model = device.model = model;
+        for (unsigned registered = 0; registered <= 1; ++registered) {
+            memory[catalog] = registered;
+            for (unsigned attached = 0; attached <= 1; ++attached) {
+                memory[home + 5] = attached;
+                assert(hpclang_library_query(id) ==
+                       (int)(registered * HPCLANG_LIBRARY_REGISTERED +
+                             attached * HPCLANG_LIBRARY_HOME_ATTACHED));
+                assert(hpclang_library_query(id + 1) == 0);
+            }
+        }
+    }
+    memory[home] = 0;
+    assert(hpclang_library_query(id) == -1 && errno == EILSEQ);
+    put_word(home, 0x2a96u);
+    memory[catalog] = 2;
+    put_word(catalog + 19, id);
+    assert(hpclang_library_query(id) == -1 && errno == EILSEQ);
+    unavailable = 1;
+    assert(hpclang_library_query(id) == -1 && errno == EIO);
+    unavailable = 0;
+    boot.model = device.model = HPCLANG_MODEL_HP39GS;
+    assert(hpclang_library_query(id) == -1 && errno == ENOSYS);
+    assert(hpclang_library_query(0x1000u) == -1 && errno == EINVAL);
+    device = saved_device;
+    boot = saved_boot;
+}
+
 static void test_discovery(void)
 {
     struct hpclang_boot_info saved_boot = boot;
@@ -497,6 +536,7 @@ static void check_port1_terminal(const struct hpclang_object *value,
 int main(void)
 {
     test_discovery();
+    test_library_query();
     test_flash();
     fixture();
     test_port_cpp(invalidate_cpp_fixture);

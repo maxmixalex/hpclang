@@ -88,6 +88,52 @@ static int port_error(int result)
     return -1;
 }
 
+static int read_pointer(uint32_t address, uint32_t *pointer)
+{
+    uint32_t value = 0;
+    for (uint32_t i = 0; i < 5; ++i) {
+        uint8_t nibble;
+        if (!read_nibble(NULL, address + i, &nibble))
+            return port_error(HPCLANG_RPL_SPAN_UNAVAILABLE);
+        if (nibble > 15)
+            return port_error(HPCLANG_RPL_SPAN_MALFORMED);
+        value |= (uint32_t)nibble << (4 * i);
+    }
+    *pointer = value;
+    return 0;
+}
+
+int hpclang_library_query(uint32_t library_number)
+{
+    if (library_number > 0xfffu) {
+        errno = EINVAL;
+        return -1;
+    }
+    const struct hpclang_device_info *device = hpclang_device_info();
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (!device || !boot || boot->model != device->model || !boot->saturn_state ||
+        device->model < HPCLANG_MODEL_HP48GII || device->model > HPCLANG_MODEL_HP50G) {
+        errno = ENOSYS;
+        return -1;
+    }
+    const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+    struct hpclang_rpl_library_binding binding;
+    const uint32_t catalog = 0x8611du;
+    int registered =
+        hpclang_rpl_library_lookup(&reader, catalog, 0x100000u - catalog, library_number, &binding);
+    if (registered < 0)
+        return port_error(registered);
+    uint32_t home;
+    if (read_pointer(0x80711u, &home))
+        return -1;
+    int attached =
+        hpclang_rpl_home_library_attached(&reader, home, 0x100000u - home, library_number);
+    if (attached < 0)
+        return port_error(attached);
+    return (registered ? HPCLANG_LIBRARY_REGISTERED : 0) |
+           (attached ? HPCLANG_LIBRARY_HOME_ATTACHED : 0);
+}
+
 static int open_cursor(uint32_t port, struct hpclang_rpl_reader *reader,
                        struct hpclang_rpl_port_cursor *cursor)
 {
@@ -126,15 +172,9 @@ static int open_cursor(uint32_t port, struct hpclang_rpl_reader *reader,
         return 0;
     }
     *reader = (struct hpclang_rpl_reader){read_nibble, NULL};
-    uint32_t start = 0;
-    for (uint32_t i = 0; i < 5; ++i) {
-        uint8_t nibble;
-        if (!read_nibble(NULL, 0x80716 + i, &nibble))
-            return port_error(HPCLANG_RPL_SPAN_UNAVAILABLE);
-        if (nibble > 15)
-            return port_error(HPCLANG_RPL_SPAN_MALFORMED);
-        start |= (uint32_t)nibble << (4 * i);
-    }
+    uint32_t start;
+    if (read_pointer(0x80716u, &start))
+        return -1;
     /* Port 0 belongs to main RAM. Its terminating zero is model dependent. */
     if (start < 0x80000 || start > 0xffffb)
         return port_error(HPCLANG_RPL_SPAN_BOUNDS);

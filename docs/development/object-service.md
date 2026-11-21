@@ -608,6 +608,12 @@ Flash allocation records use the separate slot traversal described below;
 their write transactions remain open. The RAM iterator must not be applied
 to raw Flash records.
 
+On Stock HP48gII, HP49g+ and HP50g, `hpclang_library_query(id)` looks up a
+12-bit library number in the system catalog and the HOME attachment list.
+Check for a negative return before testing `HPCLANG_LIBRARY_REGISTERED` and
+`HPCLANG_LIBRARY_HOME_ATTACHED`. Zero means the ID is absent from both lists.
+A library stored in a port can still return zero.
+
 The initial `<hpclang/port.h>` API provides `hpclang_port_iterator_open/read/close`
 and `hpclang_port_backup_get`. Iterators own their metadata; returned values are
 independent `hpclang_object` snapshots released with `hpclang_object_release`.
