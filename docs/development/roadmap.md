@@ -28,6 +28,10 @@ On D1.55 the installed-SDK Notebook now reads the active independent Aplet's
 data. Two local launches displayed the preinstalled note `Seed42` and
 `Loaded`, accepted focus changes and exited to the Aplet library. Edited
 notes still need Save-button publication and relaunch verification.
+The #49 submission includes the editor and active-Aplet reads. Its SDK check
+rebuilds the independent HP39g+ launcher from each installed Notebook image
+and compares its ARM binary and four transfer files. In a local replay all
+five matched the D1.55 run byte for byte.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN

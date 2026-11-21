@@ -21,6 +21,45 @@ def run(*args, env):
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
 
 
+def build_independent_hp39_notebook(directory, fixture, toolchain, assets, env):
+    image = directory / "notebook.hpc"
+    probe = directory / "independent-entry"
+    bundle = directory / "independent-aplet"
+    run(
+        sys.executable,
+        fixture / "build.py",
+        "--toolchain",
+        toolchain / "bin",
+        "--hp39-notebook-editor",
+        "--bitmap-image",
+        image,
+        "--output",
+        probe,
+        env=env,
+    )
+    run(
+        sys.executable,
+        fixture / "build-hp39-aplet.py",
+        "--assets",
+        assets,
+        "--bitmap-pool",
+        probe / "probe.bin",
+        "--bitmap-image",
+        image,
+        "--initial-note",
+        "Seed42",
+        "--output",
+        bundle,
+        env=env,
+    )
+    expected = {"HPGCC000.000", "HP39DIR.000", "HP39DIR.CUR", "HPCRESET.000"}
+    if {p.name for p in bundle.iterdir()} != expected:
+        raise AssertionError("unexpected independent Notebook transfer set")
+    return {Path("independent-aplet") / name for name in expected} | {
+        Path("independent-entry/probe.bin")
+    }
+
+
 def check_cpp_headers(package, work, env):
     """Compile each installed public C++ header alone with the shipped profile."""
     source = work / "public header client"
@@ -699,6 +738,17 @@ endforeach()
                 Path("notebook-launchers/memory.json"),
             }
             if aplet_options:
+                if model == "hp39gplus":
+                    for directory in (selected, repeated):
+                        outputs.update(
+                            build_independent_hp39_notebook(
+                                directory,
+                                root / "tests/e2e/independent-entry",
+                                toolchain,
+                                args.aplet_assets,
+                                env,
+                            )
+                        )
                 bundle = Path("notebook-aplet") / model
                 files = (
                     "HPGCC000.000",
