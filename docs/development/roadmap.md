@@ -35,14 +35,16 @@ at `54f6642b`. Its HP48gII CI job rejected an oversized Notebook. Checking
 the calculator family before accessing HP39 services reduced the local
 HP48gII image to 65,464 bytes within its 65,536-byte code window. Both
 independent entry paths then passed on the HP48gII ROM, including Port 0
-consecutive saves. The three-model HP39/40 changes and the HP48gII fix
-share the next #49 CI submission.
+consecutive saves. Commit `0cdc1bc0` submitted both changes to #49 for CI.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN
 reinstall screen as native backup deletion. See the
 [Port 1 placement controls](object-service.md). Public edits that move a
-library remain gated. The HP48gII Port 0 Notebook
+library remain gated. Locally, the internal guarded Port 1 edit can move
+a header-only library. On copies of both models' ERAM, deleting the backup
+before library 123 matched Stock's resulting chain; moving executable library
+275 was refused before writes. The HP48gII Port 0 Notebook
 passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
 bundles matched the historical writer on all three models.
 

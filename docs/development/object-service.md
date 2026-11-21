@@ -1062,8 +1062,10 @@ UI retains a return-stack address inside a main-RAM copy of the program.
 These probes cover ordinary program execution; library and other banked
 references still require their own checks before public replacement/removal.
 Internal ERAM edit primitives now validate complete backup chains, resize or
-remove records within the launcher ownership fence, and refuse to move a
-following library. Their caller must establish reference safety; they are not
+remove records within the launcher ownership fence, and can move a following
+library if its validated encoding contains only its header, four zero table
+offsets and CRC. The guard must cover the whole shifted suffix. A body or
+nonzero table offset prevents the move. Their caller must establish reference safety; they are not
 yet connected to the public write API. Host/sanitizer tests cover growth,
 shrinkage, same-size replacement, removal, CRC damage, I/O failure and bounds.
 
