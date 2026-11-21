@@ -98,6 +98,42 @@ or retirement of the historical dependency is authorized by this prototype.
 
 ### Source-level family assessment
 
+#### Migration decision after the full Notebook measurements (2026-11-19)
+
+**Keep the installed SDK's current launchers.** Removing the separate support
+installation would simplify first use. The HP50g fixture exercises a bounded
+Notebook save and relaunch, but does not qualify a general replacement. Keep
+the independent path experimental until the following gates pass. This
+decision retains the migration work and does not close M8.6.
+
+All page counts below use 4 KiB frames. “Minimum / editor” compares the
+production packaging floor before heap with a budget derived from the observed
+editor workload, including its heap reservation and full 8 KiB stack. It is
+neither a worst-case requirement nor the cost of a different launcher.
+
+| Family | Entry and page source | Stock services and exit | Next independent acceptance gate |
+| --- | --- | --- | --- |
+| HP39 (HP39g+ D1.55 measured) | Production Aplet: **25 / 27** pages. Its 37 frames include two native workspace pages. All 36 candidate RPL slots overlap these frames; the separate native block yields no aligned frame. Independent Aplet entry is unverified. | Production editor and ON return pass. Aplet data access depends on the action frame; no equivalent independent Start/Reset, data-slot or return contract is established. | From a clean Aplet install, enter without the support library; account for application and native workspace simultaneously. Verify save/relaunch, copied-Aplet isolation, Reset, rejected entry and settled return on all three HP39 profiles. |
+| HP48 (HP48gII) | Production ARMToolbox48: **27 / 29** pages. A model-specific no-275 entry and RPL return pass locally. KOS supplied one aligned frame. HOME-backed storage moves on insertion, and Stock recomputes a lowered `AVMEM` before it can serve as a persistent fence. Neither approach qualified extra frames. SRAM mirrors add no frames; HP48gII has no Port 1 ERAM. | Production HOME save/retry, Port 0 and settled return have Stock evidence. Independent admission refused the 29-frame request and released the KOS block. The two rejected reservations preserved HOME/Port 0 and stack values after cleanup. | Acquire and release a disjoint application-sized pool on the 256 KiB machine. Exercise HOME/Port 0 with live roots and ownership bounds, verify a successful full launch and qualify cleanup on partial assembly and entry failures. |
+| HP49/50 (HP50g budget measured) | Both models enter, run a bounded HPC1 and return without library 275. HP50g production Notebook: **32 / 35** pages. The independent HP50g fixture uses KOS and read-only Port 1 pages, not borrowed RPL gap frames. | HP50g local fixture passes HOME save/readback, settled return and GC after application exit while the frame leases are still live. This does not prove a general independent launcher or arbitrary Port mutation while pages are mapped. | Preserve the HP50g regression and qualify wider service coexistence. Repeat with the HP49g+ ROM, package and measured budget; preserve HOME, Port and supported file operations. |
+
+**Promotion evidence.** For each candidate run, record the owner, physical
+extent and lifetime of every frame; exclude aliases and Stock reservations.
+Demonstrate disjoint storage for code, RW, stage, MMU and required native
+workspace, with model-specific service fences and relocation roots. On rejection,
+normal exit and application failure, verify restored mappings, stack, control
+state and responsive Stock; verify page release or documented restoration
+before reuse. Compare first-install files/bytes, shared vs per-app dependencies,
+peak resident RAM and startup time against the same Notebook build. Require
+six-model installed-SDK packaging and supported Stock workflows before proposing
+retirement. A successful probe build or a zero-extra-frame observation alone
+does not decide the outcome for a new layout.
+
+The [roadmap measurements](roadmap.md#current-work-balanced-m8-delivery) name
+the local per-frame reports and distinguish them from CI acceptance. The
+`tests/e2e/independent-hpc1` and `tests/e2e/independent-pool` fixture READMEs
+identify the independent execution and negative checks.
+
 The current sources identify the following concrete replacement boundaries.
 This is an implementation assessment, not additional native execution evidence.
 
@@ -154,8 +190,8 @@ entry package unchanged. This small-entry baseline does not establish combined
 KOS/RPL availability with the full Notebook resident, or a lease across native
 allocation/GC. Report: `/work/nov14-independent-rpl-pool-live/verified.json`. Then
 connect the captured Stock context and service fences to a service-capable
-HP49/50 Notebook prototype, followed by HP48gII entry/allocation and the HP39
-Aplet data boundary. Compare identical application
+HP49/50 Notebook prototype, followed by HP48gII application-sized ownership
+and the HP39 Aplet data boundary. Compare identical application
 sources and configuration; record package transfer cost, supported-flow memory
 use, allocation failure and settled return. This does not require the deferred
 whole-system worst-case memory proof. Until those comparisons exist, the

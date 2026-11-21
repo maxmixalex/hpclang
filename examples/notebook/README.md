@@ -82,12 +82,44 @@ cmake -S notebook -B build/notebook-hp39gs \
 cmake --build build/notebook-hp39gs
 ```
 
-Use the corresponding model name for another calculator. The `.hpc` payload
-is not a transfer file. Classic models use the model's wrapped `.hp` launcher
-with its ARMToolbox dependency. HP39 models require the additional Aplet
-envelope described in the SDK getting-started guide; the generated `.hp` file
-alone cannot be installed as an Aplet. Keep the same Aplet when checking a
-saved note across launches, because its custom data owns the HP39 save.
+Use the corresponding model name for another calculator. `notebook.hpc`,
+the raw `.bin` and `notebook-launchers/memory.json` are not transfer files.
+
+### Install on the calculator
+
+For HP48gII, HP49g+ and HP50g, transfer the matching
+`notebook-launchers/<model>.hp` in binary mode. Follow the installed
+`docs/getting-started.md` section **Transfer and launch on HP48gII, HP49g+ or
+HP50g**: HP48gII uses ARMToolbox48 in Port 0; HP49g+/HP50g use ARMToolbox
+in Port 2. Recall the transferred Notebook object in RPN mode and launch
+it from **ARMTo → PrRUN**.
+
+The default Notebook build does not produce an HP39 Aplet. Prepare the
+external HPGCC39 host tool and assets as described in the installed
+getting-started guide, then wrap the existing launcher:
+
+```sh
+python3 /path/to/sdk/share/hpclang/tools/package-aplet.py \
+  build/notebook-hp39gs/notebook-launchers/hp39gs.hp \
+  build/notebook-hp39gs/notebook-aplet/hp39gs \
+  --tool /path/to/prepared-hpgcc39/hp2aplet \
+  --assets /path/to/prepared-hpgcc39/data --name "Notebook" --author hpclang
+```
+
+Use the same model in all paths for HP39g+ or HP40gs. Use the directory
+records, Aplet, Reset program and support library as described in the HP39
+transfer instructions. Do not send the intermediate `.hp` by itself.
+Keep the same installed Aplet across launches: it owns the save. Its
+**Reset** view clears its custom data, so use **Exit** or **ON** when you
+want to keep the last save.
+
+HP39 Stock provides Aplet-owned persistence, not HOME or Port backups in
+Notebook. HP48gII provides HOME and Port 0 but no Port 1/2 or SD export.
+HP49g+/HP50g use HOME, expose the native Port operations permitted by the
+current launch, and support export to a writable FAT SD card. A successful
+USB transfer does not establish media availability or data persistence.
+
+### Application sizing
 
 The application selects picolibc's integer-only formatter because it displays
 integer dates, port indices and error codes. Remove that target's

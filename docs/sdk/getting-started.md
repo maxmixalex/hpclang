@@ -74,7 +74,8 @@ cmake --build build/hello
 
 This produces `hello_c.elf`, `hello_c.hpc`, `hello_cpp.elf` and `hello_cpp.hpc`,
 plus `hello_c-launchers/` and `hello_cpp-launchers/` with all six model launchers.
-The HPC1 payload is model-independent; it is not a calculator transfer file.
+HPC1 is the common application format, not a calculator transfer file. A
+model-specific build uses the same format but is not portable to another model.
 Each launcher directory contains raw `.bin` images and wrapped `.hp` objects.
 Launcher packaging compresses the embedded application when this reduces its
 size, then the bootstrap expands it directly into the application's code pages.
@@ -152,8 +153,9 @@ the installed examples demonstrate `STATIC_AUTO` with `HPCLANG_UI_TEXT`.
 The C++ profile has no exceptions or RTTI. Declare external dependencies in the
 application rather than referring back to an hpclang checkout.
 
-`hpclang_target_launchers` is optional. Omitting `MODELS` builds all six models;
-an explicit list limits the output. It uses the selected compiler's matching
+`hpclang_target_launchers` is optional. Omitting `MODELS` builds all six
+launchers for a universal build, or just the selected model for a fixed-model
+build. An explicit list limits the output. It uses the selected compiler's matching
 LLVM linker and binary tools and shares its bootstrap builder with repository
 E2E. Changing the payload or bootstrap sources, or removing an output file,
 causes CMake to regenerate the launchers.
@@ -340,9 +342,9 @@ kit with HP39 support. Prepare its host tool and resources using the installed
 helper and a **host** Clang compiler:
 
 ```sh
-python /path/to/sdk/share/hpclang/tools/prepare-hp39-aplet.py \
+python3 /path/to/sdk/share/hpclang/tools/prepare-hp39-aplet.py \
   /path/to/extracted-hpgcc39 /path/to/prepared-hpgcc39
-clang -O2 /path/to/prepared-hpgcc39/src/hp2aplet.c \
+/path/to/host/clang -O2 /path/to/prepared-hpgcc39/src/hp2aplet.c \
   -o /path/to/prepared-hpgcc39/hp2aplet
 ```
 
@@ -352,7 +354,9 @@ assets remain external dependencies; preparing them does not change their
 redistribution terms. The SDK helper adds the native Aplet Start/Reset views
 and the companion Reset program.
 
-After declaring the application and enabling its launcher, add:
+For an application you develop, enable its launcher once, then add the Aplet
+target. If the project already calls `hpclang_target_launchers`, adjust that
+call if necessary instead of adding a second one:
 
 ```cmake
 hpclang_target_launchers(my_application MODELS hp39gs)
@@ -369,9 +373,21 @@ the screen's left edge.
 
 The resulting `my_application-aplet/hp39gs/` contains `HPGCC000.000`,
 `HPCRESET.000`, `LIB275L.000` and the Connectivity Kit directory files.
-Transfer the Aplet and Reset program using Conn3x/HPGComm; install the library
-once. Build separate packages with `MODEL hp39gplus` or `MODEL hp40gs` for
-those calculators. Reset clears only the selected Aplet's custom data.
+For an existing `.hp` launcher, such as the one built by the unmodified
+Notebook example, the installed `tools/package-aplet.py` can create the same
+bundle without changing CMake. See the installed Notebook README for its command.
+
+### Transfer and start the HP39 Aplet
+
+Use the calculator's USB Connectivity Kit transfer (for example, with
+Conn3x/HPGComm). Keep `HP39DIR.CUR` and `HP39DIR.000` alongside the typed
+objects; they are directory records for the transfer, not applications to run.
+Import `HPGCC000.000` as an Aplet and `HPCRESET.000` as its Reset companion
+program. Install the bundled `LIB275L.000` once if the required library is
+not already installed. Start the transferred Aplet from the Aplet library
+or its **Start** view. **Reset** clears the selected Aplet's custom data;
+it is not a calculator reset or a normal way to exit. Build a separate package
+for each of `hp39gplus`, `hp39gs` and `hp40gs`.
 
 The same directory contains a host-side `footprint.json` report. Its `files`
 map and `bundle_file_bytes` sum describe the five transfer files, including the
@@ -383,9 +399,37 @@ nested representations: do not add them together. The report is not listed for
 transfer and is excluded from the bundle total. These file sizes do not measure
 calculator resident allocations, transport overhead or peak installation RAM.
 
-For HP48gII, install ARMToolbox48 library 275 and transfer its model's `.hp`
-object. HP49g+/HP50g use their corresponding ARMToolbox launcher support.
-The generated application does not include or replace the calculator OS.
+## Transfer and launch on HP48gII, HP49g+ or HP50g
+
+In Stock **I/O → Transfer**, select the USB port and Kermit transfer type,
+then choose **I/O → Start Server**. Send files in **binary** mode. The host
+filenames below need not be the names used in calculator HOME. `HPCLANG` is
+the name used by the Stock acceptance tests for the generated `.hp` object.
+Finish the Kermit session before using the calculator keys. Use RPN mode for
+the stack-based launch sequence.
+
+| Calculator | Application file within `<target>-launchers/` | First-time Stock setup |
+| --- | --- | --- |
+| HP48gII | `hp48gii.hp` | Transfer the external ARMToolbox48 `L275_48.LIB` (received as `L275` in the tests). Recall the library to the RPN stack and store it in Port 0 (`0 STO`), then warmstart. |
+| HP49g+ | `hp49gplus.hp` | Transfer the external ARMToolbox `SETUP.BIN` as `SETUP`. Put Port 2 on the RPN stack and run `SETUP`, then warmstart. |
+| HP50g | `hp50g.hp` | Use the same `SETUP.BIN` and Port 2 installation sequence as HP49g+, but transfer the HP50g application file. |
+
+After setup, recall the application object from HOME onto the stack, open
+the Libraries menu, and choose **ARMTo → PrRUN**. Do not execute the raw `.bin`
+or `.hpc` file, transfer an HP39 Aplet envelope to these models, or repeat
+library installation on every application launch. The support files are not
+SDK outputs. The tested `L275_48.LIB` is in the historical HPGCC39 kit's
+`ARMToolbox` directory; the tested `SETUP.BIN` is in the
+[HPCalc MLREG bundle](https://www.hpcalc.org/hp49/math/statistic/mlreg.zip).
+Only its `SETUP.BIN` is used here. The generated application does not include
+or replace the calculator OS.
+
+This is the production path validated in original-ROM emulators. The HP48gII
+validation uses a 256 KiB USB-capable unit profile; the repository also has a
+UART transfer path. HP49g+/HP50g have an SD workflow for supported storage
+cases, but SD transfer or export is not an HP48gII or HP39 feature. Development
+fixtures such as `ZZE2E` are not needed for a user installation. Experimental
+no-library entry tests do not remove these production dependencies.
 
 ## Choose services at runtime
 

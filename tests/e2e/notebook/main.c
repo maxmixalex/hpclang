@@ -12,6 +12,21 @@ volatile uint32_t hpclang_e2e_result;
 extern volatile uint32_t hpclang_notebook_stack_witness[3];
 uint32_t hpclang_notebook_stack_sample(void);
 
+/* Fail only the replacement value allocation; both reads and the retry use
+ * the normal native storage path. */
+static int fail_next_string;
+int __real_hpclang_object_create_string(const uint8_t *, size_t, struct hpclang_object **);
+int __wrap_hpclang_object_create_string(const uint8_t *bytes, size_t length,
+                                        struct hpclang_object **object)
+{
+    if (fail_next_string) {
+        fail_next_string = 0;
+        errno = ENOMEM;
+        return -1;
+    }
+    return __real_hpclang_object_create_string(bytes, length, object);
+}
+
 static void hold(void)
 {
     for (volatile uint32_t n = 12000000u; n; --n)
@@ -134,6 +149,16 @@ int main(void)
         goto done;
     }
     if (phase < 2) {
+        if (phase == 1) {
+            fail_next_string = 1;
+            if (action(&note, ui, SAVE) || fail_next_string ||
+                strcmp(note.status, "Save: not enough memory") ||
+                strcmp(note.text, "Second saved note") || notebook_load(previous) ||
+                strcmp(previous, "First saved note")) {
+                failure = 10;
+                goto done;
+            }
+        }
         if (action(&note, ui, SAVE) || notebook_load(previous) || strcmp(previous, note.text)) {
             failure = 6;
             goto done;

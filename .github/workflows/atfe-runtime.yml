@@ -23,6 +23,8 @@ on:
       - "tests/e2e/port-recovery/**"
       - "tests/e2e/independent-entry/**"
       - "tests/e2e/independent-pool/**"
+      - "tests/e2e/independent-notebook/**"
+      - "tests/e2e/notebook/verify.py"
       - "tests/e2e/independent-hpc1/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
@@ -72,6 +74,8 @@ on:
       - "tests/e2e/port-recovery/**"
       - "tests/e2e/independent-entry/**"
       - "tests/e2e/independent-pool/**"
+      - "tests/e2e/independent-notebook/**"
+      - "tests/e2e/notebook/verify.py"
       - "tests/e2e/independent-hpc1/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
@@ -110,6 +114,34 @@ env:
   HPCLANG_RECOVERY_JOURNAL_SLOT: "0x160105"
 
 jobs:
+  independent-notebook:
+    name: HP50g independent Notebook save and relaunch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+      - uses: ./.github/actions/setup-atfe
+      - uses: ./.github/actions/setup-x50ng
+      - name: Run original-ROM regression from fresh firmware
+        run: |
+          dist="$GITHUB_WORKSPACE/build/x50ng/dist"
+          export PATH="$dist/tools:$PATH"
+          export LD_LIBRARY_PATH="$dist/runtime-lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          python3 tests/e2e/independent-notebook/regression.py \
+            --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-notebook
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: independent-notebook-hp50g
+          path: |
+            build/independent-notebook/report.json
+            build/independent-notebook/*/stock.json
+            build/independent-notebook/*/stock-*.pgm
+            build/independent-notebook/*/emulator.log
+          if-no-files-found: warn
+
   runtime:
     name: Runtime and unit tests
     runs-on: ubuntu-24.04

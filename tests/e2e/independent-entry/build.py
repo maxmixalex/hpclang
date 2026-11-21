@@ -41,7 +41,10 @@ def main():
     parser.add_argument(
         "--stock-state", action="store_true", help="pass original Saturn state to probe"
     )
+    parser.add_argument("--stock-frame", action="store_true", help="also pass saved register frame")
     args = parser.parse_args()
+    if args.stock_frame and not args.stock_state:
+        parser.error("--stock-frame requires --stock-state")
     root = args.output.resolve()
     root.mkdir(parents=True, exist_ok=False)
     tool = args.toolchain.resolve()
@@ -62,6 +65,8 @@ def main():
     ]
     if args.stock_state:
         common.append("-DHPCLANG_PROBE_STOCK_STATE")
+    if args.stock_frame:
+        common.append("-DHPCLANG_PROBE_STOCK_FRAME")
     for name in ("entry.S", "probe.c", "bootstrap-sync.S"):
         subprocess.run(
             common + ["-c", str(inputs[name]), "-o", str(root / (name + ".o"))],
