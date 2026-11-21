@@ -5817,7 +5817,7 @@ do not replace physical-device validation or close the remaining release goals.
 - [x] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each
   hardware family and state exactly which scenarios were emulated or physical.
-- [ ] Validate release installation, reproducible assets, resource limits,
+- [x] Validate release installation, reproducible assets, resource limits,
   error handling and Stock restoration; finish public documentation separately
   from internal design/history.
 - [ ] Evaluate the retained independent-launcher option against concrete
@@ -5825,13 +5825,13 @@ do not replace physical-device validation or close the remaining release goals.
   does not silently turn this evaluation into an implemented launcher claim.
   This is retained follow-up work, not the current Port 2 priority or a
   prerequisite for continuing native port services.
-  - [ ] Prototype Stock-to-ARM entry and normal return without invoking
+  - [x] Prototype Stock-to-ARM entry and normal return without invoking
     ARMToolbox / library 275, then connect the existing HPC1 loader. A minimal
     entry probe alone does not establish an independent application launcher.
   - [ ] Evaluate owned page allocation, MMU setup, relocation roots, native
     service coexistence and exit recovery across all three platform families,
     including the HP39 Aplet boundary and smallest-model memory budget.
-  - [ ] Present a migration decision and acceptance plan before retiring the
+  - [x] Present a migration decision and acceptance plan before retiring the
     historical dependency. Any replacement must preserve six-model packaging,
     application ABI, Stock return and documented compatibility; retirement is
     not implied by successful prototype tests.
