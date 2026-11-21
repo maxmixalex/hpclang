@@ -2236,14 +2236,15 @@ static void flashptr_guard_composition(unsigned special)
         assert(!hpclang_rpl_reference_guards_validate(&validation, guards, fixture.builder.count));
         for (unsigned mapping = 0; mapping < 3; ++mapping) {
             for (unsigned at = 0; at < 160; ++at) {
-                int observed = mapping == 2 ? at < 12
-                               : mapping    ? ((!special && at < 4) || (at >= 29 && at < 34) ||
-                                            (at >= 39 && at < 44))
-                                            : ((at >= 5 && at < 10) || at >= 80);
+                const int observed[] = {
+                    (at >= 5 && at < 10) || at >= 80,
+                    (!special && at < 4) || (at >= 29 && at < 34) || (at >= 39 && at < 44),
+                    at < 12,
+                };
                 fixture.data[mapping][at] ^= 1;
                 int status = hpclang_rpl_reference_guards_validate(&validation, guards,
                                                                    fixture.builder.count);
-                assert(observed ? status < 0 : status == 0);
+                assert(observed[mapping] ? status < 0 : status == 0);
                 fixture.data[mapping][at] ^= 1;
             }
         }
