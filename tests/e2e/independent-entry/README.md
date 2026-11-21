@@ -219,6 +219,30 @@ then returns its existing data after editor exit. The checker expects
 native data in the named Aplet directory. Reopen the Aplet from the library
 and repeat the LCD check with the second pair of captures.
 
+### Reproduce the HP39/40 Notebook Save test
+
+Core CI builds the Notebook twice using the relocated SDK, compares the
+model-specific binaries and transfer files, and exports the verified inputs.
+To run the same check locally, set `ATFE` to the toolchain root and use the
+prepared HP39 Aplet assets and host `hp2aplet` tool:
+
+```sh
+python3 tests/sdk/check.py --aplet-tool "$HP2APLET" --aplet-assets "$APLET_ASSETS" \
+    --independent-notebooks build/independent-hp39-inputs
+python3 tests/e2e/independent-entry/run-hp39-notebook.py --model hp39gplus \
+    --inputs build/independent-hp39-inputs --dist build/x50ng/dist \
+    --output build/independent-save-hp39gplus
+```
+
+Use a fresh output directory. HP39g+ uses the repository's D1.55 NOR fixture
+from Git LFS. For HP39gs and HP40gs, select the matching model, change the
+output directory, and add `--firmware /path/to/update.bin` pointing to its
+extracted Stock 2.22 update. The runner checks the firmware digest, boots
+fresh Stock, transfers the Aplet over USB and checks the two launches against
+the named SRAM directory. It then selects Reset in the Stock Aplet library,
+saves `20` into the cleared Aplet, and reopens it again. Each phase writes
+`verified.json` alongside its captures after both returns to Stock.
+
 For the Save-button regression, also pass `--aplet-writeback` to both builders.
 For HP39gs or HP40gs, build the installed Notebook with the matching
 `HPCLANG_BUILD_MODEL` and pass `--model hp39gs` or `--model hp40gs` to

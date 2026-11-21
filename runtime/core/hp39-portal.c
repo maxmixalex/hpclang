@@ -630,7 +630,8 @@ static struct hpclang_hp39_portal_context *hp39_aplet_context(uint32_t *slot)
     return portal;
 }
 
-static int hp39_owned_list(const struct hpclang_hp39_aplet_list_context *context, uint32_t *first)
+static int hp39_owned_list(const struct hpclang_hp39_aplet_list_context *context, uint32_t *first,
+                           int *reset)
 {
     uint32_t slot, list, type;
     if (hpclang_hp39_bitmap_aplet_data_slot(&hp39_stock_reader, &slot))
@@ -642,6 +643,13 @@ static int hp39_owned_list(const struct hpclang_hp39_aplet_list_context *context
         return -1;
     }
     *first = list + 5u;
+    if (!hp39_stock_read_word5(*first, &type)) {
+        errno = EIO;
+        return -1;
+    }
+    /* Stock Reset puts this ROM empty-list reference in the first element.
+     * It occupies one word in the owned list; the empty list itself occupies two. */
+    *reset = type == 0x05da2u;
     return 0;
 }
 
@@ -657,11 +665,13 @@ static void hp39_store_nibble(uint32_t physical, uint32_t value)
 static int hp39_replace_list_data(const struct hpclang_hp39_aplet_list_context *context,
                                   const struct hpclang_object *object)
 {
-    uint32_t first, limit, old_size, type, padding, semi;
-    if (hp39_owned_list(context, &first))
+    uint32_t first, limit, old_size = 5u, type, padding, semi;
+    int reset;
+    if (hp39_owned_list(context, &first, &reset))
         return -1;
-    if (!hp39_stock_read_word5(0x806f3u, &limit) || first >= limit || limit - first < 15u ||
-        hpclang_rpl_object_span(&hp39_stock_reader, first, limit - first - 15u, &old_size) ||
+    if (!hp39_stock_read_word5(0x806f3u, &limit) || first >= limit || limit - first < 20u ||
+        (!reset &&
+         hpclang_rpl_object_span(&hp39_stock_reader, first, limit - first - 15u, &old_size)) ||
         !hp39_stock_read_word5(first + old_size, &type) || type != 0x2a4eu ||
         !hp39_stock_read_word5(first + old_size + 5u, &padding) || padding < 5u ||
         padding > limit - first - old_size - 10u ||
@@ -698,6 +708,21 @@ static int hp39_replace_list_data(const struct hpclang_hp39_aplet_list_context *
     return 0;
 }
 
+static struct hpclang_object *hp39_empty_list(void)
+{
+    static const uint8_t empty_list[] = {0x74u, 0x2au, 0xb0u, 0x12u, 0x03u};
+    struct hpclang_object *object = malloc(sizeof(*object) + sizeof(empty_list));
+    if (object == NULL) {
+        errno = ENOMEM;
+        return NULL;
+    }
+    object->kind = HPCLANG_OBJECT_LIST;
+    object->native_prologue = HP39_RPL_DOLIST;
+    object->nibble_count = 10u;
+    memcpy(object->data, empty_list, sizeof(empty_list));
+    return object;
+}
+
 int hpclang_aplet_data_get(struct hpclang_object **object)
 {
     if (object == NULL) {
@@ -709,8 +734,13 @@ int hpclang_aplet_data_get(struct hpclang_object **object)
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     const struct hpclang_hp39_aplet_list_context *list = hpclang_launch_hp39_aplet_list(boot);
     if (list) {
-        if (hp39_owned_list(list, &address))
+        int reset;
+        if (hp39_owned_list(list, &address, &reset))
             return -1;
+        if (reset) {
+            *object = hp39_empty_list();
+            return *object ? 0 : -1;
+        }
         return hpclang_object_snapshot_copy(&hp39_stock_reader, address,
                                             HP39_SATURN_LIMIT - address, object);
     }
@@ -775,16 +805,9 @@ int hpclang_aplet_data_set(const struct hpclang_object *object)
 
 int hpclang_aplet_data_clear(void)
 {
-    static const uint8_t empty_list[] = {0x74u, 0x2au, 0xb0u, 0x12u, 0x03u};
-    struct hpclang_object *object = malloc(sizeof(*object) + sizeof(empty_list));
-    if (object == NULL) {
-        errno = ENOMEM;
+    struct hpclang_object *object = hp39_empty_list();
+    if (object == NULL)
         return -1;
-    }
-    object->kind = HPCLANG_OBJECT_LIST;
-    object->native_prologue = HP39_RPL_DOLIST;
-    object->nibble_count = 10u;
-    memcpy(object->data, empty_list, sizeof(empty_list));
     int result = hpclang_aplet_data_set(object);
     hpclang_object_release(object);
     return result;

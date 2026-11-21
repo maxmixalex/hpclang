@@ -44,6 +44,13 @@ on:
       - "tools/package-aplet.py"
       - "tools/package-recovery.py"
       - "tools/package-sdk.py"
+      - "tools/run-hp39-kermit-server.sh"
+      - "tools/prepare-nor-fixture.py"
+      - "tests/e2e/fixtures/hp39gplus/**"
+      - "tests/e2e/fixtures/ui/hp39-memory-clear.pgm"
+      - "tests/e2e/sequences/hp39*-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp40gs-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp39-independent-notebook-save.seq"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
@@ -99,6 +106,13 @@ on:
       - "tools/package-aplet.py"
       - "tools/package-recovery.py"
       - "tools/package-sdk.py"
+      - "tools/run-hp39-kermit-server.sh"
+      - "tools/prepare-nor-fixture.py"
+      - "tests/e2e/fixtures/hp39gplus/**"
+      - "tests/e2e/fixtures/ui/hp39-memory-clear.pgm"
+      - "tests/e2e/sequences/hp39*-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp40gs-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp39-independent-notebook-save.seq"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
@@ -122,6 +136,54 @@ env:
   HPCLANG_RECOVERY_JOURNAL_SLOT: "0x160105"
 
 jobs:
+  independent-hp39-notebook:
+    name: ${{ matrix.model }} independent Notebook save and relaunch
+    needs: runtime
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [hp39gplus, hp39gs, hp40gs]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+      - uses: ./.github/actions/setup-x50ng
+      - uses: actions/download-artifact@v7
+        with:
+          name: independent-hp39-inputs
+          path: build/independent-hp39-inputs
+      - name: Save and reopen the installed SDK Notebook in Stock
+        env:
+          MODEL: ${{ matrix.model }}
+        run: |
+          firmware=()
+          if [[ "$MODEL" != hp39gplus ]]; then
+            profile="tests/e2e/targets/$MODEL.json"
+            archive=$(jq -r .firmware.archive "$profile")
+            member=$(jq -r .firmware.member "$profile")
+            curl -fL --retry 3 "https://www.hpcalc.org/hp39/pc/$archive" -o "$RUNNER_TEMP/update.zip"
+            unzip -p "$RUNNER_TEMP/update.zip" "$member" > "$RUNNER_TEMP/update.bin"
+            firmware=(--firmware "$RUNNER_TEMP/update.bin")
+          fi
+          python3 tests/e2e/independent-entry/run-hp39-notebook.py \
+            --model "$MODEL" --inputs build/independent-hp39-inputs --dist build/x50ng/dist \
+            --output build/independent-hp39-run "${firmware[@]}"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: independent-notebook-${{ matrix.model }}
+          retention-days: 7
+          path: |
+            build/independent-hp39-run/*.json
+            build/independent-hp39-run/screen-*.pgm
+            build/independent-hp39-run/emulator.log
+            build/independent-hp39-run/gate.log
+            build/independent-hp39-run/reset/*.json
+            build/independent-hp39-run/reset/screen-*.pgm
+            build/independent-hp39-run/reset/emulator.log
+
   independent-hp48-entry:
     name: HP48gII independent Stock entry and return
     runs-on: ubuntu-24.04
@@ -291,7 +353,15 @@ jobs:
           trap 'rm -rf "$host_tool"' EXIT
           clang -O2 .cache/hp39-aplet/sdk/src/hp2aplet.c -o "$host_tool/hp2aplet"
           python3 tests/sdk/check.py --aplet-tool "$host_tool/hp2aplet" \
-            --aplet-assets .cache/hp39-aplet/sdk/data
+            --aplet-assets .cache/hp39-aplet/sdk/data \
+            --independent-notebooks build/independent-hp39-inputs
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: independent-hp39-inputs
+          path: build/independent-hp39-inputs/
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Verify independent classic entry and HP39 C Aplet build reproducibility
         run: |

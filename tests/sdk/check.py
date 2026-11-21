@@ -1,6 +1,7 @@
 """Build external examples after relocating an installed SDK."""
 
 import argparse
+from contextlib import ExitStack
 import hashlib
 import json
 import os
@@ -356,14 +357,26 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--aplet-tool", type=Path)
     parser.add_argument("--aplet-assets", type=Path)
+    parser.add_argument(
+        "--independent-notebooks", type=Path, help="export verified HP39/40 ROM test inputs"
+    )
     args = parser.parse_args()
+    if args.independent_notebooks and not args.aplet_assets:
+        parser.error("--independent-notebooks requires the Aplet tools and assets")
     if bool(args.aplet_tool) != bool(args.aplet_assets):
         parser.error("--aplet-tool and --aplet-assets must be provided together")
     root = Path(__file__).resolve().parents[2]
     toolchain = Path(os.environ["ATFE"])
     env = dict(os.environ, PATH=str(toolchain / "bin") + os.pathsep + os.environ["PATH"])
-    with tempfile.TemporaryDirectory(prefix="hpclang sdk ") as directory:
+    with tempfile.TemporaryDirectory(prefix="hpclang sdk ") as directory, ExitStack() as cleanup:
         work = Path(directory)
+        if args.independent_notebooks:
+            export_dir = args.independent_notebooks.resolve()
+            if export_dir.exists():
+                parser.error(f"export directory already exists: {export_dir}")
+            export_dir.parent.mkdir(parents=True, exist_ok=True)
+            staging = cleanup.enter_context(tempfile.TemporaryDirectory(dir=export_dir.parent))
+            notebooks = Path(staging) / "inputs"
         prefix = work / "original prefix"
         sdk = work / "relocated sdk"
         run("cmake", "-S", str(root), "-B", str(work / "installer"), env=env)
@@ -816,6 +829,15 @@ endforeach()
             for relative in sorted(outputs | font_sets[0]):
                 if (selected / relative).read_bytes() != (repeated / relative).read_bytes():
                     raise AssertionError(f"{model}: nonreproducible release output {relative}")
+            if args.independent_notebooks and aplet_options:
+                destination = notebooks / model
+                destination.mkdir(parents=True)
+                shutil.copyfile(selected / "notebook.hpc", destination / "notebook.hpc")
+                shutil.copytree(selected / "independent-aplet", destination / "independent-aplet")
+                probe = destination / "independent-entry"
+                probe.mkdir()
+                for name in ("metadata.json", "probe.bin", "build.json"):
+                    shutil.copyfile(selected / "independent-entry" / name, probe / name)
             # Keep the installed SDK for subsequent models; completed build
             # trees are temporary and no longer needed after byte comparison.
             shutil.rmtree(selected)
@@ -854,6 +876,8 @@ endforeach()
             )
             if result.returncode == 0 or diagnostic not in result.stdout + result.stderr:
                 raise AssertionError(f"Model configuration did not reject {model}: {result}")
+        if args.independent_notebooks:
+            notebooks.rename(export_dir)
         print("Installed SDK: C/C++, fonts, HPC1, six-model launchers and relocation PASS")
         if args.aplet_tool:
             print("Installed SDK: HP39g+/HP39gs/HP40gs C/C++ Aplet packaging PASS")

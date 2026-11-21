@@ -124,6 +124,15 @@ library matched the pre-launch screen pixel for pixel. Both named SRAM
 directories still matched the expected saved value and executable. Independent
 edits to a copy remain to be demonstrated.
 
+Stock Reset stores the five-nibble ROM reference `0x05da2` as the first item
+in the independent ENTER list. In the live D1.55 stack this was followed
+immediately by the padding object. The mapped D1.55 and both 2.22 ROMs
+resolve that reference to `DOLIST`, `SEMI` (the empty list). Treating the
+five nibbles as an inline object caused load and save error 134 on the first
+launch after Reset on all three models. The runtime now returns an owned
+empty list for this value and consumes just the reference's five nibbles
+when replacing it. The list terminator stays at its original address.
+
 The HP39g+ D1.55 Notebook return snapshot retains the Aplet action in SRAM
 at physical nibble offset `0x674c8`. The surrounding code matches template
 nibbles `[0x4ee, 0x655)`. Library 275 supplies four calls in that interval.

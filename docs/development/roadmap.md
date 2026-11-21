@@ -17,25 +17,20 @@ Native installation and startup recovery remain open. The combined candidate's
 Quality job flagged test formatting on `de3e2a02`. The corrected reference test
 passed locally with CI's clang-format 22.1.0 and ASan/UBSan.
 
-HP39 independent entry passed local original-ROM checks on all three models:
-USB import, ARM execution and return, RPL writeback, copy, Reset and relaunch.
-On HP39g+ D1.55, the freestanding C probe also passed stack, workspace and
-interrupt-restoration checks. Two builds reproduced the tested C Aplet; its
-packaging regression is in #49. The full independent Notebook is still open.
-The [launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
-records a 27-page Stock-owned bitmap. Code staging at `64464caf` is in #49.
-The installed-SDK independent Notebook saved `Seed42` as `Seed4220` on
-HP39g+ D1.55 and on HP39gs and HP40gs 2.22 in local original-ROM tests.
-Each model reopened the edited text, matched the named Aplet in SRAM and
-returned to its Stock library after both launches. D1.55 also created
-`20` in a fresh Aplet. With a full-size copy resident, Stock rejected
-entry for insufficient memory and preserved both notes. Editing a copy
-and active-execution GC remain open. #49 received the D1.55 Save changes
-at `54f6642b`. Its HP48gII CI job rejected an oversized Notebook. Checking
-the calculator family before accessing HP39 services reduced the local
-HP48gII image to 65,464 bytes within its 65,536-byte code window. Both
-independent entry paths then passed on the HP48gII ROM, including Port 0
-consecutive saves. Commit `0cdc1bc0` submitted both changes to #49 for CI.
+On local original-ROM runs, the installed SDK's independent Notebook saved
+`Seed42` as `Seed4220` and reopened it on HP39g+ D1.55, HP39gs 2.22 and
+HP40gs 2.22. Stock Reset exposed a ROM reference to an empty list that
+previously caused error 134 on all three. Each model now opens an empty
+editor after Reset, saves `20`, reopens it and returns to the Stock library.
+The checks cover the LCD, named Aplet in SRAM and native return state.
+The Core workflow now runs these cases with the installed SDK packages.
+D1.55 also preserved both notes when Stock rejected entry with a full-size
+copy resident. Editing a copy and GC during execution remain open. The
+[launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
+records the Stock-owned bitmap and code staging.
+The HP48gII CI size check failed on `54f6642b` and passed on `0cdc1bc0`.
+The current 64,672-byte Notebook fits the 65,536-byte code window and passed
+both local original-ROM entry paths, including consecutive Port 0 saves.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN

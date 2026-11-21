@@ -166,7 +166,12 @@ def main():
     )
     parser.add_argument("--save-frame", type=Path, help="LCD capture after pressing Save")
     parser.add_argument("--save-run", type=Path, help="verify all captures from the Save sequence")
+    parser.add_argument(
+        "--after-reset", action="store_true", help="expect an empty editor after Stock Reset"
+    )
     args = parser.parse_args()
+    if args.after_reset and not args.save_run:
+        parser.error("--after-reset requires --save-run")
     if args.save_run:
         if args.notebook_editor or args.save_frame:
             parser.error("--save-run supplies --notebook-editor and --save-frame")
@@ -202,9 +207,13 @@ def main():
                 [
                     (
                         args.save_run / "screen-action.pgm",
-                        args.initial_note,
+                        None if args.after_reset else args.initial_note,
                         True,
-                        "Loaded" if args.initial_note is not None else None,
+                        "No saved note; edit retained"
+                        if args.after_reset
+                        else "Loaded"
+                        if args.initial_note is not None
+                        else None,
                     ),
                     (args.save_run / "screen-typed.pgm", text, True, None),
                 ]

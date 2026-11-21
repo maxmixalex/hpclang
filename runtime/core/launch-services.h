@@ -87,6 +87,11 @@ hpclang_launch_hp39_context(const struct hpclang_boot_info *boot)
 static inline const struct hpclang_hp39_aplet_list_context *
 hpclang_launch_hp39_aplet_list(const struct hpclang_boot_info *boot)
 {
+#ifdef HPCLANG_COMPILED_MODEL
+    if (HPCLANG_COMPILED_MODEL < HPCLANG_MODEL_HP39GPLUS ||
+        HPCLANG_COMPILED_MODEL > HPCLANG_MODEL_HP40GS)
+        return NULL;
+#endif
     if (!boot || !boot->saturn_state ||
         (boot->model != HPCLANG_MODEL_HP39GPLUS && boot->model != HPCLANG_MODEL_HP39GS &&
          boot->model != HPCLANG_MODEL_HP40GS) ||
