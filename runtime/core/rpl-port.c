@@ -158,15 +158,14 @@ struct catalog_removal_search
     int found;
 };
 
-int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, uint32_t home,
-                                      uint32_t limit, uint32_t number)
+int hpclang_rpl_home_attachments_visit(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                       uint32_t limit, hpclang_rpl_home_attachment_fn visit,
+                                       void *context)
 {
-    if (!reader || !reader->read_nibble)
+    if (!reader || !reader->read_nibble || !visit)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     if (home < 0x80000u || home >= 0x100000u || limit > 0x100000u - home || limit < 8)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    if (number > 0xfffu)
-        return HPCLANG_RPL_SPAN_MALFORMED;
     uint32_t prologue, count;
     int result = word(reader, home, 5, &prologue);
     if (result)
@@ -178,19 +177,46 @@ int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, u
         return result;
     if (count > (limit - 8) / 13)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    int found = 0;
     for (uint32_t i = 0; i < count; ++i) {
-        uint32_t record = home + 8 + 13 * i, id, ignored;
+        uint32_t record = home + 8 + 13 * i, id, first, second;
         result = word(reader, record, 3, &id);
         if (!result)
-            result = word(reader, record + 3, 5, &ignored);
+            result = word(reader, record + 3, 5, &first);
         if (!result)
-            result = word(reader, record + 8, 5, &ignored);
+            result = word(reader, record + 8, 5, &second);
+        if (!result)
+            result = visit(context, record, id, first, second);
         if (result)
             return result;
-        found |= id == number;
     }
-    return found;
+    return 0;
+}
+
+struct attachment_search
+{
+    uint32_t number;
+    int found;
+};
+
+static int find_attachment(void *context, uint32_t record, uint32_t id, uint32_t first,
+                           uint32_t second)
+{
+    (void)record;
+    (void)first;
+    (void)second;
+    struct attachment_search *search = context;
+    search->found |= id == search->number;
+    return 0;
+}
+
+int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                      uint32_t limit, uint32_t number)
+{
+    if (number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct attachment_search search = {number, 0};
+    int result = hpclang_rpl_home_attachments_visit(reader, home, limit, find_attachment, &search);
+    return result ? result : search.found;
 }
 
 static int catalog_removal_visit(void *context, uint32_t record, uint32_t number,

@@ -103,12 +103,8 @@ static int read_pointer(uint32_t address, uint32_t *pointer)
     return 0;
 }
 
-int hpclang_library_query(uint32_t library_number)
+static int library_context(void)
 {
-    if (library_number > 0xfffu) {
-        errno = EINVAL;
-        return -1;
-    }
     const struct hpclang_device_info *device = hpclang_device_info();
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     if (!device || !boot || boot->model != device->model || !boot->saturn_state ||
@@ -116,6 +112,17 @@ int hpclang_library_query(uint32_t library_number)
         errno = ENOSYS;
         return -1;
     }
+    return 0;
+}
+
+int hpclang_library_query(uint32_t library_number)
+{
+    if (library_number > 0xfffu) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (library_context())
+        return -1;
     const struct hpclang_rpl_reader reader = {read_nibble, NULL};
     struct hpclang_rpl_library_binding binding;
     const uint32_t catalog = 0x8611du;
@@ -132,6 +139,87 @@ int hpclang_library_query(uint32_t library_number)
         return port_error(attached);
     return (registered ? HPCLANG_LIBRARY_REGISTERED : 0) |
            (attached ? HPCLANG_LIBRARY_HOME_ATTACHED : 0);
+}
+
+/* Four 12-bit library IDs per byte, with two independent status bits per ID. */
+struct library_inventory
+{
+    uint8_t flags[1024];
+    unsigned count;
+};
+
+static int inventory_add(struct library_inventory *inventory, uint32_t id, unsigned flag)
+{
+    unsigned shift = 2 * (id % 4);
+    uint8_t *byte = &inventory->flags[id / 4];
+    unsigned existing = (*byte >> shift) & 3u;
+    if (flag == HPCLANG_LIBRARY_REGISTERED && (existing & flag))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (!existing)
+        inventory->count++;
+    *byte |= flag << shift;
+    return 0;
+}
+
+static int list_registered(void *context, uint32_t record, uint32_t id,
+                           const struct hpclang_rpl_library_binding *binding)
+{
+    (void)record;
+    (void)binding;
+    return inventory_add(context, id, HPCLANG_LIBRARY_REGISTERED);
+}
+
+static int list_attached(void *context, uint32_t record, uint32_t id, uint32_t first,
+                         uint32_t second)
+{
+    (void)record;
+    (void)first;
+    (void)second;
+    return inventory_add(context, id, HPCLANG_LIBRARY_HOME_ATTACHED);
+}
+
+int hpclang_library_list(struct hpclang_library_info *entries, uint32_t capacity)
+{
+    if (!entries && capacity) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (library_context())
+        return -1;
+    uint32_t home;
+    if (read_pointer(0x80711u, &home))
+        return -1;
+    struct library_inventory *inventory = calloc(1, sizeof(*inventory));
+    if (!inventory) {
+        errno = ENOMEM;
+        return -1;
+    }
+    const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+    const uint32_t catalog = 0x8611du;
+    int result = hpclang_rpl_catalog_visit(&reader, catalog, 0x100000u - catalog, list_registered,
+                                           inventory);
+    if (!result)
+        result = hpclang_rpl_home_attachments_visit(&reader, home, 0x100000u - home, list_attached,
+                                                    inventory);
+    if (result) {
+        free(inventory);
+        return port_error(result);
+    }
+    unsigned count = inventory->count;
+    if (entries && capacity < count) {
+        free(inventory);
+        errno = ENOSPC;
+        return -1;
+    }
+    if (entries) {
+        for (uint32_t id = 0; id < 4096; ++id) {
+            unsigned flags = (inventory->flags[id / 4] >> (2 * (id % 4))) & 3;
+            if (flags)
+                *entries++ = (struct hpclang_library_info){id, flags};
+        }
+    }
+    free(inventory);
+    return count;
 }
 
 static int open_cursor(uint32_t port, struct hpclang_rpl_reader *reader,

@@ -614,6 +614,13 @@ Check for a negative return before testing `HPCLANG_LIBRARY_REGISTERED` and
 `HPCLANG_LIBRARY_HOME_ATTACHED`. Zero means the ID is absent from both lists.
 A library stored in a port can still return zero.
 
+Applications can enumerate both lists with `hpclang_library_list(NULL, 0)` to
+obtain the count, then call it again with an array of `struct hpclang_library_info`.
+Each row contains one library number and its combined status flags. The numbers
+are sorted in ascending order. If the list grows between calls, the second call
+reports `ENOSPC` and leaves the array intact. Use the port iterator to discover
+stored library records, including those awaiting registration.
+
 The initial `<hpclang/port.h>` API provides `hpclang_port_iterator_open/read/close`
 and `hpclang_port_backup_get`. Iterators own their metadata; returned values are
 independent `hpclang_object` snapshots released with `hpclang_object_release`.

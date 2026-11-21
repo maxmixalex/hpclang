@@ -225,17 +225,38 @@ static void test_library_query(void)
             }
         }
     }
+    struct hpclang_library_info entries[3] = {{0}};
+    memory[home + 5] = 3;
+    put_word(home + 21, 0xfff);
+    put_word(home + 34, 0xfff);
+    memory[catalog] = 2;
+    put_word(catalog + 3, 0);
+    put_word(catalog + 19, id);
+    assert(hpclang_library_list(NULL, 0) == 3);
+    entries[0].flags = 99;
+    assert(hpclang_library_list(entries, 2) == -1 && errno == ENOSPC && entries[0].flags == 99);
+    assert(hpclang_library_list(NULL, 1) == -1 && errno == EINVAL);
+    assert(hpclang_library_list(entries, 3) == 3);
+    assert(entries[0].number == 0 && entries[0].flags == HPCLANG_LIBRARY_REGISTERED);
+    assert(entries[1].number == id && entries[1].flags == hpclang_library_query(id));
+    assert(entries[2].number == 0xfff && entries[2].flags == HPCLANG_LIBRARY_HOME_ATTACHED);
+    put_word(catalog + 3, id);
+    memory[catalog] = 1;
+    memory[home + 5] = 1;
     memory[home] = 0;
     assert(hpclang_library_query(id) == -1 && errno == EILSEQ);
     put_word(home, 0x2a96u);
     memory[catalog] = 2;
     put_word(catalog + 19, id);
     assert(hpclang_library_query(id) == -1 && errno == EILSEQ);
+    assert(hpclang_library_list(entries, 3) == -1 && errno == EILSEQ);
     unavailable = 1;
+    assert(hpclang_library_list(NULL, 0) == -1 && errno == EIO);
     assert(hpclang_library_query(id) == -1 && errno == EIO);
     unavailable = 0;
     boot.model = device.model = HPCLANG_MODEL_HP39GS;
     assert(hpclang_library_query(id) == -1 && errno == ENOSYS);
+    assert(hpclang_library_list(NULL, 0) == -1 && errno == ENOSYS);
     assert(hpclang_library_query(0x1000u) == -1 && errno == EINVAL);
     device = saved_device;
     boot = saved_boot;

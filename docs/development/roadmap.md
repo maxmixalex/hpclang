@@ -142,7 +142,7 @@ unchanged. Sound compatibility is independent of Port2.
 
 CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 successes; Pages deploy and runtime evidence publication skipped by design). Merged as `e45f8461`; remote main verified. Earlier HP39gs transfer stalls remain unexplained. No post-merge run is claimed.
 
-M8.0 / [#49](https://github.com/maxmixalex/hpclang/pull/49): all 180 host tests passed locally, including the four catalog/HOME states. HP48gII, HP49g+ and HP50g Stock verified the registered launcher and separate storage of library 123, with six settled returns. CI submitted.
+M8.0 / [#49](https://github.com/maxmixalex/hpclang/pull/49): applications can query one library or list all registered and HOME-attached IDs in ascending order. All 180 host tests passed. HP48gII, HP49g+ and HP50g Stock verified both calls across six launches, including registered library 275 and stored-only library 123. Submitted for CI.
 
 M8.0 / #47: merged as `516231c5`, whose tree matches accepted head `1cebf08d`.
 CI: 184 successful jobs, including both HP49g+ and HP50g Stock code-relocation

@@ -2,6 +2,7 @@
 #include <hpclang/port.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 #include "object-snapshot.h"
 
 volatile uint32_t hpclang_e2e_result;
@@ -28,6 +29,25 @@ static void hold(void)
 {
     for (volatile unsigned n = 12000000; n; --n)
         __asm__ volatile("nop");
+}
+
+static int check_inventory(int launcher_state)
+{
+    int count = hpclang_library_list(NULL, 0);
+    if (count <= 0)
+        return 0;
+    struct hpclang_library_info *entries = malloc((unsigned)count * sizeof(*entries));
+    if (!entries)
+        return 0;
+    int valid = hpclang_library_list(entries, (unsigned)count) == count;
+    int found = 0;
+    for (int i = 0; valid && i < count; i++) {
+        valid = (!i || entries[i - 1].number < entries[i].number) && entries[i].number != 123;
+        if (entries[i].number == 275)
+            found = entries[i].flags == launcher_state;
+    }
+    free(entries);
+    return valid && found;
 }
 
 int main(void)
@@ -85,6 +105,9 @@ int main(void)
         hpclang_object_release(witness);
         witness = NULL;
     }
+    failure = 0x45;
+    if (!check_inventory(launcher_state))
+        goto done;
     hpclang_e2e_result = 0x4f53d000u | phase;
     hold();
     failure = 0;

@@ -125,6 +125,14 @@ int hpclang_rpl_library_registration_plan(const struct hpclang_rpl_reader *port_
                                           uint32_t catalog, uint32_t catalog_limit, uint32_t number,
                                           struct hpclang_rpl_library_registration *plan);
 
+/* Visit each validated 13-nibble HOME attachment, including zero pointer fields.
+ * The two targets remain in their original mappings. Discard partial output on error. */
+typedef int (*hpclang_rpl_home_attachment_fn)(void *context, uint32_t record, uint32_t number,
+                                              uint32_t first, uint32_t second);
+int hpclang_rpl_home_attachments_visit(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                       uint32_t limit, hpclang_rpl_home_attachment_fn visit,
+                                       void *context);
+
 /* Inspect the native HOME attachment prefix (DORRP, count, 13-nibble records).
  * Caller supplies the proven HOME address and readable extent. Validate every
  * encoded record, including records after a match. Return 1 attached, 0 absent
