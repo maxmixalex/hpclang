@@ -1,4 +1,4 @@
-# HP50g independent Notebook save and relaunch
+# HP49g+ and HP50g independent Notebook save and relaunch
 
 Run from the repository with the pinned ATfE toolchain, prepared x50ng bundle,
 Kermit and socat. Use a new output directory:
@@ -10,9 +10,14 @@ PATH="$dist/tools:$PATH" LD_LIBRARY_PATH="$dist/runtime-lib" \
   --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-notebook
 ```
 
-The test boots HP50g firmware 2.15, checks that library 275 is absent, installs
+The default target is HP50g. Add `--model hp49gplus` and select a fresh
+output directory to run HP49g+. The selected target determines the SDK build,
+the model ID passed to the application, the bootloader and the expected ROM
+fingerprint.
+
+The test boots firmware 2.15, checks that library 275 is absent, installs
 the SDK and builds its plain Notebook example. Stock creates a named Port 1
-backup containing the staged code. Four KOS blocks and the backup supply a
+backup containing the staged code. KOS allocations and the backup supply a
 fixture-specific split mapping. The loader receives the actual saved ARMSYS
 continuation and denies Port 1 edits. This fixed-layout emulator fixture is
 not a production launcher.
