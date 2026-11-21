@@ -52,20 +52,21 @@ def moving_gc_program():
 def code_for(size, offset, model="hp50g"):
     if size < 8 or size % 8 or size > 65536:
         raise ValueError("payload must contain 1..8192 complete eight-byte blocks")
-    # HP50g SAVE, capture PC, then copy into the program object's reserved RAM.
-    code = "8f" + word(0x679B) + "20" + "81b5"
+    # Save Stock pointers, capture PC, and copy into program-owned aligned RAM.
+    save, restore = (0x6F73, 0xF30C) if model == "hp39gplus" else (0x679B, 0x67D2)
+    code = "8f" + word(save) + "20" + "81b5"
     code += "da" + "34" + word(offset) + "c2" + "134"
     code += "da" + "34" + word(size * 2 + 7) + "c2"
     code += "80880" + "80881" + "80882" + "135" + "d5"
     code += "34" + word(size // 8 - 1)
     code += "1527" + "1517" + "16f" + "17f" + "ce" + "5fe"
     code += "af2" + "d9" + "81e"
-    if model == "hp48gii":
+    if model in ("hp48gii", "hp39gplus"):
         # Translate the main-RAM nibble address before converting it to bytes.
         code += "da" + "34" + word(0xC8000) + "c2"
     code += "25" + "32" + "080" + "20"
     # ARMSYS followed by Stock RESTORE and RPL return; no library call.
-    code += "80bfe" + "8f" + word(0x67D2) + "142164808c"
+    code += "80bfe" + "8f" + word(restore) + "142164808c"
     return code
 
 

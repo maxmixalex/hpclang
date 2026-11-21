@@ -13,7 +13,7 @@ def nibbles(data):
     return "".join(f"{b & 15:x}{b >> 4:x}" for b in data)
 
 
-def check(aplet, sram, copy_state=None):
+def check(aplet, sram, copy_state=None, arm_entry=False):
     title = b"EntryProbe"
     header = b"HP39BinB" + bytes([len(title)]) + title
     if not aplet.startswith(header):
@@ -48,7 +48,25 @@ def check(aplet, sram, copy_state=None):
     def require_entry(title, body):
         name = b"'" + title
         size = word(len(name), 2)
-        if memory.count(size + nibbles(name) + size + body) != 1:
+        prefix = size + nibbles(name) + size
+        variants = [body]
+        if arm_entry:
+            # The source retains the seed. Only the aligned execution copy may
+            # overwrite it. Stock can move the enclosing directory during Exit.
+            source = bytes.fromhex(
+                "01002de908009fe508008fe50100bde81eff2fe1394150487856341200000000"
+            )
+            before = nibbles(source)
+            reserve = len(before) + 7
+            if body.count(before + "0" * reserve) != 1:
+                raise ValueError("missing ARM source and reserved execution area")
+            pos = body.index(before) + len(before)
+            after = nibbles(source[:24] + source[20:24] + source[28:])
+            variants = [
+                body[:pos] + "0" * pad + after + "0" * (7 - pad) + body[pos + reserve :]
+                for pad in range(8)
+            ]
+        if sum(memory.count(prefix + variant) for variant in variants) != 1:
             raise ValueError(f"saved named Aplet directory did not match {title!r}")
 
     require_entry(title, with_custom_data(saved))
@@ -61,8 +79,9 @@ def main():
     parser.add_argument("aplet", type=Path)
     parser.add_argument("sram", type=Path)
     parser.add_argument("--copy-state", choices=("saved", "reset"))
+    parser.add_argument("--arm-entry", action="store_true")
     args = parser.parse_args()
-    check(args.aplet.read_bytes(), args.sram.read_bytes(), args.copy_state)
+    check(args.aplet.read_bytes(), args.sram.read_bytes(), args.copy_state, args.arm_entry)
 
 
 if __name__ == "__main__":

@@ -143,3 +143,14 @@ This releases the payload gate after the named Reset program transfers.
 
 This probe exercises RPL Start, ENTER, Exit and copied-Aplet Reset. ARM entry, Notebook resource
 ownership and physical-device behavior require separate execution checks.
+
+For the HP39g+ D1.55 ARM return probe, add `--arm-entry` to both the Aplet
+build and the SRAM check above. Use a fresh output directory. The 32-byte
+payload saves incoming r0, writes 0x48504139 over the seed in its executable
+copy, restores r0 and returns through lr. Following ENTER, RPL stores its own
+marker and Exit commits the modified data. The checker matches the named
+directory including the unchanged ARM source, the aligned copy with its one
+changed word and the RPL custom data. In a copy of the installed snapshot,
+replacing the r0 pop with a four-byte stack adjustment reproduced abort mode
+and an unsampled Aplet key. The positive trial returned to the Aplet list.
+This ARM check has run on HP39g+ D1.55 only.

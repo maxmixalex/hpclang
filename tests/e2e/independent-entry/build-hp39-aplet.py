@@ -3,6 +3,8 @@
 
 import argparse
 import importlib.util
+import runpy
+import struct
 from pathlib import Path
 
 
@@ -48,10 +50,33 @@ def independent_template(data):
     return pack(code)
 
 
+def arm_entry():
+    # Preserve incoming r0, load the marker, write it into the aligned copy,
+    # restore r0 and return through lr. The two literal slots follow bx lr.
+    blob = struct.pack(
+        "<8I",
+        0xE92D0001,
+        0xE59F0008,
+        0xE58F0008,
+        0xE8BD0001,
+        0xE12FFF1E,
+        0x48504139,
+        0x12345678,
+        0,
+    )
+    code_for = runpy.run_path(str(Path(__file__).with_name("build.py")))["code_for"]
+    offset = len(code_for(len(blob), 0, "hp39gplus")) - 13
+    body = code_for(len(blob), offset, "hp39gplus") + nibbles(blob) + "0" * (2 * len(blob) + 7)
+    return word(0x2DCC) + word(5 + len(body)) + body
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--assets", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--arm-entry", action="store_true", help="exercise the HP39g+ ARM call and return"
+    )
     controls = parser.add_mutually_exclusive_group()
     controls.add_argument(
         "--attached-control", action="store_true", help="retain the historical library ID"
@@ -70,18 +95,11 @@ def main():
     }
     assets["apletcode.bin"] = independent_template(assets["apletcode.bin"])
     marker = b"hpclang-enter"
-    # :: DROP "hpclang-enter" ;  ( view old-data -- view new-data )
-    action = pack(
-        word(0x2D9D)
-        + word(0x3244)
-        + word(0x2A2C)
-        + word(5 + 2 * len(marker))
-        + nibbles(marker)
-        + word(0x765C)
-        + word(0x312B)
-    )
-    # The program occupies an odd number of nibbles. Precede SEMI with a
-    # five-nibble NOP inside the program to make the data-list item byte aligned.
+    action = word(0x2D9D) + (arm_entry() if args.arm_entry else "")
+    action += word(0x3244) + word(0x2A2C) + word(5 + 2 * len(marker)) + nibbles(marker)
+    if len(action) % 2 == 0:
+        action += word(0x765C)  # NOP keeps the complete data-list item byte aligned.
+    action = pack(action + word(0x312B))
     title = b"EntryProbe"
     output = bytearray(writer.encode_aplet(action, assets, title, b"hpclang"))
     # Dir_Head packs DORRP (five nibbles) and the attached library (three).
