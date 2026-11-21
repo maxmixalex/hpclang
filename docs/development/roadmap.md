@@ -2,13 +2,9 @@
 
 Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main: `67a84462` ([#52](https://github.com/maxmixalex/hpclang/pull/52)).
-All three workflows passed on `93afbede` (21 successful jobs, one configured
-skip). [#51](https://github.com/maxmixalex/hpclang/pull/51) added the HP49g+
-independent Notebook save and relaunch regression.
-[#50](https://github.com/maxmixalex/hpclang/pull/50) records production Notebook
-release acceptance. HP39 Aplet entry, HP48gII application-sized allocation
-and wider native services remain open.
+Accepted main: `002fb5e3` ([#53](https://github.com/maxmixalex/hpclang/pull/53)). All five workflows passed on `a022c359` (186 jobs passed, two skipped). HP49g+ and HP50g Notebook runs cover low-memory exit, relaunch and Port 0 backup. #52 accepted the Port 1 relocation regression. #51 added HP49g+ independent save and relaunch. #50 records production Notebook release acceptance.
+
+M8.6 follow-up [#54](https://github.com/maxmixalex/hpclang/pull/54) covers Notebook SD export and independent HP48gII entry. HP48gII Port 0 relaunch with a verified backup CRC has also passed locally. Application-originated HP48gII HOME save, HP39 Aplet entry and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
@@ -143,7 +139,7 @@ unchanged. Sound compatibility is independent of Port2.
 
 CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 successes; Pages deploy and runtime evidence publication skipped by design). Merged as `e45f8461`; remote main verified. Earlier HP39gs transfer stalls remain unexplained. No post-merge run is claimed.
 
-M8.0 / [#49](https://github.com/maxmixalex/hpclang/pull/49): applications can query one library or list all registered and HOME-attached IDs in ascending order. All 180 host tests passed. HP48gII, HP49g+ and HP50g Stock verified both calls across six launches, including registered library 275 and stored-only library 123. After integrating #52, the port, rpl_port and rpl_reference regressions and strict docs passed locally. The installed [SDK guide](../sdk/getting-started.md#find-a-classic-stock-library) example also compiled as C and linked with a C++ caller for all three models outside the repository. CI acceptance is pending.
+M8.0 / [#49](https://github.com/maxmixalex/hpclang/pull/49): applications can query one library or list all registered and HOME-attached IDs in ascending order. All 180 host tests passed. HP48gII, HP49g+ and HP50g Stock verified both calls across six launches, including registered library 275 and stored-only library 123. After integrating main at `002fb5e3`, all 180 host tests and strict docs passed locally. The installed [SDK guide](../sdk/getting-started.md#find-a-classic-stock-library) example linked with a C++ caller for all three models outside the repository. The installed SDK also built the normal and low-memory independent Notebook fixtures for HP49g+ and HP50g. The integrated head is submitted for CI.
 
 M8.0 / [#52](https://github.com/maxmixalex/hpclang/pull/52) merged. On HP49g+
 and HP50g, the C planner matched the complete Stock catalog and both HOME
