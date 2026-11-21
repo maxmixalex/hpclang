@@ -1,4 +1,4 @@
-"""Verify the bounded independent HPC1 fixture against a real HP50g snapshot."""
+"""Verify the bounded independent HPC1 fixture against the selected model's Stock snapshot."""
 
 import argparse
 import hashlib
@@ -14,8 +14,8 @@ require = module["require"]
 def verify(artifact, state, baseline):
     manifest = json.loads((artifact / "build.json").read_text())
     model = manifest.get("model", "hp50g")
-    require(model in ("hp49gplus", "hp50g"), "unsupported fixture model")
-    model_id = 5 if model == "hp49gplus" else 6
+    require(model in ("hp48gii", "hp49gplus", "hp50g"), "unsupported fixture model")
+    model_id = {"hp48gii": 4, "hp49gplus": 5, "hp50g": 6}[model]
     rom_hash = module["ROM_SHA256_BY_MODEL"][model]
     for name, expected in manifest["outputs"].items():
         require(Path(name).name == name, "invalid artifact path")
@@ -32,8 +32,8 @@ def verify(artifact, state, baseline):
         hashlib.sha256(flash[:1310720]).hexdigest() == rom_hash,
         f"unexpected {model} firmware",
     )
-    module["no_toolbox"]((baseline / "sram").read_bytes(), flash)
-    nib, word, count = module["no_toolbox"](ram, flash)
+    module["no_toolbox"]((baseline / "sram").read_bytes(), flash, model)
+    nib, word, count = module["no_toolbox"](ram, flash, model)
     obj = word(word(526072))
     require(
         word(obj) == 9748 and word(obj + 5) == 12 and (nib(obj + 16) == 0),

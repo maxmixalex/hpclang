@@ -17,7 +17,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("nor", "dist", "toolchain", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument(
+        "--fixture", choices=("independent-entry", "independent-hpc1"), default="independent-entry"
+    )
     args = parser.parse_args()
+    fixture = E2E / args.fixture
     out = args.output.resolve()
     out.mkdir(parents=True)
     profile = json.loads((E2E / "targets/hp48gii.json").read_text())
@@ -33,7 +37,7 @@ def main():
     subprocess.run(
         [
             sys.executable,
-            HERE / "build.py",
+            fixture / "build.py",
             "--model",
             spec.model,
             "--toolchain",
@@ -52,7 +56,7 @@ def main():
         subprocess.run(
             [
                 sys.executable,
-                HERE / script,
+                fixture / script,
                 "--artifact",
                 artifact,
                 "--baseline",

@@ -137,6 +137,8 @@ jobs:
           echo "4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937  $RUNNER_TEMP/48gii.bin" | sha256sum -c -
           python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
             --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-entry
+          python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
+            --fixture independent-hpc1 --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-hpc1
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -144,6 +146,8 @@ jobs:
           path: |
             build/independent-hp48-entry/*.json
             build/independent-hp48-entry/*/*.log
+            build/independent-hp48-hpc1/*.json
+            build/independent-hp48-hpc1/*/*.log
           if-no-files-found: warn
 
   independent-notebook:
@@ -277,6 +281,7 @@ jobs:
 
       - name: Verify independent HPC1 build reproducibility
         run: |
+          python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp48gii
           python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp49gplus
           python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp50g
 

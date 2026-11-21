@@ -1,12 +1,12 @@
 # Independent HPC1 prototype
 
-This bounded HP49g+/HP50g experiment starts an embedded Thumb HPC1 application through
+This bounded HP48gII/HP49g+/HP50g experiment starts an embedded Thumb HPC1 application through
 the common bootstrap from Stock RPL without installed library 275. It is an
 evaluation fixture, not the default launcher or a general application loader.
 It supplies no native-service context and does not qualify other model families.
 
 The build needs ATFE tools, Python and repository sources; no ROM or historical
-HPGCC binaries are required. The app receives model 5 or 6 and 16 KiB of RW memory,
+HPGCC binaries are required. The app receives model 4, 5 or 6 and 16 KiB of RW memory,
 writes three words, cleans its cache and returns 42. The loader owns a 28 KiB
 alignment arena and the entry owns a 4 KiB stack. The six aligned arena pages
 hold the L2 table, code and four RW pages. The build reuses the maintained
@@ -18,7 +18,7 @@ python3 tests/e2e/independent-hpc1/build.py \
 python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin"
 ```
 
-For HP49g+, add `--model hp49gplus` to both build commands; the default is
+Select `--model hp48gii` or `--model hp49gplus` for those builds. The default is
 `hp50g`. The manifest records the model and the verifier checks its distinct ROM
 fingerprint and boot metadata. Do not mix snapshots or packages between models.
 
@@ -28,7 +28,17 @@ with spaces, compares all six release artifacts and their manifest, and removes
 its temporary directories. Core CI runs this build check; it does not claim a
 native execution check.
 
-For execution, use an original Stock snapshot for the selected model, without
+The HP48gII firmware regression boots the same full NOR image as the Stock
+harness. With x50ng and its transport tools prepared, run:
+
+```sh
+dist="$PWD/build/x50ng/dist"
+PATH="$dist/tools:$PATH" LD_LIBRARY_PATH="$dist/runtime-lib" \
+  python3 tests/e2e/independent-entry/run-hp48gii.py --fixture independent-hpc1 \
+  --toolchain "$ATFE/bin" --dist "$dist" --nor /path/to/48gii.bin --output build/hp48-hpc1
+```
+
+For manual execution, use an original Stock snapshot for the selected model, without
 library 275 and explicitly set to RPN mode, and the
 existing Stock USB harness to transfer and evaluate `program.HP`. The program
 returns decimal 124275 on the RPL stack. A fresh calculator can start in algebraic

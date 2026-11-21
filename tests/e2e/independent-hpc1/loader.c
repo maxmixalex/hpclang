@@ -18,7 +18,8 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
         image->image_size > 4096 || image->rw_static_size > 4096)
         return;
     unsigned start = ((unsigned)arena + 4095u) & ~4095u;
-    if (start < 0x08000000u || start + 24576u > 0x08080000u ||
+    const unsigned sram_end = HPCLANG_PROBE_MODEL == 4 ? 0x08040000u : 0x08080000u;
+    if (start < 0x08000000u || start + 24576u > sram_end ||
         start + 24576u > (unsigned)arena + 28672u)
         return;
     volatile unsigned *l1 = (void *)0x07f00000u;

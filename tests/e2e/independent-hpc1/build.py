@@ -1,4 +1,4 @@
-"""Build a bounded HP50g HPC1 experiment without library 275 or ROM inputs."""
+"""Build the model-specific HPC1 experiment without library 275 or ROM inputs."""
 
 import argparse
 import hashlib
@@ -35,7 +35,7 @@ def digest(path):
 
 
 def build(source, tool, output, model="hp50g"):
-    model_id = {"hp49gplus": 5, "hp50g": 6}[model]
+    model_id = {"hp48gii": 4, "hp49gplus": 5, "hp50g": 6}[model]
     output.mkdir(parents=True, exist_ok=False)
     inputs = {name: digest(source / name) for name in INPUTS}
     common = [
@@ -143,7 +143,7 @@ def build(source, tool, output, model="hp50g"):
     blob += bytes(-len(blob) % 8)
     encoder = runpy.run_path(str(source / "tests/e2e/independent-entry/build.py"))
     word, code_for = encoder["word"], encoder["code_for"]
-    code = code_for(len(blob), len(code_for(len(blob), 0)) - 13)
+    code = code_for(len(blob), len(code_for(len(blob), 0, model)) - 13, model)
     packed = "".join(f"{b & 15:x}{b >> 4:x}" for b in blob)
     reserve = len(packed) + 7
     body = code + packed + "0" * reserve
@@ -168,7 +168,7 @@ def build(source, tool, output, model="hp50g"):
     if any(digest(source / name) != expected for name, expected in inputs.items()):
         raise ValueError("build inputs changed")
     manifest = dict(
-        scope="HP49g+/HP50g bounded embedded HPC1 experiment; no native-service context",
+        scope=f"{model} bounded embedded HPC1 experiment; no native-service context",
         model=model,
         inputs=inputs,
         outputs={name: digest(output / name) for name in OUTPUTS},
@@ -182,7 +182,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
+    parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[3])
     args = parser.parse_args()
     build(args.source_root.resolve(), args.toolchain.resolve(), args.output.resolve(), args.model)

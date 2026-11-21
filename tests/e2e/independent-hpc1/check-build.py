@@ -67,7 +67,7 @@ def check(toolchain, model="hp50g"):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True)
-    parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
+    parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
     args = parser.parse_args()
     print(json.dumps(check(args.toolchain.resolve(), args.model), indent=2))
 
