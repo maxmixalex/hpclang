@@ -17,6 +17,8 @@ Native installation and startup recovery remain open. The combined candidate's
 Quality job flagged test formatting on `de3e2a02`. The corrected reference test
 passed locally with CI's clang-format 22.1.0 and ASan/UBSan.
 
+The HP39g+ Notebook return snapshot confirms four library-275 calls in the Aplet template, including a splash call before ENTER. See the [independent-entry assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19).
+
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN
 reinstall screen as native backup deletion. See the
