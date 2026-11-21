@@ -91,3 +91,25 @@ allocation/MMU and native-service coexistence, other model families including
 the HP39 Aplet path, and an explicit packaging/migration decision. Do not infer
 those capabilities or hardware safety from this entry fixture. The existing
 application launch paths remain required.
+
+## HP39 Aplet import probe
+
+Run the following with the prepared HP39 SDK data directory to build a small
+Stock RPL Aplet. Pass `--attached-control` with a second output directory to
+retain 275 in the directory header. Both bundles omit the support library and
+replace its four template calls. ENTER is intended to store the string
+`hpclang-enter` as the active Aplet's custom data. This experiment targets
+the native view and writeback contract before introducing the ARM payload.
+
+```sh
+python3 tests/e2e/independent-entry/build-hp39-aplet.py \
+  --assets "$HP39_APLET_HOME/data" --output /tmp/entry-probe
+```
+
+Local HP39g+ D1.55 original-ROM USB runs on fresh state transferred the
+Aplet and named Reset program. Both attachment settings produced the Stock
+dialog "Getting library / Transfer Failed". After dismissal the Aplet list
+selected Function, and ENTER opened Function Symbolic View. The harness
+reported `installed` when its scripted sequence ended. Check the Stock
+dialog and selected Aplet before interpreting any subsequent ENTER or marker.
+The transferred payload itself contains the marker string.
