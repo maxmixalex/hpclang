@@ -22,7 +22,13 @@ def label(value: str, maximum: int, field: str) -> bytes:
     return value.encode("ascii")
 
 
-def encode_aplet(launcher: bytes, data: dict[str, bytes], title: bytes, author: bytes) -> bytes:
+def encode_aplet(
+    launcher: bytes,
+    data: dict[str, bytes],
+    title: bytes,
+    author: bytes,
+    initial_string: bytes | None = None,
+) -> bytes:
     # Stock strings carry a five-nibble prologue and a five-nibble span.
     def string(text: bytes) -> bytes:
         return (0x2A2C | ((5 + 2 * len(text)) << 20)).to_bytes(5, "little") + text
@@ -39,7 +45,7 @@ def encode_aplet(launcher: bytes, data: dict[str, bytes], title: bytes, author: 
         + string(author)
         + graphic[8:]
         + origin * 2
-        + empty_list
+        + (empty_list if initial_string is None else string(initial_string))
     )
     # Offsets use Saturn nibbles. The views link includes its six-nibble bias.
     views_link = (0x312B | ((2 * len(fields) + 6) << 20)).to_bytes(6, "little")

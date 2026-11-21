@@ -52,9 +52,13 @@ void exercise(u32 *out, volatile u32 *ctl, const u32 *map)
     out[8] = first;
     out[9] = end;
 #ifdef HPCLANG_PROBE_NOTEBOOK_STAGE
+#ifndef NOTEBOOK_BYTES
+#define NOTEBOOK_BYTES 45456
+#define NOTEBOOK_FNV1A 0x8b0d5f8fu
+#endif
     enum
     {
-        notebook_bytes = 45456,
+        notebook_bytes = NOTEBOOK_BYTES,
         code_capacity = 12 * 4096
     };
     if (count < 27 || top > 0xffff6)
@@ -100,7 +104,7 @@ void exercise(u32 *out, volatile u32 *ctl, const u32 *map)
     out[45] = notebook_bytes;
 #ifdef HPCLANG_PROBE_NOTEBOOK_EDITOR
     /* Use the D1.55 image and physical RAM mapping qualified by the staging run. */
-    if (hash != 0x8b0d5f8fu)
+    if (hash != NOTEBOOK_FNV1A)
         return;
     volatile u32 *l1 = (void *)0x07f00000u;
     if ((l1[0x80] & 0xfff00003u) != 0x08000002u)

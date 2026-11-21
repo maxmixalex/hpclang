@@ -100,6 +100,7 @@ def main():
     controls.add_argument(
         "--zero-control", action="store_true", help="use zero as the attachment ID"
     )
+    parser.add_argument("--initial-note", help="seed the Aplet data with a Notebook note")
     args = parser.parse_args()
     if args.bitmap_image and not args.bitmap_pool:
         parser.error("--bitmap-image requires --bitmap-pool")
@@ -132,12 +133,16 @@ def main():
             action += word(0x3244)
     elif args.c_probe is not None:
         action += arm_entry(args.c_probe.read_bytes())
-    action += word(0x3244) + word(0x2A2C) + word(5 + 2 * len(marker)) + nibbles(marker)
+    if args.initial_note is None:
+        action += word(0x3244) + word(0x2A2C) + word(5 + 2 * len(marker)) + nibbles(marker)
     if len(action) % 2 == 0:
         action += word(0x765C)  # NOP keeps the complete data-list item byte aligned.
     action = pack(action + word(0x312B))
     title = b"EntryProbe"
-    output = bytearray(writer.encode_aplet(action, assets, title, b"hpclang"))
+    note = (
+        None if args.initial_note is None else b"hpclang-notebook/1\n" + args.initial_note.encode()
+    )
+    output = bytearray(writer.encode_aplet(action, assets, title, b"hpclang", note))
     # Dir_Head packs DORRP (five nibbles) and the attached library (three).
     # Stock stores 0x7ff here for a user-saved copy of Function.
     header = 9 + len(title)

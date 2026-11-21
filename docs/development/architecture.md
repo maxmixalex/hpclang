@@ -165,6 +165,24 @@ the Aplet key reopened the library with EntryProbe selected. The editor showed
 `Load error 88; edit retained` because this launcher supplied no Aplet storage
 portal. Reading the current note and preserving edits across relaunch remain open.
 
+In the active independent ENTER frame on D1.55, the data stack held the bitmap,
+HPC1 source string, current Aplet data and view in that order. Its return stack
+pointed at the `TopicVar1! DROP` continuation after `EVAL`. The independent
+reader checks that instruction sequence and the stack objects before reading
+the current data. The library-275 reader retains its existing `xPrRUN` check.
+A freshly installed SDK built a 45,704-byte Notebook image. On D1.55 it
+displayed the seeded note `Seed42` and `Loaded` on two launches from one USB
+transfer. Both focus transitions matched the expected LCD glyphs, and the
+final named Aplet still held the complete serialized seed.
+
+A separate D1.55 publication probe placed the old note and a padding object
+in a fresh Stock list with `TWO{}N`. ARM replaced the six text bytes `Seed42`
+with ten digits, shortening the padding by the same eight nibbles. After ARM
+returned, `ONE NTHCOMPDROP TOTEMPOB` supplied the new string to the Aplet's
+normal writeback. The named directory retained the exact serialized note
+`hpclang-notebook/1\n0123456789`. Notebook's Save button has yet to exercise
+this publication path.
+
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.
 Demonstrate disjoint storage for code, RW, stage, MMU and required native

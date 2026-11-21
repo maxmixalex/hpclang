@@ -16,7 +16,15 @@ def nibbles(data):
     return "".join(f"{b & 15:x}{b >> 4:x}" for b in data)
 
 
-def check(aplet, sram, copy_state=None, arm_entry=False, c_probe=None, check_workspace=None):
+def check(
+    aplet,
+    sram,
+    copy_state=None,
+    arm_entry=False,
+    c_probe=None,
+    check_workspace=None,
+    initial_note=None,
+):
     title = b"EntryProbe"
     header = b"HP39BinB" + bytes([len(title)]) + title
     if not aplet.startswith(header):
@@ -24,25 +32,28 @@ def check(aplet, sram, copy_state=None, arm_entry=False, c_probe=None, check_wor
     directory = nibbles(aplet[len(header) :])
     if not directory.startswith(word(0x2A96) + word(0x7FF, 3)):
         raise ValueError("unexpected Aplet attachment")
-    # The seventh application-data field is an empty list in the transfer.
+    # The seventh application-data field holds the initial custom data.
     # It follows the two origin coordinates and precedes the outer list SEMI.
-    empty = word(0x2A74) + word(0x312B)
+    initial = word(0x2A74) + word(0x312B)
+    if initial_note is not None:
+        value = b"hpclang-notebook/1\n" + initial_note.encode()
+        initial = word(0x2A2C) + word(5 + len(value) * 2) + nibbles(value)
     origins = (word(0x2911) + word(0)) * 2
-    tail = origins + empty + word(0x312B)
+    tail = origins + initial + word(0x312B)
     if directory.count(tail) != 1:
         raise ValueError("missing initial custom-data slot")
     slot = directory.index(tail) + len(origins)
-    link = slot + len(empty) + 5
+    link = slot + len(initial) + 5
     marker = b"hpclang-enter"
     saved = word(0x2A2C) + word(5 + len(marker) * 2) + nibbles(marker)
 
     def with_custom_data(data):
-        growth = len(data) - len(empty)
+        growth = len(data) - len(initial)
         result = directory
         for pos in (8, link):
             offset = int(result[pos : pos + 5][::-1], 16)
             result = result[:pos] + word(offset + growth) + result[pos + 5 :]
-        return result[:slot] + data + result[slot + len(empty) :]
+        return result[:slot] + data + result[slot + len(initial) :]
 
     # Both the length-prefixed directory name and its trailing length belong
     # to the Stock directory entry. Transfer buffers contain a different name.
@@ -108,9 +119,10 @@ def check(aplet, sram, copy_state=None, arm_entry=False, c_probe=None, check_wor
         if sum(memory.count(prefix + variant) for variant in variants) != 1:
             raise ValueError(f"saved named Aplet directory did not match {title!r}")
 
-    require_entry(title, with_custom_data(saved))
+    expected = saved if initial_note is None else initial
+    require_entry(title, with_custom_data(expected))
     if copy_state is not None:
-        require_entry(b"2", with_custom_data(word(0x5DA2) if copy_state == "reset" else saved))
+        require_entry(b"2", with_custom_data(word(0x5DA2) if copy_state == "reset" else expected))
 
 
 def main():
@@ -135,6 +147,7 @@ def main():
         metavar=("ENTRY_FRAME", "DOWN_FRAME"),
         help="require the editor display, focus movement, application return and restored L1",
     )
+    parser.add_argument("--initial-note", help="expect this note in the transfer and editor")
     args = parser.parse_args()
     if args.bitmap_image and not args.bitmap_pool:
         parser.error("--bitmap-image requires --bitmap-pool")
@@ -155,7 +168,9 @@ def main():
             pixels = frame[len(header) :]
             lcd["check_line"](pixels, glyphs, 0, "Notebook", path)
             lcd["check_line"](pixels, glyphs, 16, "Alpha to type", path)
-            lcd["check_line"](pixels, glyphs, 24, "", path, focused=index == 0)
+            lcd["check_line"](pixels, glyphs, 24, args.initial_note or "", path, focused=index == 0)
+            if args.initial_note is not None:
+                lcd["check_line"](pixels, glyphs, 32, "Loaded", path)
     workspace_check = None
     report = {}
     if args.rpl_pool or args.bitmap_pool:
@@ -167,20 +182,13 @@ def main():
         def workspace_check(words):
             report.update(validate(words, sram))
             if args.bitmap_image:
-                image = args.bitmap_image.read_bytes()
-                if len(image) != 45472 or struct.unpack_from("<4sIII", image) != (
-                    b"HPC1",
-                    45456,
-                    8,
-                    1048,
-                ):
-                    raise ValueError("unexpected HP39g+ Notebook image")
-                checksum = 2166136261
-                for byte in image[16:]:
-                    checksum = ((checksum ^ byte) * 16777619) & 0xFFFFFFFF
-                if tuple(words[44:46]) != (checksum, len(image) - 16):
+                inspect_image = runpy.run_path(str(Path(__file__).with_name("build.py")))[
+                    "bitmap_image_info"
+                ]
+                size, checksum = inspect_image(args.bitmap_image)
+                if tuple(words[44:46]) != (checksum, size):
                     raise ValueError("Notebook readback differs from the expected code image")
-                report.update(image_bytes=len(image) - 16, code_fnv1a=f"{checksum:08x}")
+                report.update(image_bytes=size, code_fnv1a=f"{checksum:08x}")
             if args.notebook_editor:
                 data_l1, code_l1, result, restored_data, restored_code = words[46:51]
                 if result or (data_l1, code_l1) != (restored_data, restored_code):
@@ -195,6 +203,7 @@ def main():
         args.arm_entry,
         args.c_probe or args.rpl_pool or args.bitmap_pool,
         workspace_check,
+        args.initial_note,
     )
     if report:
         print(json.dumps(report))

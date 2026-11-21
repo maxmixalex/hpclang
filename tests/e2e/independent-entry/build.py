@@ -6,8 +6,24 @@ This is an entry/return experiment, not an HPC1 application launcher.
 import argparse
 import hashlib
 import json
+import struct
 import subprocess
 from pathlib import Path
+
+
+def bitmap_image_info(path):
+    image = path.read_bytes()
+    if len(image) < 16:
+        raise ValueError("truncated HPC1 header")
+    magic, size, entry, static = struct.unpack_from("<4sIII", image)
+    if (magic, size, entry) != (b"HPC1", len(image) - 16, 8) or not 0 < size <= 12 * 4096:
+        raise ValueError("image does not fit the D1.55 editor fixture")
+    if static > 4096:
+        raise ValueError("unexpected static data requirement for the editor fixture")
+    checksum = 2166136261
+    for byte in image[16:]:
+        checksum = ((checksum ^ byte) * 16777619) & 0xFFFFFFFF
+    return size, checksum
 
 
 def word(value, width=5):
@@ -88,8 +104,11 @@ def main():
         "--stock-state", action="store_true", help="pass original Saturn state to probe"
     )
     parser.add_argument("--stock-frame", action="store_true", help="also pass saved register frame")
+    parser.add_argument("--bitmap-image", type=Path, help="compile against this Notebook HPC1")
     args = parser.parse_args()
     bitmap_image = args.hp39_notebook_stage or args.hp39_notebook_editor
+    if args.bitmap_image and not bitmap_image:
+        parser.error("--bitmap-image requires a Notebook bitmap probe")
     if bitmap_image:
         args.stock_state = True
     if args.stock_frame and not args.stock_state:
@@ -118,6 +137,10 @@ def main():
         common.append("-DHPCLANG_PROBE_STOCK_STATE")
     if bitmap_image:
         common.append("-DHPCLANG_PROBE_NOTEBOOK_STAGE")
+        if args.bitmap_image:
+            size, checksum = bitmap_image_info(args.bitmap_image)
+            common += [f"-DNOTEBOOK_BYTES={size}", f"-DNOTEBOOK_FNV1A={checksum}u"]
+            inputs["notebook.hpc"] = args.bitmap_image
     if args.stock_frame:
         common.append("-DHPCLANG_PROBE_STOCK_FRAME")
     sources = ["entry.S", "probe.c", "bootstrap-sync.S"]

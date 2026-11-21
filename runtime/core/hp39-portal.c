@@ -638,7 +638,12 @@ int hpclang_aplet_data_get(struct hpclang_object **object)
     }
     *object = NULL;
     uint32_t slot, address;
-    if (hp39_aplet_context(&slot) == NULL)
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (boot != NULL && boot->model == HPCLANG_MODEL_HP39GPLUS && boot->platform_cookie == 0u &&
+        boot->saturn_state != 0u) {
+        if (hpclang_hp39_bitmap_aplet_data_slot(&hp39_stock_reader, &slot) != 0)
+            return -1;
+    } else if (hp39_aplet_context(&slot) == NULL)
         return -1;
     if (!hp39_stock_read_word5(slot, &address)) {
         errno = EIO;

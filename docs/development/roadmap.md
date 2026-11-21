@@ -24,9 +24,10 @@ interrupt-restoration checks. Two builds reproduced the tested C Aplet; its
 packaging regression is in #49. The full independent Notebook is still open.
 The [launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
 records a 27-page Stock-owned bitmap. Code staging at `64464caf` is in #49.
-A subsequent local D1.55 run opened the independent Notebook editor, moved
-focus and exited to Stock with restored mappings. The editor reported load
-error 88. Reading, saving and reopening a note in the active Aplet remain open.
+On D1.55 the installed-SDK Notebook now reads the active independent Aplet's
+data. Two local launches displayed the preinstalled note `Seed42` and
+`Loaded`, accepted focus changes and exited to the Aplet library. Edited
+notes still need Save-button publication and relaunch verification.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN

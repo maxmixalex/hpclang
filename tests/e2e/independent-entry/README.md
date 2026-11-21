@@ -210,3 +210,11 @@ key to reopen the library. Give both PGM paths in order to the SRAM checker's
 It checks the title, prompt and focus change, application return value,
 restored mappings and named writeback. Saving a note requires Aplet storage
 support beyond this editor-entry fixture.
+
+To exercise Aplet reads with an updated installed SDK, pass the same
+`--bitmap-image /path/to/notebook.hpc` to the entry builder, Aplet builder
+and checker. Add `--initial-note Seed42` to the last two commands. The Aplet
+then returns its existing data after editor exit. The checker expects
+`Seed42` in the input field and `Loaded` on the status line, and checks the
+native data in the named Aplet directory. Reopen the Aplet from the library
+and repeat the LCD check with the second pair of captures.
