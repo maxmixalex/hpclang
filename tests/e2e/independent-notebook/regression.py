@@ -24,6 +24,11 @@ entry_verifier = runpy.run_path(str(E2E / "independent-entry/verify.py"))
 no_toolbox = entry_verifier["no_toolbox"]
 ui = runpy.run_path(str(E2E / "notebook/verify.py"))
 
+# The low-memory run starts with the normal result already on the Stock stack.
+# A distinct RPL result proves that the new program reached its cleanup check.
+NORMAL_RESULT = 124275
+LOW_MEMORY_RESULT = 124276
+
 
 def pack(nibbles):
     nibbles += "0" * (len(nibbles) % 2)
@@ -60,17 +65,40 @@ def build(dest, toolchain, profile):
         magic != b"HPC1"
         or size != len(image)
         or (size + 4095) // 4096 != 20
-        or rw + 8192 + 4096 > 32768
+        or rw + 8192 + 4096 > 20480
     ):
         raise ValueError("Notebook no longer fits the qualified fixture layout")
     checksum = 2166136261
     for b in image:
         checksum = ((checksum ^ b) * 16777619) & 0xFFFFFFFF
+    for package, rw_bytes, expected_status in (("RUN.HP", 32768, 0), ("LOWMEM.HP", 20480, 1)):
+        out = dest / package.removesuffix(".HP").lower()
+        out.mkdir()
+        build_runner(
+            out,
+            dest / package,
+            toolchain,
+            profile["model"],
+            size,
+            checksum,
+            offset,
+            rw_bytes,
+            expected_status,
+        )
+    (dest / "COPY.HP").write_bytes(pack(word(0x2D9D) + word(0x6657) + word(0x312B)))
+    return image
+
+
+def build_runner(
+    out, package, toolchain, model_id, size, checksum, offset, rw_bytes, expected_status
+):
     parts = []
     for phase in ("acquire", "check"):
-        source = dest / (phase + ".c")
+        source = out / (phase + ".c")
         source.write_text(
-            f"#define NOTEBOOK_MODEL {profile['model']}u\n"
+            f"#define NOTEBOOK_MODEL {model_id}u\n"
+            f"#define NOTEBOOK_RW_BYTES {rw_bytes}u\n"
+            f"#define NOTEBOOK_EXPECTED_STATUS {expected_status}u\n"
             f"#define IMAGE_BYTES {size}u\n"
             f"#define IMAGE_HASH {checksum}u\n"
             f"#define ENTRY_OFFSET {offset}u\n"
@@ -87,11 +115,11 @@ def build(dest, toolchain, profile):
                 "--probe-source",
                 source,
                 "--output",
-                dest / phase,
+                out / phase,
             ],
             check=True,
         )
-        digits = "".join(word(b, 2) for b in (dest / phase / "program.HP").read_bytes()[8:])
+        digits = "".join(word(b, 2) for b in (out / phase / "program.HP").read_bytes()[8:])
         parts.append(digits[5 : 10 + int(digits[10:15][::-1], 16)])
     # Make an unreachable temporary and capture the tagged object's address
     # before the original GARBAGECOL, so actual movement is observable.
@@ -123,7 +151,7 @@ def build(dest, toolchain, profile):
         + seed
         + word(0x5F42)
     )
-    (dest / "RUN.HP").write_bytes(
+    package.write_bytes(
         pack(
             word(0x2D9D)
             + parts[0]
@@ -131,15 +159,14 @@ def build(dest, toolchain, profile):
             + parts[1]
             + word(0x2614)
             + word(12)
-            + "5724210"
+            + str(LOW_MEMORY_RESULT if expected_status else NORMAL_RESULT)[::-1]
+            + "0"
             + word(0x312B)
         )
     )
-    (dest / "COPY.HP").write_bytes(pack(word(0x2D9D) + word(0x6657) + word(0x312B)))
-    return image
 
 
-def check_phase(phase, first, flash, original, font):
+def check_phase(phase, editor_text, flash, original, font):
     ram = (phase / "state/sram").read_bytes()
     assert (phase / "state/flash").read_bytes() == flash
     _, read, _ = no_toolbox(ram, flash)
@@ -147,13 +174,17 @@ def check_phase(phase, first, flash, original, font):
     assert original == ram[0x20000:0x35000]
     stack = read(0x806F8)
     result = read(stack)
-    assert (
-        read(result) == 0x2614 and sum(read(result + 10 + i, 1) * 10**i for i in range(6)) == 124275
-    )
+    expected_result = LOW_MEMORY_RESULT if editor_text is None else NORMAL_RESULT
+    digits = sum(read(result + 10 + i, 1) * 10**i for i in range(6))
+    assert read(result) == 0x2614 and read(result + 5) == 12 and digits == expected_result
     moved = read(stack + 5)
     assert moved != read(read(0x8078E) + 100) and read(moved) == 0x2A4E and read(moved + 5) == 37
     assert [read(moved + 10 + i, 1) for i in range(32)] == [int(x, 16) for x in "12345678" * 4]
     require_stock_pc(phase / "state")
+    returned = (phase / "stock-returned.pgm").read_bytes()
+    assert returned == (phase / "stock-checkpoint.pgm").read_bytes()
+    if editor_text is None:
+        return hashlib.sha256(returned).hexdigest()
     f = phase / "stock-editor.pgm"
     magic, dims, maximum, img = f.read_bytes().split(b"\n", 3)
     width, height = map(int, dims.split())
@@ -166,9 +197,8 @@ def check_phase(phase, first, flash, original, font):
     )
     pixels = b"".join(img[i * width : i * width + 131] for i in range(height))
     ui["check_line"](pixels, font, 0, "Notebook", f)
-    ui["check_line"](pixels, font, 24, "" if first else "20", f, focused=True)
-    returned = (phase / "stock-returned.pgm").read_bytes()
-    assert returned == (phase / "stock-checkpoint.pgm").read_bytes() and returned != f.read_bytes()
+    ui["check_line"](pixels, font, 24, editor_text, f, focused=True)
+    assert returned != f.read_bytes()
     return hashlib.sha256(returned).hexdigest()
 
 
@@ -256,30 +286,40 @@ def main():
     assert staged[0x21000 : 0x21000 + len(image)] == image
     font = ui["font_rows"](ROOT / "runtime/fonts/generated/newrpl_6a.S")
     hashes = {}
-    for first, name, source in [(True, "save", "setup"), (False, "reload", "save")]:
-        keys = (
-            "4300 tap two\n4900 tap zero\n5500 tap down\n6200 tap enter\n7600 capture saved\n"
-            if first
-            else ""
-        )
+    source = "setup"
+    save_keys = "4300 tap two\n4900 tap zero\n5500 tap down\n6200 tap enter\n7600 capture saved\n"
+    for name, program, package, editor in (
+        ("save", "SPLITGC", "RUN.HP", ""),
+        ("low-memory", "SPLITERR", "LOWMEM.HP", None),
+        ("reload", "SPLITGC", None, "20"),
+    ):
+        actions = ""
+        if editor is not None:
+            actions = (
+                "3500 capture editor\n" + (save_keys if name == "save" else "") + "8500 tap on\n"
+            )
         transfer(
             spec,
             dest / name,
             dest / source / "state",
             dest,
-            "SPLITGC",
-            installed=not first,
-            package_name="RUN.HP",
-            extra_files=[("COPY.HP", "CKCOPY")] if first else [],
-            remote_commands=["HOME 'SPLITGC' RCL CKCOPY"],
-            actions="3500 capture editor\n" + keys + "8500 tap on\n15000 capture returned\n",
+            program,
+            installed=package is None,
+            package_name=package,
+            extra_files=[("COPY.HP", "CKCOPY")] if name == "save" else [],
+            remote_commands=[f"HOME '{program}' RCL CKCOPY"],
+            actions=actions + "15000 capture returned\n",
             execution_ms=18000,
         )
         hashes[name] = {
-            "editor": "" if first else "20",
+            "editor": editor,
             "home_hex": b"hpclang-notebook/1\n20".hex(),
-            "settled_sha256": check_phase(dest / name, first, flash, staged[0x20000:0x35000], font),
+            "settled_sha256": check_phase(
+                dest / name, editor, flash, staged[0x20000:0x35000], font
+            ),
         }
+        source = name
+    hashes["low-memory"].update(exit_status=1, rw_bytes=20480)
     (dest / "report.json").write_text(json.dumps(hashes, indent=2))
     print(
         f"PASS independent {args.model} Notebook HOME bytes, editor reload, GC and settled return"

@@ -22,10 +22,16 @@ fixture-specific split mapping. The loader receives the actual saved ARMSYS
 continuation and denies Port 1 edits. This fixed-layout emulator fixture is
 not a production launcher.
 
-The first editor must be empty. Physical key events type `20`, activate Save
-and exit. A second emulator process uses the first process's state and recalls
-the installed program without another transfer. The verifier checks the full
-versioned HOME string, renders the expected editor text independently, checks
-the GC witness and RPL return, and compares two Stock frames one second apart.
-See `report.json` for the phase results. The fixture exercises GC after exit
-while leases remain held, rather than forcing GC inside the application's Save.
+The first editor must be empty. Key events type `20`, save the note and exit.
+The next process runs the same application image with 20 KiB of writable
+memory advertised to the runtime, including its 8 KiB stack. Notebook returns
+1 when initialization runs out of memory. The fixture restores the mappings,
+checks every KOS release, reallocates and releases equivalents, then checks
+the application status. A distinct RPL result identifies this failure run.
+
+The last process uses the state left by the failure and recalls the original
+32 KiB program. It must show `20` in the editor and exit normally. The verifier
+checks the versioned HOME string, GC witness, RPL return and two settled Stock
+frames in all three processes. It independently checks editor pixels on the
+two successful launches. See `report.json` for the phase results. The GC
+witness runs after application exit while the leases are still held.
