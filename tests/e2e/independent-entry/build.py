@@ -16,6 +16,39 @@ def word(value, width=5):
     return "".join((f"{value >> 4 * i & 15:x}" for i in range(width)))
 
 
+def moving_gc_program():
+    # Make an unreachable temporary and capture the tagged object's address
+    # before the original GARBAGECOL, so actual movement is observable.
+    dead = word(0x2A4E) + word(1029) + "0" * 1024
+    target = word(0x2A4E) + word(37) + "12345678" * 4
+    seed = (
+        "8f"
+        + word(0x679B)
+        + "20"
+        + "143"
+        + "1b"
+        + word(0x8078E)
+        + "146136"
+        + "16f" * 6
+        + "163"
+        + "140"
+        + "8f"
+        + word(0x67D2)
+        + "142164808c"
+    )
+    return (
+        dead
+        + word(0x6657)
+        + word(0x3244)
+        + target
+        + word(0x6657)
+        + word(0x2DCC)
+        + word(5 + len(seed))
+        + seed
+        + word(0x5F42)
+    )
+
+
 def code_for(size, offset, model="hp50g"):
     if size < 8 or size % 8 or size > 65536:
         raise ValueError("payload must contain 1..8192 complete eight-byte blocks")

@@ -129,36 +129,7 @@ def build_runner(
         )
         digits = "".join(word(b, 2) for b in (out / phase / "program.HP").read_bytes()[8:])
         parts.append(digits[5 : 10 + int(digits[10:15][::-1], 16)])
-    # Make an unreachable temporary and capture the tagged object's address
-    # before the original GARBAGECOL, so actual movement is observable.
-    dead = word(0x2A4E) + word(1029) + "0" * 1024
-    target = word(0x2A4E) + word(37) + "12345678" * 4
-    seed = (
-        "8f"
-        + word(0x679B)
-        + "20"
-        + "143"
-        + "1b"
-        + word(0x8078E)
-        + "146136"
-        + "16f" * 6
-        + "163"
-        + "140"
-        + "8f"
-        + word(0x67D2)
-        + "142164808c"
-    )
-    gc = (
-        dead
-        + word(0x6657)
-        + word(0x3244)
-        + target
-        + word(0x6657)
-        + word(0x2DCC)
-        + word(5 + len(seed))
-        + seed
-        + word(0x5F42)
-    )
+    gc = entry["moving_gc_program"]()
     package.write_bytes(
         pack(
             word(0x2D9D)
@@ -185,9 +156,7 @@ def check_phase(phase, editor_text, flash, original, font, expected_result):
     result = read(stack)
     digits = sum(read(result + 10 + i, 1) * 10**i for i in range(6))
     assert read(result) == 0x2614 and read(result + 5) == 12 and digits == expected_result
-    moved = read(stack + 5)
-    assert moved != read(read(0x8078E) + 100) and read(moved) == 0x2A4E and read(moved + 5) == 37
-    assert [read(moved + 10 + i, 1) for i in range(32)] == [int(x, 16) for x in "12345678" * 4]
+    entry_verifier["moving_gc_result"](read, stack + 5)
     require_stock_pc(phase / "state")
     returned = (phase / "stock-returned.pgm").read_bytes()
     assert returned == (phase / "stock-checkpoint.pgm").read_bytes()

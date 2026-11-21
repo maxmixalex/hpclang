@@ -70,6 +70,17 @@ def no_toolbox(ram, flash, model="hp50g"):
     return nib, word, count
 
 
+def moving_gc_result(read, stack_cell):
+    """Check the tagged temporary and its recorded pre-GC Saturn address."""
+    before = read(read(0x8078E) + 100)
+    after = read(stack_cell)
+    require(0x80000 <= after < before <= 0x100000 - 42, "temporary did not move down in RAM")
+    require(read(after) == 0x2A4E and read(after + 5) == 37, "invalid relocated temporary")
+    tag = [int(c, 16) for c in "12345678" * 4]
+    require([read(after + 10 + i, 1) for i in range(32)] == tag, "relocated payload changed")
+    return {"before": before, "after": after}
+
+
 def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check=None):
     manifest = json.loads((artifact / "build.json").read_text())
     model = manifest.get("model", "hp50g")

@@ -49,7 +49,10 @@ writable memory. A second Stock process deposits a versioned HOME note containin
 `314` and recalls the resident program without sending it again. The editor
 shows `314`, accepts `20` and exits with ON; HOME retains the original note.
 The snapshots check the aligned code, its retained location and the restored
-Stock state. Saving from the application and moving GC remain open.
+Stock state. After each ARM return, the Stock program creates an unreachable
+temporary, records a live tag's address and calls GARBAGECOL. The reports
+record the lower address and verify the tag at that location. Saving from the
+application and collection while its ARM mappings are active remain open.
 
 For manual execution, use an original Stock snapshot for the selected model, without
 library 275 and explicitly set to RPN mode, and the

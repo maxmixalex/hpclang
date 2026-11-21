@@ -21,7 +21,9 @@ check reacquisition, GC and relaunch from that state. On HP48gII the independent
 16 code, 12 writable). Two Stock processes ran one USB-installed program. On recall the editor
 read `314` from a Stock-written HOME note, displayed `31420` after keyboard
 input and returned with status zero. Both return snapshots verified the code and
-page mappings. Local pass. Application-originated HOME save and moving GC remain open. HP39 Aplet entry and wider native services remain open.
+page mappings. After each exit, Stock GC moved a tagged temporary and preserved
+its payload. The resident Notebook relaunched after the first collection. Local
+pass; application-originated HOME save and GC during active execution remain open. HP39 Aplet entry and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.

@@ -190,6 +190,8 @@ def build(source, tool, output, model="hp50g", notebook=None):
         reserve = len(destination)
     body = code + packed + destination
     program = word(0x2D9D) + word(0x2DCC) + word(5 + len(body)) + body
+    if notebook:
+        program += encoder["moving_gc_program"]()
     program += word(0x2614) + word(12) + "5724210" + word(0x312B)
     if len(program) & 1:
         program += "0"
@@ -222,6 +224,7 @@ def build(source, tool, output, model="hp50g", notebook=None):
         manifest["application"] = "notebook"
         manifest["scope"] = "HP48gII resident Notebook editor and Stock return"
         manifest["resident_image"] = True
+        manifest["post_exit_gc"] = True
     if model == "hp48gii":
         manifest["pool_pages"] = 29
     (output / "build.json").write_text(json.dumps(manifest, indent=2) + "\n")

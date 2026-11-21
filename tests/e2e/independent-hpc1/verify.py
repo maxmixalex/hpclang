@@ -189,6 +189,8 @@ def verify(artifact, state, baseline):
         distance = sum(int(packed[trailer + 32 + i], 16) << (4 * i) for i in range(8))
         require(trailer - distance == 2 * (base + 4096), "resident image location changed")
         report["resident_trailer_nibble"] = trailer
+    if manifest.get("post_exit_gc"):
+        report["post_exit_gc"] = module["moving_gc_result"](word, word(0x806F8) + 5)
     return report
 
 
