@@ -286,6 +286,55 @@ calculator bytes unless a particular API explicitly specifies UTF-8; ownership
 does not change their encoding. See the [migration guide](migration.md) for
 numeric, text and legacy-call boundaries.
 
+### Find a classic Stock library
+
+On HP48gII, HP49g+ and HP50g, `hpclang_library_query(number)` returns flags
+for a 12-bit library number. Check for `-1` before testing
+`HPCLANG_LIBRARY_REGISTERED` (system catalog) or
+`HPCLANG_LIBRARY_HOME_ATTACHED` (HOME attachment). Zero means neither list
+contains the number. A library stored in a port can have this state; use the
+port iterator to find its stored record. HP39 and launches without a classic
+Stock context report `ENOSYS`.
+
+For example, this function counts the libraries attached to HOME. The list
+contains each number once, in ascending order, with both flags available.
+
+```c
+#include <hpclang/port.h>
+#include <errno.h>
+#include <stdlib.h>
+
+int home_library_count(void)
+{
+    int capacity = hpclang_library_list(NULL, 0);
+    if (capacity <= 0)
+        return capacity;
+
+    struct hpclang_library_info *libraries = malloc((size_t)capacity * sizeof *libraries);
+    if (!libraries) {
+        errno = ENOMEM;
+        return -1;
+    }
+    int used = hpclang_library_list(libraries, (uint32_t)capacity);
+    if (used < 0) {
+        int error = errno;
+        free(libraries);
+        errno = error;
+        return -1;
+    }
+    int attached = 0;
+    for (int i = 0; i < used; ++i)
+        if (libraries[i].flags & HPCLANG_LIBRARY_HOME_ATTACHED)
+            ++attached;
+    free(libraries);
+    return attached;
+}
+```
+
+Each list call uses about 1 KiB of temporary heap. If the catalog grows between
+calls, the second call can return `ENOSPC` and preserves the output array.
+Call the function again to take a fresh count.
+
 ## Migrate HPGCC source
 
 See the [migration guide](migration.md) for per-interface decisions, precision,
