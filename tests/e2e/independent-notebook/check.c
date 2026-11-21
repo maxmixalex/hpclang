@@ -39,6 +39,7 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
         }
     }
     out[60] = split(rec, 1, map, frame);
+    u32 status = rec[40];
     out[3] = stock_call(201, 0x100, 1048576);
     if (out[3])
         for (;;) {
@@ -51,6 +52,14 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
         if (!out[11 + 4 * (i - 1)] || stock_call(101, out[11 + 4 * (i - 1)], 0))
             for (;;) {
             }
+    for (unsigned i = 0; i < count; i++)
+        if (out[10 + 4 * i])
+            for (;;) {
+            }
+    /* Check the application's exit status after restoring and releasing leases. */
+    if (status != NOTEBOOK_EXPECTED_STATUS)
+        for (;;) {
+        }
     out[4] = 0xd04ec105;
     control[1] = hpclang_irq_save_disable() | 0xc0;
 }

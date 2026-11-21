@@ -8,11 +8,12 @@ now records production Notebook release acceptance. Earlier integration
 [#48](https://github.com/maxmixalex/hpclang/pull/48) passed all five workflows
 on `5898f704`, including HP50g independent persistence and installed SDK checks.
 
-M8.6 local verification on HP49g+ now covers independent Notebook launch,
-HOME save and relaunch. The original-ROM test read back `20`, checked the
-returned RPL value and GC witness, and verified settled Stock frames after
-both exits. The retained HP50g test uses the same verifier. HP39 Aplet entry,
-HP48gII application-sized allocation and wider native services remain open.
+M8.6 local verification on HP49g+ and HP50g covers independent Notebook
+launch from original ROM, saving `20` in HOME, a low-memory application exit
+and normal relaunch from that state. Notebook backs up an edit to Port 0;
+Stock recalls `202` while HOME retains `20`. Both fixtures check lease
+release, GC and settled Stock return. HP39 Aplet entry, HP48gII application-sized
+allocation and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
