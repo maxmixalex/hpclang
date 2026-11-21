@@ -2,6 +2,9 @@
 """Verify ENTER writeback in the named HP39 Aplet directory after Stock exit."""
 
 import argparse
+import json
+import runpy
+import struct
 from pathlib import Path
 
 
@@ -13,7 +16,7 @@ def nibbles(data):
     return "".join(f"{b & 15:x}{b >> 4:x}" for b in data)
 
 
-def check(aplet, sram, copy_state=None, arm_entry=False):
+def check(aplet, sram, copy_state=None, arm_entry=False, c_probe=None):
     title = b"EntryProbe"
     header = b"HP39BinB" + bytes([len(title)]) + title
     if not aplet.startswith(header):
@@ -66,6 +69,40 @@ def check(aplet, sram, copy_state=None, arm_entry=False):
                 body[:pos] + "0" * pad + after + "0" * (7 - pad) + body[pos + reserve :]
                 for pad in range(8)
             ]
+        elif c_probe is not None:
+            meta = json.loads((c_probe / "metadata.json").read_text())
+            blob = (c_probe / "probe.bin").read_bytes()
+            blob += bytes(-len(blob) % 8)
+            source = nibbles(blob)
+            reserve = len(source) + 7
+            if blob.hex() != meta["blob"] or body.count(source + "0" * reserve) != 1:
+                raise ValueError("C probe does not match the Aplet")
+            pos = body.index(source) + len(source)
+            start = prefix + body[:pos]
+            if memory.count(start) != 1:
+                raise ValueError("missing named C probe directory")
+            idx = memory.index(start) + len(start)
+            area = memory[idx : idx + reserve]
+            pad = area.find(source[:64])
+            if not 0 <= pad <= 7:
+                raise ValueError("missing executed C probe")
+            packed = area[pad : pad + len(source)]
+            actual = bytes(int(packed[i : i + 2][::-1], 16) for i in range(0, len(packed), 2))
+            workspace = meta["symbols"]["workspace"]
+            marker = struct.unpack_from("<I", actual, workspace)[0]
+            base = struct.unpack_from("<I", actual, workspace + 16)[0] - workspace
+            if (
+                marker != 0x48504343
+                or base % 4
+                or not 0x08000000 <= base <= 0x08000000 + len(sram) - len(blob)
+            ):
+                raise ValueError("invalid C workspace or execution address")
+            # Stock may relocate the directory after the payload records its addresses.
+            check_payload = runpy.run_path(str(Path(__file__).with_name("verify.py")))[
+                "check_payload"
+            ]
+            check_payload(actual, meta, base)
+            variants = [body[:pos] + "0" * pad + packed + "0" * (7 - pad) + body[pos + reserve :]]
         if sum(memory.count(prefix + variant) for variant in variants) != 1:
             raise ValueError(f"saved named Aplet directory did not match {title!r}")
 
@@ -79,9 +116,17 @@ def main():
     parser.add_argument("aplet", type=Path)
     parser.add_argument("sram", type=Path)
     parser.add_argument("--copy-state", choices=("saved", "reset"))
-    parser.add_argument("--arm-entry", action="store_true")
+    entry = parser.add_mutually_exclusive_group()
+    entry.add_argument("--arm-entry", action="store_true")
+    entry.add_argument("--c-probe", type=Path, help="directory with probe.bin and metadata.json")
     args = parser.parse_args()
-    check(args.aplet.read_bytes(), args.sram.read_bytes(), args.copy_state, args.arm_entry)
+    check(
+        args.aplet.read_bytes(),
+        args.sram.read_bytes(),
+        args.copy_state,
+        args.arm_entry,
+        args.c_probe,
+    )
 
 
 if __name__ == "__main__":

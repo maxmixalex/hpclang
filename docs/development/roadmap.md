@@ -22,10 +22,12 @@ Aplet imported through Stock USB with attachment ID `0x7ff`. All three
 profiles passed Start, ENTER, Exit, copy, confirmed Reset and relaunch.
 Full SRAM directory checks found the original marker intact while the copy
 was cleared and then saved again. The zero and 275 attachment controls failed
-import on HP39g+. On HP39g+ D1.55, a 32-byte ARM probe preserved incoming r0, wrote its
+import on HP39g+. On all three profiles, a 32-byte ARM probe preserved incoming r0, wrote its
 marker, returned through RPL writeback and exited to the Stock Aplet list.
-A same-layout control that discarded r0 reproduced the abort. Independent
-C/Notebook execution and ARM return on HP39gs/40gs remain open.
+On HP39g+ a same-layout control that discarded r0 reproduced the abort. On HP39g+ D1.55 the independent C probe also returned through Stock
+writeback, with 128 verified workspace values, an owned 4 KiB stack,
+unchanged guards and restored interrupt state. The full independent HP39
+Notebook and its concurrent native workspace allocation remain open.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN

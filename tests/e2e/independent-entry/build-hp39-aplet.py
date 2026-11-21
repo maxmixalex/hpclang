@@ -50,10 +50,10 @@ def independent_template(data):
     return pack(code)
 
 
-def arm_entry():
+def return_probe():
     # Preserve incoming r0, load the marker, write it into the aligned copy,
     # restore r0 and return through lr. The two literal slots follow bx lr.
-    blob = struct.pack(
+    return struct.pack(
         "<8I",
         0xE92D0001,
         0xE59F0008,
@@ -64,6 +64,10 @@ def arm_entry():
         0x12345678,
         0,
     )
+
+
+def arm_entry(blob):
+    blob += bytes(-len(blob) % 8)
     code_for = runpy.run_path(str(Path(__file__).with_name("build.py")))["code_for"]
     offset = len(code_for(len(blob), 0, "hp39gplus")) - 13
     body = code_for(len(blob), offset, "hp39gplus") + nibbles(blob) + "0" * (2 * len(blob) + 7)
@@ -74,8 +78,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--assets", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument(
-        "--arm-entry", action="store_true", help="exercise the HP39g+ ARM call and return"
+    entry = parser.add_mutually_exclusive_group()
+    entry.add_argument(
+        "--arm-entry", action="store_true", help="exercise the HP39 ARM call and return"
+    )
+    entry.add_argument(
+        "--c-probe", type=Path, help="embed probe.bin from the independent C entry build"
     )
     controls = parser.add_mutually_exclusive_group()
     controls.add_argument(
@@ -95,7 +103,11 @@ def main():
     }
     assets["apletcode.bin"] = independent_template(assets["apletcode.bin"])
     marker = b"hpclang-enter"
-    action = word(0x2D9D) + (arm_entry() if args.arm_entry else "")
+    action = word(0x2D9D)
+    if args.arm_entry:
+        action += arm_entry(return_probe())
+    elif args.c_probe is not None:
+        action += arm_entry(args.c_probe.read_bytes())
     action += word(0x3244) + word(0x2A2C) + word(5 + 2 * len(marker)) + nibbles(marker)
     if len(action) % 2 == 0:
         action += word(0x765C)  # NOP keeps the complete data-list item byte aligned.

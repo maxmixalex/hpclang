@@ -144,7 +144,7 @@ This releases the payload gate after the named Reset program transfers.
 This probe exercises RPL Start, ENTER, Exit and copied-Aplet Reset. ARM entry, Notebook resource
 ownership and physical-device behavior require separate execution checks.
 
-For the HP39g+ D1.55 ARM return probe, add `--arm-entry` to both the Aplet
+For the HP39/40 ARM return probe, add `--arm-entry` to both the Aplet
 build and the SRAM check above. Use a fresh output directory. The 32-byte
 payload saves incoming r0, writes 0x48504139 over the seed in its executable
 copy, restores r0 and returns through lr. Following ENTER, RPL stores its own
@@ -153,4 +153,21 @@ directory including the unchanged ARM source, the aligned copy with its one
 changed word and the RPL custom data. In a copy of the installed snapshot,
 replacing the r0 pop with a four-byte stack adjustment reproduced abort mode
 and an unsampled Aplet key. The positive trial returned to the Aplet list.
-This ARM check has run on HP39g+ D1.55 only.
+The same installed bundle passed the directory check and returned to the
+Aplet list on HP39gs and HP40gs 2.22. Changing one nibble of the saved ARM
+result made each snapshot fail verification.
+
+For the HP39g+ D1.55 C probe, build the freestanding payload with
+`build.py --toolchain /path/to/atfe/bin --output /tmp/c-entry`, then pass
+`--c-probe /tmp/c-entry/probe.bin` to the Aplet builder. Pass
+`--c-probe /tmp/c-entry` to the SRAM checker. Only the position-independent
+ARM binary from that build goes into the Aplet; the Aplet builder supplies
+the HP39 Saturn entry and return code. Use the normal Kermit watchdog for
+the larger transfer.
+
+The local USB run verified all 128 C workspace values and their checksum,
+the owned stack bounds and alignment, IRQ/FIQ masking and restoration, the
+unchanged SWI vector and code/guards, and RPL writeback in the named Aplet.
+The verifier rejected separate changes to a workspace value, control byte,
+stack guard and saved vector. Notebook loading and its memory budget remain
+separate gates.

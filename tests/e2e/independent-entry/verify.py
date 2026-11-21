@@ -81,6 +81,49 @@ def moving_gc_result(read, stack_cell):
     return {"before": before, "after": after}
 
 
+def check_payload(actual, meta, physical, workspace_check=None):
+    symbols = meta["symbols"]
+    expected = bytes.fromhex(meta["blob"])
+    result = struct.unpack_from("<134I", actual, symbols["workspace"])
+    low, high = (physical + symbols["stack_start"], physical + symbols["stack_end"])
+    if workspace_check is not None:
+        workspace_check(result)
+    else:
+        checksum = 0x12345678
+        for i in range(128):
+            value = ((i % 32) * 0x10203 + 7) ^ (i * 0x01010101)
+            require(result[6 + i] == value, "result[6 + i] == value")
+            checksum = (checksum << 3 | checksum >> 29) & 0xFFFFFFFF ^ value
+        require(result[1] == checksum, "result[1] == checksum")
+        require(
+            low <= result[2] and result[2] + 128 <= high,
+            "low <= result[2] and result[2] + 128 <= high",
+        )
+        require(
+            low <= result[3] <= result[2] and result[3] % 8 == 0,
+            "low <= result[3] <= result[2] and result[3] % 8 == 0",
+        )
+        require(
+            result[4] == physical + symbols["workspace"] and result[5] == result[4] + 536,
+            "result[4] == physical + symbols['workspace'] and result[5] == result[4] + 536",
+        )
+    control = struct.unpack_from("<5I", actual, symbols["control"])
+    require(control[0] & 0xFF == 0x10, "expected unmasked user-mode caller")
+    require(control[1] & 0xFF == 0xD0, "C exercise did not mask IRQ/FIQ")
+    require(control[2] & 0xFF == control[0] & 0xFF, "caller control not restored")
+    require(control[3] != 0 and control[3] == control[4], "SWI vector not restored")
+    require(len(actual) == len(expected) == meta["size"], "truncated payload")
+    for index, (before, after) in enumerate(zip(expected, actual)):
+        if symbols["control"] <= index < symbols["control"] + 20:
+            continue
+        if symbols["workspace"] <= index < symbols["workspace"] + 536:
+            continue
+        if symbols["stack_start"] <= index < symbols["stack_end"]:
+            continue
+        require(before == after, "before == after")
+    return control
+
+
 def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check=None):
     manifest = json.loads((artifact / "build.json").read_text())
     model = manifest.get("model", "hp50g")
@@ -123,44 +166,8 @@ def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check
     start = candidates[0]
     require(start % 4 == 0, "start % 4 == 0")
     physical = 0x08000000 + start
-    result = struct.unpack_from("<134I", ram, start + symbols["workspace"])
-    low, high = (physical + symbols["stack_start"], physical + symbols["stack_end"])
-    if workspace_check is not None:
-        workspace_check(result)
-    else:
-        checksum = 0x12345678
-        for i in range(128):
-            value = ((i % 32) * 0x10203 + 7) ^ (i * 0x01010101)
-            require(result[6 + i] == value, "result[6 + i] == value")
-            checksum = (checksum << 3 | checksum >> 29) & 0xFFFFFFFF ^ value
-        require(result[1] == checksum, "result[1] == checksum")
-        require(
-            low <= result[2] and result[2] + 128 <= high,
-            "low <= result[2] and result[2] + 128 <= high",
-        )
-        require(
-            low <= result[3] <= result[2] and result[3] % 8 == 0,
-            "low <= result[3] <= result[2] and result[3] % 8 == 0",
-        )
-        require(
-            result[4] == physical + symbols["workspace"] and result[5] == result[4] + 536,
-            "result[4] == physical + symbols['workspace'] and result[5] == result[4] + 536",
-        )
-    control = struct.unpack_from("<5I", ram, start + symbols["control"])
-    require(control[0] & 0xFF == 0x10, "expected unmasked user-mode caller")
-    require(control[1] & 0xFF == 0xD0, "C exercise did not mask IRQ/FIQ")
-    require(control[2] & 0xFF == control[0] & 0xFF, "caller control not restored")
-    require(control[3] != 0 and control[3] == control[4], "SWI vector not restored")
     actual = ram[start : start + meta["size"]]
-    require(len(actual) == len(expected) == meta["size"], "truncated payload")
-    for index, (before, after) in enumerate(zip(expected, actual)):
-        if symbols["control"] <= index < symbols["control"] + 20:
-            continue
-        if symbols["workspace"] <= index < symbols["workspace"] + 536:
-            continue
-        if symbols["stack_start"] <= index < symbols["stack_end"]:
-            continue
-        require(before == after, "before == after")
+    control = check_payload(actual, meta, physical, workspace_check)
 
     def nibbles(data):
         return "".join((f"{b & 15:x}{b >> 4:x}" for b in data))
@@ -184,7 +191,7 @@ def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check
         "complete": True,
         "scope": f"{model} entry/return snapshot",
         "payload_physical": physical,
-        "owned_stack_bytes": high - low,
+        "owned_stack_bytes": symbols["stack_end"] - symbols["stack_start"],
         "cpsr_control": [value & 0xFF for value in control[:3]],
         "swi_vector": list(control[3:]),
         "program_sha256": hashlib.sha256((artifact / "program.HP").read_bytes()).hexdigest(),
