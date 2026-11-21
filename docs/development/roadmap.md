@@ -2,10 +2,7 @@
 
 Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main: `67a84462` ([#52](https://github.com/maxmixalex/hpclang/pull/52)).
-All three workflows passed on `93afbede` (21 successful jobs, one configured
-skip). [#51](https://github.com/maxmixalex/hpclang/pull/51) added the HP49g+
-independent Notebook save and relaunch regression.
+Accepted main: `002fb5e3` ([#53](https://github.com/maxmixalex/hpclang/pull/53)). All five workflows passed on `a022c359` (186 jobs passed, two skipped). Notebook low-memory exit and Port 0 backup are accepted on HP49g+ and HP50g. #52 accepted the Port 1 relocation regression. #51 added the HP49g+ independent Notebook save and relaunch regression.
 [#50](https://github.com/maxmixalex/hpclang/pull/50) records production Notebook
 release acceptance.
 
@@ -24,7 +21,7 @@ input and returned with status zero. Both return snapshots verified the code and
 page mappings. After each exit, Stock GC moved a tagged temporary and preserved
 its payload. The resident Notebook relaunched after the first collection. This
 passed locally at `7b29e9f2` and is submitted for CI in #54. Application-originated
-HOME save and GC during active execution remain open. A local HP48gII Save-button replay confirmed that both create and replace report ENOSYS. The independent loader supplies the Saturn state for reads but no RPL mutation bounds. Both launches returned normally; the existing HOME note retained 314. HP39 Aplet entry and wider native services remain open.
+HOME save and GC during active execution remain open. A local HP48gII Save-button replay confirmed that both create and replace report ENOSYS. The independent loader supplies the Saturn state for reads but no RPL mutation bounds. A Port 0 placement trial installed the full 137,279-byte Notebook package with a valid backup CRC. A smaller entry probe executed inside its Port 0 record, which stayed at the same address across a Stock HOME insertion. In-place workspace writes invalidated the backup CRC. Independent HOME save still requires a launch context and an owner that retains its integrity. HP39 Aplet entry and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
