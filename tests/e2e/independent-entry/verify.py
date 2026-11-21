@@ -85,10 +85,10 @@ def check_payload(actual, meta, physical, workspace_check=None):
     symbols = meta["symbols"]
     expected = bytes.fromhex(meta["blob"])
     result = struct.unpack_from("<134I", actual, symbols["workspace"])
-    low, high = (physical + symbols["stack_start"], physical + symbols["stack_end"])
     if workspace_check is not None:
         workspace_check(result)
     else:
+        low, high = (physical + symbols["stack_start"], physical + symbols["stack_end"])
         checksum = 0x12345678
         for i in range(128):
             value = ((i % 32) * 0x10203 + 7) ^ (i * 0x01010101)

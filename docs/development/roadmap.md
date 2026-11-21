@@ -27,7 +27,11 @@ marker, returned through RPL writeback and exited to the Stock Aplet list.
 On HP39g+ a same-layout control that discarded r0 reproduced the abort. On HP39g+ D1.55 the independent C probe also returned through Stock
 writeback, with 128 verified workspace values, an owned 4 KiB stack,
 unchanged guards and restored interrupt state. The full independent HP39
-Notebook and its concurrent native workspace allocation remain open. Two
+Notebook remains open. A separate D1.55 Aplet allocated a 1024 by 896
+Stock bitmap on the RPL data stack before entering C. Its pixels contained
+27 distinct aligned 4 KiB frames. Stock released the stack reference after
+the ARM call and the Aplet saved its marker. Mapping Notebook into these
+frames and maintaining ownership through its native calls remain unverified. Two
 local builds in separate directories reproduced the four C Aplet transfer
 files byte-for-byte, including the executable tested on HP39g+ D1.55.
 The combined Core runtime workflow now runs this packaging check.

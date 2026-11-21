@@ -16,7 +16,7 @@ def nibbles(data):
     return "".join(f"{b & 15:x}{b >> 4:x}" for b in data)
 
 
-def check(aplet, sram, copy_state=None, arm_entry=False, c_probe=None):
+def check(aplet, sram, copy_state=None, arm_entry=False, c_probe=None, check_workspace=None):
     title = b"EntryProbe"
     header = b"HP39BinB" + bytes([len(title)]) + title
     if not aplet.startswith(header):
@@ -88,20 +88,22 @@ def check(aplet, sram, copy_state=None, arm_entry=False, c_probe=None):
                 raise ValueError("missing executed C probe")
             packed = area[pad : pad + len(source)]
             actual = bytes(int(packed[i : i + 2][::-1], 16) for i in range(0, len(packed), 2))
-            workspace = meta["symbols"]["workspace"]
-            marker = struct.unpack_from("<I", actual, workspace)[0]
-            base = struct.unpack_from("<I", actual, workspace + 16)[0] - workspace
-            if (
-                marker != 0x48504343
-                or base % 4
-                or not 0x08000000 <= base <= 0x08000000 + len(sram) - len(blob)
-            ):
-                raise ValueError("invalid C workspace or execution address")
+            base = None
+            if check_workspace is None:
+                workspace = meta["symbols"]["workspace"]
+                marker = struct.unpack_from("<I", actual, workspace)[0]
+                base = struct.unpack_from("<I", actual, workspace + 16)[0] - workspace
+                if (
+                    marker != 0x48504343
+                    or base % 4
+                    or not 0x08000000 <= base <= 0x08000000 + len(sram) - len(blob)
+                ):
+                    raise ValueError("invalid C workspace or execution address")
             # Stock may relocate the directory after the payload records its addresses.
             check_payload = runpy.run_path(str(Path(__file__).with_name("verify.py")))[
                 "check_payload"
             ]
-            check_payload(actual, meta, base)
+            check_payload(actual, meta, base, check_workspace)
             variants = [body[:pos] + "0" * pad + packed + "0" * (7 - pad) + body[pos + reserve :]]
         if sum(memory.count(prefix + variant) for variant in variants) != 1:
             raise ValueError(f"saved named Aplet directory did not match {title!r}")
@@ -119,14 +121,35 @@ def main():
     entry = parser.add_mutually_exclusive_group()
     entry.add_argument("--arm-entry", action="store_true")
     entry.add_argument("--c-probe", type=Path, help="directory with probe.bin and metadata.json")
+    entry.add_argument(
+        "--rpl-pool", type=Path, help="build directory for the paused RPL page probe"
+    )
+    entry.add_argument(
+        "--bitmap-pool", type=Path, help="build directory for the stack-held bitmap probe"
+    )
     args = parser.parse_args()
+    workspace_check = None
+    report = {}
+    if args.rpl_pool or args.bitmap_pool:
+        verifier = Path(__file__).resolve().parents[1] / "independent-pool/verify.py"
+        validate = runpy.run_path(str(verifier))[
+            "check_bitmap_workspace" if args.bitmap_pool else "check_rpl_workspace"
+        ]
+
+        def workspace_check(words):
+            report.update(validate(words, sram))
+
+    sram = args.sram.read_bytes()
     check(
         args.aplet.read_bytes(),
-        args.sram.read_bytes(),
+        sram,
         args.copy_state,
         args.arm_entry,
-        args.c_probe,
+        args.c_probe or args.rpl_pool or args.bitmap_pool,
+        workspace_check,
     )
+    if report:
+        print(json.dumps(report))
 
 
 if __name__ == "__main__":

@@ -171,3 +171,24 @@ unchanged SWI vector and code/guards, and RPL writeback in the named Aplet.
 The verifier rejected separate changes to a workspace value, control byte,
 stack guard and saved vector. Notebook loading and its memory budget remain
 separate gates.
+
+For a paused HP39g+ RPL memory measurement, compile
+`tests/e2e/independent-pool/rpl-probe.c` with the entry builder's
+`--stock-state --probe-source` options. Supply the resulting binary to the
+Aplet builder with `--c-probe`, then pass its build directory to the SRAM
+checker with `--rpl-pool`. The D1.55 run checked 45 distinct 4 KiB frames
+between the live return and data stacks. It restored both ends of each page,
+the original stack bounds, interrupt state and vector. The named Aplet
+retained the expected writeback. Stock was paused throughout the borrow.
+
+For a Stock-owned page source, compile
+`tests/e2e/independent-pool/hp39-bitmap-probe.c` with `--stock-state`.
+Pass its `probe.bin` to the Aplet builder with `--bitmap-pool`, and its build
+directory to the SRAM checker with the same option. On HP39g+ D1.55,
+MAKEGROB allocated a 1024 by 896 bitmap before the ARM call. C resolved the
+bitmap from DSKTOP and inspected its pixel extent. Its 112 KiB of pixels
+contained 27 complete, distinct 4 KiB frames. After C returned, the RPL
+action dropped the bitmap and completed writeback. The verifier checks both
+2 KiB mappings for every frame against saved SRAM, its bounds inside the
+pixel area and the named Aplet directory. The probe reads page descriptors;
+Notebook execution and stability during moving GC need separate checks.

@@ -85,6 +85,9 @@ def main():
     entry.add_argument(
         "--c-probe", type=Path, help="embed probe.bin from the independent C entry build"
     )
+    entry.add_argument(
+        "--bitmap-pool", type=Path, help="run a C probe with a Stock bitmap on the data stack"
+    )
     controls = parser.add_mutually_exclusive_group()
     controls.add_argument(
         "--attached-control", action="store_true", help="retain the historical library ID"
@@ -106,6 +109,10 @@ def main():
     action = word(0x2D9D)
     if args.arm_entry:
         action += arm_entry(return_probe())
+    elif args.bitmap_pool is not None:
+        # Stock MAKEGROB consumes two system binaries; DROP releases the stack reference.
+        action += word(0x2911) + word(1024) + word(0x2911) + word(896) + word(0x1D622)
+        action += arm_entry(args.bitmap_pool.read_bytes()) + word(0x3244)
     elif args.c_probe is not None:
         action += arm_entry(args.c_probe.read_bytes())
     action += word(0x3244) + word(0x2A2C) + word(5 + 2 * len(marker)) + nibbles(marker)

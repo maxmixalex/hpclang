@@ -67,6 +67,28 @@ def check_rpl_workspace(words, ram):
     )
 
 
+def check_bitmap_workspace(words, ram):
+    marker, status, cpu, top, obj, prologue, span, count, first, end = words[:10]
+    require(marker == 0x47524F42 and status == 0, "bitmap inspection incomplete")
+    require(0x08000000 <= cpu <= 0x0807FC00 and 0x80000 <= top <= 0xFFFFA, "invalid Stock stack")
+    require(prologue == 0x2B1E and span == 0x3800F, "unexpected native bitmap")
+    require(0x80000 <= obj < obj + 5 + span <= 0x100000, "bitmap outside RPL address space")
+    require(
+        first == (obj + 20 + 8191) & ~8191 and end == (obj + 5 + span) & ~8191,
+        "bitmap bounds changed",
+    )
+    pages = words[12 : 12 + count]
+    require(27 <= count <= 28 and end - first == count * 8192, "invalid bitmap page count")
+    require(len(set(pages)) == count, "aliased bitmap pages")
+    for i, page in enumerate(pages):
+        require(page % 4096 == 0 and 0x08001000 <= page <= 0x0807F000, "invalid bitmap frame")
+        offset = cpu - 0x08000000 + ((first + i * 8192) >> 12) * 4
+        require(
+            struct.unpack_from("<2I", ram, offset) == (page, page + 2048), "bitmap mapping changed"
+        )
+    return {"bitmap_nibble_address": obj, "pages": pages}
+
+
 def verify(artifact, state, baseline, *, rpl=False):
     allocations = []
     borrowed = {}
