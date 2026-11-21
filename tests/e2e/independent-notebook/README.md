@@ -26,6 +26,11 @@ continuation and denies Port 1 edits. This fixed-layout emulator fixture is
 not a production launcher.
 
 The first editor must be empty. Key events type `20`, save the note and exit.
+A second launch asks KOS for 35 aligned pages. On partial allocation the
+loader releases every acquired block before installing any mappings. The test
+reacquires all those block sizes together and releases them again. Stock GC
+runs, and the private RPL result remains `124277` for admission refusal.
+
 The next process runs the same application image with 20 KiB of writable
 memory advertised to the runtime, including its 8 KiB stack. Notebook returns
 1 when initialization runs out of memory. The fixture restores the mappings,
@@ -40,6 +45,6 @@ verifier reads `HPCNOTE.TXT` and a pre-existing file and checks their bytes.
 
 The Stock verifier checks the versioned HOME string, GC witness, RPL return
 and two settled Stock frames after each application exit. It also checks the
-editor pixels on the two successful launches. The GC witness runs after
-application exit while the leases are still held. See `report.json` for the
+editor pixels on the two successful launches. The GC witness runs with leases held after application exit and with the
+partial pool already released after admission refusal. See `report.json` for the
 phase results.

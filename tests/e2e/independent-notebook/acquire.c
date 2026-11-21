@@ -4,7 +4,7 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
     hpclang_irq_restore(control[0]);
     unsigned count = 0, total = 0;
     for (unsigned n = 8; n; n /= 2)
-        while (count < 12 && total + n <= POOL_PAGES) {
+        while (count < 12 && total + n <= REQUEST_PAGES) {
             unsigned ptr = stock_call(201, 0x100, n * 4096 + 4095);
             if (!ptr)
                 break;
@@ -26,13 +26,31 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
             total += n;
             count++;
         }
-    if (!count)
-        for (;;) {
+    if (total != REQUEST_PAGES || (((out[8] + 4095) & ~4095u) - out[8]) < 168) {
+        for (unsigned i = count; i; i--)
+            if (stock_call(101, out[8 + 2 * (i - 1)], 0))
+                for (;;) {
+                }
+        if (REQUEST_PAGES != POOL_PAGES) {
+            /* Verify partial admission against the real KOS allocator. */
+            if (!count || total >= REQUEST_PAGES)
+                for (;;) {
+                }
+            for (unsigned i = 0; i < count; i++) {
+                out[32 + i] = stock_call(201, 0x100, out[9 + 2 * i] * 4096 + 4095);
+                if (!out[32 + i])
+                    for (;;) {
+                    }
+            }
+            for (unsigned i = count; i; i--)
+                if (stock_call(101, out[32 + i - 1], 0))
+                    for (;;) {
+                    }
         }
+        control[1] = hpclang_irq_save_disable() | 0xc0;
+        return;
+    }
     volatile u32 *record = (volatile u32 *)out[8]; // leading alignment slack
-    if ((((out[8] + 4095) & ~4095u) - out[8]) < 168)
-        for (;;) {
-        }
     record[0] = 0x4b4c4541;
     record[1] = count;
     record[2] = total;

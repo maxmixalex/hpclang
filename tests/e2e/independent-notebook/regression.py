@@ -28,6 +28,7 @@ ui = runpy.run_path(str(E2E / "notebook/verify.py"))
 # A distinct RPL result proves that the new program reached its cleanup check.
 NORMAL_RESULT = 124275
 LOW_MEMORY_RESULT = 124276
+REFUSED_RESULT = 124277
 
 
 def pack(nibbles):
@@ -71,7 +72,11 @@ def build(dest, toolchain, profile):
     checksum = 2166136261
     for b in image:
         checksum = ((checksum ^ b) * 16777619) & 0xFFFFFFFF
-    for package, rw_bytes, expected_status in (("RUN.HP", 32768, 0), ("LOWMEM.HP", 20480, 1)):
+    for package, rw_bytes, expected_status in (
+        ("RUN.HP", 32768, 0),
+        ("LOWMEM.HP", 20480, 1),
+        ("REFUSE.HP", 32768, None),
+    ):
         out = dest / package.removesuffix(".HP").lower()
         out.mkdir()
         build_runner(
@@ -98,7 +103,8 @@ def build_runner(
         source.write_text(
             f"#define NOTEBOOK_MODEL {profile['model']}u\n"
             f"#define NOTEBOOK_RW_BYTES {rw_bytes}u\n"
-            f"#define NOTEBOOK_EXPECTED_STATUS {expected_status}u\n"
+            f"#define NOTEBOOK_EXPECTED_STATUS {expected_status or 0}u\n"
+            f"#define REQUEST_PAGES {35 if expected_status is None else 'POOL_PAGES'}\n"
             f"#define IMAGE_BYTES {size}u\n"
             f"#define IMAGE_HASH {checksum}u\n"
             f"#define ENTRY_OFFSET {offset}u\n"
@@ -158,17 +164,18 @@ def build_runner(
             word(0x2D9D)
             + parts[0]
             + gc
-            + parts[1]
             + word(0x2614)
             + word(12)
-            + str(LOW_MEMORY_RESULT if expected_status else NORMAL_RESULT)[::-1]
+            + str(REFUSED_RESULT)[::-1]
             + "0"
+            + word(0x6657)  # NEWOB: private writable copy of the refusal result
+            + parts[1]
             + word(0x312B)
         )
     )
 
 
-def check_phase(phase, editor_text, flash, original, font):
+def check_phase(phase, editor_text, flash, original, font, expected_result):
     ram = (phase / "state/sram").read_bytes()
     assert (phase / "state/flash").read_bytes() == flash
     _, read, _ = no_toolbox(ram, flash)
@@ -176,7 +183,6 @@ def check_phase(phase, editor_text, flash, original, font):
     assert original == ram[0x20000:0x35000]
     stack = read(0x806F8)
     result = read(stack)
-    expected_result = LOW_MEMORY_RESULT if editor_text is None else NORMAL_RESULT
     digits = sum(read(result + 10 + i, 1) * 10**i for i in range(6))
     assert read(result) == 0x2614 and read(result + 5) == 12 and digits == expected_result
     moved = read(stack + 5)
@@ -299,6 +305,7 @@ def main():
     save_keys = "4300 tap two\n4900 tap zero\n5500 tap down\n6200 tap enter\n7600 capture saved\n"
     for name, program, package, editor in (
         ("save", "SPLITGC", "RUN.HP", ""),
+        ("refused", "NBFULL", "REFUSE.HP", None),
         ("low-memory", "SPLITERR", "LOWMEM.HP", None),
         ("reload", "SPLITGC", None, "20"),
     ):
@@ -323,7 +330,9 @@ def main():
             installed=package is None,
             package_name=package,
             extra_files=[("COPY.HP", "CKCOPY")] if name == "save" else [],
-            remote_commands=[f"HOME '{program}' RCL CKCOPY"],
+            remote_commands=[
+                f"HOME '{program}' RCL CKCOPY" + (" 'NBFULL' PURGE" if name == "refused" else "")
+            ],
             actions=actions + "15000 capture returned\n",
             execution_ms=18000,
             sd_image=card if name == "reload" else None,
@@ -332,12 +341,20 @@ def main():
             "editor": editor,
             "home_hex": b"hpclang-notebook/1\n20".hex(),
             "settled_sha256": check_phase(
-                dest / name, editor, flash, staged[0x20000:0x35000], font
+                dest / name,
+                editor,
+                flash,
+                staged[0x20000:0x35000],
+                font,
+                {"refused": REFUSED_RESULT, "low-memory": LOW_MEMORY_RESULT}.get(
+                    name, NORMAL_RESULT
+                ),
             ),
         }
         source = name
     media["verify"](files, card)
     hashes["reload"]["export"] = files["expected_files"]
+    hashes["refused"].update(requested_pages=35, rpl_result=REFUSED_RESULT)
     hashes["low-memory"].update(exit_status=1, rw_bytes=20480)
     recall = dest / "port0-recall"
     transfer(
