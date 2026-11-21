@@ -1,8 +1,8 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+Current checkpoint: 2026-11-22. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `002fb5e3` (#53). The current integration candidate combines
+Accepted main is `43d5aac9` (#55). Port 1 HOME cache relocation passed all five workflows on `771646cd`. The current integration candidate combines
 M8.0 library discovery (#49) and Port 1 cache relocation (#55) with M8.6
 independent Notebook (#54) and HP39/40 SDK packaging (#56). Local validation
 on `3604db84` passed all 180 host tests, three native Port sanitizer tests,
