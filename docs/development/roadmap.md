@@ -105,7 +105,7 @@ M7 acceptance does not imply those capabilities are implemented.
 | M8.3 Components/renderers | **Accepted complete** under the approved resource scope | Preserve six-model rendering, low-memory recovery, budgets and clean return |
 | M8.4 HPGCC source adapters | **Accepted complete** | Preserve original-source adapters, explicit migrations, tone/RTC ownership and supported-model regressions |
 | M8.5 Modern C++/migration | **Accepted complete** | Preserve ownership/error/lifetime, migration tooling, installed C/C++ examples and deterministic resources |
-| M8.6 Applications/release | Stage open | Nontrivial integrated apps, clean SDK use, cross-family resource/return checks, documentation and release acceptance |
+| M8.6 Applications/release | Production Notebook release checks accepted | Complete the independent-launcher evaluation across three families |
 
 Detailed stage contracts are preserved under [M8 stages](roadmap-history.md#m8-stages).
 UI must retain the user's declarative C design: nested ordinary C declarations,
@@ -395,7 +395,21 @@ ON exit and settled return. SHA-256 manifests checked before and after launch:
 This covers clean SDK consumption, model packaging and the measured entry/exit
 workload across three families. Resource measurements include observer overhead.
 Backup/export, failure recovery, independent-launcher evaluation and release
-documentation retain their own acceptance records; final release audit is open.
+documentation have separate acceptance records below.
+
+**Production Notebook release checks accepted on main `b3d86f65` (2026-11-21).**
+The audit rehashed six model packages and 15 outputs from two installation
+prefixes, checked the three HP39 Aplet transfer sets, and reran the maintained
+editor pixel, resource and Stock return verifier against captures for HP39gs,
+HP48gII and HP50g. All nine save-failure, retry and relaunch reports on these
+models recorded the expected phase and settled return. The installed transfer
+instructions shipped in [#48](https://github.com/maxmixalex/hpclang/pull/48).
+The evidence covers original-ROM emulation and the supported application flows.
+
+The independent HP50g Notebook save/relaunch prototype and the documented
+decision to retain the current launchers satisfy two launcher checklist items.
+Cross-family independent page ownership, native service coexistence and exit
+recovery remain open, including HP39 Aplet entry and the HP48gII memory budget.
 
 **M8.6 release reconciliation (2026-11-19).** Against the original
 [application and release checklist](roadmap-history.md#m86-application-and-release-acceptance):
