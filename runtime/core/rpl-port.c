@@ -212,7 +212,7 @@ static int find_attachment(void *context, uint32_t record, uint32_t id, uint32_t
 }
 
 int hpclang_rpl_home_library_find(const struct hpclang_rpl_reader *reader, uint32_t home,
-                                      uint32_t limit, uint32_t number, uint32_t *unique_record)
+                                  uint32_t limit, uint32_t number, uint32_t *unique_record)
 {
     if (number > 0xfffu)
         return HPCLANG_RPL_SPAN_MALFORMED;

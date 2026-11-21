@@ -644,10 +644,9 @@ endforeach()
                     source.write(
                         "\nhpclang_target_aplet(notebook MODEL ${HPCLANG_BUILD_MODEL}"
                         ' NAME "SDK example" AUTHOR hpclang'
-                        ' TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")\n'
+                        ' ASSETS "${APLET_ASSETS}")\n'
                     )
                 aplet_options = [
-                    f"-DAPLET_TOOL={args.aplet_tool.resolve()}",
                     f"-DAPLET_ASSETS={args.aplet_assets.resolve()}",
                 ]
             run(
@@ -709,6 +708,23 @@ endforeach()
                     "HP39DIR.CUR",
                 )
                 outputs.update(bundle / name for name in (*files, "footprint.json"))
+                reference = work / f"historical-aplet-{model}"
+                run(
+                    sys.executable,
+                    str(package / "tools/package-aplet.py"),
+                    str(launchers / f"{model}.hp"),
+                    str(reference),
+                    "--tool",
+                    str(args.aplet_tool.resolve()),
+                    "--assets",
+                    str(args.aplet_assets.resolve()),
+                    "--name",
+                    "SDK example",
+                    env=env,
+                )
+                for name in (*files, "footprint.json"):
+                    if (selected / bundle / name).read_bytes() != (reference / name).read_bytes():
+                        raise AssertionError(f"{model}: historical Aplet mismatch in {name}")
                 for directory in (selected, repeated):
                     wrapped = (directory / "notebook-launchers" / f"{model}.hp").read_bytes()
                     aplet = (directory / bundle / "HPGCC000.000").read_bytes()

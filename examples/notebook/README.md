@@ -95,14 +95,13 @@ in Port 2. Recall the transferred Notebook object in RPN mode and launch
 it from **ARMTo → PrRUN**.
 
 The default Notebook build does not produce an HP39 Aplet. Prepare the
-external HPGCC39 host tool and assets as described in the installed
+external HPGCC39 resources as described in the installed
 getting-started guide, then wrap the existing launcher:
 
 ```sh
 python3 /path/to/sdk/share/hpclang/tools/package-aplet.py \
   build/notebook-hp39gs/notebook-launchers/hp39gs.hp \
   build/notebook-hp39gs/notebook-aplet/hp39gs \
-  --tool /path/to/prepared-hpgcc39/hp2aplet \
   --assets /path/to/prepared-hpgcc39/data --name "Notebook" --author hpclang
 ```
 

@@ -2,18 +2,16 @@
 
 Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main: `002fb5e3` ([#53](https://github.com/maxmixalex/hpclang/pull/53)). All five workflows passed on `a022c359` (186 jobs passed, two skipped). Notebook low-memory exit and Port 0 backup are accepted on HP49g+ and HP50g. #52 accepted the Port 1 relocation regression. #51 added the HP49g+ independent Notebook save and relaunch regression.
-[#50](https://github.com/maxmixalex/hpclang/pull/50) records production Notebook
-release acceptance.
+Accepted main is `002fb5e3` (#53). The current integration candidate combines
+M8.0 library discovery (#49) and Port 1 cache relocation (#55) with M8.6
+independent Notebook (#54) and HP39/40 SDK packaging (#56).
 
-M8.6: HP49g+ and HP50g independent Notebook save, low-memory exit and Port 0
-backup are accepted on main. FAT16 export and HP48gII HOME creation and
-replacement are in [#54](https://github.com/maxmixalex/hpclang/pull/54).
-An HP48gII local follow-up exercises two saves during the second launch of
-the Port 0 Notebook. It checks both save messages, the final HOME note,
-the resident backup CRC, the restored mappings and moving GC after exit.
-HP39/40 SDK Aplet packaging is in #56. HP39 independent entry, active-execution
-GC and wider native services remain open.
+On HP49g+ and HP50g, Stock recalled the complete relocated Port 1 library,
+but PrRUN requested reinstallation after both replayed and native moves.
+Public edits that move a library remain gated. The HP48gII Port 0 Notebook
+passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
+bundles matched the historical writer on all three models. HP39 independent
+entry, active-execution GC and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.

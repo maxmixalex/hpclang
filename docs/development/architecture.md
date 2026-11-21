@@ -55,7 +55,7 @@ The current transfer baseline has three different boundaries:
 
 | Family | Current external support | What independence would need to replace |
 | --- | --- | --- |
-| HP39g+/39gs/40gs | Aplet support library and external Aplet packaging assets/tool | ARM entry and allocation support, while preserving Aplet Start/Reset and custom-data persistence |
+| HP39g+/39gs/40gs | Aplet support library and external Aplet resources (the SDK writes the transfer bundle) | ARM entry and allocation support, while preserving Aplet Start/Reset and custom-data persistence |
 | HP48gII | ARMToolbox48 library 275 | Stock-to-ARM entry, page-pool acquisition and matching release |
 | HP49g+/50g | ARMToolbox setup/library support | Stock-to-ARM entry, page-pool acquisition and matching release |
 

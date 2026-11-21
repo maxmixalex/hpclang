@@ -69,7 +69,7 @@ function(hpclang_target_aplet target)
     if(aplet_UNPARSED_ARGUMENTS OR aplet_KEYWORDS_MISSING_VALUES)
         message(FATAL_ERROR "Invalid hpclang_target_aplet arguments")
     endif()
-    foreach(required IN ITEMS MODEL NAME TOOL ASSETS)
+    foreach(required IN ITEMS MODEL NAME ASSETS)
         if(NOT aplet_${required})
             message(FATAL_ERROR "hpclang_target_aplet requires ${required}")
         endif()
@@ -82,9 +82,14 @@ function(hpclang_target_aplet target)
     if(NOT aplet_AUTHOR)
         set(aplet_AUTHOR hpclang)
     endif()
-    get_filename_component(aplet_TOOL "${aplet_TOOL}" ABSOLUTE)
     get_filename_component(aplet_ASSETS "${aplet_ASSETS}" ABSOLUTE)
-    set(dependencies "${aplet_TOOL}")
+    set(dependencies)
+    set(writer_args)
+    if(aplet_TOOL)
+        get_filename_component(aplet_TOOL "${aplet_TOOL}" ABSOLUTE)
+        list(APPEND dependencies "${aplet_TOOL}")
+        list(APPEND writer_args --tool "${aplet_TOOL}")
+    endif()
     foreach(asset IN ITEMS apletcode.bin apletepilog.bin blank.gro LIB275L.L39 HPCRESET.000)
         list(APPEND dependencies "${aplet_ASSETS}/${asset}")
     endforeach()
@@ -101,7 +106,7 @@ function(hpclang_target_aplet target)
     set(payload "${CMAKE_CURRENT_BINARY_DIR}/${target}-launchers/${aplet_MODEL}.hp")
     add_custom_command(OUTPUT ${outputs}
         COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-aplet.py"
-            "${payload}" "${output}" --tool "${aplet_TOOL}" --assets "${aplet_ASSETS}"
+            "${payload}" "${output}" ${writer_args} --assets "${aplet_ASSETS}"
             --name "${aplet_NAME}" --author "${aplet_AUTHOR}"
         DEPENDS ${target}_launchers "${payload}" ${dependencies}
             "${HPCLANG_ROOT}/tools/package-aplet.py"

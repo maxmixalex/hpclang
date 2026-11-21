@@ -97,7 +97,7 @@ HP48gII/HP49g+/HP50g use the wrapped object with the corresponding installed
 ARMToolbox library. HP39g+/HP39gs/HP40gs need an additional Aplet envelope;
 the `.hp` file is an intermediate input, not a directly installable Aplet.
 `hpclang_target_aplet` creates that envelope when supplied with the prepared
-historical host tool and assets described below. The small examples
+historical Aplet resources described below. The small examples
 draw a greeting and return immediately; they are build examples, not interactive
 applications or calculator execution acceptance tests.
 
@@ -387,20 +387,15 @@ that an arbitrary historical application compiles unchanged.
 
 HP39g+, HP39gs and HP40gs share the historical HPGCC39 Aplet format, with a
 different model launcher inside each package. Supply an extracted HPGCC 1.1
-kit with HP39 support. Prepare its host tool and resources using the installed
-helper and a **host** Clang compiler:
+kit with HP39 support. Prepare its calculator resources using the installed helper:
 
 ```sh
 python3 /path/to/sdk/share/hpclang/tools/prepare-hp39-aplet.py \
   /path/to/extracted-hpgcc39 /path/to/prepared-hpgcc39
-/path/to/host/clang -O2 /path/to/prepared-hpgcc39/src/hp2aplet.c \
-  -o /path/to/prepared-hpgcc39/hp2aplet
 ```
 
-The host tool runs on the development computer, so do not give this compile
-command the calculator's ARM target flags. Its original source and binary
-assets remain external dependencies; preparing them does not change their
-redistribution terms. The SDK helper adds the native Aplet Start/Reset views
+The installed Python packager writes the transfer bundle. The historical binary
+resources, including library 275, retain their original redistribution terms. The SDK helper adds the native Aplet Start/Reset views
 and the companion Reset program.
 
 For an application you develop, enable its launcher once, then add the Aplet
@@ -411,11 +406,12 @@ call if necessary instead of adding a second one:
 hpclang_target_launchers(my_application MODELS hp39gs)
 hpclang_target_aplet(my_application
     MODEL hp39gs NAME "My application" AUTHOR "My name"
-    TOOL "${HP39_APLET_TOOL}" ASSETS "${HP39_APLET_ASSETS}")
+    ASSETS "${HP39_APLET_ASSETS}")
 ```
 
-Configure the project with `-DHP39_APLET_TOOL=/path/to/prepared-hpgcc39/hp2aplet`
-and `-DHP39_APLET_ASSETS=/path/to/prepared-hpgcc39/data`. `NAME` accepts 1–48
+Configure with `-DHP39_APLET_ASSETS=/path/to/prepared-hpgcc39/data`. Existing
+projects can select a compiled historical writer with the optional CMake
+`TOOL` argument or the packaging script's `--tool` option. `NAME` accepts 1–48
 printable ASCII characters; `AUTHOR` defaults to `hpclang` and accepts 1–33.
 The author bound prevents the historical splash renderer from drawing before
 the screen's left edge.

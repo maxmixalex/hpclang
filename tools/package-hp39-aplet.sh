@@ -31,11 +31,8 @@ case "$TARGET" in
 esac
 
 SDK="${HP39_APLET_HOME:-$ROOT/.cache/hp39-aplet/sdk}"
-BUILD="$(mktemp -d)"
-trap 'rm -rf "$BUILD"' EXIT
-"${CC:-cc}" -O2 "$SDK/src/hp2aplet.c" -o "$BUILD/hp2aplet"
 python3 "$ROOT/tools/package-aplet.py" "$INPUT" "$OUT" \
-    --tool "$BUILD/hp2aplet" --assets "$SDK/data" \
+    --assets "$SDK/data" \
     --name "HPCLANG HPC1 TEST" --author hpclang
 
 python3 - "$OUT" "$TARGET_LABEL" "$MODEL_ID" <<'PY'
