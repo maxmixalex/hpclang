@@ -31,10 +31,17 @@ cases = {
     "low-guard": ("sram", start + symbols["guard_low"]),
     "high-guard": ("sram", start + symbols["guard_high"]),
     "loaded-code": ("sram", result["arena"][0] - 0x08000000 + 4096),
-    "application-data": ("sram", result["arena"][0] - 0x08000000 + 12288),
+    "application-data": (
+        "sram",
+        result["arena"][0] - 0x08000000 + (2 + result["code_pages"]) * 4096,
+    ),
     "code": ("sram", start),
     "flash": ("flash", 0x180000),
 }
+if result["code_pages"] == 16:
+    table = result["arena"][0] - 0x08000000
+    cases["last-code-page"] = ("sram", table + (256 + 32 + 15) * 4)
+    cases["last-rw-page"] = ("sram", table + 11 * 4)
 rejected = {}
 with tempfile.TemporaryDirectory(prefix="hpclang-entry-negative-") as temp:
     target = Path(temp)

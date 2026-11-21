@@ -18,9 +18,15 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
         image->image_size > 4096 || image->rw_static_size > 4096)
         return;
     unsigned start = ((unsigned)arena + 4095u) & ~4095u;
+    enum
+    {
+        code_count = HPCLANG_PROBE_MODEL == 4 ? 16 : 1,
+        rw_count = HPCLANG_PROBE_MODEL == 4 ? 12 : 4,
+        pool_bytes = (1 + code_count + rw_count) * 4096
+    };
     const unsigned sram_end = HPCLANG_PROBE_MODEL == 4 ? 0x08040000u : 0x08080000u;
-    if (start < 0x08000000u || start + 24576u > sram_end ||
-        start + 24576u > (unsigned)arena + 28672u)
+    if (start < 0x08000000u || start + pool_bytes > sram_end ||
+        start + pool_bytes > (unsigned)arena + (pool_bytes + 4096u))
         return;
     volatile unsigned *l1 = (void *)0x07f00000u;
     if ((l1[0x80] & 3u) != 2u || (l1[0x80] & 0xfff00000u) != 0x08000000u) {
@@ -28,23 +34,25 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
         return;
     }
     unsigned *memory = (void *)start;
-    for (unsigned i = 0; i < 24576 / 4; i++)
+    for (unsigned i = 0; i < pool_bytes / 4; i++)
         memory[i] = 0;
     unsigned char *code = (void *)(start + 4096u);
     const unsigned char *from = (const void *)(image + 1);
     for (unsigned i = 0; i < image->image_size; i++)
         code[i] = from[i];
-    unsigned code_page = start + 4096u, rw_pages[4];
-    for (unsigned i = 0; i < 4; i++)
-        rw_pages[i] = start + 8192u + i * 4096u;
+    unsigned code_pages[code_count], rw_pages[rw_count];
+    for (unsigned i = 0; i < code_count; i++)
+        code_pages[i] = start + 4096u * (1 + i);
+    for (unsigned i = 0; i < rw_count; i++)
+        rw_pages[i] = start + (1 + code_count + i) * 4096u;
     struct hpclang_launch_context launch;
     launch.mmu.l1 = l1;
     launch.mmu.l2_workspace = (void *)start;
     launch.mmu.l2_workspace_phys = start;
     launch.mmu.rw_pages = rw_pages;
-    launch.mmu.rw_page_count = 4;
-    launch.mmu.code_pages = &code_page;
-    launch.mmu.code_page_count = 1;
+    launch.mmu.rw_page_count = rw_count;
+    launch.mmu.code_pages = code_pages;
+    launch.mmu.code_page_count = code_count;
     launch.mmu.code_window_pages = 0;
     launch.mmu.code_window_page_count = 0;
     launch.model = HPCLANG_PROBE_MODEL;
@@ -55,21 +63,21 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
     out[4] = l1[0x12];
     out[7] = *(volatile unsigned *)0x08000008u;
     out[9] = start;
-    out[10] = start + 24576;
+    out[10] = start + pool_bytes;
     out[14] = cpsr();
-    hpclang_cache_clean((const void *)start, 24576);
+    hpclang_cache_clean((const void *)start, pool_bytes);
     out[2] = (unsigned)hpclang_bootstrap_run(&launch);
     out[15] = cpsr();
     out[5] = l1[0x11];
     out[6] = l1[0x12];
     out[8] = *(volatile unsigned *)0x08000008u;
-    volatile unsigned *data = (void *)(start + 12288u);
+    volatile unsigned *data = (void *)(start + (2 + code_count) * 4096u);
     out[11] = data[0];
     out[12] = data[1];
     out[13] = data[2];
     out[1] = out[2] == 42 && out[3] == out[5] && out[4] == out[6] && out[7] == out[8] &&
-                     out[11] == HPCLANG_PROBE_MODEL && out[12] == 16384 && out[13] == 0x31435048u &&
-                     (out[14] & 255u) == (out[15] & 255u)
+                     out[11] == HPCLANG_PROBE_MODEL && out[12] == rw_count * 4096u &&
+                     out[13] == 0x31435048u && (out[14] & 255u) == (out[15] & 255u)
                  ? 0
                  : 3;
 }

@@ -6,10 +6,12 @@ evaluation fixture, not the default launcher or a general application loader.
 It supplies no native-service context and does not qualify other model families.
 
 The build needs ATFE tools, Python and repository sources; no ROM or historical
-HPGCC binaries are required. The app receives model 4, 5 or 6 and 16 KiB of RW memory,
-writes three words, cleans its cache and returns 42. The loader owns a 28 KiB
-alignment arena and the entry owns a 4 KiB stack. The six aligned arena pages
-hold the L2 table, code and four RW pages. The build reuses the maintained
+HPGCC binaries are required. The app receives the build's model ID, writes three words and returns 42.
+HP49g+ and HP50g map six aligned pages, including four writable pages (16 KiB).
+On HP48gII the Stock program reserves its arena once in the execution destination.
+The initialized ARM payload is copied there before entry. The probe maps 29
+aligned pages: one for the L2 tables, 16 for code and 12 for writable memory
+(48 KiB). All three models use a 4 KiB entry stack. The build reuses the maintained
 independent entry and common bootstrap sources.
 
 ```sh
@@ -59,7 +61,8 @@ python3 tests/e2e/independent-hpc1/check-snapshot.py \
 Verification requires the known ROM fingerprint, unchanged Flash, absent
 library 275, expected application data and RPL result, owned allocation, restored
 MMU entries/SWI vector/control state, unchanged code and stack guards. Fifteen
-corrupted snapshot variants must fail. Snapshots and ROM images are local inputs
+corrupted snapshot variants must fail. On HP48gII two additional cases corrupt
+the last code and data page descriptors. Snapshots and ROM images are local inputs
 and are not distributed with this fixture.
 
 The default HP50g build reproduces the previously executed package SHA-256

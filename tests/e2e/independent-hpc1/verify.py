@@ -16,6 +16,11 @@ def verify(artifact, state, baseline):
     model = manifest.get("model", "hp50g")
     require(model in ("hp48gii", "hp49gplus", "hp50g"), "unsupported fixture model")
     model_id = {"hp48gii": 4, "hp49gplus": 5, "hp50g": 6}[model]
+    pages = manifest.get("pool_pages", 6)
+    require(pages == 6 or (model == "hp48gii" and pages == 29), "unsupported arena layout")
+    wide_pool = pages == 29
+    code_pages, rw_pages = (16, 12) if wide_pool else (1, 4)
+    rw_bytes = 4096 * rw_pages
     rom_hash = module["ROM_SHA256_BY_MODEL"][model]
     for name, expected in manifest["outputs"].items():
         require(Path(name).name == name, "invalid artifact path")
@@ -63,8 +68,8 @@ def verify(artifact, state, baseline):
         "result[2] == 42 and result[3:5] == result[5:7] and (result[7] == result[8])",
     )
     require(
-        result[11:14] == (model_id, 16384, 826495048),
-        "result[11:14] == (model_id, 16384, 826495048)",
+        result[11:14] == (model_id, rw_bytes, 826495048),
+        "result[11:14] == (model_id, rw_bytes, 826495048)",
     )
     require(
         result[14] & 255 == result[15] & 255 == 208, "result[14] & 255 == result[15] & 255 == 208"
@@ -79,12 +84,19 @@ def verify(artifact, state, baseline):
     arena = result[9]
     end = result[10]
     require(
-        arena % 4096 == 0 and end - arena == 24576, "arena % 4096 == 0 and end - arena == 24576"
+        arena % 4096 == 0 and end - arena == 4096 * (1 + code_pages + rw_pages),
+        "incorrect pool alignment or size",
     )
     require(
         physical + symbols["arena"] <= arena < end <= physical + symbols["arena_end"],
         "physical + symbols['arena'] <= arena < end <= physical + symbols['arena_end']",
     )
+    base = arena - 0x08000000
+    if wide_pool:
+        for index, first, count in ((256 + 32, 1, code_pages), (0, 1 + code_pages, rw_pages)):
+            actual_pages = struct.unpack_from(f"<{count}I", ram, base + 4 * index)
+            expected_pages = tuple((arena + (first + i) * 4096) | 0xFFE for i in range(count))
+            require(actual_pages == expected_pages, "unexpected HPC1 page descriptors")
     hpc = (artifact / "app.hpc").read_bytes()
     magic, size, entry, rw = struct.unpack_from("<4sIII", hpc)
     require(
@@ -96,8 +108,9 @@ def verify(artifact, state, baseline):
         "ram[arena - 134217728 + 4096:arena - 134217728 + 4096 + size] == hpc[16:]",
     )
     require(
-        struct.unpack_from("<III", ram, arena - 134217728 + 12288) == (model_id, 16384, 826495048),
-        "struct.unpack_from('<III', ram, arena - 134217728 + 12288) == (model_id, 16384, 826495048)",
+        struct.unpack_from("<III", ram, arena - 134217728 + (2 + code_pages) * 4096)
+        == (model_id, rw_bytes, 826495048),
+        "struct.unpack_from('<III', ram, arena - 134217728 + (2 + code_pages) * 4096) == (model_id, rw_bytes, 826495048)",
     )
     mutable = [
         (symbols["control"], symbols["control"] + 20),
@@ -121,7 +134,10 @@ def verify(artifact, state, baseline):
         for i in range(len(packed))
         if packed.startswith(prefix, i)
         and i + len(prefix) <= start * 2
-        and (start * 2 + meta["size"] * 2 <= i + len(prefix) + meta["reserve"])
+        and (
+            start * 2 + max(meta["size"], symbols["arena_end"]) * 2
+            <= i + len(prefix) + meta["reserve"]
+        )
     ]
     require(len(owners) == 1, "len(owners) == 1")
     report = dict(
@@ -132,6 +148,8 @@ def verify(artifact, state, baseline):
         boot_model=result[11],
         rw_bytes=result[12],
         arena=[arena, end],
+        code_pages=code_pages,
+        rw_pages=rw_pages,
         entry_control=[control[0] & 255, control[2] & 255],
         entry_swi=list(control[3:]),
         l1_before=list(result[3:5]),

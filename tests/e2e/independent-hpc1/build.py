@@ -103,7 +103,16 @@ def build(source, tool, output, model="hp50g"):
         if assembly.count(old) != 1:
             raise ValueError("shared entry no longer has the expected call/offset structure")
         assembly = assembly.replace(old, new)
-    assembly += '\n.balign 8\n.global arena\narena: .space 28672\n.global arena_end\narena_end:\n.balign 4\n.global hpc\nhpc: .incbin "app.hpc"\nhpc_end:\n'
+    arena_bytes = 30 * 4096 if model == "hp48gii" else 7 * 4096
+    arena = (
+        f".balign 8\n.global arena\narena: .space {arena_bytes}\n.global arena_end\narena_end:\n"
+    )
+    image = '.balign 4\n.global hpc\nhpc: .incbin "app.hpc"\nhpc_end:\n'
+    if model == "hp48gii":
+        # Only initialized bytes need a transfer copy beside the program-owned destination.
+        assembly += "\n" + image + '.section .bss,"aw",%nobits\n' + arena
+    else:
+        assembly += "\n" + arena + image
     (output / "entry.S").write_text(assembly)
     compile_file(output / "entry.S", "entry.o")
     run(
@@ -145,7 +154,8 @@ def build(source, tool, output, model="hp50g"):
     word, code_for = encoder["word"], encoder["code_for"]
     code = code_for(len(blob), len(code_for(len(blob), 0, model)) - 13, model)
     packed = "".join(f"{b & 15:x}{b >> 4:x}" for b in blob)
-    reserve = len(packed) + 7
+    layout = symbols("probe.elf")
+    reserve = 2 * max(len(blob), layout["arena_end"]) + 7
     body = code + packed + "0" * reserve
     program = word(0x2D9D) + word(0x2DCC) + word(5 + len(body)) + body
     program += word(0x2614) + word(12) + "5724210" + word(0x312B)
@@ -158,7 +168,7 @@ def build(source, tool, output, model="hp50g"):
         )
     )
     metadata = dict(
-        symbols=symbols("probe.elf"),
+        symbols=layout,
         size=len(blob),
         prefix=15 + len(code) + len(packed),
         reserve=reserve,
@@ -174,6 +184,8 @@ def build(source, tool, output, model="hp50g"):
         outputs={name: digest(output / name) for name in OUTPUTS},
         compiler=subprocess.check_output([str(tool / "clang"), "--version"], text=True),
     )
+    if model == "hp48gii":
+        manifest["pool_pages"] = 29
     (output / "build.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Built {len(blob)}-byte payload in {output}")
 

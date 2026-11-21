@@ -16,13 +16,12 @@ and backs it up to Port 0. Both contain `202` while HOME retains `20`.
 All 20 code pages map directly from Port 1, reducing aligned KOS usage from
 21 to nine pages on normal launch. When a 35-page request is only partly
 satisfied, the loader releases the blocks and returns to Stock. Both models
-check reacquisition, GC and relaunch from that state. On HP48gII, fresh NOR boots passed the independent entry and
-a bounded Thumb HPC1 application. The common bootstrap supplied model 4 and
-16 KiB of writable memory from a six-page program-owned arena. Stock received
-the RPL result after application status 42, with mappings and interrupt state
-restored. The entry and HPC1 verifiers rejected 10 and 15 corrupted snapshots
-respectively. The HPC1 run passed locally. The independent Notebook still
-needs its 29-page pool. HP39 Aplet entry and wider native services remain open.
+check reacquisition, GC and relaunch from that state. On HP48gII, a fresh NOR boot ran the model-4 HPC1 probe
+with 29 aligned pages inside the executing RPL program: one page for tables,
+16 code pages and 12 writable pages (48 KiB). The app returned 42; the Stock
+snapshot confirmed every page descriptor, restored mappings and unchanged Flash.
+The verifier rejected 17 corrupted snapshots. Local pass; CI acceptance pending.
+Running Notebook with native HOME operations and GC in this layout remains open. HP39 Aplet entry and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
