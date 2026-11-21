@@ -564,9 +564,10 @@ int hpclang_rpl_port1_attachment_plan(const struct hpclang_rpl_reader *ram, uint
                                       uint32_t home_limit, uint32_t number,
                                       const struct hpclang_rpl_reader *rom, uint32_t flash_table,
                                       uint32_t eram_entry, uint32_t first, uint32_t end,
-                                      int32_t delta, struct hpclang_rpl_reference_patch patches[2])
+                                      int32_t delta, uint32_t ram_mapping,
+                                      struct hpclang_rpl_reference_edit edits[2])
 {
-    if (!ram || !ram->read_nibble || !rom || !rom->read_nibble || !patches)
+    if (!ram || !ram->read_nibble || !rom || !rom->read_nibble || !edits)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     if (first >= end || end > 0x40000u || (int64_t)first + delta < 0 ||
         (int64_t)end + delta > 0x40000)
@@ -580,7 +581,7 @@ int hpclang_rpl_port1_attachment_plan(const struct hpclang_rpl_reader *ram, uint
     if (result)
         return result;
     uint32_t prefix_end = home + 8 + 13 * count;
-    struct hpclang_rpl_reference_patch next[2];
+    struct hpclang_rpl_reference_edit next[2];
     for (unsigned i = 0; i < 2; ++i) {
         uint32_t object;
         result = word(ram, record + 3 + 5 * i, 5, &object);
@@ -596,13 +597,16 @@ int hpclang_rpl_port1_attachment_plan(const struct hpclang_rpl_reader *ram, uint
         if (result != 1 || target.bank.kind != HPCLANG_RPL_BANK_ERAM || target.offset < first ||
             target.offset >= end)
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        next[i].mapping = ram_mapping;
+        next[i].width = 5;
+        next[i].expected = 0x40000u + target.offset;
         next[i].field = object + 5;
         next[i].value = (uint32_t)(0x40000 + (int64_t)target.offset + delta);
     }
     if (next[0].field < next[1].field + 15 && next[1].field < next[0].field + 15)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
-    patches[0] = next[0];
-    patches[1] = next[1];
+    edits[0] = next[0];
+    edits[1] = next[1];
     return 0;
 }
 

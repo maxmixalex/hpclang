@@ -14,8 +14,9 @@ Independent HP39 entry and wider native services remain open.
 
 M8.0 Port 1: local code now finds a unique attachment by library number in
 HOME and resolves both cache pointers through the ROM bank table. For library
-275, both planned updates matched the native HP49g+ and HP50g backup deletion
-snapshots. #55 is running CI on the earlier record-address version. Live writes
+275, replay into independent 512 KiB SRAM copies matched the native HP49g+
+and HP50g cache updates after backup deletion. Each replay changed five nibbles
+and preserved every other nibble. A second replay issued zero writes. #55 is running CI on the earlier record-address version. Live writes
 and wider reference collection remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
