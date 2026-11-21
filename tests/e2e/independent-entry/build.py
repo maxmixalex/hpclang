@@ -14,6 +14,13 @@ from pathlib import Path
 HP39_MODELS = ("hp39gplus", "hp39gs", "hp40gs")
 
 
+def bitmap_rows(aplet_writeback):
+    # 1024 monochrome pixels per row, 32 rows per 4 KiB page.
+    # The editor uses 12 code pages, one MMU page and seven RW pages.
+    # One additional page covers alignment within the Stock bitmap.
+    return (12 + 1 + 7 + 1) * 32 if aplet_writeback else 896
+
+
 def bitmap_image_info(path):
     image = path.read_bytes()
     if len(image) < 16:
@@ -148,7 +155,10 @@ def main():
     if args.stock_state:
         common.append("-DHPCLANG_PROBE_STOCK_STATE")
     if bitmap_image:
-        common.append("-DHPCLANG_PROBE_NOTEBOOK_STAGE")
+        common += [
+            "-DHPCLANG_PROBE_NOTEBOOK_STAGE",
+            f"-DBITMAP_ROWS={bitmap_rows(args.aplet_writeback)}",
+        ]
         if args.bitmap_image:
             size, checksum = bitmap_image_info(args.bitmap_image)
             common += [f"-DNOTEBOOK_BYTES={size}", f"-DNOTEBOOK_FNV1A={checksum}u"]
@@ -247,6 +257,8 @@ def main():
             for name in ("program.HP", "probe.bin", "probe.elf", "metadata.json")
         },
     }
+    if bitmap_image:
+        manifest["bitmap_rows"] = bitmap_rows(args.aplet_writeback)
     (root / "build.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Built {len(blob)}-byte independent entry payload in {root}")
 

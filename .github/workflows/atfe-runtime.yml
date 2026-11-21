@@ -169,7 +169,7 @@ jobs:
           fi
           python3 tests/e2e/independent-entry/run-hp39-notebook.py \
             --model "$MODEL" --inputs build/independent-hp39-inputs --dist build/x50ng/dist \
-            --output build/independent-hp39-run "${firmware[@]}"
+            --output build/independent-hp39-run --edit-copy "${firmware[@]}"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -183,6 +183,9 @@ jobs:
             build/independent-hp39-run/reset/*.json
             build/independent-hp39-run/reset/screen-*.pgm
             build/independent-hp39-run/reset/emulator.log
+            build/independent-hp39-run/copy/*.json
+            build/independent-hp39-run/copy/screen-*.pgm
+            build/independent-hp39-run/copy/emulator.log
 
   independent-hp48-entry:
     name: HP48gII independent Stock entry and return

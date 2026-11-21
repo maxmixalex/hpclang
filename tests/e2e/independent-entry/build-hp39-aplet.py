@@ -122,7 +122,9 @@ def main():
     action = word(0x2D9D)
     if args.aplet_writeback:
         # TWO{}N creates an owned list containing the input and a padding object.
-        action += word(0x2A4E) + word(7005) + "0" * 7000 + word(0xFAA1)
+        # 256 bytes cover a full 191-byte note, signature and String header.
+        padding = 512
+        action += word(0x2A4E) + word(5 + padding) + "0" * padding + word(0xFAA1)
     if args.arm_entry:
         action += arm_entry(return_probe())
     elif args.bitmap_pool is not None:
@@ -135,7 +137,14 @@ def main():
                 parser.error("invalid raw HPC1 image")
             action += word(0x2A2C) + word(5 + 2 * len(image)) + nibbles(image)
         # Stock MAKEGROB consumes two system binaries; DROP releases the stack reference.
-        action += word(0x2911) + word(1024) + word(0x2911) + word(896) + word(0x1D622)
+        rows = runpy.run_path(str(Path(__file__).with_name("build.py")))["bitmap_rows"]
+        action += (
+            word(0x2911)
+            + word(1024)
+            + word(0x2911)
+            + word(rows(args.aplet_writeback))
+            + word(0x1D622)
+        )
         action += arm_entry(args.bitmap_pool.read_bytes()) + word(0x3244)
         if args.bitmap_image:
             action += word(0x3244)

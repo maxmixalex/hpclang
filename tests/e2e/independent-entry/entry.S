@@ -48,7 +48,13 @@ workspace: .space 536
 .global guard_low
 guard_low: .word 0x13579bdf, 0x2468ace0
 .global stack_start
-stack_start: .space 4096
+stack_start:
+#ifdef HPCLANG_PROBE_APLET_WRITEBACK
+ /* Only the native entry and bootstrap use this stack; HPC1 has its own. */
+ .space 1024
+#else
+ .space 4096
+#endif
 .global stack_end
 stack_end:
 .global guard_high

@@ -3,6 +3,9 @@
 #include <hpclang/target.h>
 void hpclang_cache_clean(const void *, unsigned);
 #endif
+#ifndef BITMAP_ROWS
+#define BITMAP_ROWS 896
+#endif
 typedef unsigned int u32;
 static u32 read5(const u32 *map, u32 a)
 {
@@ -35,7 +38,7 @@ void exercise(u32 *out, volatile u32 *ctl, const u32 *map)
     u32 type = read5(map, obj), span = read5(map, obj + 5);
     out[5] = type;
     out[6] = span;
-    if (type != 0x2b1e || span < 229376 || span > 0x100000 - obj - 5)
+    if (type != 0x2b1e || span != BITMAP_ROWS * 256u + 15u || span > 0x100000 - obj - 5)
         return;
     u32 first = (obj + 20 + 8191) & ~8191u, end = (obj + 5 + span) & ~8191u, count = 0;
     for (u32 a = first; a < end; a += 8192) {
@@ -61,7 +64,7 @@ void exercise(u32 *out, volatile u32 *ctl, const u32 *map)
         notebook_bytes = NOTEBOOK_BYTES,
         code_capacity = 12 * 4096
     };
-    if (count < 27 || top > 0xffff6)
+    if (count < BITMAP_ROWS / 32u - 1u || top > 0xffff6)
         return;
     /* The source string sits below the bitmap on the native data stack. */
     u32 source = read5(map, top + 5);

@@ -53,8 +53,10 @@ def run_stock(dist, state, out, boot, env, timeout):
         raise ValueError("Stock Save sequence did not finish")
 
 
-def verify_save(data, state, out, after_reset=False):
+def verify_save(data, state, out, after_reset=False, original_note=None):
     saved = "20" if after_reset else "Seed4220"
+    if original_note is not None:
+        saved = original_note + "20"
     report = subprocess.check_output(
         [
             sys.executable,
@@ -72,12 +74,36 @@ def verify_save(data, state, out, after_reset=False):
             "--save-run",
             out,
             *(["--after-reset"] if after_reset else []),
+            *(
+                ["--copy-state", "saved", "--original-note", original_note]
+                if original_note is not None
+                else []
+            ),
         ],
         text=True,
     )
     verified = json.loads(report)
     verified.update(model=data.name, after_reset=after_reset, reopened_note=saved)
+    if original_note is not None:
+        verified.update(copy_name="2", original_note=original_note)
     (out / "verified.json").write_text(json.dumps(verified, indent=2) + "\n")
+
+
+def replay_save(dist, state, out, env, sequence):
+    out.mkdir()
+    suffix = E2E / "sequences/hp39-independent-notebook-save.seq"
+    for line in suffix.read_text().splitlines():
+        if line and not line.startswith("#"):
+            when, action = line.split(maxsplit=1)
+            sequence.append(f"{8000 + int(when)} {action}")
+    seq = out / "sequence.seq"
+    seq.write_text("\n".join(sequence) + "\n")
+    env.update(
+        HPCLANG_E2E_SEQUENCE=str(seq),
+        HPCLANG_STOCK_PREFIX=str(out / "screen"),
+        HPCLANG_STOCK_JSON=str(out / "result.json"),
+    )
+    run_stock(dist, state, out, [], env, 120)
 
 
 def main():
@@ -87,6 +113,11 @@ def main():
     parser.add_argument("--dist", type=Path, required=True, help="portable x50ng distribution")
     parser.add_argument("--firmware", type=Path, help="Stock 2.22 update image for the gs model")
     parser.add_argument("--output", required=True, type=Path, help="new run directory")
+    parser.add_argument(
+        "--edit-copy",
+        action="store_true",
+        help="also save and reopen a Stock copy while retaining the original",
+    )
     args = parser.parse_args()
     profile = json.loads((E2E / "targets" / f"{args.model}.json").read_text())
     nor = profile.get("nor")
@@ -186,26 +217,15 @@ def main():
         if fetch.wait(timeout=5):
             raise RuntimeError("USB transfer did not complete")
     verify_save(data, state, out)
-    reset = out / "reset"
-    reset.mkdir()
-    # Reset returns to HOME. Open the library again before starting the editor;
-    # the same Stock state must now accept a first Save to the cleared Aplet.
-    sequence = ["1000 tap f2", "3000 tap f6", "7000 tap aplet"]
-    suffix = E2E / "sequences/hp39-independent-notebook-save.seq"
-    for line in suffix.read_text().splitlines():
-        if line and not line.startswith("#"):
-            when, action = line.split(maxsplit=1)
-            sequence.append(f"{8000 + int(when)} {action}")
-    seq = reset / "sequence.seq"
-    seq.write_text("\n".join(sequence) + "\n")
     del env["HPCLANG_X50NG_USB0"], env["HPCLANG_E2E_HOST_GATE_FILE"]
-    env.update(
-        HPCLANG_E2E_SEQUENCE=str(seq),
-        HPCLANG_STOCK_PREFIX=str(reset / "screen"),
-        HPCLANG_STOCK_JSON=str(reset / "result.json"),
-    )
-    run_stock(dist, state, reset, [], env, 120)
+    reset = out / "reset"
+    replay_save(dist, state, reset, env, ["1000 tap f2", "3000 tap f6", "7000 tap aplet"])
     verify_save(data, state, reset, after_reset=True)
+    if args.edit_copy:
+        copy = out / "copy"
+        replay_save(dist, state, copy, env, ["1000 tap f1", "3500 tap two", "4500 tap enter"])
+        verify_save(data, state, copy, original_note="20")
+        print(f"{args.model}: copy 2 reopened 2020 and the original retained 20")
     print(f"{args.model}: saved and reopened Seed4220, reset the Aplet, then saved and reopened 20")
 
 

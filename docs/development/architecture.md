@@ -113,27 +113,30 @@ neither a worst-case requirement nor the cost of a different launcher.
 
 | Family | Entry and page source | Stock services and exit | Next independent acceptance gate |
 | --- | --- | --- | --- |
-| HP39 (HP39g+ D1.55 memory measurements) | Production Aplet: **25 / 27** pages. Its 37 frames include two native workspace pages. All 36 candidate RPL slots overlap these frames. Independent entry found 27 aligned frames inside a stack-held bitmap on D1.55. | Production editor and ON return pass. A library-free probe returned from ARM and wrote back to its named Aplet on all three models. RPL probes also passed copy, Reset and relaunch. | The independent editor saved and reopened a note on D1.55 and on both 2.22 models. Verify edits to a copied Aplet when memory permits. Account for the bitmap moving during Stock GC. |
+| HP39 (HP39g+ D1.55 memory measurements) | Production Aplet: **25 / 27** pages. Its 37 frames include two native workspace pages. All 36 candidate RPL slots overlap these frames. Independent entry found 27 aligned frames inside a stack-held bitmap on D1.55. | Production editor and ON return pass. A library-free probe returned from ARM and wrote back to its named Aplet on all three models. RPL probes also passed copy, Reset and relaunch. | The independent editor saved and reopened a note on D1.55 and on both 2.22 models. Stock copies on all three models saved and reopened their own edits. Account for the bitmap moving during Stock GC. |
 | HP48 (HP48gII) | Production ARMToolbox48: **27 / 29** pages. A model-specific no-275 entry and RPL return pass locally. KOS supplied one aligned frame. HOME-backed storage moves on insertion, and Stock recomputes a lowered `AVMEM` before it can serve as a persistent fence. Neither approach qualified extra frames. SRAM mirrors add no frames; HP48gII has no Port 1 ERAM. | Production HOME save/retry, Port 0 and settled return have Stock evidence. Independent admission refused the 29-frame request and released the KOS block. The two rejected reservations preserved HOME/Port 0 and stack values after cleanup. | A separate model-4 HPC1 probe now maps 29 aligned pages within its executing program on the 256 KiB machine. The unmapped reservation occupies a single copy in the transfer object. Exercise HOME/Port 0 with live roots and ownership bounds, verify a successful full launch and qualify cleanup on partial assembly and entry failures. |
 | HP49/50 | Both models run the model-specific Notebook without library 275 with all 20 code pages mapped read-only from Port 1. The normal independent entry uses nine aligned KOS pages, including its page tables. Both production packages require **32 / 35** pages for the minimum / observed editor workload. On HP49g+, the 79,168-byte image uses 20 code pages. The earlier observed editor used 13,660 bytes of heap reservation and touched 1,912 of 8,192 stack bytes. | Both original-ROM fixtures save to HOME, return status 1 with a 20 KiB RW budget, release and reacquire the KOS blocks, then reload the saved text on normal launch. A 35-page request also exercises partial allocation, release and simultaneous reacquisition of the same block sizes before Stock return. All four launches pass the GC and settled Stock checks. Stock recalls the distinct Port 0 backup written by the relaunched editor, with the Port 1 code record intact. The editor also exports to a FAT16 card. External readback checks the exported bytes and an existing file. | Exercise remaining native Port services under independent page ownership. |
 
-On each of the three ROMs, Stock copied the installed Notebook with its saved
-note `20` into a second named directory, `2`. Selecting the copy and entering
-the editor displayed **Insufficient Memory** before ARM entry. Both directories
-retained their saved note and executable. The following byte counts come from
-the current packages and the mapped Stock RSKTOP-to-DSKTOP gap at the library
-screen before and after copying. They describe these snapshots only.
+The earlier 112 KiB startup bitmap exceeded the 67–70 KiB stack gap left
+with two full-size Aplets resident. The independent editor now requests a
+1024 by 672 monochrome bitmap (84 KiB). One page covers alignment. The tested
+20 aligned frames supply 12 code pages, one MMU page and seven application RW
+pages. The native bootstrap uses a separate 1 KiB stack. The Aplet keeps
+256 bytes of padding for the saved note string and its signature.
 
-| Model | Aplet transfer bytes | Stack gap with one Aplet | Stack gap with both |
+On each original ROM, Stock copied the reset-and-edited Notebook into a
+second Aplet named `2`. The original retained `20` while the copy saved and
+reopened `2020`. Both named directories, the editor display, ARM return,
+interrupt state and restored Stock mappings were checked. HP40gs also saved
+and reopened a 191-byte note in the copy while the original retained `20`.
+The stack gaps below
+are read from RSKTOP and DSKTOP after returning to the library.
+
+| Model | Aplet transfer bytes | Gap with one Aplet (bytes) | Gap with both (bytes) |
 | --- | ---: | ---: | ---: |
-| HP39g+ D1.55 | 65,727 | 137,554 | 71,827 |
-| HP39gs 2.22 | 65,727 | 134,917 | 69,191 |
-| HP40gs 2.22 | 65,719 | 134,738 | 69,022 |
-
-The bitmap needs 114,688 pixel bytes before its header and other temporary
-objects. Even on D1.55 the gap with both Aplets is 42,861 bytes short of
-the pixels alone. Independent copy editing still requires a smaller combined
-storage and execution footprint.
+| HP39g+ D1.55 | 56,339 | 146,941 | 90,598 |
+| HP39gs 2.22 | 56,323 | 144,320 | 87,994 |
+| HP40gs 2.22 | 56,331 | 144,123 | 87,789 |
 
 Stock Reset stores the five-nibble ROM reference `0x05da2` as the first item
 in the independent ENTER list. In the live D1.55 stack this was followed

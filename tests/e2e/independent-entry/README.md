@@ -231,16 +231,18 @@ python3 tests/sdk/check.py --aplet-tool "$HP2APLET" --aplet-assets "$APLET_ASSET
     --independent-notebooks build/independent-hp39-inputs
 python3 tests/e2e/independent-entry/run-hp39-notebook.py --model hp39gplus \
     --inputs build/independent-hp39-inputs --dist build/x50ng/dist \
-    --output build/independent-save-hp39gplus
+    --output build/independent-save-hp39gplus --edit-copy
 ```
 
 Use a fresh output directory. HP39g+ uses the repository's D1.55 NOR fixture
 from Git LFS. For HP39gs and HP40gs, select the matching model, change the
 output directory, and add `--firmware /path/to/update.bin` pointing to its
 extracted Stock 2.22 update. The runner checks the firmware digest, boots
-fresh Stock, transfers the Aplet over USB and checks the two launches against
+fresh Stock, transfers the Aplet over USB and checks the first two launches against
 the named SRAM directory. It then selects Reset in the Stock Aplet library,
-saves `20` into the cleared Aplet, and reopens it again. Each phase writes
+saves `20` into the cleared Aplet, and reopens it. With `--edit-copy` the runner
+uses Stock Save to create Aplet `2`, edits it to `2020`, reopens it and checks
+both named directories. The original must retain `20`. Each phase writes
 `verified.json` alongside its captures after both returns to Stock.
 
 For the Save-button regression, also pass `--aplet-writeback` to both builders.

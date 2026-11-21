@@ -25,6 +25,7 @@ def check(
     check_workspace=None,
     initial_note=None,
     saved_note=None,
+    original_note=None,
 ):
     title = b"EntryProbe"
     header = b"HP39BinB" + bytes([len(title)]) + title
@@ -33,12 +34,16 @@ def check(
     directory = nibbles(aplet[len(header) :])
     if not directory.startswith(word(0x2A96) + word(0x7FF, 3)):
         raise ValueError("unexpected Aplet attachment")
+
+    def note_object(note):
+        value = b"hpclang-notebook/1\n" + note.encode()
+        return word(0x2A2C) + word(5 + len(value) * 2) + nibbles(value)
+
     # The seventh application-data field holds the initial custom data.
     # It follows the two origin coordinates and precedes the outer list SEMI.
     initial = word(0x2A74) + word(0x312B)
     if initial_note is not None:
-        value = b"hpclang-notebook/1\n" + initial_note.encode()
-        initial = word(0x2A2C) + word(5 + len(value) * 2) + nibbles(value)
+        initial = note_object(initial_note)
     origins = (word(0x2911) + word(0)) * 2
     tail = origins + initial + word(0x312B)
     if directory.count(tail) != 1:
@@ -131,9 +136,10 @@ def check(
 
     expected = saved if initial_note is None else initial
     if saved_note is not None:
-        value = b"hpclang-notebook/1\n" + saved_note.encode()
-        expected = word(0x2A2C) + word(5 + len(value) * 2) + nibbles(value)
-    require_entry(title, with_custom_data(expected))
+        expected = note_object(saved_note)
+    require_entry(
+        title, with_custom_data(expected if original_note is None else note_object(original_note))
+    )
     if copy_state is not None:
         require_entry(b"2", with_custom_data(word(0x5DA2) if copy_state == "reset" else expected))
 
@@ -169,7 +175,12 @@ def main():
     parser.add_argument(
         "--after-reset", action="store_true", help="expect an empty editor after Stock Reset"
     )
+    parser.add_argument("--original-note", help="verify the original while editing its Stock copy")
     args = parser.parse_args()
+    if args.original_note is not None and (
+        args.copy_state != "saved" or not args.save_run or args.after_reset
+    ):
+        parser.error("--original-note requires --copy-state saved and --save-run on the copy")
     if args.after_reset and not args.save_run:
         parser.error("--after-reset requires --save-run")
     if args.save_run:
@@ -207,7 +218,13 @@ def main():
                 [
                     (
                         args.save_run / "screen-action.pgm",
-                        None if args.after_reset else args.initial_note,
+                        None
+                        if args.after_reset
+                        else (
+                            args.original_note
+                            if args.original_note is not None
+                            else args.initial_note
+                        ),
                         True,
                         "No saved note; edit retained"
                         if args.after_reset
@@ -225,9 +242,16 @@ def main():
                 or len(set(library[len(header) :])) < 2
             ):
                 raise ValueError("missing original library display after transfer")
-            for name in ("exited", "final"):
-                if (args.save_run / f"screen-{name}.pgm").read_bytes() != library:
-                    raise ValueError(f"Stock library display differed after {name}")
+            exited = (args.save_run / "screen-exited.pgm").read_bytes()
+            final = (args.save_run / "screen-final.pgm").read_bytes()
+            if len(exited) != len(library) or final != exited:
+                raise ValueError("Stock library display differed between the two returns")
+            # Stock redraws the selected Aplet's size when Save crosses a display
+            # rounding boundary. Its name, selection, other rows and menus must match.
+            for i, (before, after) in enumerate(zip(library, exited)):
+                y, x = divmod(i - len(header), 131)
+                if before != after and not (9 <= y <= 15 and 85 <= x <= 108):
+                    raise ValueError("Stock library display differed after Save")
         for path, expected, focused, status in frames:
             frame = path.read_bytes()
             if not frame.startswith(header) or len(frame) != len(header) + 131 * 64:
@@ -246,8 +270,13 @@ def main():
             "check_bitmap_workspace" if args.bitmap_pool else "check_rpl_workspace"
         ]
 
+        dimensions = {}
+        if args.bitmap_pool:
+            manifest = json.loads((args.bitmap_pool / "build.json").read_text())
+            dimensions["rows"] = manifest.get("bitmap_rows", 896)
+
         def workspace_check(words):
-            report.update(validate(words, sram))
+            report.update(validate(words, sram, **dimensions))
             if args.bitmap_image:
                 inspect_image = runpy.run_path(str(Path(__file__).with_name("build.py")))[
                     "bitmap_image_info"
@@ -272,6 +301,7 @@ def main():
         workspace_check,
         args.initial_note,
         args.saved_note,
+        args.original_note,
     )
     if report:
         print(json.dumps(report))

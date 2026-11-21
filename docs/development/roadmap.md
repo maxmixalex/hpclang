@@ -23,12 +23,11 @@ HP40gs 2.22. Stock Reset exposed a ROM reference to an empty list that
 previously caused error 134 on all three. Each model now opens an empty
 editor after Reset, saves `20`, reopens it and returns to the Stock library.
 The checks cover the LCD, named Aplet in SRAM and native return state.
-The Core workflow now runs these cases with the installed SDK packages.
-Stock preserved both named notes on all three models, but the copied editor
-could not start. The two-Aplet stack gap was 67–70 KiB and the startup bitmap
-requires 112 KiB. Editing a copy and GC during execution remain open. The
-[launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
-records the Stock-owned bitmap and code staging.
+All three install/Save/Reset jobs passed CI on `7e87d081`. Locally, the
+84 KiB startup bitmap and smaller Aplet now allow two Notebooks to coexist:
+Stock copy `2` saved and reopened `2020` while its original retained `20` on
+all three models. CI acceptance of the copy case and GC during execution
+remain open. See the [launcher measurements](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19).
 The HP48gII CI size check failed on `54f6642b` and passed on `0cdc1bc0`.
 The current 64,672-byte Notebook fits the 65,536-byte code window and passed
 both local original-ROM entry paths, including consecutive Port 0 saves.
