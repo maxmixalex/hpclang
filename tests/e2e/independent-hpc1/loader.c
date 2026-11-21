@@ -7,16 +7,42 @@ static unsigned cpsr(void)
     __asm__ volatile("mrs %0, cpsr" : "=r"(v));
     return v;
 }
+#ifdef HPCLANG_NOTEBOOK
+/* The Saturn program and the aligned ARM copy can begin on different nibbles. */
+static unsigned char packed_byte(const unsigned char *source, unsigned nibble)
+{
+    unsigned index = nibble / 2;
+    return nibble & 1 ? (source[index] >> 4) | (source[index + 1] << 4) : source[index];
+}
+
+void exercise(unsigned *out, unsigned char *arena, unsigned saturn_state)
+#else
 void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_header *image,
               unsigned bytes)
+#endif
 {
     for (unsigned i = 0; i < 134; i++)
         out[i] = 0;
     out[0] = 0x32435048u;
     out[1] = 1;
+#ifdef HPCLANG_NOTEBOOK
+    struct hpclang_image_header header;
+    unsigned pos;
+    for (pos = 57; pos <= 64; pos++) {
+        for (unsigned i = 0; i < sizeof(header); i++)
+            ((unsigned char *)&header)[i] = packed_byte(arena, pos + 2 * i);
+        if (hpclang_stage_image_valid(&header, NOTEBOOK_BYTES + sizeof(header)) &&
+            header.magic[3] == '1' && header.entry_offset == NOTEBOOK_ENTRY)
+            break;
+    }
+    if (pos > 64)
+        return;
+    const struct hpclang_image_header *image = &header;
+#else
     if (!hpclang_stage_image_valid(image, bytes) || image->magic[3] != '1' ||
         image->image_size > 4096 || image->rw_static_size > 4096)
         return;
+#endif
     unsigned start = ((unsigned)arena + 4095u) & ~4095u;
     enum
     {
@@ -33,6 +59,14 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
         out[1] = 2;
         return;
     }
+#ifdef HPCLANG_NOTEBOOK
+    unsigned char *code = (void *)(start + 4096u);
+    /* The destination is higher and overlaps the packed source. */
+    for (unsigned i = NOTEBOOK_BYTES; i; --i)
+        code[i - 1] = packed_byte(arena, pos + 2 * (sizeof(header) + i - 1));
+    for (unsigned i = NOTEBOOK_BYTES; i < pool_bytes - 4096u; i++)
+        code[i] = 0;
+#else
     unsigned *memory = (void *)start;
     for (unsigned i = 0; i < pool_bytes / 4; i++)
         memory[i] = 0;
@@ -40,6 +74,7 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
     const unsigned char *from = (const void *)(image + 1);
     for (unsigned i = 0; i < image->image_size; i++)
         code[i] = from[i];
+#endif
     unsigned code_pages[code_count], rw_pages[rw_count];
     for (unsigned i = 0; i < code_count; i++)
         code_pages[i] = start + 4096u * (1 + i);
@@ -57,7 +92,11 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
     launch.mmu.code_window_page_count = 0;
     launch.model = HPCLANG_PROBE_MODEL;
     launch.entry_offset = image->entry_offset;
+#ifdef HPCLANG_NOTEBOOK
+    launch.saturn_state = saturn_state;
+#else
     launch.saturn_state = 0;
+#endif
     launch.platform_cookie = 0;
     out[3] = l1[0x11];
     out[4] = l1[0x12];
@@ -71,6 +110,13 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
     out[5] = l1[0x11];
     out[6] = l1[0x12];
     out[8] = *(volatile unsigned *)0x08000008u;
+#ifdef HPCLANG_NOTEBOOK
+    const volatile struct hpclang_boot_info *boot =
+        (const void *)(start + (1 + code_count) * 4096u);
+    out[11] = boot->model;
+    out[12] = boot->rw_bytes;
+    out[1] = out[2] || out[3] != out[5] || out[4] != out[6] || out[7] != out[8];
+#else
     volatile unsigned *data = (void *)(start + (2 + code_count) * 4096u);
     out[11] = data[0];
     out[12] = data[1];
@@ -80,4 +126,5 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
                      out[13] == 0x31435048u && (out[14] & 255u) == (out[15] & 255u)
                  ? 0
                  : 3;
+#endif
 }

@@ -38,6 +38,9 @@ cases = {
     "code": ("sram", start),
     "flash": ("flash", 0x180000),
 }
+if result["application"] == "notebook":
+    del cases["application-data"]
+    cases["boot-data"] = ("sram", result["arena"][0] - 0x08000000 + 17 * 4096)
 if result["code_pages"] == 16:
     table = result["arena"][0] - 0x08000000
     cases["last-code-page"] = ("sram", table + (256 + 32 + 15) * 4)

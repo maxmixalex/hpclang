@@ -34,7 +34,7 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build(source, tool, output, model="hp50g"):
+def build(source, tool, output, model="hp50g", notebook=None):
     model_id = {"hp48gii": 4, "hp49gplus": 5, "hp50g": 6}[model]
     output.mkdir(parents=True, exist_ok=False)
     inputs = {name: digest(source / name) for name in INPUTS}
@@ -69,36 +69,58 @@ def build(source, tool, output, model="hp50g"):
                 result[fields[2]] = int(fields[0], 16)
         return result
 
-    compile_file(source / FIXTURE / "app.c", "app.o", True)
     compile_file(source / "runtime/bootstrap/sync.S", "sync.o")
-    run(
-        common
-        + [
-            "-mthumb",
-            "-nostdlib",
-            "-Wl,--gc-sections",
-            "-Wl,-Ttext,0x01220000",
-            "-Wl,-e,app",
-            "app.o",
-            "sync.o",
-            "-o",
-            "app.elf",
-        ]
-    )
-    run([str(tool / "llvm-objcopy"), "-O", "binary", "-j", ".text", "app.elf", "app.bin"])
-    payload = (output / "app.bin").read_bytes()
-    entry = (symbols("app.elf")["app"] - 0x01220000) | 1
-    if not 0 < entry < len(payload) <= 4096:
-        raise ValueError("fixture app exceeds the single-page HPC1 contract")
-    (output / "app.hpc").write_bytes(
-        struct.pack("<4sIII", b"HPC1", len(payload), entry, 12) + payload
-    )
+    if notebook:
+        application = notebook.read_bytes()
+        if model != "hp48gii" or len(application) < 16:
+            raise ValueError("expected an HP48gII Notebook image")
+        magic, size, entry, rw = struct.unpack_from("<4sIII", application)
+        if (
+            magic != b"HPC1"
+            or size != len(application) - 16
+            or not 0 < entry < size <= 65536
+            or rw + 8192 + 4096 > 49152
+        ):
+            raise ValueError("Notebook exceeds the HP48gII layout or has an invalid HPC1 header")
+        (output / "app.hpc").write_bytes(application)
+        common += ["-DHPCLANG_NOTEBOOK", f"-DNOTEBOOK_BYTES={size}", f"-DNOTEBOOK_ENTRY={entry}"]
+    else:
+        compile_file(source / FIXTURE / "app.c", "app.o", True)
+        run(
+            common
+            + [
+                "-mthumb",
+                "-nostdlib",
+                "-Wl,--gc-sections",
+                "-Wl,-Ttext,0x01220000",
+                "-Wl,-e,app",
+                "app.o",
+                "sync.o",
+                "-o",
+                "app.elf",
+            ]
+        )
+        run([str(tool / "llvm-objcopy"), "-O", "binary", "-j", ".text", "app.elf", "app.bin"])
+        payload = (output / "app.bin").read_bytes()
+        entry = (symbols("app.elf")["app"] - 0x01220000) | 1
+        if not 0 < entry < len(payload) <= 4096:
+            raise ValueError("fixture app exceeds the single-page HPC1 contract")
+        (output / "app.hpc").write_bytes(
+            struct.pack("<4sIII", b"HPC1", len(payload), entry, 12) + payload
+        )
 
     assembly = (source / "tests/e2e/independent-entry/entry.S").read_text()
     replacements = {
         " bl exercise": " ldr r2, arena_offset\n add r1, r6, r2\n ldr r2, image_offset\n add r2, r6, r2\n ldr r3, image_bytes\n bl exercise",
         "workspace_offset: .word workspace-entry": "workspace_offset: .word workspace-entry\narena_offset: .word arena-entry\nimage_offset: .word hpc-entry\nimage_bytes: .word hpc_end-hpc",
     }
+    if notebook:
+        replacements[" bl exercise"] = (
+            " ldr r2, arena_offset\n add r1, r6, r2\n ldr r2, [r4, #4]\n bl exercise"
+        )
+        replacements["workspace_offset: .word workspace-entry"] = (
+            "workspace_offset: .word workspace-entry\narena_offset: .word arena-entry"
+        )
     for old, new in replacements.items():
         if assembly.count(old) != 1:
             raise ValueError("shared entry no longer has the expected call/offset structure")
@@ -110,7 +132,7 @@ def build(source, tool, output, model="hp50g"):
     image = '.balign 4\n.global hpc\nhpc: .incbin "app.hpc"\nhpc_end:\n'
     if model == "hp48gii":
         # Only initialized bytes need a transfer copy beside the program-owned destination.
-        assembly += "\n" + image + '.section .bss,"aw",%nobits\n' + arena
+        assembly += "\n" + ("" if notebook else image) + '.section .bss,"aw",%nobits\n' + arena
     else:
         assembly += "\n" + arena + image
     (output / "entry.S").write_text(assembly)
@@ -156,7 +178,13 @@ def build(source, tool, output, model="hp50g"):
     packed = "".join(f"{b & 15:x}{b >> 4:x}" for b in blob)
     layout = symbols("probe.elf")
     reserve = 2 * max(len(blob), layout["arena_end"]) + 7
-    body = code + packed + "0" * reserve
+    destination = "0" * reserve
+    if notebook:
+        # The payload starts 32 bytes after the arena symbol before the entry aligns its copy.
+        pos = 2 * layout["arena"] + 64
+        payload = "".join(f"{b & 15:x}{b >> 4:x}" for b in application)
+        destination = destination[:pos] + payload + destination[pos + len(payload) :]
+    body = code + packed + destination
     program = word(0x2D9D) + word(0x2DCC) + word(5 + len(body)) + body
     program += word(0x2614) + word(12) + "5724210" + word(0x312B)
     if len(program) & 1:
@@ -181,9 +209,14 @@ def build(source, tool, output, model="hp50g"):
         scope=f"{model} bounded embedded HPC1 experiment; no native-service context",
         model=model,
         inputs=inputs,
-        outputs={name: digest(output / name) for name in OUTPUTS},
+        outputs={
+            name: digest(output / name) for name in OUTPUTS if not notebook or name != "app.elf"
+        },
         compiler=subprocess.check_output([str(tool / "clang"), "--version"], text=True),
     )
+    if notebook:
+        manifest["application"] = "notebook"
+        manifest["scope"] = "HP48gII one-shot Notebook editor and Stock return"
     if model == "hp48gii":
         manifest["pool_pages"] = 29
     (output / "build.json").write_text(json.dumps(manifest, indent=2) + "\n")
@@ -196,8 +229,15 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[3])
+    parser.add_argument("--notebook", type=Path, help="installed-SDK HP48gII notebook.hpc")
     args = parser.parse_args()
-    build(args.source_root.resolve(), args.toolchain.resolve(), args.output.resolve(), args.model)
+    build(
+        args.source_root.resolve(),
+        args.toolchain.resolve(),
+        args.output.resolve(),
+        args.model,
+        args.notebook,
+    )
 
 
 if __name__ == "__main__":

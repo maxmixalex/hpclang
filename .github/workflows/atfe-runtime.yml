@@ -126,6 +126,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
       - uses: ./.github/actions/setup-atfe
       - uses: ./.github/actions/setup-x50ng
       - name: Run from fresh HP48gII NOR
@@ -139,6 +141,22 @@ jobs:
             --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-entry
           python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
             --fixture independent-hpc1 --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-hpc1
+      - name: Build and exercise the installed HP48gII Notebook
+        run: |
+          sdk="$RUNNER_TEMP/hp48-sdk"
+          app="$RUNNER_TEMP/hp48-notebook"
+          dist="$GITHUB_WORKSPACE/build/x50ng/dist"
+          export PATH="$ATFE/bin:$dist/tools:$PATH"
+          export LD_LIBRARY_PATH="$dist/runtime-lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          cmake -S . -B "$RUNNER_TEMP/hp48-install" -DCMAKE_INSTALL_PREFIX="$sdk"
+          cmake --install "$RUNNER_TEMP/hp48-install"
+          cmake -S "$sdk/share/hpclang/examples/notebook" -B "$app" -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_PREFIX_PATH="$sdk" -DCMAKE_TOOLCHAIN_FILE="$sdk/share/hpclang/cmake/toolchains/hpclang-armv4t.cmake" \
+            -DHPCLANG_BUILD_MODEL=hp48gii
+          cmake --build "$app" --target notebook_launchers -j4
+          python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
+            --fixture independent-hpc1 --notebook "$app/notebook.hpc" --dist "$dist" \
+            --toolchain "$ATFE/bin" --output build/independent-hp48-notebook
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -146,6 +164,9 @@ jobs:
           path: |
             build/independent-hp48-entry/*.json
             build/independent-hp48-entry/*/*.log
+            build/independent-hp48-notebook/*.json
+            build/independent-hp48-notebook/run/stock-*.pgm
+            build/independent-hp48-notebook/run/emulator.log
             build/independent-hp48-hpc1/*.json
             build/independent-hp48-hpc1/*/*.log
           if-no-files-found: warn

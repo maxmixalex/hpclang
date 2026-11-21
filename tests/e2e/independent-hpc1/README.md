@@ -40,6 +40,15 @@ PATH="$dist/tools:$PATH" LD_LIBRARY_PATH="$dist/runtime-lib" \
   --toolchain "$ATFE/bin" --dist "$dist" --nor /path/to/48gii.bin --output build/hp48-hpc1
 ```
 
+Add `--notebook /path/to/notebook.hpc` and choose a fresh output directory
+to exercise the HP48gII Notebook built from the installed SDK. The package
+contains a single execution reservation and stages the initialized application
+bytes inside it. The loader moves the image backwards into the aligned code
+pages before initializing writable memory. This one-shot run types `20`,
+checks the editor pixels, exits with ON and verifies Stock return. The platform
+cookie is zero. Native mutation, moving GC and persistent relaunch require
+separate qualification.
+
 For manual execution, use an original Stock snapshot for the selected model, without
 library 275 and explicitly set to RPN mode, and the
 existing Stock USB harness to transfer and evaluate `program.HP`. The program

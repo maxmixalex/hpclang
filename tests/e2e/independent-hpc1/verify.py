@@ -21,6 +21,7 @@ def verify(artifact, state, baseline):
     wide_pool = pages == 29
     code_pages, rw_pages = (16, 12) if wide_pool else (1, 4)
     rw_bytes = 4096 * rw_pages
+    notebook = manifest.get("application") == "notebook"
     rom_hash = module["ROM_SHA256_BY_MODEL"][model]
     for name, expected in manifest["outputs"].items():
         require(Path(name).name == name, "invalid artifact path")
@@ -64,12 +65,14 @@ def verify(artifact, state, baseline):
     result = struct.unpack_from("<134I", ram, start + symbols["workspace"])
     require(result[0] == 843272264 and result[1] == 0, result[:16])
     require(
-        result[2] == 42 and result[3:5] == result[5:7] and (result[7] == result[8]),
-        "result[2] == 42 and result[3:5] == result[5:7] and (result[7] == result[8])",
+        result[2] == (0 if notebook else 42)
+        and result[3:5] == result[5:7]
+        and (result[7] == result[8]),
+        "incorrect application status or Stock mappings/vector after return",
     )
     require(
-        result[11:14] == (model_id, rw_bytes, 826495048),
-        "result[11:14] == (model_id, rw_bytes, 826495048)",
+        result[11:13] == (model_id, rw_bytes) and (notebook or result[13] == 826495048),
+        "unexpected application boot metadata",
     )
     require(
         result[14] & 255 == result[15] & 255 == 208, "result[14] & 255 == result[15] & 255 == 208"
@@ -100,18 +103,27 @@ def verify(artifact, state, baseline):
     hpc = (artifact / "app.hpc").read_bytes()
     magic, size, entry, rw = struct.unpack_from("<4sIII", hpc)
     require(
-        magic == b"HPC1" and rw == 12 and entry & 1 and (len(hpc) == size + 16),
-        "magic == b'HPC1' and rw == 12 and entry & 1 and (len(hpc) == size + 16)",
+        magic == b"HPC1"
+        and len(hpc) == size + 16
+        and 0 < entry < size
+        and (notebook or (rw == 12 and entry & 1)),
+        "invalid application image header",
     )
     require(
         ram[arena - 134217728 + 4096 : arena - 134217728 + 4096 + size] == hpc[16:],
         "ram[arena - 134217728 + 4096:arena - 134217728 + 4096 + size] == hpc[16:]",
     )
-    require(
-        struct.unpack_from("<III", ram, arena - 134217728 + (2 + code_pages) * 4096)
-        == (model_id, rw_bytes, 826495048),
-        "struct.unpack_from('<III', ram, arena - 134217728 + (2 + code_pages) * 4096) == (model_id, rw_bytes, 826495048)",
-    )
+    if notebook:
+        boot = struct.unpack_from("<IIII", ram, base + (1 + code_pages) * 4096)
+        require(
+            boot[:2] == (model_id, rw_bytes) and boot[2] and boot[3] == 0, "Notebook boot context"
+        )
+    else:
+        require(
+            struct.unpack_from("<III", ram, arena - 134217728 + (2 + code_pages) * 4096)
+            == (model_id, rw_bytes, 826495048),
+            "struct.unpack_from('<III', ram, arena - 134217728 + (2 + code_pages) * 4096) == (model_id, rw_bytes, 826495048)",
+        )
     mutable = [
         (symbols["control"], symbols["control"] + 20),
         (symbols["workspace"], symbols["workspace"] + 536),
@@ -145,6 +157,7 @@ def verify(artifact, state, baseline):
         model=model,
         payload_physical=physical,
         app_result=result[2],
+        application="notebook" if notebook else "probe",
         boot_model=result[11],
         rw_bytes=result[12],
         arena=[arena, end],
@@ -161,7 +174,9 @@ def verify(artifact, state, baseline):
         no_library_275=True,
         unchanged_flash=True,
         owned_storage=True,
-        scope="Bounded embedded HPC1/Thumb program through common bootstrap from independent Stock entry; not arbitrary apps, service coexistence or other families.",
+        scope="HP48gII Notebook editor and Stock return"
+        if notebook
+        else "Embedded Thumb probe through common bootstrap from independent Stock entry",
         program_sha256=hashlib.sha256((artifact / "program.HP").read_bytes()).hexdigest(),
         sram_sha256=hashlib.sha256(ram).hexdigest(),
     )
