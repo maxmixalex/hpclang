@@ -116,7 +116,10 @@ def verify(artifact, state, baseline):
     if notebook:
         boot = struct.unpack_from("<IIII", ram, base + (1 + code_pages) * 4096)
         require(
-            boot[:2] == (model_id, rw_bytes) and boot[2] and boot[3] == 0, "Notebook boot context"
+            boot[:2] == (model_id, rw_bytes)
+            and boot[2]
+            and (boot[3] & 1 if manifest.get("port0_backup") else boot[3] == 0),
+            "Notebook boot context",
         )
     else:
         require(

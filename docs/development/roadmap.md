@@ -13,15 +13,14 @@ and backs it up to Port 0. Both contain `202` while HOME retains `20`.
 All 20 code pages map directly from Port 1, reducing aligned KOS usage from
 21 to nine pages on normal launch. When a 35-page request is only partly
 satisfied, the loader releases the blocks and returns to Stock. Both models
-check reacquisition, GC and relaunch from that state. On HP48gII the independent launcher now runs the installed SDK's
-64,264-byte Notebook in 29 pages owned by the executing program (one table,
-16 code, 12 writable). Two Stock processes ran one USB-installed program. On recall the editor
-read `314` from a Stock-written HOME note, displayed `31420` after keyboard
-input and returned with status zero. Both return snapshots verified the code and
-page mappings. After each exit, Stock GC moved a tagged temporary and preserved
-its payload. The resident Notebook relaunched after the first collection. This
-passed locally at `7b29e9f2` and is submitted for CI in #54. Application-originated
-HOME save and GC during active execution remain open. A local HP48gII Save-button replay confirmed that both create and replace report ENOSYS. The independent loader supplies the Saturn state for reads but no RPL mutation bounds. An optional Port 0 fixture now runs the full Notebook from a Stock backup and finishes its CRC from the saved ARM stack on exit. Two local HP48gII Stock processes recalled one installation. Editor, return and GC checks passed twice, and both backup CRCs matched independent recalculation. All 19 corruption cases were rejected. Application writes to HOME still need a qualified mutation context. HP39 Aplet entry and wider native services remain open.
+check reacquisition, GC and relaunch from that state. On HP48gII, the independent launcher runs the installed SDK Notebook in 29 pages.
+In the Port 0 variant, the application created a HOME note containing `20`,
+then loaded it in a second Stock process and saved `2020`. Both snapshots
+verified the note, normal return, backup CRC, mappings and moving GC after
+exit. All 20 corrupted snapshots were rejected. The HOME-resident variant
+continues to read Stock-written notes. These results passed locally and are
+submitted for CI in [#54](https://github.com/maxmixalex/hpclang/pull/54).
+GC during active ARM execution, HP39 Aplet entry and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.

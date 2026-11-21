@@ -51,11 +51,16 @@ shows `314`, accepts `20` and exits with ON; HOME retains the original note.
 The snapshots check the aligned code, its retained location and the restored
 Stock state. After each ARM return, the Stock program creates an unreachable
 temporary, records a live tag's address and calls GARBAGECOL. The reports
-record the lower address and verify the tag at that location. Saving from the
-application and collection while its ARM mappings are active remain open.
+record the lower address and verify the tag at that location. This HOME-resident variant supplies a read-only object-store context.
 
 With both `--notebook` and `--port0`, the runner installs the Notebook as
 the first Port 0 backup named `ENTRY48` and recalls that same program twice.
+On the first launch the editor creates a HOME note containing `20`. On the
+second launch it reads that note and replaces it with `2020`. Each exit
+checks the versioned HOME bytes directly in the Stock snapshot. The loader
+checks the Stock map and its executing Port 0 record before passing the live
+RPL stack bounds and saved return PC to the runtime. Port 0 remains read-only
+to application code during this invocation.
 The loader switches back to the saved ARM stack before computing the final
 CRC over the backup, including the workspace and stack bytes written during
 execution. Each snapshot checks that the executed code belongs to that record

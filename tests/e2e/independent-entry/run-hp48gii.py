@@ -38,6 +38,15 @@ def check_editor(phase, initial):
         raise ValueError("Stock display did not settle after Notebook exit")
 
 
+def check_home_note(state, expected):
+    entry = runpy.run_path(str(HERE / "verify.py"))
+    _, read, _ = entry["no_toolbox"](
+        (state / "sram").read_bytes(), (state / "flash").read_bytes(), "hp48gii"
+    )
+    if home_string(read, b"HPCNOTE") != expected:
+        raise ValueError("unexpected HOME note after Notebook exit")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("nor", "dist", "toolchain", "output"):
@@ -90,7 +99,8 @@ def main():
     if args.notebook:
         actions = (
             "3500 capture editor\n4300 tap two\n4900 tap zero\n6000 capture typed\n"
-            "8500 tap on\n14000 capture returned\n"
+            + ("6600 tap down\n7300 tap enter\n9500 tap on\n" if args.port0 else "8500 tap on\n")
+            + "14000 capture returned\n"
         )
     transfer(
         spec,
@@ -110,10 +120,14 @@ def main():
     )
     if args.notebook:
         check_editor(out / "run", "")
-        # Stock deposits a distinct note before recalling the resident program.
         seed = b"hpclang-notebook/1\n314"
-        wrap = runpy.run_path(str(E2E.parents[1] / "tools/hp-rpl-string-wrap.py"))["wrap_docstr"]
-        (artifact / "NOTE.HP").write_bytes(wrap(seed))
+        if args.port0:
+            check_home_note(out / "run/state", b"hpclang-notebook/1\n20")
+        else:
+            wrap = runpy.run_path(str(E2E.parents[1] / "tools/hp-rpl-string-wrap.py"))[
+                "wrap_docstr"
+            ]
+            (artifact / "NOTE.HP").write_bytes(wrap(seed))
         transfer(
             spec,
             out / "resume",
@@ -122,17 +136,12 @@ def main():
             "ENTRY48",
             installed=True,
             remote_commands=["-95 CF HOME :0:ENTRY48 RCL"] if args.port0 else None,
-            extra_files=[("NOTE.HP", "HPCNOTE")],
+            extra_files=[] if args.port0 else [("NOTE.HP", "HPCNOTE")],
             actions=actions,
         )
-        check_editor(out / "resume", "314")
+        check_editor(out / "resume", "20" if args.port0 else "314")
         snapshot = out / "resume/state"
-        entry = runpy.run_path(str(HERE / "verify.py"))
-        _, read, _ = entry["no_toolbox"](
-            (snapshot / "sram").read_bytes(), (snapshot / "flash").read_bytes(), spec.model
-        )
-        if home_string(read, b"HPCNOTE") != seed:
-            raise ValueError("resident HOME note changed during the unsaved edit")
+        check_home_note(snapshot, b"hpclang-notebook/1\n2020" if args.port0 else seed)
         subprocess.run(
             [
                 sys.executable,

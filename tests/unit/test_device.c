@@ -41,6 +41,9 @@ static void mutation_context_test(void)
     boot.platform_cookie = (uintptr_t)&bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
     mutation_state(HPCLANG_CAPABILITY_SUPPORTED);
     struct hpclang_rpl_memory_bounds saved = bounds;
+    bounds.magic = HPCLANG_RPL_BOUNDS_PORT0_RESIDENT;
+    mutation_state(boot.model == HPCLANG_MODEL_HP48GII ? HPCLANG_CAPABILITY_SUPPORTED
+                                                       : HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
     bounds.magic = 0u;
     mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
     bounds = saved;

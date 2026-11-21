@@ -51,6 +51,7 @@ if "resident_trailer_nibble" in result:
         (result["resident_trailer_nibble"] + 34) // 2,
     )
 if "port0_crc_nibble" in result:
+    cases["resident-boot-cookie"] = ("sram", cases["boot-data"][1] + 12)
     cases["port0-crc"] = ("sram", (result["port0_crc_nibble"] + 1) // 2)
 rejected = {}
 with tempfile.TemporaryDirectory(prefix="hpclang-entry-negative-") as temp:

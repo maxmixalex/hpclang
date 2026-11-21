@@ -128,6 +128,9 @@ def build(source, tool, output, model="hp50g", notebook=None, port0=False):
     if port0:
         # Use the original ARM stack after the last workspace write. All record
         # bytes must be stable while the CRC is calculated, including stack data.
+        replacements[" bl exercise"] = replacements[" bl exercise"].replace(
+            " bl exercise", " mov r3, r4\n bl exercise"
+        )
         replacements[" mov sp, r4"] = (
             " bic sp, r4, #7\n ldr r0, [r4, #4]\n mov r1, r6\n bl finish_port0_backup\n mov sp, r4"
         )

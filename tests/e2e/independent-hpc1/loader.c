@@ -26,7 +26,13 @@ static void store_packed_byte(unsigned char *data, unsigned nibble, unsigned cha
     }
 }
 
+#ifdef HPCLANG_NOTEBOOK_PORT0
+static unsigned owner_record(const unsigned *map, unsigned entry, unsigned last);
+static unsigned backup_word(const unsigned char *ram, unsigned at, unsigned width);
+void exercise(unsigned *out, unsigned char *arena, unsigned saturn_state, unsigned *frame)
+#else
 void exercise(unsigned *out, unsigned char *arena, unsigned saturn_state)
+#endif
 #else
 void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_header *image,
               unsigned bytes)
@@ -127,6 +133,25 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
     launch.saturn_state = 0;
 #endif
     launch.platform_cookie = 0;
+#ifdef HPCLANG_NOTEBOOK_PORT0
+    const unsigned char *ram = (const void *)0x08008000u;
+    unsigned record = owner_record((void *)saturn_state, (unsigned)out, start + pool_bytes - 1);
+    if (!record)
+        return;
+    unsigned rstk = backup_word(ram, 0x806f3, 5);
+    unsigned dstk = backup_word(ram, 0x806f8, 5);
+    if (rstk < 0x80000u || dstk <= rstk || dstk >= record)
+        return;
+    unsigned *roots[] = {frame};
+    struct hpclang_rpl_memory_bounds bounds = {
+        .magic = HPCLANG_RPL_BOUNDS_PORT0_RESIDENT,
+        .temp_limit = dstk,
+        .user_limit = rstk,
+        .native_roots = roots,
+        .native_root_count = 1,
+    };
+    launch.platform_cookie = (unsigned)&bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+#endif
     out[3] = l1[0x11];
     out[4] = l1[0x12];
     out[7] = *(volatile unsigned *)0x08000008u;
@@ -169,31 +194,42 @@ static unsigned backup_word(const unsigned char *ram, unsigned at, unsigned widt
     return value;
 }
 
-void finish_port0_backup(const unsigned *map, unsigned entry)
+static unsigned owner_record(const unsigned *map, unsigned entry, unsigned last)
 {
     /* Stop before the physical SRAM mirror; require matching Stock read/write maps. */
     const unsigned char *ram = (const void *)0x08008000u;
     for (unsigned i = 128; i < 240; ++i)
         if (map[i] != (unsigned)ram + (i - 128) * 2048 || map[257 + i] != map[i])
-            return;
+            return 0;
     unsigned record = backup_word(ram, 0x80716, 5);
     if (record < 0x80000 || record > 0xf0000 - 29 || backup_word(ram, record, 5) != 0x2b62 ||
         backup_word(ram, record + 10, 2) != 7)
-        return;
+        return 0;
     /* The name is encoded as ENT, RY4, then 8 and the repeated length byte. */
     if (backup_word(ram, record + 12, 6) != 0x544e45 ||
         backup_word(ram, record + 18, 6) != 0x345952 || backup_word(ram, record + 24, 4) != 0x0738)
-        return;
+        return 0;
     unsigned end = record + 5 + backup_word(ram, record + 5, 5);
     unsigned program = record + 28;
     if (end > 0xf0000 || end < program + 25 || backup_word(ram, program, 5) != 0x2d9d ||
         backup_word(ram, program + 5, 5) != 0x2dcc || backup_word(ram, end - 10, 5) != 0x2911)
-        return;
+        return 0;
     unsigned code_end = program + 10 + backup_word(ram, program + 10, 5);
     unsigned pc = 0x80000 + 2 * (entry - (unsigned)ram);
     if (entry < (unsigned)ram || entry >= 0x08040000 || code_end > end - 10 || pc < program + 15 ||
-        pc >= code_end)
+        pc >= code_end || last < entry || last >= 0x08040000 ||
+        0x80000 + 2 * (last - (unsigned)ram) + 1 >= code_end)
+        return 0;
+    return record;
+}
+
+void finish_port0_backup(const unsigned *map, unsigned entry)
+{
+    unsigned record = owner_record(map, entry, entry);
+    if (!record)
         return;
+    const unsigned char *ram = (const void *)0x08008000u;
+    unsigned end = record + 5 + backup_word(ram, record + 5, 5);
     unsigned crc = 0;
     for (unsigned at = record + 5; at < end - 4; ++at)
         crc = (crc >> 4) ^ (((crc ^ backup_word(ram, at, 1)) & 15) * 0x1081);
