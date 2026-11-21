@@ -1086,6 +1086,22 @@ both payload updates from the saved states. The Port 1 host regression checks
 this two-pointer case. Other live references, including suspended execution,
 still need coverage before public editing.
 
+A combined replay on HP49g+ and HP50g Stock 2.15 moved library 275 and its
+terminator down 50 nibbles in an offline ERAM copy, then applied the C catalog
+and HOME cache edits to the same SRAM image. All 62 catalog records and both
+cache words matched the original-ROM purge. After resuming each image, Stock
+executed `:1:275 RCL 'MOVEDLIB' STO`. The HOME copy matched all 13,671 nibbles
+of the original library.
+
+Execution has a separate gate. Before relocation, invoking the attached
+library's `PrRUN` launched an SDK program that created the HOME string
+`MOVEDRUN` with value `Port1 PrRUN` and returned to Stock on both models.
+After relocation the same call displayed `PrRUN Error: Reinstall ARMToolbox`
+and the marker was absent. Native `:1:BEFORE PURGE` produced the same screen
+pixel for pixel on both models. A warmstart of the replayed state reproduced
+the error on both. The underlying execution dependency remains unidentified.
+Keep size-changing backup edits that would move a following library disabled.
+
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
 preserve this difference from HP49g+/HP50g rather than fabricating three ports

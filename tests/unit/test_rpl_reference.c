@@ -1361,6 +1361,25 @@ static void catalog_offset_plans(void)
     assert(!edits[1].expected && !edits[1].value);
 }
 
+static int read_attachment_ram(void *context, uint32_t at, uint8_t *value)
+{
+    return at >= 0x80000u && read_nibble(context, at - 0x80000u, value);
+}
+
+static int read_attachment_edit(void *context, uint32_t mapping, uint32_t at, uint8_t *value)
+{
+    return mapping == 7 && read_attachment_ram(context, at, value);
+}
+
+static int write_attachment_edit(void *context, uint32_t mapping, uint32_t at, uint8_t value)
+{
+    struct image *image = context;
+    if (mapping != 7 || at < 0x80000u || at - 0x80000u >= image->size)
+        return 0;
+    image->data[at - 0x80000u] = value;
+    return 1;
+}
+
 /* HP49g+/HP50g Stock 2.15: PURGE of :1:BEFORE moves attached library 275
  * down by 50 nibbles. Its HOME record still points to the same two main-RAM
  * ACPTRs. Only their payload words move with the library. */
@@ -1395,6 +1414,47 @@ static void port1_attachment_relocation(void)
                                                        50 + 13671, -50, &patch) == 1);
         assert(patch.field == at + 5 && patch.value == relocated[i]);
     }
+    pointers.size = 64;
+    put(&pointers, 30, 0x2a96, 5);
+    put(&pointers, 35, 2, 3);
+    put(&pointers, 38, 111, 3);
+    put(&pointers, 51, 275, 3);
+    put(&pointers, 54, 0x80000, 5);
+    put(&pointers, 59, 0x8000f, 5);
+    const struct hpclang_rpl_reader main_ram = {read_attachment_ram, &pointers};
+    struct hpclang_rpl_reference_edit pair[2];
+    assert(!hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 275, &rom, 0, 112, 50, 13721,
+                                              -50, 7, pair));
+    assert(pair[0].field == 0x80005 && pair[0].value == relocated[0]);
+    assert(pair[1].field == 0x80014 && pair[1].value == relocated[1]);
+    for (unsigned i = 0; i < 2; ++i)
+        assert(pair[i].mapping == 7 && pair[i].width == 5 && pair[i].expected == payloads[i]);
+    struct image repaired = pointers, expected = pointers;
+    put(&expected, 5, relocated[0], 5);
+    put(&expected, 20, relocated[1], 5);
+    const struct hpclang_rpl_reference_writer writer = {{read_attachment_edit, &repaired},
+                                                        write_attachment_edit};
+    assert(!hpclang_rpl_reference_edits_validate(&writer.reader, pair, 2));
+    assert(!hpclang_rpl_reference_edits_replay(&writer, pair, 2));
+    assert(!memcmp(repaired.data, expected.data, sizeof repaired.data));
+    struct hpclang_rpl_reference_edit saved[2];
+    memcpy(saved, pair, sizeof pair);
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 127, &rom, 0, 112, 50, 13721,
+                                             -50, 7, pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(saved, pair, sizeof pair));
+    put(&pointers, 38, 275, 3);
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 275, &rom, 0, 112, 50, 13721,
+                                             -50, 7, pair) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(saved, pair, sizeof pair));
+    put(&pointers, 38, 111, 3);
+    put(&pointers, 25, 0x1000, 5); /* Second selector chooses Flash at the same numeric address. */
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 275, &rom, 0, 112, 50, 13721,
+                                             -49, 7, pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(saved, pair, sizeof pair));
+    put(&pointers, 59, 0x80000, 5);
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 275, &rom, 0, 112, 50, 13721,
+                                             -50, 7, pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(saved, pair, sizeof pair));
 }
 
 static void catalog_executable_switches(void)
@@ -2178,7 +2238,7 @@ static void flashptr_guard_composition(unsigned special)
             for (unsigned at = 0; at < 160; ++at) {
                 int observed = mapping == 2 ? at < 12
                                : mapping    ? ((!special && at < 4) || (at >= 29 && at < 34) ||
-                                               (at >= 39 && at < 44))
+                                            (at >= 39 && at < 44))
                                             : ((at >= 5 && at < 10) || at >= 80);
                 fixture.data[mapping][at] ^= 1;
                 int status = hpclang_rpl_reference_guards_validate(&validation, guards,
