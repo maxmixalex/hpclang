@@ -22,7 +22,10 @@ Aplet imported through Stock USB with attachment ID `0x7ff`. All three
 profiles passed Start, ENTER, Exit, copy, confirmed Reset and relaunch.
 Full SRAM directory checks found the original marker intact while the copy
 was cleared and then saved again. The zero and 275 attachment controls failed
-import on HP39g+. Independent HP39 ARM entry remains open.
+import on HP39g+. On D1.55 a library-free Aplet entered a 24-byte ARM
+payload and wrote its expected word in the aligned execution copy. Stock
+then stopped sampling the exit key; the CPU was in abort mode. ARM return
+and Notebook execution remain open.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN
