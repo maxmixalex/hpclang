@@ -24,7 +24,7 @@ input and returned with status zero. Both return snapshots verified the code and
 page mappings. After each exit, Stock GC moved a tagged temporary and preserved
 its payload. The resident Notebook relaunched after the first collection. This
 passed locally at `7b29e9f2` and is submitted for CI in #54. Application-originated
-HOME save and GC during active execution remain open. HP39 Aplet entry and wider native services remain open.
+HOME save and GC during active execution remain open. A local HP48gII Save-button replay confirmed that both create and replace report ENOSYS. The independent loader supplies the Saturn state for reads but no RPL mutation bounds. Both launches returned normally; the existing HOME note retained 314. HP39 Aplet entry and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
