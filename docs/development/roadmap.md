@@ -2,9 +2,10 @@
 
 Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main: `cf43236a` ([#51](https://github.com/maxmixalex/hpclang/pull/51)).
-All five workflows passed on `7a974547` (186 successful jobs, two configured
-skips). HP49g+ independent Notebook save and relaunch join the HP50g regression.
+Accepted main: `67a84462` ([#52](https://github.com/maxmixalex/hpclang/pull/52)).
+All three workflows passed on `93afbede` (21 successful jobs, one configured
+skip). [#51](https://github.com/maxmixalex/hpclang/pull/51) added the HP49g+
+independent Notebook save and relaunch regression.
 [#50](https://github.com/maxmixalex/hpclang/pull/50) records production Notebook
 release acceptance. HP39 Aplet entry, HP48gII application-sized allocation
 and wider native services remain open.
@@ -142,7 +143,13 @@ unchanged. Sound compatibility is independent of Port2.
 
 CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 successes; Pages deploy and runtime evidence publication skipped by design). Merged as `e45f8461`; remote main verified. Earlier HP39gs transfer stalls remain unexplained. No post-merge run is claimed.
 
-M8.0 / [#49](https://github.com/maxmixalex/hpclang/pull/49): applications can query one library or list all registered and HOME-attached IDs in ascending order. All 180 host tests passed. HP48gII, HP49g+ and HP50g Stock verified both calls across six launches, including registered library 275 and stored-only library 123. Submitted for CI.
+M8.0 / [#49](https://github.com/maxmixalex/hpclang/pull/49): applications can query one library or list all registered and HOME-attached IDs in ascending order. All 180 host tests passed. HP48gII, HP49g+ and HP50g Stock verified both calls across six launches, including registered library 275 and stored-only library 123. After integrating #52, the port, rpl_port and rpl_reference regressions and strict docs passed locally. CI acceptance is pending.
+
+M8.0 / [#52](https://github.com/maxmixalex/hpclang/pull/52) merged. On HP49g+
+and HP50g, the C planner matched the complete Stock catalog and both HOME
+cache pointer updates after native deletion moved a Port 1 library.
+[Port 1 observations](object-service.md) detail the two firmware runs.
+General reference collection and public Port 1 replacement/removal remain open.
 
 M8.0 / #47: merged as `516231c5`, whose tree matches accepted head `1cebf08d`.
 CI: 184 successful jobs, including both HP49g+ and HP50g Stock code-relocation
