@@ -24,15 +24,19 @@ interrupt-restoration checks. Two builds reproduced the tested C Aplet; its
 packaging regression is in #49. The full independent Notebook is still open.
 The [launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
 records a 27-page Stock-owned bitmap. Code staging at `64464caf` is in #49.
-On D1.55 the installed-SDK Notebook now reads the active independent Aplet's
-data. Local D1.55 Save-button tests created `20` in a fresh Aplet and
-changed `Seed42` to `Seed4220` in a seeded Aplet. Both reopened with
-`Loaded`, matching text in the editor and the named Stock directory, and
-returned to the Aplet library. HP39gs/40gs editor coverage remains open.
-Commit `54f6642b` submitted the D1.55 Save changes to #49 for CI. Its SDK check
-rebuilds the independent HP39g+ launcher from each installed Notebook image
-and compares its ARM binary and four transfer files. In a local replay all
-five matched the D1.55 run byte for byte.
+The installed-SDK independent Notebook saved `Seed42` as `Seed4220` on
+HP39g+ D1.55 and on HP39gs and HP40gs 2.22 in local original-ROM tests.
+Each model reopened the edited text, matched the named Aplet in SRAM and
+returned to its Stock library after both launches. D1.55 also created
+`20` in a fresh Aplet. With a full-size copy resident, Stock rejected
+entry for insufficient memory and preserved both notes. Editing a copy
+and active-execution GC remain open. #49 received the D1.55 Save changes
+at `54f6642b`. Its HP48gII CI job rejected an oversized Notebook. Checking
+the calculator family before accessing HP39 services reduced the local
+HP48gII image to 65,464 bytes within its 65,536-byte code window. Both
+independent entry paths then passed on the HP48gII ROM, including Port 0
+consecutive saves. The three-model HP39/40 changes and the HP48gII fix
+share the next #49 CI submission.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN
@@ -40,8 +44,7 @@ reinstall screen as native backup deletion. See the
 [Port 1 placement controls](object-service.md). Public edits that move a
 library remain gated. The HP48gII Port 0 Notebook
 passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
-bundles matched the historical writer on all three models. Independent Notebook
-execution on HP39gs/40gs, active-execution GC and wider native services remain open.
+bundles matched the historical writer on all three models.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.

@@ -21,7 +21,7 @@ def run(*args, env):
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
 
 
-def build_independent_hp39_notebook(directory, fixture, toolchain, assets, env):
+def build_independent_hp39_notebook(directory, fixture, toolchain, assets, model, env):
     image = directory / "notebook.hpc"
     probe = directory / "independent-entry"
     bundle = directory / "independent-aplet"
@@ -30,6 +30,8 @@ def build_independent_hp39_notebook(directory, fixture, toolchain, assets, env):
         fixture / "build.py",
         "--toolchain",
         toolchain / "bin",
+        "--model",
+        model,
         "--hp39-notebook-editor",
         "--aplet-writeback",
         "--bitmap-image",
@@ -740,17 +742,17 @@ endforeach()
                 Path("notebook-launchers/memory.json"),
             }
             if aplet_options:
-                if model == "hp39gplus":
-                    for directory in (selected, repeated):
-                        outputs.update(
-                            build_independent_hp39_notebook(
-                                directory,
-                                root / "tests/e2e/independent-entry",
-                                toolchain,
-                                args.aplet_assets,
-                                env,
-                            )
+                for directory in (selected, repeated):
+                    outputs.update(
+                        build_independent_hp39_notebook(
+                            directory,
+                            root / "tests/e2e/independent-entry",
+                            toolchain,
+                            args.aplet_assets,
+                            model,
+                            env,
                         )
+                    )
                 bundle = Path("notebook-aplet") / model
                 files = (
                     "HPGCC000.000",

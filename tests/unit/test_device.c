@@ -19,6 +19,8 @@ static int reject_contrast;
 static unsigned contrast_writes;
 static struct hpclang_hp39_platform_context portal = {.magic = HPCLANG_HP39_PLATFORM_MAGIC,
                                                       .portal_entry = 1u};
+static const struct hpclang_hp39_aplet_list_context aplet_list = {HPCLANG_HP39_APLET_LIST_MAGIC,
+                                                                  0x81000u};
 static struct hpclang_rpl_memory_bounds bounds = {.magic = HPCLANG_RPL_BOUNDS_MAGIC,
                                                   .temp_limit = 0xe0000u,
                                                   .user_limit = 0xf0000u,
@@ -128,6 +130,12 @@ int main(void)
             assert(
                 hpclang_device_capability((enum hpclang_capability)capability) ==
                 (hp39 ? HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE : HPCLANG_CAPABILITY_UNSUPPORTED));
+            boot.platform_cookie = (uintptr_t)&aplet_list | HPCLANG_PLATFORM_COOKIE_HP39_TAG;
+            int independent = hp39 && capability == HPCLANG_CAPABILITY_APLET_DATA;
+            assert(hpclang_device_capability((enum hpclang_capability)capability) ==
+                   (independent ? HPCLANG_CAPABILITY_SUPPORTED
+                    : hp39      ? HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE
+                                : HPCLANG_CAPABILITY_UNSUPPORTED));
             boot.platform_cookie = (uintptr_t)&portal | HPCLANG_PLATFORM_COOKIE_HP39_TAG;
             portal.magic = 0u;
             assert(

@@ -1,4 +1,4 @@
-# HP39g+ D1.55 suffix after the Stock USB payload gate. The Aplet starts with Seed42.
+# After the model-specific Stock USB payload gate on HP39g+, HP39gs or HP40gs.
 2500 capture downloaded
 5000 tap enter
 8000 capture start

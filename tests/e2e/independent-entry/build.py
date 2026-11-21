@@ -11,13 +11,16 @@ import subprocess
 from pathlib import Path
 
 
+HP39_MODELS = ("hp39gplus", "hp39gs", "hp40gs")
+
+
 def bitmap_image_info(path):
     image = path.read_bytes()
     if len(image) < 16:
         raise ValueError("truncated HPC1 header")
     magic, size, entry, static = struct.unpack_from("<4sIII", image)
     if (magic, size, entry) != (b"HPC1", len(image) - 16, 8) or not 0 < size <= 12 * 4096:
-        raise ValueError("image does not fit the D1.55 editor fixture")
+        raise ValueError("image does not fit the HP39/40 editor fixture")
     if static > 4096:
         raise ValueError("unexpected static data requirement for the editor fixture")
     checksum = 2166136261
@@ -69,7 +72,7 @@ def code_for(size, offset, model="hp50g"):
     if size < 8 or size % 8 or size > 65536:
         raise ValueError("payload must contain 1..8192 complete eight-byte blocks")
     # Save Stock pointers, capture PC, and copy into program-owned aligned RAM.
-    save, restore = (0x6F73, 0xF30C) if model == "hp39gplus" else (0x679B, 0x67D2)
+    save, restore = (0x6F73, 0xF30C) if model in HP39_MODELS else (0x679B, 0x67D2)
     code = "8f" + word(save) + "20" + "81b5"
     code += "da" + "34" + word(offset) + "c2" + "134"
     code += "da" + "34" + word(size * 2 + 7) + "c2"
@@ -77,7 +80,7 @@ def code_for(size, offset, model="hp50g"):
     code += "34" + word(size // 8 - 1)
     code += "1527" + "1517" + "16f" + "17f" + "ce" + "5fe"
     code += "af2" + "d9" + "81e"
-    if model in ("hp48gii", "hp39gplus"):
+    if model == "hp48gii" or model in HP39_MODELS:
         # Translate the main-RAM nibble address before converting it to bytes.
         code += "da" + "34" + word(0xC8000) + "c2"
     code += "25" + "32" + "080" + "20"
@@ -89,16 +92,16 @@ def code_for(size, offset, model="hp50g"):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True, help="LLVM bin directory")
-    parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
+    parser.add_argument("--model", choices=(*HP39_MODELS, "hp48gii", "hp49gplus", "hp50g"))
     parser.add_argument("--output", type=Path, required=True, help="new output directory")
     parser.add_argument("--bootstrap-sync", type=Path, help="shared runtime/bootstrap/sync.S")
     probe = parser.add_mutually_exclusive_group()
     probe.add_argument("--probe-source", type=Path, help="alternative bounded experiment body")
     probe.add_argument(
-        "--hp39-notebook-stage", action="store_true", help="stage the HP39g+ Notebook in a bitmap"
+        "--hp39-notebook-stage", action="store_true", help="stage the HP39/40 Notebook in a bitmap"
     )
     probe.add_argument(
-        "--hp39-notebook-editor", action="store_true", help="enter the staged HP39g+ Notebook"
+        "--hp39-notebook-editor", action="store_true", help="enter the staged HP39/40 Notebook"
     )
     parser.add_argument(
         "--stock-state", action="store_true", help="pass original Saturn state to probe"
@@ -112,6 +115,10 @@ def main():
     if args.aplet_writeback and not args.hp39_notebook_editor:
         parser.error("--aplet-writeback requires --hp39-notebook-editor")
     bitmap_image = args.hp39_notebook_stage or args.hp39_notebook_editor
+    if args.model is None:
+        args.model = "hp39gplus" if bitmap_image else "hp50g"
+    if bitmap_image and args.model not in HP39_MODELS:
+        parser.error("Notebook bitmap probes require an HP39/40 model")
     if args.bitmap_image and not bitmap_image:
         parser.error("--bitmap-image requires a Notebook bitmap probe")
     if bitmap_image:
@@ -153,6 +160,7 @@ def main():
         repo = source.parents[2]
         if args.aplet_writeback:
             common.append("-DHPCLANG_PROBE_APLET_WRITEBACK")
+        common.append(f"-DNOTEBOOK_MODEL=HPCLANG_MODEL_{args.model.upper()}")
         common += ["-DHPCLANG_PROBE_NOTEBOOK_EDITOR", "-I" + str(repo / "include")]
         bootstrap = ["mmu.c", "run.c", "enter.S"]
         inputs.update({name: repo / "runtime/bootstrap" / name for name in bootstrap})

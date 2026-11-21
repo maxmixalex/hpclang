@@ -103,15 +103,15 @@ void exercise(u32 *out, volatile u32 *ctl, const u32 *map)
     out[44] = hash;
     out[45] = notebook_bytes;
 #ifdef HPCLANG_PROBE_NOTEBOOK_EDITOR
-    /* Use the D1.55 image and physical RAM mapping qualified by the staging run. */
+    /* Verify the staged image before switching to application mappings. */
     if (hash != NOTEBOOK_FNV1A)
         return;
     volatile u32 *l1 = (void *)0x07f00000u;
     if ((l1[0x80] & 0xfff00003u) != 0x08000002u)
         return;
     u32 fonts[2];
-    fonts[0] = 0x6e000;
-    fonts[1] = 0x6f000;
+    fonts[0] = NOTEBOOK_MODEL == HPCLANG_MODEL_HP39GPLUS ? 0x6e000 : 0x7e000;
+    fonts[1] = fonts[0] + 4096;
     struct hpclang_launch_context launch;
     launch.mmu.l1 = l1;
     launch.mmu.l2_workspace = (void *)out[24];
@@ -122,7 +122,7 @@ void exercise(u32 *out, volatile u32 *ctl, const u32 *map)
     launch.mmu.rw_page_count = count - 13;
     launch.mmu.code_window_pages = fonts;
     launch.mmu.code_window_page_count = 2;
-    launch.model = HPCLANG_MODEL_HP39GPLUS;
+    launch.model = NOTEBOOK_MODEL;
     launch.entry_offset = 8;
     launch.saturn_state = (u32)map;
     launch.platform_cookie = 0;

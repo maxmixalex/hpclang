@@ -165,7 +165,15 @@ def main():
         "--saved-note", help="expect this edited text in the reopened editor and native directory"
     )
     parser.add_argument("--save-frame", type=Path, help="LCD capture after pressing Save")
+    parser.add_argument("--save-run", type=Path, help="verify all captures from the Save sequence")
     args = parser.parse_args()
+    if args.save_run:
+        if args.notebook_editor or args.save_frame:
+            parser.error("--save-run supplies --notebook-editor and --save-frame")
+        args.notebook_editor = [
+            args.save_run / f"screen-{name}.pgm" for name in ("editor2", "moved2")
+        ]
+        args.save_frame = args.save_run / "screen-saved.pgm"
     if (args.saved_note is not None) != (args.save_frame is not None) or (
         args.save_frame and not args.notebook_editor
     ):
@@ -183,21 +191,44 @@ def main():
         glyphs = lcd["font_rows"](tests.parents[1] / "runtime/fonts/generated/newrpl_6a.S")
         header = b"P5\n131 64\n255\n"
         text = args.saved_note if args.save_frame else args.initial_note
-        frames = list(args.notebook_editor)
+        frames = [
+            (args.notebook_editor[0], text, True, "Loaded" if text is not None else None),
+            (args.notebook_editor[1], text, False, "Loaded" if text is not None else None),
+        ]
         if args.save_frame:
-            frames.append(args.save_frame)
-        for index, path in enumerate(frames):
+            frames.append((args.save_frame, text, False, "Saved; exit normally"))
+        if args.save_run:
+            frames.extend(
+                [
+                    (
+                        args.save_run / "screen-action.pgm",
+                        args.initial_note,
+                        True,
+                        "Loaded" if args.initial_note is not None else None,
+                    ),
+                    (args.save_run / "screen-typed.pgm", text, True, None),
+                ]
+            )
+            library = (args.save_run / "screen-downloaded.pgm").read_bytes()
+            if (
+                not library.startswith(header)
+                or len(library) != len(header) + 131 * 64
+                or len(set(library[len(header) :])) < 2
+            ):
+                raise ValueError("missing original library display after transfer")
+            for name in ("exited", "final"):
+                if (args.save_run / f"screen-{name}.pgm").read_bytes() != library:
+                    raise ValueError(f"Stock library display differed after {name}")
+        for path, expected, focused, status in frames:
             frame = path.read_bytes()
             if not frame.startswith(header) or len(frame) != len(header) + 131 * 64:
                 raise ValueError("unexpected HP39 LCD frame")
             pixels = frame[len(header) :]
             lcd["check_line"](pixels, glyphs, 0, "Notebook", path)
             lcd["check_line"](pixels, glyphs, 16, "Alpha to type", path)
-            lcd["check_line"](pixels, glyphs, 24, text or "", path, focused=index == 0)
-            if text is not None:
-                lcd["check_line"](
-                    pixels, glyphs, 32, "Saved; exit normally" if index == 2 else "Loaded", path
-                )
+            lcd["check_line"](pixels, glyphs, 24, expected or "", path, focused=focused)
+            if status:
+                lcd["check_line"](pixels, glyphs, 32, status, path)
     workspace_check = None
     report = {}
     if args.rpl_pool or args.bitmap_pool:

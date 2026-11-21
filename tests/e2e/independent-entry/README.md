@@ -220,9 +220,15 @@ native data in the named Aplet directory. Reopen the Aplet from the library
 and repeat the LCD check with the second pair of captures.
 
 For the Save-button regression, also pass `--aplet-writeback` to both builders.
+For HP39gs or HP40gs, build the installed Notebook with the matching
+`HPCLANG_BUILD_MODEL` and pass `--model hp39gs` or `--model hp40gs` to
+`build.py`. The model selects the runtime identity and the two physical ROM
+font pages. Use the matching Stock USB receive sequence through the payload
+gate, since the 2.22 receive menu differs from D1.55.
 After the HP39 USB payload gate, run `../sequences/hp39-independent-notebook-save.seq`.
 It types two digits, presses Save and reopens the same Aplet after exiting.
-Run the checker with `--initial-note Seed42 --saved-note Seed4220`,
-`--save-frame screen-saved.pgm` and
-`--notebook-editor screen-editor2.pgm screen-moved2.pgm`. The native directory
-and both launches' LCD evidence must agree on the edited text.
+Run the checker with `--initial-note Seed42 --saved-note Seed4220`
+and `--save-run /path/to/captures`. This checks the first edit, the saved and
+reopened text, the named directory, and the return to the Stock Aplet library
+after both launches. Omit `--initial-note` and use `--saved-note 20` for a
+fresh Aplet.
