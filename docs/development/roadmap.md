@@ -4,7 +4,11 @@ Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 
 
 Accepted main is `002fb5e3` (#53). The current integration candidate combines
 M8.0 library discovery (#49) and Port 1 cache relocation (#55) with M8.6
-independent Notebook (#54) and HP39/40 SDK packaging (#56).
+independent Notebook (#54) and HP39/40 SDK packaging (#56). Local validation
+on `3604db84` passed all 180 host tests, three native Port sanitizer tests,
+the installed SDK on all six models (613 identical release outputs), the
+HP48gII independent Notebook save/relaunch and the strict documentation build.
+[#49](https://github.com/maxmixalex/hpclang/pull/49) carries the combined CI gate.
 
 On HP49g+ and HP50g, Stock recalled the complete relocated Port 1 library,
 but PrRUN requested reinstallation after both replayed and native moves.
