@@ -1361,6 +1361,42 @@ static void catalog_offset_plans(void)
     assert(!edits[1].expected && !edits[1].value);
 }
 
+/* HP49g+/HP50g Stock 2.15: PURGE of :1:BEFORE moves attached library 275
+ * down by 50 nibbles. Its HOME record still points to the same two main-RAM
+ * ACPTRs. Only their payload words move with the library. */
+static void port1_attachment_relocation(void)
+{
+    const uint32_t payloads[] = {0x40321, 0x400ab};
+    const uint32_t relocated[] = {0x402ef, 0x40079};
+    struct image pointers = {.size = 30, .fail = UINT32_MAX};
+    struct image selectors = {.size = 117, .fail = UINT32_MAX};
+    for (unsigned i = 0; i < 16; ++i)
+        put(&selectors, 7 * i, 0x1000 + i, 5);
+    put(&selectors, 112, 0x23c21, 5);
+    const struct hpclang_rpl_reader ram = {read_nibble, &pointers};
+    const struct hpclang_rpl_reader rom = {read_nibble, &selectors};
+
+    for (unsigned i = 0; i < 2; ++i) {
+        unsigned at = 15 * i;
+        put(&pointers, at, 0x2baa, 5);
+        put(&pointers, at + 5, payloads[i], 5);
+        put(&pointers, at + 10, 0x23c21, 5);
+        struct edges edges = {0};
+        assert(!hpclang_rpl_reference_visit(&ram, at, 15, 0, collect, &edges));
+        assert(edges.count == 2 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_ACPTR);
+        assert(edges.items[1].kind == HPCLANG_RPL_REFERENCE_EXECUTION &&
+               edges.items[1].target == 0x23c21 && edges.items[1].field == at + 10);
+        struct hpclang_rpl_banked_target target;
+        assert(hpclang_rpl_acptr_resolve(&ram, at, 15, &rom, 0, 112, &target) == 1);
+        assert(target.bank.kind == HPCLANG_RPL_BANK_ERAM && target.offset == payloads[i] - 0x40000);
+        const struct hpclang_rpl_reference_mappings mappings = {0, 1, 1};
+        struct hpclang_rpl_reference_patch patch;
+        assert(hpclang_rpl_reference_plan_offset_shift(&edges.items[0], &mappings, 0, -0x40000, 50,
+                                                       50 + 13671, -50, &patch) == 1);
+        assert(patch.field == at + 5 && patch.value == relocated[i]);
+    }
+}
+
 static void catalog_executable_switches(void)
 {
     struct image image = {.size = 19, .fail = UINT32_MAX};
@@ -2338,6 +2374,7 @@ int main(void)
     catalog_relocation_plan();
     catalog_executable_switches();
     catalog_offset_plans();
+    port1_attachment_relocation();
     physical_alias_replay();
     execution_address_planning();
     rebuilt_catalog_replay();
