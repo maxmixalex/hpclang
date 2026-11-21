@@ -17,24 +17,13 @@ Native installation and startup recovery remain open. The combined candidate's
 Quality job flagged test formatting on `de3e2a02`. The corrected reference test
 passed locally with CI's clang-format 22.1.0 and ASan/UBSan.
 
-On HP39g+ D1.55, HP39gs 2.22 and HP40gs 2.22, the same library-free RPL
-Aplet imported through Stock USB with attachment ID `0x7ff`. All three
-profiles passed Start, ENTER, Exit, copy, confirmed Reset and relaunch.
-Full SRAM directory checks found the original marker intact while the copy
-was cleared and then saved again. The zero and 275 attachment controls failed
-import on HP39g+. On all three profiles, a 32-byte ARM probe preserved incoming r0, wrote its
-marker, returned through RPL writeback and exited to the Stock Aplet list.
-On HP39g+ a same-layout control that discarded r0 reproduced the abort. On HP39g+ D1.55 the independent C probe also returned through Stock
-writeback, with 128 verified workspace values, an owned 4 KiB stack,
-unchanged guards and restored interrupt state. The full independent HP39
-Notebook remains open. A separate D1.55 Aplet allocated a 1024 by 896
-Stock bitmap on the RPL data stack before entering C. Its pixels contained
-27 distinct aligned 4 KiB frames. Stock released the stack reference after
-the ARM call and the Aplet saved its marker. Mapping Notebook into these
-frames and maintaining ownership through its native calls remain unverified. Two
-local builds in separate directories reproduced the four C Aplet transfer
-files byte-for-byte, including the executable tested on HP39g+ D1.55.
-The combined Core runtime workflow now runs this packaging check.
+HP39 independent entry passed local original-ROM checks on all three models:
+USB import, ARM execution and return, RPL writeback, copy, Reset and relaunch.
+On HP39g+ D1.55, the freestanding C probe also passed stack, workspace and
+interrupt-restoration checks. Two builds reproduced the tested C Aplet; its
+packaging regression is in #49. The full independent Notebook is still open.
+The [launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
+records a 27-page Stock-owned bitmap. Moving GC preserved its contents but shifted its first physical frame by 8 KiB. Notebook mappings across GC remain open.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN

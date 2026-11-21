@@ -126,6 +126,27 @@ An independent Start must handle view entry before ENTER. The data-slot
 reader also checks the exact PrRUN continuation, so an independent action
 needs its own verified frame before it can save changes to the active Aplet.
 
+**HP39 independent Aplet follow-up (D1.55, 2026-11-22).** Stock held a
+1024 by 896 bitmap on its RPL data stack while a library-free ARM probe ran.
+Its 112 KiB of pixels contained 27 aligned, distinct 4 KiB frames. To test
+their lifetime, an Aplet allocated and dropped an 8 KiB bitmap before creating
+the live one. An ARM call recorded the live object's Saturn nibble address
+and a tag in its pixels. The next RPL instruction was either NOP or GARBAGE;
+the second ARM call resolved the bitmap again from the data stack.
+
+| RPL instruction | Object address before and after | First aligned physical frame after |
+| --- | --- | --- |
+| NOP | `0x8b6f2` → `0x8b6f2` | `0x0800e000` |
+| GARBAGE | `0x8b6f2` → `0x87041` | `0x0800c000` |
+
+Both snapshots retained the in-object tag and original address, 27 valid
+frames, intact ARM code and guards, restored interrupt state and RPL
+writeback in the named Aplet. The root keeps the bitmap alive across GC,
+but GC can move both its address and its within-page pixel offset. A Notebook
+launcher using these pages must end its mappings before Stock can collect,
+or establish a page owner that remains fixed through those calls. Reusing
+the previous physical frame list would address different pixel data.
+
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.
 Demonstrate disjoint storage for code, RW, stage, MMU and required native
