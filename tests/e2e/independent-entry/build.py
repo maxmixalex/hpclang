@@ -81,12 +81,16 @@ def main():
     probe.add_argument(
         "--hp39-notebook-stage", action="store_true", help="stage the HP39g+ Notebook in a bitmap"
     )
+    probe.add_argument(
+        "--hp39-notebook-editor", action="store_true", help="enter the staged HP39g+ Notebook"
+    )
     parser.add_argument(
         "--stock-state", action="store_true", help="pass original Saturn state to probe"
     )
     parser.add_argument("--stock-frame", action="store_true", help="also pass saved register frame")
     args = parser.parse_args()
-    if args.hp39_notebook_stage:
+    bitmap_image = args.hp39_notebook_stage or args.hp39_notebook_editor
+    if bitmap_image:
         args.stock_state = True
     if args.stock_frame and not args.stock_state:
         parser.error("--stock-frame requires --stock-state")
@@ -99,7 +103,7 @@ def main():
     inputs["bootstrap-sync.S"] = sync
     if args.probe_source:
         inputs["probe.c"] = args.probe_source.resolve()
-    if args.hp39_notebook_stage:
+    if bitmap_image:
         inputs["probe.c"] = source.parent / "independent-pool/hp39-bitmap-probe.c"
     common = [
         str(tool / "clang"),
@@ -112,11 +116,18 @@ def main():
     ]
     if args.stock_state:
         common.append("-DHPCLANG_PROBE_STOCK_STATE")
-    if args.hp39_notebook_stage:
+    if bitmap_image:
         common.append("-DHPCLANG_PROBE_NOTEBOOK_STAGE")
     if args.stock_frame:
         common.append("-DHPCLANG_PROBE_STOCK_FRAME")
-    for name in ("entry.S", "probe.c", "bootstrap-sync.S"):
+    sources = ["entry.S", "probe.c", "bootstrap-sync.S"]
+    if args.hp39_notebook_editor:
+        repo = source.parents[2]
+        common += ["-DHPCLANG_PROBE_NOTEBOOK_EDITOR", "-I" + str(repo / "include")]
+        bootstrap = ["mmu.c", "run.c", "enter.S"]
+        inputs.update({name: repo / "runtime/bootstrap" / name for name in bootstrap})
+        sources = bootstrap + sources
+    for name in sources:
         subprocess.run(
             common + ["-c", str(inputs[name]), "-o", str(root / (name + ".o"))],
             check=True,
@@ -126,9 +137,7 @@ def main():
         + [
             "-nostdlib",
             "-Wl,-T," + str(source / "link.ld"),
-            str(root / "entry.S.o"),
-            str(root / "probe.c.o"),
-            str(root / "bootstrap-sync.S.o"),
+            *(str(root / (name + ".o")) for name in sources),
             "-o",
             str(root / "probe.elf"),
         ],

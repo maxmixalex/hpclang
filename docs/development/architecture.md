@@ -155,6 +155,16 @@ bitmap on the data stack. The ARM probe read back all 45,456 code bytes in
 interrupt restoration passed. Changing one expected image byte made the
 checker reject the snapshot. This run stopped before MMU setup or editor entry.
 
+The next D1.55 run installed a 60,842-byte Aplet over Stock USB. The launcher
+used 12 of the bitmap's 27 pages for Notebook code, one for the MMU tables
+and 14 for the boot page, writable data, heap and stack. LCD captures matched
+the Notebook title, input prompt and empty focused editor. DOWN moved focus;
+ON exited with application result zero. Both Stock L1 entries, interrupt state
+and SWI vector were restored. The named Aplet retained its RPL writeback, and
+the Aplet key reopened the library with EntryProbe selected. The editor showed
+`Load error 88; edit retained` because this launcher supplied no Aplet storage
+portal. Reading the current note and preserving edits across relaunch remain open.
+
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.
 Demonstrate disjoint storage for code, RW, stage, MMU and required native

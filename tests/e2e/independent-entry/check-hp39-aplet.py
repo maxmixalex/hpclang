@@ -128,9 +128,34 @@ def main():
         "--bitmap-pool", type=Path, help="build directory for the stack-held bitmap probe"
     )
     parser.add_argument("--bitmap-image", type=Path, help="HPC1 image expected in the staged pages")
+    parser.add_argument(
+        "--notebook-editor",
+        nargs=2,
+        type=Path,
+        metavar=("ENTRY_FRAME", "DOWN_FRAME"),
+        help="require the editor display, focus movement, application return and restored L1",
+    )
     args = parser.parse_args()
     if args.bitmap_image and not args.bitmap_pool:
         parser.error("--bitmap-image requires --bitmap-pool")
+    if args.notebook_editor:
+        if not args.bitmap_image:
+            parser.error("--notebook-editor requires --bitmap-image and --bitmap-pool")
+        symbols = json.loads((args.bitmap_pool / "metadata.json").read_text())["symbols"]
+        if "hpclang_bootstrap_run" not in symbols:
+            parser.error("this probe only stages the image")
+        tests = Path(__file__).resolve().parents[1]
+        lcd = runpy.run_path(str(tests / "notebook/verify.py"))
+        glyphs = lcd["font_rows"](tests.parents[1] / "runtime/fonts/generated/newrpl_6a.S")
+        header = b"P5\n131 64\n255\n"
+        for index, path in enumerate(args.notebook_editor):
+            frame = path.read_bytes()
+            if not frame.startswith(header) or len(frame) != len(header) + 131 * 64:
+                raise ValueError("unexpected HP39 LCD frame")
+            pixels = frame[len(header) :]
+            lcd["check_line"](pixels, glyphs, 0, "Notebook", path)
+            lcd["check_line"](pixels, glyphs, 16, "Alpha to type", path)
+            lcd["check_line"](pixels, glyphs, 24, "", path, focused=index == 0)
     workspace_check = None
     report = {}
     if args.rpl_pool or args.bitmap_pool:
@@ -156,6 +181,11 @@ def main():
                 if tuple(words[44:46]) != (checksum, len(image) - 16):
                     raise ValueError("Notebook readback differs from the expected code image")
                 report.update(image_bytes=len(image) - 16, code_fnv1a=f"{checksum:08x}")
+            if args.notebook_editor:
+                data_l1, code_l1, result, restored_data, restored_code = words[46:51]
+                if result or (data_l1, code_l1) != (restored_data, restored_code):
+                    raise ValueError("Notebook return or Stock L1 restoration failed")
+                report.update(application_result=result, stock_l1=[restored_data, restored_code])
 
     sram = args.sram.read_bytes()
     check(

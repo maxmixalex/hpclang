@@ -23,10 +23,10 @@ On HP39g+ D1.55, the freestanding C probe also passed stack, workspace and
 interrupt-restoration checks. Two builds reproduced the tested C Aplet; its
 packaging regression is in #49. The full independent Notebook is still open.
 The [launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
-records a 27-page Stock-owned bitmap. On D1.55 the independent Aplet staged
-and verified all 45,456 bytes of Notebook code in 12 of those pages and
-returned to Stock. This result passed locally at `64464caf` and is included
-in the #49 CI submission. Editor entry and mappings across moving GC remain open.
+records a 27-page Stock-owned bitmap. Code staging at `64464caf` is in #49.
+A subsequent local D1.55 run opened the independent Notebook editor, moved
+focus and exited to Stock with restored mappings. The editor reported load
+error 88. Reading, saving and reopening a note in the active Aplet remain open.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN
@@ -34,8 +34,8 @@ reinstall screen as native backup deletion. See the
 [Port 1 placement controls](object-service.md). Public edits that move a
 library remain gated. The HP48gII Port 0 Notebook
 passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
-bundles matched the historical writer on all three models. Independent HP39
-Notebook execution, active-execution GC and wider native services remain open.
+bundles matched the historical writer on all three models. Independent Notebook
+execution on HP39gs/40gs, active-execution GC and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.

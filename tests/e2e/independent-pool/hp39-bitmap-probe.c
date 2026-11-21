@@ -1,3 +1,8 @@
+#ifdef HPCLANG_PROBE_NOTEBOOK_EDITOR
+#include <hpclang/bootstrap.h>
+#include <hpclang/target.h>
+void hpclang_cache_clean(const void *, unsigned);
+#endif
 typedef unsigned int u32;
 static u32 read5(const u32 *map, u32 a)
 {
@@ -93,6 +98,46 @@ void exercise(u32 *out, volatile u32 *ctl, const u32 *map)
     }
     out[44] = hash;
     out[45] = notebook_bytes;
+#ifdef HPCLANG_PROBE_NOTEBOOK_EDITOR
+    /* Use the D1.55 image and physical RAM mapping qualified by the staging run. */
+    if (hash != 0x8b0d5f8fu)
+        return;
+    volatile u32 *l1 = (void *)0x07f00000u;
+    if ((l1[0x80] & 0xfff00003u) != 0x08000002u)
+        return;
+    u32 fonts[2];
+    fonts[0] = 0x6e000;
+    fonts[1] = 0x6f000;
+    struct hpclang_launch_context launch;
+    launch.mmu.l1 = l1;
+    launch.mmu.l2_workspace = (void *)out[24];
+    launch.mmu.l2_workspace_phys = out[24];
+    launch.mmu.code_pages = out + 12;
+    launch.mmu.code_page_count = 12;
+    launch.mmu.rw_pages = out + 25;
+    launch.mmu.rw_page_count = count - 13;
+    launch.mmu.code_window_pages = fonts;
+    launch.mmu.code_window_page_count = 2;
+    launch.model = HPCLANG_MODEL_HP39GPLUS;
+    launch.entry_offset = 8;
+    launch.saturn_state = (u32)map;
+    launch.platform_cookie = 0;
+    for (u32 j = 0; j < count; j++) {
+        if (j >= 12) {
+            volatile u32 *page = (void *)out[12 + j];
+            for (u32 k = 0; k < HPCLANG_PAGE_SIZE / sizeof(*page); k++)
+                page[k] = 0;
+        }
+        hpclang_cache_clean((void *)out[12 + j], HPCLANG_PAGE_SIZE);
+    }
+    out[46] = l1[HPCLANG_L1_DATA_INDEX];
+    out[47] = l1[HPCLANG_L1_CODE_INDEX];
+    out[48] = hpclang_bootstrap_run(&launch);
+    out[49] = l1[HPCLANG_L1_DATA_INDEX];
+    out[50] = l1[HPCLANG_L1_CODE_INDEX];
+    if (out[46] != out[49] || out[47] != out[50] || out[48])
+        return;
+#endif
 #endif
     out[1] = 0;
 }

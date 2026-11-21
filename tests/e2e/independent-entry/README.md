@@ -200,3 +200,13 @@ SRAM checker the build directory with `--bitmap-pool` and the same HPC1 file
 with `--bitmap-image`. The probe copies the 45,456 code bytes to the first
 12 aligned bitmap pages, zeroes the remaining code-page bytes and reads both
 back. The checker compares the recorded checksum with the supplied HPC1.
+
+To enter that same Notebook image on HP39g+ D1.55, build the probe using
+`--hp39-notebook-editor` and package it with the same bitmap and image options.
+After USB import, start EntryProbe and press ENTER to open Notebook. Capture
+the editor before and after pressing DOWN, then press ON to exit and the Aplet
+key to reopen the library. Give both PGM paths in order to the SRAM checker's
+`--notebook-editor` option along with the build directory and image as above.
+It checks the title, prompt and focus change, application return value,
+restored mappings and named writeback. Saving a note requires Aplet storage
+support beyond this editor-entry fixture.
