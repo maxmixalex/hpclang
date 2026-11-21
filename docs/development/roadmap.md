@@ -19,7 +19,7 @@ passed locally with CI's clang-format 22.1.0 and ASan/UBSan.
 
 On HP39g+ D1.55, a library-free RPL Aplet imported through Stock USB using
 the native attachment ID `0x7ff`. Start, ENTER and Exit persisted the marker
-in the named Aplet's custom data. The full saved directory matched. ID zero
+in the named Aplet's custom data. The copied Aplet retained the marker, cleared it on confirmed Reset and saved it again after relaunch. The original retained its marker in all three SRAM snapshots. ID zero
 and 275 failed at import. The build and snapshot check are in
 `tests/e2e/independent-entry/`. Independent HP39 ARM entry remains open.
 

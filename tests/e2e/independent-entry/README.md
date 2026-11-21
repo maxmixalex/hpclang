@@ -125,5 +125,14 @@ but displayed "Getting library / Transfer Failed". The harness reports
 `installed` when its scripted sequence ends even on that failure. The
 directory verifier rejected the failed zero-ID snapshot.
 
-This probe exercises RPL Start, ENTER and Exit. ARM entry, Notebook resource
-ownership, copied-Aplet isolation and Reset require separate execution checks.
+For the copy and Reset check, save a copy named `2` from the Aplet library.
+Check its snapshot with `--copy-state saved`. Select that copy, press Reset
+and confirm, then return to the library and check with `--copy-state reset`.
+Start the copy again, press ENTER and return to the library. Check with
+`--copy-state saved` again. On HP39g+ D1.55 all three snapshots matched the
+two named directories. Reset stored the Stock empty-list reference (0x05da2)
+in the copy. The original retained its marker throughout. Each snapshot also
+failed verification when given the opposite expected copy state.
+
+This probe exercises RPL Start, ENTER, Exit and copied-Aplet Reset. ARM entry, Notebook resource
+ownership and other HP39 profiles require separate execution checks.
