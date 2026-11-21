@@ -17,11 +17,11 @@ Native installation and startup recovery remain open. The combined candidate's
 Quality job flagged test formatting on `de3e2a02`. The corrected reference test
 passed locally with CI's clang-format 22.1.0 and ASan/UBSan.
 
-On HP39g+ D1.55, the first independent Aplet transfer probe reached the
-Stock importer. USB/Kermit delivered the Aplet and Reset program. Stock
-reported "Getting library / Transfer Failed" with both zero and 275 in the
-directory attachment field. Start and ENTER remain unverified. See the
-probe in `tests/e2e/independent-entry/build-hp39-aplet.py` and its README.
+On HP39g+ D1.55, a library-free RPL Aplet imported through Stock USB using
+the native attachment ID `0x7ff`. Start, ENTER and Exit persisted the marker
+in the named Aplet's custom data. The full saved directory matched. ID zero
+and 275 failed at import. The build and snapshot check are in
+`tests/e2e/independent-entry/`. Independent HP39 ARM entry remains open.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN

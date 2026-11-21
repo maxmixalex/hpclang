@@ -94,22 +94,36 @@ application launch paths remain required.
 
 ## HP39 Aplet import probe
 
-Run the following with the prepared HP39 SDK data directory to build a small
-Stock RPL Aplet. Pass `--attached-control` with a second output directory to
-retain 275 in the directory header. Both bundles omit the support library and
-replace its four template calls. ENTER is intended to store the string
-`hpclang-enter` as the active Aplet's custom data. This experiment targets
-the native view and writeback contract before introducing the ARM payload.
+Build a Stock RPL Aplet using the prepared HP39 SDK data directory.
 
 ```sh
 python3 tests/e2e/independent-entry/build-hp39-aplet.py \
   --assets "$HP39_APLET_HOME/data" --output /tmp/entry-probe
 ```
 
-Local HP39g+ D1.55 original-ROM USB runs on fresh state transferred the
-Aplet and named Reset program. Both attachment settings produced the Stock
-dialog "Getting library / Transfer Failed". After dismissal the Aplet list
-selected Function, and ENTER opened Function Symbolic View. The harness
-reported `installed` when its scripted sequence ended. Check the Stock
-dialog and selected Aplet before interpreting any subsequent ENTER or marker.
-The transferred payload itself contains the marker string.
+The default attachment ID is `0x7ff`, observed in both Function and its
+user-saved copy on HP39g+ D1.55. Install the four generated files through the
+Stock USB disk interface, start EntryProbe, press ENTER, then return to the
+Aplet library. Verify the saved emulator SRAM against the original transfer:
+
+```sh
+python3 tests/e2e/independent-entry/check-hp39-aplet.py \
+  /tmp/entry-probe/HPGCC000.000 /path/to/state/sram
+```
+
+In a local original-ROM run, Stock listed EntryProbe at 0.97 KB after import
+and 0.98 KB after exit. The verifier matched the entire named Aplet directory
+including the custom-data field changed from an empty list to the string
+`hpclang-enter` and the two adjusted links. The code in the original transfer
+also contains that string. Searching for the marker alone cannot establish
+writeback.
+
+For importer controls, build into fresh directories with `--attached-control`
+(ID 275) and `--zero-control` (ID zero). All three packages omit the library.
+Both controls delivered the Aplet and Reset files on fresh HP39g+ D1.55 Stock
+but displayed "Getting library / Transfer Failed". The harness reports
+`installed` when its scripted sequence ends even on that failure. The
+directory verifier rejected the failed zero-ID snapshot.
+
+This probe exercises RPL Start, ENTER and Exit. ARM entry, Notebook resource
+ownership, copied-Aplet isolation and Reset require separate execution checks.

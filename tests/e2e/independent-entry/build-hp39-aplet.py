@@ -52,8 +52,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--assets", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument(
+    controls = parser.add_mutually_exclusive_group()
+    controls.add_argument(
         "--attached-control", action="store_true", help="retain the historical library ID"
+    )
+    controls.add_argument(
+        "--zero-control", action="store_true", help="use zero as the attachment ID"
     )
     args = parser.parse_args()
     path = Path(__file__).resolve().parents[3] / "tools/package-aplet.py"
@@ -81,12 +85,14 @@ def main():
     title = b"EntryProbe"
     output = bytearray(writer.encode_aplet(action, assets, title, b"hpclang"))
     # Dir_Head packs DORRP (five nibbles) and the attached library (three).
-    # Compare the zero-ID transfer with the historical attachment declaration.
+    # Stock stores 0x7ff here for a user-saved copy of Function.
     header = 9 + len(title)
     if int.from_bytes(output[header : header + 4], "little") != 0x11302A96:
         raise ValueError("unexpected transfer header")
     if not args.attached_control:
-        output[header : header + 4] = (0x02A96).to_bytes(4, "little")
+        output[header : header + 4] = (0x02A96 if args.zero_control else 0x7FF02A96).to_bytes(
+            4, "little"
+        )
     args.output.mkdir(parents=True, exist_ok=False)
     (args.output / "HPGCC000.000").write_bytes(output)
     (args.output / "HP39DIR.000").write_bytes(
