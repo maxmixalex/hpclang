@@ -293,9 +293,10 @@ jobs:
           python3 tests/sdk/check.py --aplet-tool "$host_tool/hp2aplet" \
             --aplet-assets .cache/hp39-aplet/sdk/data
 
-      - name: Verify independent HP48gII and HP50g entry build reproducibility
+      - name: Verify independent classic entry and HP39 C Aplet build reproducibility
         run: |
-          python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin" --model hp48gii
+          python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin" --model hp48gii \
+            --hp39-assets .cache/hp39-aplet/sdk/data
           python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin" --model hp50g
 
       - name: Build independent Stock allocation experiment

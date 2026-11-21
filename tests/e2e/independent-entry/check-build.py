@@ -10,11 +10,14 @@ import sys
 import tempfile
 
 
-def check(toolchain, model="hp50g"):
+def check(toolchain, model="hp50g", hp39_assets=None):
     source = Path(__file__).resolve().parent
     inputs = {name: source / name for name in ("build.py", "entry.S", "probe.c", "link.ld")}
     inputs["bootstrap-sync.S"] = source.parents[2] / "runtime/bootstrap/sync.S"
     outputs = ("program.HP", "probe.bin", "probe.elf", "metadata.json", "build.json")
+    bundle_files = {"HPGCC000.000", "HP39DIR.000", "HP39DIR.CUR", "HPCRESET.000"}
+    if hp39_assets is not None:
+        outputs += tuple("aplet/" + name for name in sorted(bundle_files))
     hashes = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in inputs.items()}
     with tempfile.TemporaryDirectory(prefix="hpclang-entry-build-") as temporary:
         root = Path(temporary)
@@ -46,6 +49,23 @@ def check(toolchain, model="hp50g"):
             for artifact, digest in manifest["outputs"].items():
                 if hashlib.sha256((output / artifact).read_bytes()).hexdigest() != digest:
                     raise ValueError(f"artifact hash mismatch: {artifact}")
+            if hp39_assets is not None:
+                bundle = output / "aplet"
+                subprocess.run(
+                    [
+                        sys.executable,
+                        str(source / "build-hp39-aplet.py"),
+                        "--assets",
+                        str(hp39_assets),
+                        "--c-probe",
+                        str(output / "probe.bin"),
+                        "--output",
+                        str(bundle),
+                    ],
+                    check=True,
+                )
+                if {item.name for item in bundle.iterdir()} != bundle_files:
+                    raise ValueError("unexpected independent HP39 transfer set")
             builds.append(output)
         comparisons = {}
         for name in outputs:
@@ -67,8 +87,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True)
     parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
+    parser.add_argument(
+        "--hp39-assets", type=Path, help="also compare independent HP39 C Aplet bundles"
+    )
     args = parser.parse_args()
-    print(json.dumps(check(args.toolchain.resolve(), args.model), indent=2))
+    print(json.dumps(check(args.toolchain.resolve(), args.model, args.hp39_assets), indent=2))
 
 
 if __name__ == "__main__":

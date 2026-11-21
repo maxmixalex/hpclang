@@ -27,7 +27,10 @@ marker, returned through RPL writeback and exited to the Stock Aplet list.
 On HP39g+ a same-layout control that discarded r0 reproduced the abort. On HP39g+ D1.55 the independent C probe also returned through Stock
 writeback, with 128 verified workspace values, an owned 4 KiB stack,
 unchanged guards and restored interrupt state. The full independent HP39
-Notebook and its concurrent native workspace allocation remain open.
+Notebook and its concurrent native workspace allocation remain open. Two
+local builds in separate directories reproduced the four C Aplet transfer
+files byte-for-byte, including the executable tested on HP39g+ D1.55.
+The combined Core runtime workflow now runs this packaging check.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN
