@@ -1,12 +1,9 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-19. **M8 is incomplete; M8.1–M8.5 are accepted complete.**
-Accepted main: `516231c5` (#47). Prior integrations: `e45f8461` (#46) and
-`38e9472a` (#43), integrating compatibility, C++/migration, SDK
-distribution, applications and UI observation fixes. Exact head `712e60c6` passed
-all seven workflows: 201 successful jobs and three configured skips. Remote main
-and merged PR were independently verified. Delivery acceptance does not by itself
-complete the remaining M8 milestones.
+Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+
+Accepted main: `b3d86f65` ([#48](https://github.com/maxmixalex/hpclang/pull/48)). All five workflows passed on `5898f704` (185 successful jobs, two configured skips). The HP50g independent Notebook save/relaunch and installed SDK checks passed. Earlier main integrations include #47, #46 and #43.
+
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
 
