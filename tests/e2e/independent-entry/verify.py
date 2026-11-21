@@ -6,7 +6,10 @@ import json
 import struct
 from pathlib import Path
 
-ROM_SHA256 = "be21f48a44feb9a899a1e9c31799a55e8d1cbdd7e3774e868d64062e41f5105c"
+ROM_SHA256_BY_MODEL = {
+    "hp49gplus": "894e146c3252191ad3700b17d24bc0669c6f3f0923e9307c1ed4f3d9857477d8",
+    "hp50g": "be21f48a44feb9a899a1e9c31799a55e8d1cbdd7e3774e868d64062e41f5105c",
+}
 
 
 def require(condition, message):
@@ -63,7 +66,7 @@ def no_toolbox(ram, flash):
 def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check=None):
     flash = (root / "flash").read_bytes()
     require(
-        hashlib.sha256(flash[:0x140000]).hexdigest() == ROM_SHA256,
+        hashlib.sha256(flash[:0x140000]).hexdigest() == ROM_SHA256_BY_MODEL["hp50g"],
         "unqualified HP50g ROM",
     )
     no_toolbox((baseline / "sram").read_bytes(), (baseline / "flash").read_bytes())

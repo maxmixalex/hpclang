@@ -2,7 +2,17 @@
 
 Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main: `b3d86f65` ([#48](https://github.com/maxmixalex/hpclang/pull/48)). All five workflows passed on `5898f704` (185 successful jobs, two configured skips). The HP50g independent Notebook save/relaunch and installed SDK checks passed. Earlier main integrations include #47, #46 and #43.
+Accepted main: `51fe383c` ([#50](https://github.com/maxmixalex/hpclang/pull/50)).
+The documentation check passed on `64c2f182`. The original M8.6 checklist
+now records production Notebook release acceptance. Earlier integration
+[#48](https://github.com/maxmixalex/hpclang/pull/48) passed all five workflows
+on `5898f704`, including HP50g independent persistence and installed SDK checks.
+
+M8.6 local verification on HP49g+ now covers independent Notebook launch,
+HOME save and relaunch. The original-ROM test read back `20`, checked the
+returned RPL value and GC witness, and verified settled Stock frames after
+both exits. The retained HP50g test uses the same verifier. HP39 Aplet entry,
+HP48gII application-sized allocation and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
