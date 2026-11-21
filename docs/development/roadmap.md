@@ -10,9 +10,11 @@ the installed SDK on all six models (613 identical release outputs), the
 HP48gII independent Notebook save/relaunch and the strict documentation build.
 [#49](https://github.com/maxmixalex/hpclang/pull/49) carries the combined CI gate.
 
-On HP49g+ and HP50g, Stock recalled the complete relocated Port 1 library,
-but PrRUN requested reinstallation after both replayed and native moves.
-Public edits that move a library remain gated. The HP48gII Port 0 Notebook
+On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
+and remained readable after a one-byte move that produced the same PrRUN
+reinstall screen as native backup deletion. See the
+[Port 1 placement controls](object-service.md). Public edits that move a
+library remain gated. The HP48gII Port 0 Notebook
 passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
 bundles matched the historical writer on all three models. HP39 independent
 entry, active-execution GC and wider native services remain open.

@@ -1099,8 +1099,16 @@ library's `PrRUN` launched an SDK program that created the HOME string
 After relocation the same call displayed `PrRUN Error: Reinstall ARMToolbox`
 and the marker was absent. Native `:1:BEFORE PURGE` produced the same screen
 pixel for pixel on both models. A warmstart of the replayed state reproduced
-the error on both. The underlying execution dependency remains unidentified.
-Keep size-changing backup edits that would move a following library disabled.
+the error on both. Two smaller moves distinguish the placements on both models.
+Shortening the preceding CRC-valid backup name from `BEFORE` to `BE` moved
+the library from ERAM offset 50 to 42 nibbles. Stock recalled all 13,671
+library nibbles, then PrRUN executed the SDK program, created its HOME marker
+and returned. Shortening the name to `BEFOR` moved the same library to offset
+48. Recall passed but the reinstall screen matched the native purge pixel
+for pixel. The unmodified offset-50 controls passed on both models. These
+observations qualify the tested word-preserving move for this library.
+The executable's internal placement requirement and general live-reference
+coverage remain open. Public size-changing edits that move libraries stay gated.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
