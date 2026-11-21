@@ -129,6 +129,15 @@ extern "C"
 #define HPCLANG_HP39_PLATFORM_MAGIC UINT32_C(0x39335048) /* "HP39" */
 #define HPCLANG_PLATFORM_COOKIE_HP39_TAG ((uintptr_t)2u)
 
+    /* Independent ENTER owns a fresh two-element Stock list until ARM returns.
+     * The first element holds the active Aplet data, the second reserves space. */
+#define HPCLANG_HP39_APLET_LIST_MAGIC UINT32_C(0x4c413339)
+    struct hpclang_hp39_aplet_list_context
+    {
+        uint32_t magic;
+        uint32_t list_address;
+    };
+
     struct hpclang_hp39_platform_context
     {
         uint32_t magic;

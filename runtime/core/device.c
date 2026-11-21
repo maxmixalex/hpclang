@@ -80,6 +80,9 @@ int hpclang_device_capability(enum hpclang_capability capability)
                    ? HPCLANG_CAPABILITY_SUPPORTED
                    : HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE;
     case HPCLANG_CAPABILITY_APLET_DATA:
+        if (hpclang_launch_hp39_aplet_list(hpclang_boot_info()))
+            return HPCLANG_CAPABILITY_SUPPORTED;
+        /* fall through */
     case HPCLANG_CAPABILITY_APLET_VARIABLES:
     case HPCLANG_CAPABILITY_TEXT_CATALOG:
     case HPCLANG_CAPABILITY_APLET_CATALOG: {

@@ -105,7 +105,12 @@ def main():
     )
     parser.add_argument("--stock-frame", action="store_true", help="also pass saved register frame")
     parser.add_argument("--bitmap-image", type=Path, help="compile against this Notebook HPC1")
+    parser.add_argument(
+        "--aplet-writeback", action="store_true", help="enable owned Aplet data in the editor"
+    )
     args = parser.parse_args()
+    if args.aplet_writeback and not args.hp39_notebook_editor:
+        parser.error("--aplet-writeback requires --hp39-notebook-editor")
     bitmap_image = args.hp39_notebook_stage or args.hp39_notebook_editor
     if args.bitmap_image and not bitmap_image:
         parser.error("--bitmap-image requires a Notebook bitmap probe")
@@ -146,6 +151,8 @@ def main():
     sources = ["entry.S", "probe.c", "bootstrap-sync.S"]
     if args.hp39_notebook_editor:
         repo = source.parents[2]
+        if args.aplet_writeback:
+            common.append("-DHPCLANG_PROBE_APLET_WRITEBACK")
         common += ["-DHPCLANG_PROBE_NOTEBOOK_EDITOR", "-I" + str(repo / "include")]
         bootstrap = ["mmu.c", "run.c", "enter.S"]
         inputs.update({name: repo / "runtime/bootstrap" / name for name in bootstrap})

@@ -126,6 +126,16 @@ void exercise(u32 *out, volatile u32 *ctl, const u32 *map)
     launch.entry_offset = 8;
     launch.saturn_state = (u32)map;
     launch.platform_cookie = 0;
+#ifdef HPCLANG_PROBE_APLET_WRITEBACK
+    if (top > 0xffff1u)
+        return;
+    struct hpclang_hp39_aplet_list_context list = {HPCLANG_HP39_APLET_LIST_MAGIC,
+                                                   read5(map, top + 10u)};
+    if (list.list_address < 0x80000u || list.list_address > 0xffff0u ||
+        read5(map, list.list_address) != 0x2a74u)
+        return;
+    launch.platform_cookie = (u32)&list | HPCLANG_PLATFORM_COOKIE_HP39_TAG;
+#endif
     for (u32 j = 0; j < count; j++) {
         if (j >= 12) {
             volatile u32 *page = (void *)out[12 + j];

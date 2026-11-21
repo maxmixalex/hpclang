@@ -180,8 +180,18 @@ in a fresh Stock list with `TWO{}N`. ARM replaced the six text bytes `Seed42`
 with ten digits, shortening the padding by the same eight nibbles. After ARM
 returned, `ONE NTHCOMPDROP TOTEMPOB` supplied the new string to the Aplet's
 normal writeback. The named directory retained the exact serialized note
-`hpclang-notebook/1\n0123456789`. Notebook's Save button has yet to exercise
-this publication path.
+`hpclang-notebook/1\n0123456789`.
+
+The installed-SDK Notebook now uses the same list for Save on D1.55.
+The launcher identifies the list in its private context, and the runtime
+checks the active ENTER frame, both object extents and the complete writable
+RAM mapping before copying the new value. Stock extracts and publishes the
+first element after the temporary application mappings have been removed.
+Two separate USB installs covered creation from an empty Aplet (`20`) and
+replacement (`Seed42` to `Seed4220`). In each, the Save button reported
+`Saved; exit normally`, the reopened editor showed `Loaded`, and the saved
+SRAM contained the same serialized string in the named Aplet. Application
+return, IRQ/FIQ, SWI vector, L1 restoration and return to the library passed.
 
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.

@@ -1,0 +1,26 @@
+# HP39g+ D1.55 suffix after the Stock USB payload gate. The Aplet starts with Seed42.
+2500 capture downloaded
+5000 tap enter
+8000 capture start
+11000 tap enter
+14000 capture action
+14600 tap two
+15000 tap zero
+15400 capture typed
+16000 tap down
+16600 tap enter
+18000 capture saved
+20000 tap on
+23000 capture returned
+25000 tap aplet
+28000 capture exited
+31000 tap enter
+34000 capture reopened
+37000 tap enter
+40000 capture editor2
+42000 tap down
+44000 capture moved2
+46000 tap on
+49000 tap aplet
+52000 capture final
+54000 finish-install

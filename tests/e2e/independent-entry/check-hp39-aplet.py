@@ -24,6 +24,7 @@ def check(
     c_probe=None,
     check_workspace=None,
     initial_note=None,
+    saved_note=None,
 ):
     title = b"EntryProbe"
     header = b"HP39BinB" + bytes([len(title)]) + title
@@ -115,11 +116,23 @@ def check(
                 "check_payload"
             ]
             check_payload(actual, meta, base, check_workspace)
-            variants = [body[:pos] + "0" * pad + packed + "0" * (7 - pad) + body[pos + reserve :]]
+            previous = ["0" * reserve]
+            if saved_note is not None:
+                # Publishing a longer note can move the Aplet before its second
+                # launch. The previous aligned copy can leave up to seven edge
+                # nibbles, all from immutable instructions at the ends of the blob.
+                previous = ["0" * i + source + "0" * (7 - i) for i in range(8)]
+            variants = {
+                body[:pos] + old[:pad] + packed + old[pad + len(source) :] + body[pos + reserve :]
+                for old in previous
+            }
         if sum(memory.count(prefix + variant) for variant in variants) != 1:
             raise ValueError(f"saved named Aplet directory did not match {title!r}")
 
     expected = saved if initial_note is None else initial
+    if saved_note is not None:
+        value = b"hpclang-notebook/1\n" + saved_note.encode()
+        expected = word(0x2A2C) + word(5 + len(value) * 2) + nibbles(value)
     require_entry(title, with_custom_data(expected))
     if copy_state is not None:
         require_entry(b"2", with_custom_data(word(0x5DA2) if copy_state == "reset" else expected))
@@ -148,7 +161,15 @@ def main():
         help="require the editor display, focus movement, application return and restored L1",
     )
     parser.add_argument("--initial-note", help="expect this note in the transfer and editor")
+    parser.add_argument(
+        "--saved-note", help="expect this edited text in the reopened editor and native directory"
+    )
+    parser.add_argument("--save-frame", type=Path, help="LCD capture after pressing Save")
     args = parser.parse_args()
+    if (args.saved_note is not None) != (args.save_frame is not None) or (
+        args.save_frame and not args.notebook_editor
+    ):
+        parser.error("--saved-note and --save-frame require each other and --notebook-editor")
     if args.bitmap_image and not args.bitmap_pool:
         parser.error("--bitmap-image requires --bitmap-pool")
     if args.notebook_editor:
@@ -161,16 +182,22 @@ def main():
         lcd = runpy.run_path(str(tests / "notebook/verify.py"))
         glyphs = lcd["font_rows"](tests.parents[1] / "runtime/fonts/generated/newrpl_6a.S")
         header = b"P5\n131 64\n255\n"
-        for index, path in enumerate(args.notebook_editor):
+        text = args.saved_note if args.save_frame else args.initial_note
+        frames = list(args.notebook_editor)
+        if args.save_frame:
+            frames.append(args.save_frame)
+        for index, path in enumerate(frames):
             frame = path.read_bytes()
             if not frame.startswith(header) or len(frame) != len(header) + 131 * 64:
                 raise ValueError("unexpected HP39 LCD frame")
             pixels = frame[len(header) :]
             lcd["check_line"](pixels, glyphs, 0, "Notebook", path)
             lcd["check_line"](pixels, glyphs, 16, "Alpha to type", path)
-            lcd["check_line"](pixels, glyphs, 24, args.initial_note or "", path, focused=index == 0)
-            if args.initial_note is not None:
-                lcd["check_line"](pixels, glyphs, 32, "Loaded", path)
+            lcd["check_line"](pixels, glyphs, 24, text or "", path, focused=index == 0)
+            if text is not None:
+                lcd["check_line"](
+                    pixels, glyphs, 32, "Saved; exit normally" if index == 2 else "Loaded", path
+                )
     workspace_check = None
     report = {}
     if args.rpl_pool or args.bitmap_pool:
@@ -204,6 +231,7 @@ def main():
         args.c_probe or args.rpl_pool or args.bitmap_pool,
         workspace_check,
         args.initial_note,
+        args.saved_note,
     )
     if report:
         print(json.dumps(report))

@@ -101,7 +101,12 @@ def main():
         "--zero-control", action="store_true", help="use zero as the attachment ID"
     )
     parser.add_argument("--initial-note", help="seed the Aplet data with a Notebook note")
+    parser.add_argument(
+        "--aplet-writeback", action="store_true", help="publish the editor's current Aplet data"
+    )
     args = parser.parse_args()
+    if args.aplet_writeback and not args.bitmap_image:
+        parser.error("--aplet-writeback requires --bitmap-image")
     if args.bitmap_image and not args.bitmap_pool:
         parser.error("--bitmap-image requires --bitmap-pool")
     path = Path(__file__).resolve().parents[3] / "tools/package-aplet.py"
@@ -115,6 +120,9 @@ def main():
     assets["apletcode.bin"] = independent_template(assets["apletcode.bin"])
     marker = b"hpclang-enter"
     action = word(0x2D9D)
+    if args.aplet_writeback:
+        # TWO{}N creates an owned list containing the input and a padding object.
+        action += word(0x2A4E) + word(7005) + "0" * 7000 + word(0xFAA1)
     if args.arm_entry:
         action += arm_entry(return_probe())
     elif args.bitmap_pool is not None:
@@ -133,7 +141,9 @@ def main():
             action += word(0x3244)
     elif args.c_probe is not None:
         action += arm_entry(args.c_probe.read_bytes())
-    if args.initial_note is None:
+    if args.aplet_writeback:
+        action += word(0x4053) + word(0xF476) + word(0x6E2F)  # ONE NTHCOMPDROP TOTEMPOB
+    elif args.initial_note is None:
         action += word(0x3244) + word(0x2A2C) + word(5 + 2 * len(marker)) + nibbles(marker)
     if len(action) % 2 == 0:
         action += word(0x765C)  # NOP keeps the complete data-list item byte aligned.

@@ -630,6 +630,74 @@ static struct hpclang_hp39_portal_context *hp39_aplet_context(uint32_t *slot)
     return portal;
 }
 
+static int hp39_owned_list(const struct hpclang_hp39_aplet_list_context *context, uint32_t *first)
+{
+    uint32_t slot, list, type;
+    if (hpclang_hp39_bitmap_aplet_data_slot(&hp39_stock_reader, &slot))
+        return -1;
+    if (!hp39_stock_read_word5(slot, &list) || list != context->list_address || list < 0x80000u ||
+        list > HP39_SATURN_LIMIT - 20u || !hp39_stock_read_word5(list, &type) ||
+        type != HP39_RPL_DOLIST) {
+        errno = EILSEQ;
+        return -1;
+    }
+    *first = list + 5u;
+    return 0;
+}
+
+/* Stock is paused. Resolve the entire writable range before changing either
+ * element. The list terminator and total native allocation size stay fixed. */
+static void hp39_store_nibble(uint32_t physical, uint32_t value)
+{
+    volatile uint8_t *byte = (void *)(uintptr_t)(physical / 2u);
+    unsigned shift = (physical & 1u) * 4u;
+    *byte = (uint8_t)((*byte & ~(15u << shift)) | ((value & 15u) << shift));
+}
+
+static int hp39_replace_list_data(const struct hpclang_hp39_aplet_list_context *context,
+                                  const struct hpclang_object *object)
+{
+    uint32_t first, limit, old_size, type, padding, semi;
+    if (hp39_owned_list(context, &first))
+        return -1;
+    if (!hp39_stock_read_word5(0x806f3u, &limit) || first >= limit || limit - first < 15u ||
+        hpclang_rpl_object_span(&hp39_stock_reader, first, limit - first - 15u, &old_size) ||
+        !hp39_stock_read_word5(first + old_size, &type) || type != 0x2a4eu ||
+        !hp39_stock_read_word5(first + old_size + 5u, &padding) || padding < 5u ||
+        padding > limit - first - old_size - 10u ||
+        !hp39_stock_read_word5(first + old_size + 5u + padding, &semi) || semi != 0x312bu) {
+        errno = EILSEQ;
+        return -1;
+    }
+    uint32_t extent = old_size + 5u + padding;
+    if (object->nibble_count < 5u || object->nibble_count > extent - 10u ||
+        object->nibble_count > HP39P_STAGED_OBJECT_MAX_NIBBLES) {
+        errno = E2BIG;
+        return -1;
+    }
+    const uint32_t *map = (const void *)hpclang_boot_info()->saturn_state;
+    uint32_t physical;
+    if (hpclang_rpl_stock_resolve_span(map, first, extent, &physical) || physical < 0x10000000u) {
+        errno = EIO;
+        return -1;
+    }
+    for (unsigned i = first >> 12; i <= (first + extent - 1u) >> 12; ++i) {
+        if (map[i] != map[257u + i]) {
+            errno = EIO;
+            return -1;
+        }
+    }
+    for (unsigned i = 0; i < object->nibble_count; ++i)
+        hp39_store_nibble(physical + i, object->data[i / 2u] >> (4u * (i & 1u)));
+    uint32_t pad_start = physical + object->nibble_count;
+    uint32_t pad_size = extent - object->nibble_count - 5u;
+    for (unsigned i = 0; i < 5u; ++i) {
+        hp39_store_nibble(pad_start + i, 0x2a4eu >> (4u * i));
+        hp39_store_nibble(pad_start + 5u + i, pad_size >> (4u * i));
+    }
+    return 0;
+}
+
 int hpclang_aplet_data_get(struct hpclang_object **object)
 {
     if (object == NULL) {
@@ -639,6 +707,13 @@ int hpclang_aplet_data_get(struct hpclang_object **object)
     *object = NULL;
     uint32_t slot, address;
     const struct hpclang_boot_info *boot = hpclang_boot_info();
+    const struct hpclang_hp39_aplet_list_context *list = hpclang_launch_hp39_aplet_list(boot);
+    if (list) {
+        if (hp39_owned_list(list, &address))
+            return -1;
+        return hpclang_object_snapshot_copy(&hp39_stock_reader, address,
+                                            HP39_SATURN_LIMIT - address, object);
+    }
     if (boot != NULL && boot->model == HPCLANG_MODEL_HP39GPLUS && boot->platform_cookie == 0u &&
         boot->saturn_state != 0u) {
         if (hpclang_hp39_bitmap_aplet_data_slot(&hp39_stock_reader, &slot) != 0)
@@ -659,6 +734,10 @@ int hpclang_aplet_data_set(const struct hpclang_object *object)
         errno = EINVAL;
         return -1;
     }
+    const struct hpclang_hp39_aplet_list_context *list =
+        hpclang_launch_hp39_aplet_list(hpclang_boot_info());
+    if (list)
+        return hp39_replace_list_data(list, object);
     uint32_t slot;
     struct hpclang_hp39_portal_context *portal = hp39_aplet_context(&slot);
     if (portal == NULL)

@@ -25,9 +25,10 @@ packaging regression is in #49. The full independent Notebook is still open.
 The [launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
 records a 27-page Stock-owned bitmap. Code staging at `64464caf` is in #49.
 On D1.55 the installed-SDK Notebook now reads the active independent Aplet's
-data. Two local launches displayed the preinstalled note `Seed42` and
-`Loaded`, accepted focus changes and exited to the Aplet library. Edited
-notes still need Save-button publication and relaunch verification.
+data. Local D1.55 Save-button tests created `20` in a fresh Aplet and
+changed `Seed42` to `Seed4220` in a seeded Aplet. Both reopened with
+`Loaded`, matching text in the editor and the named Stock directory, and
+returned to the Aplet library. HP39gs/40gs editor coverage remains open.
 The #49 submission includes the editor and active-Aplet reads. Its SDK check
 rebuilds the independent HP39g+ launcher from each installed Notebook image
 and compares its ARM binary and four transfer files. In a local replay all
