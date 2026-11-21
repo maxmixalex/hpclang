@@ -296,6 +296,18 @@ static void test_discovery(void)
                         HPCLANG_PORT_REPLACE_BACKUP | HPCLANG_PORT_CREATE_LIBRARY));
         }
     }
+    device.model = boot.model = HPCLANG_MODEL_HP48GII;
+    device.family = HPCLANG_FAMILY_HP48;
+    bounds.magic = HPCLANG_RPL_BOUNDS_PORT0_RESIDENT;
+    assert(!hpclang_port_query(0, &info) && info.available == reads && info.implemented != reads);
+    struct hpclang_object library = {.kind = HPCLANG_OBJECT_LIBRARY};
+    assert(hpclang_port_backup_create(0, NULL, 0, &library) == -1 && errno == ENOSYS);
+    assert(hpclang_port_backup_replace(0, NULL, 0, &library) == -1 && errno == ENOSYS);
+    assert(hpclang_port_backup_remove(0, NULL, 0) == -1 && errno == ENOSYS);
+    assert(hpclang_port_library_create(0, &library) == -1 && errno == ENOSYS);
+    device.model = boot.model = HPCLANG_MODEL_HP50G;
+    device.family = HPCLANG_FAMILY_HP4950;
+    bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC;
     // Zero writable headroom means supported-but-full, not an unavailable API.
     assert(hpclang_port_query(1, &info) == 0 && (info.available & HPCLANG_PORT_CREATE_BACKUP));
     bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V4;

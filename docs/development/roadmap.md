@@ -2,9 +2,18 @@
 
 Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main: `002fb5e3` ([#53](https://github.com/maxmixalex/hpclang/pull/53)). All five workflows passed on `a022c359` (186 jobs passed, two skipped). HP49g+ and HP50g Notebook runs cover low-memory exit, relaunch and Port 0 backup. #52 accepted the Port 1 relocation regression. #51 added HP49g+ independent save and relaunch. #50 records production Notebook release acceptance.
+Accepted main: `002fb5e3` ([#53](https://github.com/maxmixalex/hpclang/pull/53)). All five workflows passed on `a022c359` (186 jobs passed, two skipped). Notebook low-memory exit and Port 0 backup are accepted on HP49g+ and HP50g. #52 accepted the Port 1 relocation regression. #51 added the HP49g+ independent Notebook save and relaunch regression.
+[#50](https://github.com/maxmixalex/hpclang/pull/50) records production Notebook
+release acceptance.
 
-M8.6 follow-up [#54](https://github.com/maxmixalex/hpclang/pull/54) covers Notebook SD export and independent HP48gII entry. HP48gII Port 0 relaunch with a verified backup CRC has also passed locally. Application-originated HP48gII HOME save, HP39 Aplet entry and wider native services remain open.
+M8.6: HP49g+ and HP50g independent Notebook save, low-memory exit and Port 0
+backup are accepted on main. FAT16 export and HP48gII HOME creation and
+replacement are in [#54](https://github.com/maxmixalex/hpclang/pull/54).
+An HP48gII local follow-up exercises two saves during the second launch of
+the Port 0 Notebook. It checks both save messages, the final HOME note,
+the resident backup CRC, the restored mappings and moving GC after exit.
+HP39/40 SDK Aplet packaging is in #56. HP39 independent entry, active-execution
+GC and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
@@ -139,13 +148,12 @@ unchanged. Sound compatibility is independent of Port2.
 
 CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 successes; Pages deploy and runtime evidence publication skipped by design). Merged as `e45f8461`; remote main verified. Earlier HP39gs transfer stalls remain unexplained. No post-merge run is claimed.
 
-M8.0 / [#49](https://github.com/maxmixalex/hpclang/pull/49): applications can query one library or list all registered and HOME-attached IDs in ascending order. All 180 host tests passed. HP48gII, HP49g+ and HP50g Stock verified both calls across six launches, including registered library 275 and stored-only library 123. After integrating main at `002fb5e3`, all 180 host tests and strict docs passed locally. The installed [SDK guide](../sdk/getting-started.md#find-a-classic-stock-library) example linked with a C++ caller for all three models outside the repository. The installed SDK also built the normal and low-memory independent Notebook fixtures for HP49g+ and HP50g. The integrated head is submitted for CI.
-
-M8.0 / [#52](https://github.com/maxmixalex/hpclang/pull/52) merged. On HP49g+
-and HP50g, the C planner matched the complete Stock catalog and both HOME
-cache pointer updates after native deletion moved a Port 1 library.
-[Port 1 observations](object-service.md) detail the two firmware runs.
-General reference collection and public Port 1 replacement/removal remain open.
+M8.0 local: on HP49g+ and HP50g, the catalog relocation planner matched
+Stock's complete library catalog after native deletion of a backup preceding
+a registered Port 1 library. The [Port 1 observations](object-service.md)
+cover the header movement and a separate attached-library run: both native
+HOME cache pointers matched the C relocation plan on both models. The focused
+host regression passes. General root collection and live execution remain open.
 
 M8.0 / #47: merged as `516231c5`, whose tree matches accepted head `1cebf08d`.
 CI: 184 successful jobs, including both HP49g+ and HP50g Stock code-relocation

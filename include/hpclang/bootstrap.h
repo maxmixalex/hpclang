@@ -89,6 +89,9 @@ extern "C"
 #define HPCLANG_RPL_BOUNDS_MAGIC UINT32_C(0x334c5052)    /* "RPL3" adds ERAM fence */
 #define HPCLANG_RPL_BOUNDS_MAGIC_V4 UINT32_C(0x344c5052) /* "RPL4" adds root masks */
 #define HPCLANG_RPL_BOUNDS_MAGIC_V5 UINT32_C(0x354c5052) /* "RPL5" adds execution PC */
+/* HP48gII code executing inside Port 0: RPL2 bounds and native roots are
+ * available for stack and HOME mutations. Port 0 must remain stationary. */
+#define HPCLANG_RPL_BOUNDS_PORT0_RESIDENT UINT32_C(0x304c5052) /* "RPL0" */
 #define HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG ((uintptr_t)1u)
 
     struct hpclang_rpl_memory_bounds

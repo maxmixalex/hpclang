@@ -31,10 +31,28 @@ cases = {
     "low-guard": ("sram", start + symbols["guard_low"]),
     "high-guard": ("sram", start + symbols["guard_high"]),
     "loaded-code": ("sram", result["arena"][0] - 0x08000000 + 4096),
-    "application-data": ("sram", result["arena"][0] - 0x08000000 + 12288),
+    "application-data": (
+        "sram",
+        result["arena"][0] - 0x08000000 + (2 + result["code_pages"]) * 4096,
+    ),
     "code": ("sram", start),
     "flash": ("flash", 0x180000),
 }
+if result["application"] == "notebook":
+    del cases["application-data"]
+    cases["boot-data"] = ("sram", result["arena"][0] - 0x08000000 + 17 * 4096)
+if result["code_pages"] == 16:
+    table = result["arena"][0] - 0x08000000
+    cases["last-code-page"] = ("sram", table + (256 + 32 + 15) * 4)
+    cases["last-rw-page"] = ("sram", table + 11 * 4)
+if "resident_trailer_nibble" in result:
+    cases["resident-code-location"] = (
+        "sram",
+        (result["resident_trailer_nibble"] + 34) // 2,
+    )
+if "port0_crc_nibble" in result:
+    cases["resident-boot-cookie"] = ("sram", cases["boot-data"][1] + 12)
+    cases["port0-crc"] = ("sram", (result["port0_crc_nibble"] + 1) // 2)
 rejected = {}
 with tempfile.TemporaryDirectory(prefix="hpclang-entry-negative-") as temp:
     target = Path(temp)

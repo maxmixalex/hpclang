@@ -23,7 +23,9 @@ hpclang_launch_rpl_bounds(const struct hpclang_boot_info *boot)
     if ((bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC &&
          bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V2 &&
          bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4 &&
-         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V5) ||
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V5 &&
+         !(bounds->magic == HPCLANG_RPL_BOUNDS_PORT0_RESIDENT &&
+           boot->model == HPCLANG_MODEL_HP48GII)) ||
         bounds->temp_limit <= 0x80000u || bounds->temp_limit > 0x100000u ||
         bounds->user_limit < 0x80000u || bounds->user_limit >= 0x100000u ||
         bounds->stack_reserve_nibbles > 0x100000u - bounds->user_limit ||

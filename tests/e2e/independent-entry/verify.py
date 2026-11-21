@@ -1,4 +1,4 @@
-"""Check HP50g independent-entry results in an emulator snapshot."""
+"""Check independent-entry results in an emulator snapshot."""
 
 import argparse
 import hashlib
@@ -7,6 +7,7 @@ import struct
 from pathlib import Path
 
 ROM_SHA256_BY_MODEL = {
+    "hp48gii": "7fce66905036b5b66b9f2bffd17900e7cd6e8f037d30eb944d7ff2fa86b3328b",
     "hp49gplus": "894e146c3252191ad3700b17d24bc0669c6f3f0923e9307c1ed4f3d9857477d8",
     "hp50g": "be21f48a44feb9a899a1e9c31799a55e8d1cbdd7e3774e868d64062e41f5105c",
 }
@@ -17,12 +18,16 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def mapping(ram, flash):
-    require(len(ram) == 0x80000, "expected HP50g 512 KiB SRAM")
-    words = struct.unpack("<131072I", ram)
+def mapping(ram, flash, model="hp50g"):
+    small = model == "hp48gii"
+    size = 0x40000 if small else 0x80000
+    require(len(ram) == size, "unexpected SRAM size for " + model)
+    words = struct.unpack(f"<{size // 4}I", ram)
     matches = []
     for table, value in enumerate(words[:-128]):
         if not 0x08000000 <= value < 0x08000000 + len(ram) or value % 2048:
+            continue
+        if small and value != 0x08008000:
             continue
         if any(words[table + j] != value + j * 2048 for j in (1, 2, 3, 16, 64, 127)):
             continue
@@ -35,6 +40,8 @@ def mapping(ram, flash):
             data, offset = (
                 (ram, physical - 0x08000000) if physical >= 0x08000000 else (flash, physical)
             )
+            if small and data is ram and size <= offset < 2 * size:
+                offset -= size  # HP48gII external SRAM mirror
             require(0 <= offset < len(data), "mapped byte out of bounds")
             return (data[offset] >> (4 * (addr & 1))) & 15
 
@@ -52,8 +59,8 @@ def mapping(ram, flash):
     return matches[0][:2]
 
 
-def no_toolbox(ram, flash):
-    nib, word = mapping(ram, flash)
+def no_toolbox(ram, flash, model="hp50g"):
+    nib, word = mapping(ram, flash, model)
     count = word(0x8611D, 3)
     require(count < 128, "invalid library catalog count")
     require(
@@ -63,16 +70,29 @@ def no_toolbox(ram, flash):
     return nib, word, count
 
 
+def moving_gc_result(read, stack_cell):
+    """Check the tagged temporary and its recorded pre-GC Saturn address."""
+    before = read(read(0x8078E) + 100)
+    after = read(stack_cell)
+    require(0x80000 <= after < before <= 0x100000 - 42, "temporary did not move down in RAM")
+    require(read(after) == 0x2A4E and read(after + 5) == 37, "invalid relocated temporary")
+    tag = [int(c, 16) for c in "12345678" * 4]
+    require([read(after + 10 + i, 1) for i in range(32)] == tag, "relocated payload changed")
+    return {"before": before, "after": after}
+
+
 def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check=None):
+    manifest = json.loads((artifact / "build.json").read_text())
+    model = manifest.get("model", "hp50g")
+    require(model in ROM_SHA256_BY_MODEL, "unknown entry model")
     flash = (root / "flash").read_bytes()
     require(
-        hashlib.sha256(flash[:0x140000]).hexdigest() == ROM_SHA256_BY_MODEL["hp50g"],
-        "unqualified HP50g ROM",
+        hashlib.sha256(flash[:0x140000]).hexdigest() == ROM_SHA256_BY_MODEL[model],
+        "unqualified ROM for " + model,
     )
-    no_toolbox((baseline / "sram").read_bytes(), (baseline / "flash").read_bytes())
+    no_toolbox((baseline / "sram").read_bytes(), (baseline / "flash").read_bytes(), model)
     ram = (root / "sram").read_bytes()
-    nib, word, _ = no_toolbox(ram, flash)
-    manifest = json.loads((artifact / "build.json").read_text())
+    nib, word, _ = no_toolbox(ram, flash, model)
     for name, digest in manifest["outputs"].items():
         require(Path(name).name == name, "invalid manifest filename")
         require(
@@ -162,7 +182,7 @@ def verify(artifact, root, baseline, *, marker_value=0x48504343, workspace_check
     )
     return {
         "complete": True,
-        "scope": "HP50g entry/return snapshot",
+        "scope": f"{model} entry/return snapshot",
         "payload_physical": physical,
         "owned_stack_bytes": high - low,
         "cpsr_control": [value & 0xFF for value in control[:3]],

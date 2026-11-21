@@ -51,7 +51,7 @@ int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
             result.available = reads;
             const struct hpclang_rpl_memory_bounds *bounds =
                 port < 2 ? hpclang_launch_rpl_bounds(boot) : NULL;
-            if (port == 0 && bounds)
+            if (port == 0 && bounds && bounds->magic != HPCLANG_RPL_BOUNDS_PORT0_RESIDENT)
                 result.available = result.implemented;
             else if (port == 1 && bounds &&
                      (bounds->magic == HPCLANG_RPL_BOUNDS_MAGIC ||

@@ -5,6 +5,7 @@
 #include <hpclang/port.h>
 #include <hpclang/target.h>
 #include "object-snapshot.h"
+#include "launch-services.h"
 #include "rpl-backup.h"
 #include "rpl-port-mutation.h"
 #include "rpl-stock-memory.h"
@@ -34,6 +35,13 @@ static int writable_port(uint32_t port, int allow_extended)
         (device->family != HPCLANG_FAMILY_HP48 && device->family != HPCLANG_FAMILY_HP4950)) {
         errno = ENOSYS;
         return -1;
+    }
+    if (port == 0) {
+        const struct hpclang_rpl_memory_bounds *bounds = hpclang_launch_rpl_bounds(boot);
+        if (bounds && bounds->magic == HPCLANG_RPL_BOUNDS_PORT0_RESIDENT) {
+            errno = ENOSYS;
+            return -1;
+        }
     }
     return 0;
 }

@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 
-def check(toolchain):
+def check(toolchain, model="hp50g"):
     source = Path(__file__).resolve().parent
     inputs = {name: source / name for name in ("build.py", "entry.S", "probe.c", "link.ld")}
     inputs["bootstrap-sync.S"] = source.parents[2] / "runtime/bootstrap/sync.S"
@@ -31,6 +31,8 @@ def check(toolchain):
                     str(copy / "build.py"),
                     "--toolchain",
                     str(toolchain),
+                    "--model",
+                    model,
                     "--bootstrap-sync",
                     str(copy / "bootstrap-sync.S"),
                     "--output",
@@ -64,8 +66,9 @@ def check(toolchain):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True)
+    parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
     args = parser.parse_args()
-    print(json.dumps(check(args.toolchain.resolve()), indent=2))
+    print(json.dumps(check(args.toolchain.resolve(), args.model), indent=2))
 
 
 if __name__ == "__main__":
