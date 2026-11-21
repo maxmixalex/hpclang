@@ -54,8 +54,8 @@ python3 tests/e2e/independent-entry/check-snapshot.py \
   --baseline /path/to/pre-run-state --report /tmp/entry-negative.json
 ```
 
-The verifier is qualified for the HP50g ROM code fingerprint embedded in
-`verify.py` and 512 KiB SRAM. Both snapshots must have no library 275 registered.
+The verifier checks the ROM fingerprint and physical SRAM size for the model in
+the build manifest (256 KiB for HP48gII and 512 KiB for HP49g+/HP50g). Both snapshots must have no library 275 registered.
 It verifies artifact hashes, the 128 workspace values/checksum, stack
 alignment/bounds, IRQ/FIQ masking and restoration, SWI vector restoration,
 unchanged code/guards, object containment, the RPL return
@@ -63,7 +63,21 @@ integer and unchanged Flash. Equivalent SRAM mapping-table copies are allowed;
 conflicting mappings are rejected. The negative check corrupts ten temporary
 snapshot copies and removes those copies when finished.
 
-Local validation includes a fresh USB transfer and Stock execution using a copy
+To reproduce the HP48gII CI run, supply the original 2 MiB NOR image used
+by the HP48gII Stock harness and a prepared x50ng bundle:
+
+```sh
+dist="$PWD/build/x50ng/dist"
+PATH="$dist/tools:$PATH" LD_LIBRARY_PATH="$dist/runtime-lib" \
+  python3 tests/e2e/independent-entry/run-hp48gii.py --nor /path/to/48gii.bin \
+  --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-entry
+```
+
+The runner boots fresh firmware, transfers the program over emulated USB,
+evaluates it in Stock and writes the verified return to `report.json`.
+The ten corruption checks write their results to `corruptions.json`.
+
+HP50g local validation includes a fresh USB transfer and Stock execution using a copy
 of the historical no-library-275 emulator baseline, not a freshly initialized
 ROM or physical calculator. The returned HOME screen shows 124275; the snapshot
 verifier and all ten corruptions pass. The observed CPSR control sequence is

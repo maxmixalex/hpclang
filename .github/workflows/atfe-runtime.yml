@@ -48,6 +48,8 @@ on:
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - "tools/build-ckermit.sh"
+      - "tools/prepare-hp48gii-nor.py"
+      - "tests/e2e/sequences/hp48gii-stock-usb-run.seq"
       - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/ckermit-*.patch"
@@ -100,6 +102,8 @@ on:
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - "tools/build-ckermit.sh"
+      - "tools/prepare-hp48gii-nor.py"
+      - "tests/e2e/sequences/hp48gii-stock-usb-run.seq"
       - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/ckermit-*.patch"
@@ -116,6 +120,32 @@ env:
   HPCLANG_RECOVERY_JOURNAL_SLOT: "0x160105"
 
 jobs:
+  independent-hp48-entry:
+    name: HP48gII independent Stock entry and return
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-atfe
+      - uses: ./.github/actions/setup-x50ng
+      - name: Run from fresh HP48gII NOR
+        run: |
+          dist="$GITHUB_WORKSPACE/build/x50ng/dist"
+          export PATH="$dist/tools:$PATH"
+          export LD_LIBRARY_PATH="$dist/runtime-lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          curl -fL --retry 3 https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin -o "$RUNNER_TEMP/48gii.bin"
+          echo "4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937  $RUNNER_TEMP/48gii.bin" | sha256sum -c -
+          python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
+            --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-entry
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: independent-hp48-entry
+          path: |
+            build/independent-hp48-entry/*.json
+            build/independent-hp48-entry/*/*.log
+          if-no-files-found: warn
+
   independent-notebook:
     name: ${{ matrix.model }} independent Notebook save and relaunch
     strategy:

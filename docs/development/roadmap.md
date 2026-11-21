@@ -2,9 +2,10 @@
 
 Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main: `cf43236a` ([#51](https://github.com/maxmixalex/hpclang/pull/51)).
-All five workflows passed on `7a974547` (186 successful jobs, two configured
-skips). HP49g+ independent Notebook save and relaunch join the HP50g regression.
+Accepted main: `67a84462` ([#52](https://github.com/maxmixalex/hpclang/pull/52)).
+All three workflows passed on `93afbede` (21 successful jobs, one configured
+skip). [#51](https://github.com/maxmixalex/hpclang/pull/51) added the HP49g+
+independent Notebook save and relaunch regression.
 [#50](https://github.com/maxmixalex/hpclang/pull/50) records production Notebook
 release acceptance.
 
@@ -15,9 +16,10 @@ and backs it up to Port 0. Both contain `202` while HOME retains `20`.
 All 20 code pages map directly from Port 1, reducing aligned KOS usage from
 21 to nine pages on normal launch. When a 35-page request is only partly
 satisfied, the loader releases the blocks and returns to Stock. Both models
-check reacquisition, GC and relaunch from that state. The repository-built HP48gII entry also
-returns successfully on the original ROM with its own 4 KiB stack. HP39 Aplet
-entry, HP48gII application-sized
+check reacquisition, GC and relaunch from that state. The HP48gII regression now boots a fresh NOR image,
+transfers the independent entry over USB and verifies the RPL return, the
+4 KiB stack and restored interrupt state. All ten corrupted snapshots were
+rejected locally. CI acceptance is pending. HP39 Aplet entry, HP48gII application-sized
 allocation and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks

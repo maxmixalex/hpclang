@@ -79,7 +79,7 @@ def emulator(
     env.update(
         TARGET=args.model,
         HPCLANG_X50NG_HARNESS="stock",
-        HPCLANG_X50NG_SRAM_SIZE="0x00080000",
+        HPCLANG_X50NG_SRAM_SIZE="0x00040000" if args.model == "hp48gii" else "0x00080000",
         HPCLANG_X50NG_LCD_HEIGHT=str(args.profile["lcd_height"]),
         HPCLANG_STOCK_MODE="install",
         HPCLANG_E2E_SEQUENCE=str(seq),
@@ -100,7 +100,8 @@ def emulator(
         str(args.dist / "x50ng"),
         "--datadir=" + str(phase / "state"),
         "--overwrite-config",
-        "--style=" + str(args.dist / "style-50g.css"),
+        "--style="
+        + str(args.dist / ("style-40g.css" if args.model == "hp48gii" else "style-50g.css")),
         *extra,
     ]
     return process(command, env, phase / "emulator.log")
@@ -149,7 +150,8 @@ def transfer(
             # Accumulating old witnesses can exhaust Stock menu/USB workspace.
             remote_commands[0] += f" '{name}' PURGE"
     prefix = []
-    for line in (ROOT / "tests/e2e/sequences/hp4950-stock-usb-run.seq").read_text().splitlines():
+    family = "hp48gii" if args.model == "hp48gii" else "hp4950"
+    for line in (ROOT / f"tests/e2e/sequences/{family}-stock-usb-run.seq").read_text().splitlines():
         tokens = line.split()
         # Welcome prompts were acknowledged during the clean boot.
         if tokens[1:] != ["tap", "f6"]:
