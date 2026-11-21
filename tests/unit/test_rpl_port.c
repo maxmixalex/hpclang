@@ -273,6 +273,16 @@ static void test_catalog_traversal(void)
     put_word(&image, 27, 0xdd56a, 5);
     put_word(&image, 32, 0, 5);
     put_word(&image, 37, 0x456, 3);
+    assert(hpclang_rpl_port1_catalog_overlap(&reader, 5, 35, 0x22f2e, 0xdee9, 0xdeea) == 1);
+    assert(!hpclang_rpl_port1_catalog_overlap(&reader, 5, 35, 0x22f2e, 0, 0xdee9));
+    assert(!hpclang_rpl_port1_catalog_overlap(&reader, 5, 35, 0x23c21, 0, 0x40000));
+    image.fail_at = 37;
+    assert(hpclang_rpl_port1_catalog_overlap(&reader, 5, 35, 0x22f2e, 0, 0x40000) < 0);
+    image.fail_at = UINT32_MAX;
+    put_word(&image, 32, 0x22f2e, 5);
+    assert(hpclang_rpl_port1_catalog_overlap(&reader, 5, 35, 0x22f2e, 0, 0x40000) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    put_word(&image, 32, 0, 5);
     struct image before = image;
     struct catalog_state state = {0};
     assert(hpclang_rpl_catalog_visit(&reader, 5, 35, visit_catalog, &state) == 0);

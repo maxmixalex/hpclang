@@ -1088,6 +1088,16 @@ both payload updates from the saved states. The Port 1 host regression checks
 this two-pointer case. Other live references, including suspended execution,
 still need coverage before public editing.
 
+The guarded edit fixture checks the live library catalog before each backup edit.
+It reads the ERAM switch from the Stock 2.15 ROM table and compares each binding
+using that switch with the affected ERAM nibble range. Read failure anywhere in
+the catalog prevents approval, even after an earlier match. On saved HP49g+ and
+HP50g states, the check located library 123 at offset `0x42` before native purge
+and `0x10` afterward, and library 275 at `0x94` and `0x62` respectively. Adjacent
+ranges excluded those bindings. The fixture retains its separate proof that Stock
+has never seen the newly appended records. Public editing still requires coverage
+of other bank mappings, HOME caches and live execution references.
+
 A combined replay on HP49g+ and HP50g Stock 2.15 moved library 275 and its
 terminator down 50 nibbles in an offline ERAM copy, then applied the C catalog
 and HOME cache edits to the same SRAM image. All 62 catalog records and both

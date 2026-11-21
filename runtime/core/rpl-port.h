@@ -167,6 +167,15 @@ typedef int (*hpclang_rpl_catalog_visit_fn)(void *context, uint32_t record, uint
 int hpclang_rpl_catalog_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
                               uint32_t limit, hpclang_rpl_catalog_visit_fn visit, void *context);
 
+/* Check all catalog payload fields selected by the caller-verified ERAM switch.
+ * first/end are half-open ERAM nibble offsets. Return 1 for a binding in range,
+ * 0 for none, or a negative span error (including unreadable later records).
+ * Other bank selectors, switch code, HOME caches and execution roots require
+ * independent mapping/coverage before a caller may authorize a Port 1 edit. */
+int hpclang_rpl_port1_catalog_overlap(const struct hpclang_rpl_reader *reader, uint32_t catalog,
+                                      uint32_t limit, uint32_t eram_switch, uint32_t first,
+                                      uint32_t end);
+
 /* Resolve a library ID in a bounded classic Stock catalog (3-nibble count,
  * 16-nibble records). Preserve the bank-switch identity: address alone is not
  * a dereferenceable object pointer. Mapping the catalog and resolving the bank

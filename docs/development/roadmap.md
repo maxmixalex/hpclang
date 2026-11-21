@@ -40,7 +40,11 @@ reinstall screen as native backup deletion. See the
 library remain gated. Locally, the internal guarded Port 1 edit can move
 a header-only library. On copies of both models' ERAM, deleting the backup
 before library 123 matched Stock's resulting chain; moving executable library
-275 was refused before writes. The HP48gII Port 0 Notebook
+275 was refused before writes. The guarded edit fixture now checks live ERAM
+catalog bindings. It tracked both libraries before and after native PURGE on
+both models. Guarded backup replacement and deletion passed on both Stock 2.15
+ROMs, including two relaunches. Public edits still require other live roots.
+The HP48gII Port 0 Notebook
 passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
 bundles matched the historical writer on all three models.
 
