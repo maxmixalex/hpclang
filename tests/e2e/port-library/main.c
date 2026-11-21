@@ -36,6 +36,11 @@ int main(void)
     struct hpclang_object *source = NULL, *copy = NULL, *witness = NULL;
     struct hpclang_object_store *home = NULL;
     unsigned failure = 1, phase = 0;
+    failure = 0x40;
+    int launcher_state = hpclang_library_query(275);
+    if (launcher_state < 0 || !(launcher_state & HPCLANG_LIBRARY_REGISTERED))
+        goto done;
+    failure = 1;
     if (hpclang_object_snapshot_copy(&reader, 0, sizeof encoding - 1, &source))
         goto done;
     for (uint32_t port = 0; port < 3; ++port) {
@@ -53,6 +58,9 @@ int main(void)
             phase = copy != NULL;
         if (!phase) {
             if (copy || errno != ENOENT || hpclang_port_library_create(port, source))
+                goto done;
+            failure = 0x41 + port;
+            if (hpclang_library_query(123) != 0)
                 goto done;
             copy = hpclang_port_library_get(port, 123);
         } else {

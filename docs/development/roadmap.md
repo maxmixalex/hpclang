@@ -4,6 +4,8 @@ Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 
 
 Accepted main: `b3d86f65` ([#48](https://github.com/maxmixalex/hpclang/pull/48)). All five workflows passed on `5898f704` (185 successful jobs, two configured skips). The HP50g independent Notebook save/relaunch and installed SDK checks passed. Earlier main integrations include #47, #46 and #43.
 
+M8.0 local: the public library status query reads the classic Stock catalog and HOME attachment list. The Port host test passes all four combinations. Stock runtime validation is pending.
+
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
 
