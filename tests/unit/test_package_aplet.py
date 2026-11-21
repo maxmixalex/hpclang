@@ -12,6 +12,15 @@ SPEC.loader.exec_module(APLET)
 
 
 class ApletPackageTests(unittest.TestCase):
+    def test_builtin_writer_matches_historical_binary_layout(self):
+        # hp2aplet output using single-byte template, launcher, graphic and epilog.
+        data = {"apletcode.bin": b"\xaa", "apletepilog.bin": b"\xbb", "blank.gro": b"HPHP49-C\xcc"}
+        expected = bytes.fromhex(
+            "4850333942696e420158962a3011500000000000aa40a702dd2c2a700000582c"
+            "2a70000059cc11290000001129000000742ab012032b3160040000bb"
+        )
+        self.assertEqual(APLET.encode_aplet(b"\xdd", data, b"X", b"Y"), expected)
+
     def test_invalid_project_fields_never_invoke_historical_writer(self):
         with patch.object(APLET.subprocess, "run") as run:
             for name, author in (

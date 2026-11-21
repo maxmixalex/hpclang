@@ -2,18 +2,16 @@
 
 Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main: `51fe383c` ([#50](https://github.com/maxmixalex/hpclang/pull/50)).
-The documentation check passed on `64c2f182`. The original M8.6 checklist
-now records production Notebook release acceptance. Earlier integration
-[#48](https://github.com/maxmixalex/hpclang/pull/48) passed all five workflows
-on `5898f704`, including HP50g independent persistence and installed SDK checks.
+Accepted main: `002fb5e3` ([#53](https://github.com/maxmixalex/hpclang/pull/53)).
+HP49g+ and HP50g passed independent Notebook save/relaunch, low-memory exit and
+Port 0 backup. M8.0 library discovery (#49) and paired Port 1 cache relocation
+(#55) are in CI. M8.6 HP48gII HOME save and reload across two Stock processes
+passed locally (#54, submitted for CI). GC during active ARM execution remains open.
 
-M8.6 local verification on HP49g+ and HP50g covers independent Notebook
-launch from original ROM, saving `20` in HOME, a low-memory application exit
-and normal relaunch from that state. Notebook backs up an edit to Port 0;
-Stock recalls `202` while HOME retains `20`. Both fixtures check lease
-release, GC and settled Stock return. HP39 Aplet entry, HP48gII application-sized
-allocation and wider native services remain open.
+M8.6 HP39 packaging: the installed SDK can generate the Aplet transfer bundle
+from a launcher and the prepared historical resources. Local comparisons for
+HP39g+, HP39gs and HP40gs matched the historical writer byte for byte.
+Independent calculator entry without library 275 remains open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.
