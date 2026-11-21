@@ -133,6 +133,11 @@ int hpclang_rpl_library_registration_plan(const struct hpclang_rpl_reader *port_
 int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, uint32_t home,
                                       uint32_t limit, uint32_t number);
 
+/* As above. With a non-null output require a unique matching record and
+ * publish its address only after validating the whole attachment prefix. */
+int hpclang_rpl_home_library_find(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                  uint32_t limit, uint32_t number, uint32_t *unique_record);
+
 /* Plan removal from the strictly ID-ordered catalog. Validate the entire table,
  * including entries after the match, before publishing its slot and binding.
  * Returns 1 found, 0 absent, or a negative span result; output changes only on

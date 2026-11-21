@@ -560,24 +560,34 @@ static int word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned c
     return 0;
 }
 
-int hpclang_rpl_port1_attachment_plan(const struct hpclang_rpl_reader *ram, uint32_t record,
+int hpclang_rpl_port1_attachment_plan(const struct hpclang_rpl_reader *ram, uint32_t home,
+                                      uint32_t home_limit, uint32_t number,
                                       const struct hpclang_rpl_reader *rom, uint32_t flash_table,
                                       uint32_t eram_entry, uint32_t first, uint32_t end,
                                       int32_t delta, struct hpclang_rpl_reference_patch patches[2])
 {
     if (!ram || !ram->read_nibble || !rom || !rom->read_nibble || !patches)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
-    if (record < 0x80000u || record > 0x100000u - 13 || first >= end || end > 0x40000u ||
-        (int64_t)first + delta < 0 || (int64_t)end + delta > 0x40000)
+    if (first >= end || end > 0x40000u || (int64_t)first + delta < 0 ||
+        (int64_t)end + delta > 0x40000)
         return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t record;
+    int found = hpclang_rpl_home_library_find(ram, home, home_limit, number, &record);
+    if (found <= 0)
+        return found < 0 ? found : HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t count;
+    int result = word(ram, home + 5, 3, &count);
+    if (result)
+        return result;
+    uint32_t prefix_end = home + 8 + 13 * count;
     struct hpclang_rpl_reference_patch next[2];
     for (unsigned i = 0; i < 2; ++i) {
         uint32_t object;
-        int result = word(ram, record + 3 + 5 * i, 5, &object);
+        result = word(ram, record + 3 + 5 * i, 5, &object);
         if (result)
             return result;
         if (object < 0x80000u || object > 0x100000u - 15 ||
-            (object < record + 13 && record < object + 15))
+            (object < prefix_end && home < object + 15))
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
         struct hpclang_rpl_banked_target target;
         result = hpclang_rpl_acptr_resolve(ram, object, 15, rom, flash_table, eram_entry, &target);

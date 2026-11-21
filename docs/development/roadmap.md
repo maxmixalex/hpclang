@@ -6,24 +6,17 @@ Accepted main: `002fb5e3` ([#53](https://github.com/maxmixalex/hpclang/pull/53))
 [#50](https://github.com/maxmixalex/hpclang/pull/50) records production Notebook
 release acceptance.
 
-M8.6 local verification on HP49g+ and HP50g covers independent Notebook
-launch from original ROM, saving `20` in HOME, a low-memory application exit
-and normal relaunch from that state. Notebook exports the edit to a FAT16 card
-and backs it up to Port 0. Both contain `202` while HOME retains `20`.
-All 20 code pages map directly from Port 1, reducing aligned KOS usage from
-21 to nine pages on normal launch. When a 35-page request is only partly
-satisfied, the loader releases the blocks and returns to Stock. Both models
-check reacquisition, GC and relaunch from that state. On HP48gII the independent launcher now runs the installed SDK's
-64,264-byte Notebook in 29 pages owned by the executing program (one table,
-16 code, 12 writable). Two Stock processes ran one USB-installed program. On recall the editor
-read `314` from a Stock-written HOME note, displayed `31420` after keyboard
-input and returned with status zero. Both return snapshots verified the code and
-page mappings. After each exit, Stock GC moved a tagged temporary and preserved
-its payload. The resident Notebook relaunched after the first collection. This
-passed locally at `7b29e9f2` and is submitted for CI in #54. Application-originated
-HOME save and GC during active execution remain open. A local HP48gII Save-button replay confirmed that both create and replace report ENOSYS. The independent loader supplies the Saturn state for reads but no RPL mutation bounds. A Port 0 placement trial installed the full 137,279-byte Notebook package with a valid backup CRC. A smaller entry probe executed inside its Port 0 record, which stayed at the same address across a Stock HOME insertion. In-place workspace writes invalidated the backup CRC. Independent HOME save still requires a launch context and an owner that retains its integrity. HP39 Aplet entry and wider native services remain open.
+M8.6: HP49g+/HP50g independent low-memory exit and Port 0 backup are accepted
+on main. HP48gII Notebook HOME creation and replacement passed locally (#54,
+submitted for CI). Active-execution GC remains open. HP39/40 installed SDK
+Aplet bundles matched the historical writer locally (#56, submitted for CI).
+Independent HP39 entry and wider native services remain open.
 
-M8.0 Port 1: the attachment planner reads a HOME record and resolves both cache pointers through the ROM bank table. Local reference tests and HP49g+/HP50g snapshot replays matched both addresses after native backup deletion. All 180 host tests, strict documentation and the ARMv4T Thumb compilation passed locally. Live writes and wider reference collection remain open.
+M8.0 Port 1: local code now finds a unique attachment by library number in
+HOME and resolves both cache pointers through the ROM bank table. For library
+275, both planned updates matched the native HP49g+ and HP50g backup deletion
+snapshots. #55 is running CI on the earlier record-address version. Live writes
+and wider reference collection remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.

@@ -1400,25 +1400,36 @@ static void port1_attachment_relocation(void)
                                                        50 + 13671, -50, &patch) == 1);
         assert(patch.field == at + 5 && patch.value == relocated[i]);
     }
-    pointers.size = 43;
-    put(&pointers, 30, 275, 3);
-    put(&pointers, 33, 0x80000, 5);
-    put(&pointers, 38, 0x8000f, 5);
+    pointers.size = 64;
+    put(&pointers, 30, 0x2a96, 5);
+    put(&pointers, 35, 2, 3);
+    put(&pointers, 38, 111, 3);
+    put(&pointers, 51, 275, 3);
+    put(&pointers, 54, 0x80000, 5);
+    put(&pointers, 59, 0x8000f, 5);
     const struct hpclang_rpl_reader main_ram = {read_attachment_ram, &pointers};
     struct hpclang_rpl_reference_patch pair[2];
-    assert(
-        !hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, &rom, 0, 112, 50, 13721, -50, pair));
+    assert(!hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 275, &rom, 0, 112, 50, 13721,
+                                              -50, pair));
     assert(pair[0].field == 0x80005 && pair[0].value == relocated[0]);
     assert(pair[1].field == 0x80014 && pair[1].value == relocated[1]);
     struct hpclang_rpl_reference_patch saved[2];
     memcpy(saved, pair, sizeof pair);
-    put(&pointers, 25, 0x1000, 5); /* Second selector chooses Flash at the same numeric address. */
-    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, &rom, 0, 112, 50, 13721, -49,
-                                             pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 127, &rom, 0, 112, 50, 13721,
+                                             -50, pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
     assert(!memcmp(saved, pair, sizeof pair));
-    put(&pointers, 38, 0x80000, 5);
-    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, &rom, 0, 112, 50, 13721, -50,
-                                             pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    put(&pointers, 38, 275, 3);
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 275, &rom, 0, 112, 50, 13721,
+                                             -50, pair) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(saved, pair, sizeof pair));
+    put(&pointers, 38, 111, 3);
+    put(&pointers, 25, 0x1000, 5); /* Second selector chooses Flash at the same numeric address. */
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 275, &rom, 0, 112, 50, 13721,
+                                             -49, pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(saved, pair, sizeof pair));
+    put(&pointers, 59, 0x80000, 5);
+    assert(hpclang_rpl_port1_attachment_plan(&main_ram, 0x8001e, 34, 275, &rom, 0, 112, 50, 13721,
+                                             -50, pair) == HPCLANG_RPL_SPAN_UNSUPPORTED);
     assert(!memcmp(saved, pair, sizeof pair));
 }
 
@@ -2203,7 +2214,7 @@ static void flashptr_guard_composition(unsigned special)
             for (unsigned at = 0; at < 160; ++at) {
                 int observed = mapping == 2 ? at < 12
                                : mapping    ? ((!special && at < 4) || (at >= 29 && at < 34) ||
-                                               (at >= 39 && at < 44))
+                                            (at >= 39 && at < 44))
                                             : ((at >= 5 && at < 10) || at >= 80);
                 fixture.data[mapping][at] ^= 1;
                 int status = hpclang_rpl_reference_guards_validate(&validation, guards,
