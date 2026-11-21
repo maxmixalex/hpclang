@@ -46,7 +46,12 @@ if result["code_pages"] == 16:
     cases["last-code-page"] = ("sram", table + (256 + 32 + 15) * 4)
     cases["last-rw-page"] = ("sram", table + 11 * 4)
 if "resident_trailer_nibble" in result:
-    cases["resident-code-location"] = ("sram", (result["resident_trailer_nibble"] + 34) // 2)
+    cases["resident-code-location"] = (
+        "sram",
+        (result["resident_trailer_nibble"] + 34) // 2,
+    )
+if "port0_crc_nibble" in result:
+    cases["port0-crc"] = ("sram", (result["port0_crc_nibble"] + 1) // 2)
 rejected = {}
 with tempfile.TemporaryDirectory(prefix="hpclang-entry-negative-") as temp:
     target = Path(temp)

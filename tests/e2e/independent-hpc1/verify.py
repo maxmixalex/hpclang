@@ -189,6 +189,32 @@ def verify(artifact, state, baseline):
         distance = sum(int(packed[trailer + 32 + i], 16) << (4 * i) for i in range(8))
         require(trailer - distance == 2 * (base + 4096), "resident image location changed")
         report["resident_trailer_nibble"] = trailer
+    if manifest.get("port0_backup"):
+        record = word(0x80716)
+        require(
+            model == "hp48gii" and 0x80000 <= record <= 0xF0000 - 28,
+            "Port 0 record address",
+        )
+        end = record + 5 + word(record + 5)
+        require(
+            record + 38 < end <= 0xF0000 and word(record) == 0x2B62,
+            "Port 0 backup extent",
+        )
+        name = bytes(word(record + 12 + 2 * i, 2) for i in range(7))
+        require(
+            word(record + 10, 2) == word(record + 26, 2) == 7 and name == b"ENTRY48",
+            "Port 0 backup name",
+        )
+        require(
+            record + 28 - 0x70000 == owners[0] and word(end - 10) == 0x2911,
+            "executing program is outside the Port 0 backup",
+        )
+        crc = 0
+        for at in range(record + 5, end - 4):
+            crc = (crc >> 4) ^ (((crc ^ nib(at)) & 15) * 0x1081)
+        require(crc == word(end - 4, 4), "Port 0 backup CRC mismatch")
+        report["port0_crc"] = crc
+        report["port0_crc_nibble"] = end - 4 - 0x70000
     if manifest.get("post_exit_gc"):
         report["post_exit_gc"] = module["moving_gc_result"](word, word(0x806F8) + 5)
     return report

@@ -159,6 +159,9 @@ jobs:
           python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
             --fixture independent-hpc1 --notebook "$app/notebook.hpc" --dist "$dist" \
             --toolchain "$ATFE/bin" --output build/independent-hp48-notebook
+          python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
+            --fixture independent-hpc1 --notebook "$app/notebook.hpc" --dist "$dist" --port0 \
+            --toolchain "$ATFE/bin" --output build/independent-hp48-port0
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -169,6 +172,8 @@ jobs:
             build/independent-hp48-notebook/*.json
             build/independent-hp48-notebook/*/stock-*.pgm
             build/independent-hp48-notebook/*/emulator.log
+            build/independent-hp48-port0/*.json
+            build/independent-hp48-port0/*/emulator.log
             build/independent-hp48-hpc1/*.json
             build/independent-hp48-hpc1/*/*.log
           if-no-files-found: warn

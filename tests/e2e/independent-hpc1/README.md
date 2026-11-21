@@ -54,6 +54,13 @@ temporary, records a live tag's address and calls GARBAGECOL. The reports
 record the lower address and verify the tag at that location. Saving from the
 application and collection while its ARM mappings are active remain open.
 
+With both `--notebook` and `--port0`, the runner installs the Notebook as
+the first Port 0 backup named `ENTRY48` and recalls that same program twice.
+The loader switches back to the saved ARM stack before computing the final
+CRC over the backup, including the workspace and stack bytes written during
+execution. Each snapshot checks that the executed code belongs to that record
+and recalculates its CRC. This mode assumes the fresh HP48gII fixture layout.
+
 For manual execution, use an original Stock snapshot for the selected model, without
 library 275 and explicitly set to RPN mode, and the
 existing Stock USB harness to transfer and evaluate `program.HP`. The program

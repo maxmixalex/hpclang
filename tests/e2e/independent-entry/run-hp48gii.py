@@ -46,7 +46,12 @@ def main():
         "--fixture", choices=("independent-entry", "independent-hpc1"), default="independent-entry"
     )
     parser.add_argument("--notebook", type=Path, help="run an installed-SDK HP48gII Notebook image")
+    parser.add_argument(
+        "--port0", action="store_true", help="install and recall Notebook in Port 0"
+    )
     args = parser.parse_args()
+    if args.port0 and not args.notebook:
+        parser.error("--port0 requires --notebook")
     if args.notebook and args.fixture != "independent-hpc1":
         parser.error("--notebook requires --fixture independent-hpc1")
     fixture = E2E / args.fixture
@@ -72,6 +77,7 @@ def main():
             args.toolchain.resolve(),
             "--output",
             artifact,
+            *(["--port0"] if args.port0 else []),
             *(["--notebook", args.notebook.resolve()] if args.notebook else []),
         ],
         check=True,
@@ -87,7 +93,20 @@ def main():
             "8500 tap on\n14000 capture returned\n"
         )
     transfer(
-        spec, out / "run", state, artifact, "ENTRY48", package_name="program.HP", actions=actions
+        spec,
+        out / "run",
+        state,
+        artifact,
+        "ENTRY48",
+        package_name="program.HP",
+        actions=actions,
+        remote_commands=[
+            "-95 CF HOME",
+            "'ENTRY48' RCL 'ENTRY48' PURGE :0:ENTRY48 STO",
+            ":0:ENTRY48 RCL",
+        ]
+        if args.port0
+        else None,
     )
     if args.notebook:
         check_editor(out / "run", "")
@@ -102,6 +121,7 @@ def main():
             artifact,
             "ENTRY48",
             installed=True,
+            remote_commands=["-95 CF HOME :0:ENTRY48 RCL"] if args.port0 else None,
             extra_files=[("NOTE.HP", "HPCNOTE")],
             actions=actions,
         )

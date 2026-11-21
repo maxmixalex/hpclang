@@ -157,3 +157,51 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
                  : 3;
 #endif
 }
+
+#ifdef HPCLANG_NOTEBOOK_PORT0
+/* Stock 2.15 HP48gII fixture. Only the first Port 0 backup, named ENTRY48,
+ * may own this entry. The runner installs it on a fresh Stock state. */
+static unsigned backup_word(const unsigned char *ram, unsigned at, unsigned width)
+{
+    unsigned value = 0;
+    for (unsigned i = 0; i < width; ++i, ++at)
+        value |= ((ram[(at - 0x80000u) / 2] >> (4 * (at & 1))) & 15u) << (4 * i);
+    return value;
+}
+
+void finish_port0_backup(const unsigned *map, unsigned entry)
+{
+    /* Stop before the physical SRAM mirror; require matching Stock read/write maps. */
+    const unsigned char *ram = (const void *)0x08008000u;
+    for (unsigned i = 128; i < 240; ++i)
+        if (map[i] != (unsigned)ram + (i - 128) * 2048 || map[257 + i] != map[i])
+            return;
+    unsigned record = backup_word(ram, 0x80716, 5);
+    if (record < 0x80000 || record > 0xf0000 - 29 || backup_word(ram, record, 5) != 0x2b62 ||
+        backup_word(ram, record + 10, 2) != 7)
+        return;
+    /* The name is encoded as ENT, RY4, then 8 and the repeated length byte. */
+    if (backup_word(ram, record + 12, 6) != 0x544e45 ||
+        backup_word(ram, record + 18, 6) != 0x345952 || backup_word(ram, record + 24, 4) != 0x0738)
+        return;
+    unsigned end = record + 5 + backup_word(ram, record + 5, 5);
+    unsigned program = record + 28;
+    if (end > 0xf0000 || end < program + 25 || backup_word(ram, program, 5) != 0x2d9d ||
+        backup_word(ram, program + 5, 5) != 0x2dcc || backup_word(ram, end - 10, 5) != 0x2911)
+        return;
+    unsigned code_end = program + 10 + backup_word(ram, program + 10, 5);
+    unsigned pc = 0x80000 + 2 * (entry - (unsigned)ram);
+    if (entry < (unsigned)ram || entry >= 0x08040000 || code_end > end - 10 || pc < program + 15 ||
+        pc >= code_end)
+        return;
+    unsigned crc = 0;
+    for (unsigned at = record + 5; at < end - 4; ++at)
+        crc = (crc >> 4) ^ (((crc ^ backup_word(ram, at, 1)) & 15) * 0x1081);
+    for (unsigned at = end - 4; at < end; ++at) {
+        unsigned char *byte = (unsigned char *)ram + (at - 0x80000u) / 2;
+        unsigned shift = 4 * (at & 1);
+        *byte = (*byte & ~(15u << shift)) | ((crc & 15u) << shift);
+        crc >>= 4;
+    }
+}
+#endif

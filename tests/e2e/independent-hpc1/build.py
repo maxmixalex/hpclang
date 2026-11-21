@@ -34,7 +34,7 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build(source, tool, output, model="hp50g", notebook=None):
+def build(source, tool, output, model="hp50g", notebook=None, port0=False):
     model_id = {"hp48gii": 4, "hp49gplus": 5, "hp50g": 6}[model]
     output.mkdir(parents=True, exist_ok=False)
     inputs = {name: digest(source / name) for name in INPUTS}
@@ -70,6 +70,10 @@ def build(source, tool, output, model="hp50g", notebook=None):
         return result
 
     compile_file(source / "runtime/bootstrap/sync.S", "sync.o")
+    if port0:
+        if not notebook or model != "hp48gii":
+            raise ValueError("Port 0 execution requires the HP48gII Notebook")
+        common.append("-DHPCLANG_NOTEBOOK_PORT0")
     if notebook:
         application = notebook.read_bytes()
         if model != "hp48gii" or len(application) < 16:
@@ -120,6 +124,12 @@ def build(source, tool, output, model="hp50g", notebook=None):
         )
         replacements["workspace_offset: .word workspace-entry"] = (
             "workspace_offset: .word workspace-entry\narena_offset: .word arena-entry"
+        )
+    if port0:
+        # Use the original ARM stack after the last workspace write. All record
+        # bytes must be stable while the CRC is calculated, including stack data.
+        replacements[" mov sp, r4"] = (
+            " bic sp, r4, #7\n ldr r0, [r4, #4]\n mov r1, r6\n bl finish_port0_backup\n mov sp, r4"
         )
     for old, new in replacements.items():
         if assembly.count(old) != 1:
@@ -225,6 +235,8 @@ def build(source, tool, output, model="hp50g", notebook=None):
         manifest["scope"] = "HP48gII resident Notebook editor and Stock return"
         manifest["resident_image"] = True
         manifest["post_exit_gc"] = True
+    if port0:
+        manifest["port0_backup"] = True
     if model == "hp48gii":
         manifest["pool_pages"] = 29
     (output / "build.json").write_text(json.dumps(manifest, indent=2) + "\n")
@@ -238,6 +250,7 @@ def main():
     parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--notebook", type=Path, help="installed-SDK HP48gII notebook.hpc")
+    parser.add_argument("--port0", action="store_true", help="run in the ENTRY48 Port 0 backup")
     args = parser.parse_args()
     build(
         args.source_root.resolve(),
@@ -245,6 +258,7 @@ def main():
         args.output.resolve(),
         args.model,
         args.notebook,
+        args.port0,
     )
 
 
