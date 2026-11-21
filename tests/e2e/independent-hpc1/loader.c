@@ -15,6 +15,17 @@ static unsigned char packed_byte(const unsigned char *source, unsigned nibble)
     return nibble & 1 ? (source[index] >> 4) | (source[index + 1] << 4) : source[index];
 }
 
+static void store_packed_byte(unsigned char *data, unsigned nibble, unsigned char value)
+{
+    unsigned index = nibble / 2;
+    if (nibble & 1) {
+        data[index] = (data[index] & 15u) | (value << 4);
+        data[index + 1] = (data[index + 1] & 0xf0u) | (value >> 4);
+    } else {
+        data[index] = value;
+    }
+}
+
 void exercise(unsigned *out, unsigned char *arena, unsigned saturn_state)
 #else
 void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_header *image,
@@ -28,14 +39,18 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
 #ifdef HPCLANG_NOTEBOOK
     struct hpclang_image_header header;
     unsigned pos;
-    for (pos = 57; pos <= 64; pos++) {
+    enum
+    {
+        trailer = 30 * 4096 * 2
+    };
+    for (pos = trailer; pos <= trailer + 7; pos++) {
         for (unsigned i = 0; i < sizeof(header); i++)
             ((unsigned char *)&header)[i] = packed_byte(arena, pos + 2 * i);
         if (hpclang_stage_image_valid(&header, NOTEBOOK_BYTES + sizeof(header)) &&
             header.magic[3] == '1' && header.entry_offset == NOTEBOOK_ENTRY)
             break;
     }
-    if (pos > 64)
+    if (pos > trailer + 7)
         return;
     const struct hpclang_image_header *image = &header;
 #else
@@ -61,9 +76,23 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
     }
 #ifdef HPCLANG_NOTEBOOK
     unsigned char *code = (void *)(start + 4096u);
-    /* The destination is higher and overlaps the packed source. */
-    for (unsigned i = NOTEBOOK_BYTES; i; --i)
-        code[i - 1] = packed_byte(arena, pos + 2 * (sizeof(header) + i - 1));
+    unsigned distance = 0;
+    for (unsigned i = 0; i < 4; i++)
+        distance |= (unsigned)packed_byte(arena, pos + 2 * (sizeof(header) + i)) << (8 * i);
+    if (distance > pos || distance < 2 * NOTEBOOK_BYTES)
+        return;
+    unsigned source = pos - distance;
+    unsigned target = 2 * ((unsigned)code - (unsigned)arena);
+    if (source < target) {
+        for (unsigned i = NOTEBOOK_BYTES; i; --i)
+            code[i - 1] = packed_byte(arena, source + 2 * (i - 1));
+    } else if (source > target) {
+        for (unsigned i = 0; i < NOTEBOOK_BYTES; i++)
+            code[i] = packed_byte(arena, source + 2 * i);
+    }
+    distance = pos - target;
+    for (unsigned i = 0; i < 4; i++)
+        store_packed_byte(arena, pos + 2 * (sizeof(header) + i), distance >> (8 * i));
     for (unsigned i = NOTEBOOK_BYTES; i < pool_bytes - 4096u; i++)
         code[i] = 0;
 #else

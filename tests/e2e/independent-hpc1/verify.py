@@ -180,6 +180,15 @@ def verify(artifact, state, baseline):
         program_sha256=hashlib.sha256((artifact / "program.HP").read_bytes()).hexdigest(),
         sram_sha256=hashlib.sha256(ram).hexdigest(),
     )
+    if manifest.get("resident_image"):
+        # The persistent trailer and its distance move together with the Stock object.
+        trailer = owners[0] + len(prefix) + meta["reserve"] - 40
+        require(
+            packed[trailer : trailer + 32] == nibbles(hpc[:16]), "resident image header changed"
+        )
+        distance = sum(int(packed[trailer + 32 + i], 16) << (4 * i) for i in range(8))
+        require(trailer - distance == 2 * (base + 4096), "resident image location changed")
+        report["resident_trailer_nibble"] = trailer
     return report
 
 

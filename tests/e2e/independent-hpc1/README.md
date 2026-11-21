@@ -42,12 +42,14 @@ PATH="$dist/tools:$PATH" LD_LIBRARY_PATH="$dist/runtime-lib" \
 
 Add `--notebook /path/to/notebook.hpc` and choose a fresh output directory
 to exercise the HP48gII Notebook built from the installed SDK. The package
-contains a single execution reservation and stages the initialized application
-bytes inside it. The loader moves the image backwards into the aligned code
-pages before initializing writable memory. This one-shot run types `20`,
-checks the editor pixels, exits with ON and verifies Stock return. The platform
-cookie is zero. Native mutation, moving GC and persistent relaunch require
-separate qualification.
+contains a single execution reservation. A trailer outside the mapped pages
+records the HPC1 header and the distance in nibbles to the initialized code.
+On each launch the loader aligns the code, updates that distance and initializes
+writable memory. A second Stock process deposits a versioned HOME note containing
+`314` and recalls the resident program without sending it again. The editor
+shows `314`, accepts `20` and exits with ON; HOME retains the original note.
+The snapshots check the aligned code, its retained location and the restored
+Stock state. Saving from the application and moving GC remain open.
 
 For manual execution, use an original Stock snapshot for the selected model, without
 library 275 and explicitly set to RPN mode, and the

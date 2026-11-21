@@ -18,9 +18,10 @@ All 20 code pages map directly from Port 1, reducing aligned KOS usage from
 satisfied, the loader releases the blocks and returns to Stock. Both models
 check reacquisition, GC and relaunch from that state. On HP48gII the independent launcher now runs the installed SDK's
 64,264-byte Notebook in 29 pages owned by the executing program (one table,
-16 code, 12 writable). A fresh NOR boot showed the empty editor, accepted
-`20` and returned to Stock on ON with application status zero. Local pass.
-HP48gII native HOME save, moving GC and relaunch still require qualification. HP39 Aplet entry and wider native services remain open.
+16 code, 12 writable). Two Stock processes ran one USB-installed program. On recall the editor
+read `314` from a Stock-written HOME note, displayed `31420` after keyboard
+input and returned with status zero. Both return snapshots verified the code and
+page mappings. Local pass. Application-originated HOME save and moving GC remain open. HP39 Aplet entry and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.

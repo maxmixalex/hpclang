@@ -180,10 +180,14 @@ def build(source, tool, output, model="hp50g", notebook=None):
     reserve = 2 * max(len(blob), layout["arena_end"]) + 7
     destination = "0" * reserve
     if notebook:
-        # The payload starts 32 bytes after the arena symbol before the entry aligns its copy.
+        # The header stays beyond the writable arena. Its backwards distance to the
+        # code is in Saturn nibbles, so a moved HOME object can execute again.
         pos = 2 * layout["arena"] + 64
-        payload = "".join(f"{b & 15:x}{b >> 4:x}" for b in application)
+        payload = "".join(f"{b & 15:x}{b >> 4:x}" for b in application[16:])
+        trailer = application[:16] + struct.pack("<I", reserve - pos)
         destination = destination[:pos] + payload + destination[pos + len(payload) :]
+        destination += "".join(f"{b & 15:x}{b >> 4:x}" for b in trailer)
+        reserve = len(destination)
     body = code + packed + destination
     program = word(0x2D9D) + word(0x2DCC) + word(5 + len(body)) + body
     program += word(0x2614) + word(12) + "5724210" + word(0x312B)
@@ -216,7 +220,8 @@ def build(source, tool, output, model="hp50g", notebook=None):
     )
     if notebook:
         manifest["application"] = "notebook"
-        manifest["scope"] = "HP48gII one-shot Notebook editor and Stock return"
+        manifest["scope"] = "HP48gII resident Notebook editor and Stock return"
+        manifest["resident_image"] = True
     if model == "hp48gii":
         manifest["pool_pages"] = 29
     (output / "build.json").write_text(json.dumps(manifest, indent=2) + "\n")

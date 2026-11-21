@@ -12,6 +12,30 @@ HERE = Path(__file__).resolve().parent
 E2E = HERE.parent
 sys.path.insert(0, str(E2E / "port-recovery"))
 from run import completed, emulator, transfer  # noqa: E402
+from verify import home_string  # noqa: E402
+
+
+def check_editor(phase, initial):
+    ui = runpy.run_path(str(E2E / "notebook/verify.py"))
+    font = ui["font_rows"](E2E.parents[1] / "runtime/fonts/generated/newrpl_6a.S")
+    for name, text in (("editor", initial), ("typed", initial + "20")):
+        path = phase / f"stock-{name}.pgm"
+        magic, dims, limit, pixels = path.read_bytes().split(b"\n", 3)
+        width, height = map(int, dims.split())
+        if (
+            magic != b"P5"
+            or limit != b"255"
+            or width not in (131, 132)
+            or height != 64
+            or len(pixels) != width * height
+        ):
+            raise ValueError(f"unexpected HP48gII display capture: {path}")
+        pixels = b"".join(pixels[row * width : row * width + 131] for row in range(height))
+        ui["check_line"](pixels, font, 0, "Notebook", path)
+        ui["check_line"](pixels, font, 24, text, path, focused=True)
+    returned = (phase / "stock-returned.pgm").read_bytes()
+    if returned != (phase / "stock-checkpoint.pgm").read_bytes():
+        raise ValueError("Stock display did not settle after Notebook exit")
 
 
 def main():
@@ -66,26 +90,44 @@ def main():
         spec, out / "run", state, artifact, "ENTRY48", package_name="program.HP", actions=actions
     )
     if args.notebook:
-        ui = runpy.run_path(str(E2E / "notebook/verify.py"))
-        font = ui["font_rows"](E2E.parents[1] / "runtime/fonts/generated/newrpl_6a.S")
-        for name, text in (("editor", ""), ("typed", "20")):
-            path = out / "run" / f"stock-{name}.pgm"
-            magic, dims, limit, pixels = path.read_bytes().split(b"\n", 3)
-            width, height = map(int, dims.split())
-            if (
-                magic != b"P5"
-                or limit != b"255"
-                or width not in (131, 132)
-                or height != 64
-                or len(pixels) != width * height
-            ):
-                raise ValueError(f"unexpected HP48gII display capture: {path}")
-            pixels = b"".join(pixels[row * width : row * width + 131] for row in range(height))
-            ui["check_line"](pixels, font, 0, "Notebook", path)
-            ui["check_line"](pixels, font, 24, text, path, focused=True)
-        returned = (out / "run/stock-returned.pgm").read_bytes()
-        if returned != (out / "run/stock-checkpoint.pgm").read_bytes():
-            raise ValueError("Stock display did not settle after Notebook exit")
+        check_editor(out / "run", "")
+        # Stock deposits a distinct note before recalling the resident program.
+        seed = b"hpclang-notebook/1\n314"
+        wrap = runpy.run_path(str(E2E.parents[1] / "tools/hp-rpl-string-wrap.py"))["wrap_docstr"]
+        (artifact / "NOTE.HP").write_bytes(wrap(seed))
+        transfer(
+            spec,
+            out / "resume",
+            out / "run/state",
+            artifact,
+            "ENTRY48",
+            installed=True,
+            extra_files=[("NOTE.HP", "HPCNOTE")],
+            actions=actions,
+        )
+        check_editor(out / "resume", "314")
+        snapshot = out / "resume/state"
+        entry = runpy.run_path(str(HERE / "verify.py"))
+        _, read, _ = entry["no_toolbox"](
+            (snapshot / "sram").read_bytes(), (snapshot / "flash").read_bytes(), spec.model
+        )
+        if home_string(read, b"HPCNOTE") != seed:
+            raise ValueError("resident HOME note changed during the unsaved edit")
+        subprocess.run(
+            [
+                sys.executable,
+                fixture / "verify.py",
+                "--artifact",
+                artifact,
+                "--baseline",
+                state,
+                "--state",
+                snapshot,
+                "--report",
+                out / "resume.json",
+            ],
+            check=True,
+        )
     for script, report in (("verify.py", "report.json"), ("check-snapshot.py", "corruptions.json")):
         subprocess.run(
             [
