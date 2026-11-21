@@ -29,8 +29,11 @@ memory advertised to the runtime, including its 8 KiB stack. Notebook returns
 checks every KOS release, reallocates and releases equivalents, then checks
 the application status. A distinct RPL result identifies this failure run.
 
-The last process uses the state left by the failure and recalls the original
-32 KiB program. It must show `20` in the editor and exit normally. The verifier
+The last application launch uses the state left by the failure and recalls the original
+32 KiB program. It must show `20` in the editor. Key events append another `2`, activate
+the Port 0 backup button and exit normally. A fresh Stock session recalls
+`:0:HPCNOTE` and verifies that the backup contains `202` while HOME retains
+`20`. The verifier
 checks the versioned HOME string, GC witness, RPL return and two settled Stock
 frames in all three processes. It independently checks editor pixels on the
 two successful launches. See `report.json` for the phase results. The GC

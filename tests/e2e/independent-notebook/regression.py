@@ -298,6 +298,14 @@ def main():
             actions = (
                 "3500 capture editor\n" + (save_keys if name == "save" else "") + "8500 tap on\n"
             )
+        if name == "reload":
+            # Leave HOME unchanged and back up a distinct edit through the UI.
+            # Focus moves from the editor past Save, Reload, Clock and Export.
+            actions = (
+                "3500 capture editor\n4300 tap two\n"
+                + "".join(f"{5000 + 700 * i} tap down\n" for i in range(5))
+                + "9000 tap enter\n11500 tap on\n"
+            )
         transfer(
             spec,
             dest / name,
@@ -320,6 +328,27 @@ def main():
         }
         source = name
     hashes["low-memory"].update(exit_status=1, rw_bytes=20480)
+    recall = dest / "port0-recall"
+    transfer(
+        spec,
+        recall,
+        dest / "reload/state",
+        dest,
+        "SPLITGC",
+        installed=True,
+        execute=False,
+        remote_commands=["HOME :0:HPCNOTE RCL 'NBREAD' STO"],
+        execution_ms=4000,
+    )
+    assert (recall / "state/flash").read_bytes() == flash
+    ram = (recall / "state/sram").read_bytes()
+    _, read, _ = no_toolbox(ram, flash)
+    saved = home_string(read, b"HPCNOTE")
+    backup = home_string(read, b"NBREAD")
+    assert saved == b"hpclang-notebook/1\n20" and backup == b"hpclang-notebook/1\n202"
+    assert ram[0x20000:0x35000] == staged[0x20000:0x35000]
+    require_stock_pc(recall / "state")
+    hashes["port0-recall"] = {"home_hex": saved.hex(), "backup_hex": backup.hex()}
     (dest / "report.json").write_text(json.dumps(hashes, indent=2))
     print(
         f"PASS independent {args.model} Notebook HOME bytes, editor reload, GC and settled return"
