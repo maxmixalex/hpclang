@@ -127,7 +127,10 @@ def main():
     entry.add_argument(
         "--bitmap-pool", type=Path, help="build directory for the stack-held bitmap probe"
     )
+    parser.add_argument("--bitmap-image", type=Path, help="HPC1 image expected in the staged pages")
     args = parser.parse_args()
+    if args.bitmap_image and not args.bitmap_pool:
+        parser.error("--bitmap-image requires --bitmap-pool")
     workspace_check = None
     report = {}
     if args.rpl_pool or args.bitmap_pool:
@@ -138,6 +141,21 @@ def main():
 
         def workspace_check(words):
             report.update(validate(words, sram))
+            if args.bitmap_image:
+                image = args.bitmap_image.read_bytes()
+                if len(image) != 45472 or struct.unpack_from("<4sIII", image) != (
+                    b"HPC1",
+                    45456,
+                    8,
+                    1048,
+                ):
+                    raise ValueError("unexpected HP39g+ Notebook image")
+                checksum = 2166136261
+                for byte in image[16:]:
+                    checksum = ((checksum ^ byte) * 16777619) & 0xFFFFFFFF
+                if tuple(words[44:46]) != (checksum, len(image) - 16):
+                    raise ValueError("Notebook readback differs from the expected code image")
+                report.update(image_bytes=len(image) - 16, code_fnv1a=f"{checksum:08x}")
 
     sram = args.sram.read_bytes()
     check(

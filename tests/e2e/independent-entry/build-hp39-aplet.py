@@ -88,6 +88,11 @@ def main():
     entry.add_argument(
         "--bitmap-pool", type=Path, help="run a C probe with a Stock bitmap on the data stack"
     )
+    parser.add_argument(
+        "--bitmap-image",
+        type=Path,
+        help="push a raw HPC1 image below the bitmap for a staging probe",
+    )
     controls = parser.add_mutually_exclusive_group()
     controls.add_argument(
         "--attached-control", action="store_true", help="retain the historical library ID"
@@ -96,6 +101,8 @@ def main():
         "--zero-control", action="store_true", help="use zero as the attachment ID"
     )
     args = parser.parse_args()
+    if args.bitmap_image and not args.bitmap_pool:
+        parser.error("--bitmap-image requires --bitmap-pool")
     path = Path(__file__).resolve().parents[3] / "tools/package-aplet.py"
     spec = importlib.util.spec_from_file_location("package_aplet", path)
     writer = importlib.util.module_from_spec(spec)
@@ -110,9 +117,19 @@ def main():
     if args.arm_entry:
         action += arm_entry(return_probe())
     elif args.bitmap_pool is not None:
+        if args.bitmap_image:
+            image = args.bitmap_image.read_bytes()
+            if len(image) < 16 or len(image) * 2 + 5 > 0xFFFFF:
+                parser.error("image does not fit a Stock string")
+            magic, size, entry_offset, _ = struct.unpack_from("<4sIII", image)
+            if magic != b"HPC1" or size != len(image) - 16 or entry_offset >= size:
+                parser.error("invalid raw HPC1 image")
+            action += word(0x2A2C) + word(5 + 2 * len(image)) + nibbles(image)
         # Stock MAKEGROB consumes two system binaries; DROP releases the stack reference.
         action += word(0x2911) + word(1024) + word(0x2911) + word(896) + word(0x1D622)
         action += arm_entry(args.bitmap_pool.read_bytes()) + word(0x3244)
+        if args.bitmap_image:
+            action += word(0x3244)
     elif args.c_probe is not None:
         action += arm_entry(args.c_probe.read_bytes())
     action += word(0x3244) + word(0x2A2C) + word(5 + 2 * len(marker)) + nibbles(marker)

@@ -46,5 +46,53 @@ void exercise(u32 *out, volatile u32 *ctl, const u32 *map)
     out[7] = count;
     out[8] = first;
     out[9] = end;
+#ifdef HPCLANG_PROBE_NOTEBOOK_STAGE
+    enum
+    {
+        notebook_bytes = 45456,
+        code_capacity = 12 * 4096
+    };
+    if (count < 27 || top > 0xffff6)
+        return;
+    /* The source string sits below the bitmap on the native data stack. */
+    u32 source = read5(map, top + 5);
+    if (source < 0x80000 || source > 0xfffe0 || read5(map, source) != 0x2a2c)
+        return;
+    u32 source_span = read5(map, source + 5);
+    if (source_span != 5 + 2 * (16 + notebook_bytes) || source_span > 0x100000 - source - 5)
+        return;
+    u32 payload = source + 10;
+    for (u32 j = payload >> 12; j <= (source + 4 + source_span) >> 12; j++)
+        if (map[j] < 0x08000000 || map[j] > 0x0807f800)
+            return;
+    if ((read5(map, payload) & 65535) != 0x5048 || (read5(map, payload + 4) & 65535) != 0x3143)
+        return;
+    payload += 32;          /* Skip the 16-byte HPC1 header in nibble address space. */
+    u32 hash = 2166136261u; /* FNV-1a over bytes read back from the physical pages. */
+    for (u32 i = 0; i < code_capacity; i++) {
+        u32 value = 0;
+        if (i < notebook_bytes) {
+            u32 nibble = payload + 2 * i;
+            u32 low = *(volatile unsigned char *)(map[nibble >> 12] + ((nibble & 4095) >> 1));
+            value = low;
+            if (nibble & 1) {
+                u32 next_nibble = nibble + 1;
+                u32 high = *(volatile unsigned char *)(map[next_nibble >> 12] +
+                                                       ((next_nibble & 4095) >> 1));
+                value = (low >> 4) | ((high & 15) << 4);
+            }
+        }
+        *(volatile unsigned char *)(out[12 + (i >> 12)] + (i & 4095)) = value;
+    }
+    for (u32 i = 0; i < code_capacity; i++) {
+        u32 value = *(volatile unsigned char *)(out[12 + (i >> 12)] + (i & 4095));
+        if (i < notebook_bytes)
+            hash = (hash ^ value) * 16777619u;
+        else if (value)
+            return;
+    }
+    out[44] = hash;
+    out[45] = notebook_bytes;
+#endif
     out[1] = 0;
 }

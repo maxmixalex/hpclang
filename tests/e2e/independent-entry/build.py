@@ -76,12 +76,18 @@ def main():
     parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument("--output", type=Path, required=True, help="new output directory")
     parser.add_argument("--bootstrap-sync", type=Path, help="shared runtime/bootstrap/sync.S")
-    parser.add_argument("--probe-source", type=Path, help="alternative bounded experiment body")
+    probe = parser.add_mutually_exclusive_group()
+    probe.add_argument("--probe-source", type=Path, help="alternative bounded experiment body")
+    probe.add_argument(
+        "--hp39-notebook-stage", action="store_true", help="stage the HP39g+ Notebook in a bitmap"
+    )
     parser.add_argument(
         "--stock-state", action="store_true", help="pass original Saturn state to probe"
     )
     parser.add_argument("--stock-frame", action="store_true", help="also pass saved register frame")
     args = parser.parse_args()
+    if args.hp39_notebook_stage:
+        args.stock_state = True
     if args.stock_frame and not args.stock_state:
         parser.error("--stock-frame requires --stock-state")
     root = args.output.resolve()
@@ -93,6 +99,8 @@ def main():
     inputs["bootstrap-sync.S"] = sync
     if args.probe_source:
         inputs["probe.c"] = args.probe_source.resolve()
+    if args.hp39_notebook_stage:
+        inputs["probe.c"] = source.parent / "independent-pool/hp39-bitmap-probe.c"
     common = [
         str(tool / "clang"),
         "--target=arm-none-eabi",
@@ -104,6 +112,8 @@ def main():
     ]
     if args.stock_state:
         common.append("-DHPCLANG_PROBE_STOCK_STATE")
+    if args.hp39_notebook_stage:
+        common.append("-DHPCLANG_PROBE_NOTEBOOK_STAGE")
     if args.stock_frame:
         common.append("-DHPCLANG_PROBE_STOCK_FRAME")
     for name in ("entry.S", "probe.c", "bootstrap-sync.S"):

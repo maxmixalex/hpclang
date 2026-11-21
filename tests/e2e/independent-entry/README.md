@@ -192,3 +192,11 @@ action dropped the bitmap and completed writeback. The verifier checks both
 2 KiB mappings for every frame against saved SRAM, its bounds inside the
 pixel area and the named Aplet directory. The probe reads page descriptors;
 Notebook execution and stability during moving GC need separate checks.
+
+To stage the HP39g+ Notebook, compile the entry with `--hp39-notebook-stage`.
+Pass its `probe.bin` to the Aplet builder with `--bitmap-pool` and pass the
+45,472-byte raw HPC1 file with `--bitmap-image`. After Stock exits, give the
+SRAM checker the build directory with `--bitmap-pool` and the same HPC1 file
+with `--bitmap-image`. The probe copies the 45,456 code bytes to the first
+12 aligned bitmap pages, zeroes the remaining code-page bytes and reads both
+back. The checker compares the recorded checksum with the supplied HPC1.

@@ -113,7 +113,7 @@ neither a worst-case requirement nor the cost of a different launcher.
 
 | Family | Entry and page source | Stock services and exit | Next independent acceptance gate |
 | --- | --- | --- | --- |
-| HP39 (HP39g+ D1.55 measured) | Production Aplet: **25 / 27** pages. Its 37 frames include two native workspace pages. All 36 candidate RPL slots overlap these frames; the separate native block yields no aligned frame. Independent Aplet entry is unverified. | Production editor and ON return pass. Aplet data access depends on the action frame; no equivalent independent Start/Reset, data-slot or return contract is established. | From a clean Aplet install, enter without the support library; account for application and native workspace simultaneously. Verify save/relaunch, copied-Aplet isolation, Reset, rejected entry and settled return on all three HP39 profiles. |
+| HP39 (HP39g+ D1.55 memory measurements) | Production Aplet: **25 / 27** pages. Its 37 frames include two native workspace pages. All 36 candidate RPL slots overlap these frames. Independent entry found 27 aligned frames inside a stack-held bitmap on D1.55. | Production editor and ON return pass. A library-free probe returned from ARM and wrote back to its named Aplet on all three models. RPL probes also passed copy, Reset and relaunch. | Run the independent Notebook editor, save and reopen a note, and verify copied-Aplet isolation, rejected entry and settled return. Account for the bitmap moving during Stock GC. |
 | HP48 (HP48gII) | Production ARMToolbox48: **27 / 29** pages. A model-specific no-275 entry and RPL return pass locally. KOS supplied one aligned frame. HOME-backed storage moves on insertion, and Stock recomputes a lowered `AVMEM` before it can serve as a persistent fence. Neither approach qualified extra frames. SRAM mirrors add no frames; HP48gII has no Port 1 ERAM. | Production HOME save/retry, Port 0 and settled return have Stock evidence. Independent admission refused the 29-frame request and released the KOS block. The two rejected reservations preserved HOME/Port 0 and stack values after cleanup. | A separate model-4 HPC1 probe now maps 29 aligned pages within its executing program on the 256 KiB machine. The unmapped reservation occupies a single copy in the transfer object. Exercise HOME/Port 0 with live roots and ownership bounds, verify a successful full launch and qualify cleanup on partial assembly and entry failures. |
 | HP49/50 | Both models run the model-specific Notebook without library 275 with all 20 code pages mapped read-only from Port 1. The normal independent entry uses nine aligned KOS pages, including its page tables. Both production packages require **32 / 35** pages for the minimum / observed editor workload. On HP49g+, the 79,168-byte image uses 20 code pages. The earlier observed editor used 13,660 bytes of heap reservation and touched 1,912 of 8,192 stack bytes. | Both original-ROM fixtures save to HOME, return status 1 with a 20 KiB RW budget, release and reacquire the KOS blocks, then reload the saved text on normal launch. A 35-page request also exercises partial allocation, release and simultaneous reacquisition of the same block sizes before Stock return. All four launches pass the GC and settled Stock checks. Stock recalls the distinct Port 0 backup written by the relaunched editor, with the Port 1 code record intact. The editor also exports to a FAT16 card. External readback checks the exported bytes and an existing file. | Exercise remaining native Port services under independent page ownership. |
 
@@ -146,6 +146,14 @@ but GC can move both its address and its within-page pixel offset. A Notebook
 launcher using these pages must end its mappings before Stock can collect,
 or establish a page owner that remains fixed through those calls. Reusing
 the previous physical frame list would address different pixel data.
+
+A separate D1.55 run transferred a 59,207-byte independent Aplet containing
+the HP39g+ Notebook HPC1 image. ENTER kept the source string and destination
+bitmap on the data stack. The ARM probe read back all 45,456 code bytes in
+12 of the 27 verified frames (FNV-1a `8b0d5f8f`) and verified the remaining
+3,696 bytes were zero. After exit, the named Aplet writeback, ARM guards and
+interrupt restoration passed. Changing one expected image byte made the
+checker reject the snapshot. This run stopped before MMU setup or editor entry.
 
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.
