@@ -25,7 +25,8 @@ packaging regression is in #49. The full independent Notebook is still open.
 The [launcher assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19)
 records a 27-page Stock-owned bitmap. On D1.55 the independent Aplet staged
 and verified all 45,456 bytes of Notebook code in 12 of those pages and
-returned to Stock. Editor entry and mappings across moving GC remain open.
+returned to Stock. This result passed locally at `64464caf` and is included
+in the #49 CI submission. Editor entry and mappings across moving GC remain open.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN
