@@ -9,6 +9,7 @@ on `3604db84` passed all 180 host tests, three native Port sanitizer tests,
 the installed SDK on all six models (613 identical release outputs), the
 HP48gII independent Notebook save/relaunch and the strict documentation build.
 [#49](https://github.com/maxmixalex/hpclang/pull/49) carries the combined CI gate.
+On `7e87d081`, [HP39gs Stock dialogs](https://github.com/maxmixalex/hpclang/actions/runs/44940273064/job/136957048225) stopped before application entry after 90 seconds without a Kermit ACK. A local replay with that job's emulator, SDK payload and transfer files passed through Stock return. The source of the transfer stall remains open.
 
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy
