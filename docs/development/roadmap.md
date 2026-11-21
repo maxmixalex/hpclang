@@ -137,6 +137,11 @@ unchanged. Sound compatibility is independent of Port2.
 
 CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 successes; Pages deploy and runtime evidence publication skipped by design). Merged as `e45f8461`; remote main verified. Earlier HP39gs transfer stalls remain unexplained. No post-merge run is claimed.
 
+M8.0 local: on HP49g+ and HP50g, the catalog relocation planner matched
+Stock's complete library catalog after native deletion of a backup preceding
+a registered Port 1 library. The [Port 1 observations](object-service.md)
+record the header movement. Checking attached and executing references remains open.
+
 M8.0 / #47: merged as `516231c5`, whose tree matches accepted head `1cebf08d`.
 CI: 184 successful jobs, including both HP49g+ and HP50g Stock code-relocation
 jobs, and two configured publication skips. Local original-ROM runs at
