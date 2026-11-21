@@ -103,7 +103,7 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame)
     if (!second) {
         volatile u32 *boot = (void *)0x01100000;
         boot[0] = NOTEBOOK_MODEL;
-        boot[1] = 32768;
+        boot[1] = NOTEBOOK_RW_BYTES;
         boot[2] = (u32)map;
         u32 lo, hi;
         if (!rd((void *)map, 0x806f3, 5, &lo) || !rd((void *)map, 0x806f8, 5, &hi) ||
@@ -137,9 +137,9 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame)
         boot[3] = (u32)bounds | 1;
 
         extern int nb_enter(u32, u32);
-        rec[40] = nb_enter(0x01220000 + ENTRY_OFFSET, 0x01108000);
+        rec[40] = nb_enter(0x01220000 + ENTRY_OFFSET, 0x01100000 + NOTEBOOK_RW_BYTES);
         rec[41] = 0x4e424558;
-    } else if (rec[41] != 0x4e424558 || rec[40])
+    } else if (rec[41] != 0x4e424558)
         for (;;) {
         }
     l1[17] = oldrw;
