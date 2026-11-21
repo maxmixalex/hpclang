@@ -140,7 +140,9 @@ CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 succ
 M8.0 local: on HP49g+ and HP50g, the catalog relocation planner matched
 Stock's complete library catalog after native deletion of a backup preceding
 a registered Port 1 library. The [Port 1 observations](object-service.md)
-record the header movement. Checking attached and executing references remains open.
+cover the header movement and a separate attached-library run: both native
+HOME cache pointers matched the C relocation plan on both models. The focused
+host regression passes. General root collection and live execution remain open.
 
 M8.0 / #47: merged as `516231c5`, whose tree matches accepted head `1cebf08d`.
 CI: 184 successful jobs, including both HP49g+ and HP50g Stock code-relocation
