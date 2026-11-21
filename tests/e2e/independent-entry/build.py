@@ -1,4 +1,4 @@
-"""Build the HP50g Stock-to-ARM entry fixture without ARMToolbox.
+"""Build the model-specific Stock-to-ARM entry fixture without ARMToolbox.
 
 This is an entry/return experiment, not an HPC1 application launcher.
 """
@@ -16,7 +16,7 @@ def word(value, width=5):
     return "".join((f"{value >> 4 * i & 15:x}" for i in range(width)))
 
 
-def code_for(size, offset):
+def code_for(size, offset, model="hp50g"):
     if size < 8 or size % 8 or size > 65536:
         raise ValueError("payload must contain 1..8192 complete eight-byte blocks")
     # HP50g SAVE, capture PC, then copy into the program object's reserved RAM.
@@ -26,7 +26,11 @@ def code_for(size, offset):
     code += "80880" + "80881" + "80882" + "135" + "d5"
     code += "34" + word(size // 8 - 1)
     code += "1527" + "1517" + "16f" + "17f" + "ce" + "5fe"
-    code += "af2" + "d9" + "81e" + "25" + "32" + "080" + "20"
+    code += "af2" + "d9" + "81e"
+    if model == "hp48gii":
+        # Translate the main-RAM nibble address before converting it to bytes.
+        code += "da" + "34" + word(0xC8000) + "c2"
+    code += "25" + "32" + "080" + "20"
     # ARMSYS followed by Stock RESTORE and RPL return; no library call.
     code += "80bfe" + "8f" + word(0x67D2) + "142164808c"
     return code
@@ -35,6 +39,7 @@ def code_for(size, offset):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True, help="LLVM bin directory")
+    parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument("--output", type=Path, required=True, help="new output directory")
     parser.add_argument("--bootstrap-sync", type=Path, help="shared runtime/bootstrap/sync.S")
     parser.add_argument("--probe-source", type=Path, help="alternative bounded experiment body")
@@ -107,7 +112,8 @@ def main():
 
     blob = (root / "probe.bin").read_bytes()
     blob += bytes((-len(blob)) % 8)
-    code = code_for(len(blob), len(code_for(len(blob), 0)) - 13)
+    offset = len(code_for(len(blob), 0, args.model)) - 13
+    code = code_for(len(blob), offset, args.model)
     payload = "".join(f"{b & 15:x}{b >> 4:x}" for b in blob)
     reserve = len(payload) + 7
     body = code + payload + "0" * reserve
@@ -139,7 +145,8 @@ def main():
         )
     )
     manifest = {
-        "scope": "HP50g independent entry and return only",
+        "scope": "Independent entry and return only",
+        "model": args.model,
         "inputs": {
             name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in inputs.items()
         },

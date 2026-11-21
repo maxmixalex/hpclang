@@ -78,7 +78,7 @@ def build(dest, toolchain, profile):
             out,
             dest / package,
             toolchain,
-            profile["model"],
+            profile,
             size,
             checksum,
             offset,
@@ -90,13 +90,13 @@ def build(dest, toolchain, profile):
 
 
 def build_runner(
-    out, package, toolchain, model_id, size, checksum, offset, rw_bytes, expected_status
+    out, package, toolchain, profile, size, checksum, offset, rw_bytes, expected_status
 ):
     parts = []
     for phase in ("acquire", "check"):
         source = out / (phase + ".c")
         source.write_text(
-            f"#define NOTEBOOK_MODEL {model_id}u\n"
+            f"#define NOTEBOOK_MODEL {profile['model']}u\n"
             f"#define NOTEBOOK_RW_BYTES {rw_bytes}u\n"
             f"#define NOTEBOOK_EXPECTED_STATUS {expected_status}u\n"
             f"#define IMAGE_BYTES {size}u\n"
@@ -108,6 +108,8 @@ def build_runner(
             [
                 sys.executable,
                 E2E / "independent-entry/build.py",
+                "--model",
+                profile["target"],
                 "--toolchain",
                 toolchain,
                 "--stock-state",

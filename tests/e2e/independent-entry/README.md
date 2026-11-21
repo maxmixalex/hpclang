@@ -1,4 +1,4 @@
-# Independent HP50g entry fixture
+# Independent classic Stock entry fixture
 
 This fixture builds a Stock RPL program that enters ARM code without
 ARMToolbox/library 275, calls freestanding C using a program-owned 4 KiB stack
@@ -11,6 +11,10 @@ Build with the project's ATFE 22.1.0 toolchain (LLVM tools in `bin`):
 python3 tests/e2e/independent-entry/build.py \
   --toolchain /path/to/atfe/bin --output /tmp/independent-entry
 ```
+
+The default is HP50g. Select `--model hp48gii` for the 256 KiB Stock
+main-RAM address translation, or `--model hp49gplus` for HP49g+.
+The snapshot verifier uses the build manifest to select SRAM and ROM checks.
 
 The output directory must not exist. `program.HP` is the transfer artifact;
 `probe.elf`, `probe.bin` and `metadata.json` describe its ARM payload and reserved
@@ -29,7 +33,7 @@ checks their input/output manifests and compares all five emitted release/debug
 artifacts byte for byte. Temporary sources and builds are removed on completion
 or failure. This gate needs no ROM and does not replace Stock execution checks.
 
-The Saturn encoder uses HP50g SAVE/RESTORE addresses and the SRAM physical
+The Saturn encoder uses Stock SAVE/RESTORE addresses and the selected SRAM
 mapping. It copies the ARM payload into aligned storage reserved inside the
 program object. The entry saves registers and uses the shared
 `runtime/bootstrap/sync.S` SWI helpers to mask IRQ/FIQ before entering C and
