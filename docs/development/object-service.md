@@ -1054,6 +1054,25 @@ following library. Their caller must establish reference safety; they are not
 yet connected to the public write API. Host/sanitizer tests cover growth,
 shrinkage, same-size replacement, removal, CRC damage, I/O failure and bounds.
 
+On HP49g+ and HP50g Stock 2.15, a native Port 1 test stored integer 456
+as `:1:BEFORE`, then installed library 123 (title X) immediately after it.
+The backup occupied 50 nibbles. Across warmstart the library header stayed
+at Saturn address `0x40042`. Stock's `:1:BEFORE PURGE` moved the intact
+library to ERAM offset zero and updated its catalog header to `0x40010`.
+Its switch stayed `0x23c21`, the entry read from the ROM ERAM switch table.
+With ERAM coordinates relative to `0x40000`, the C catalog relocation planner
+matched every field of the 62 resulting catalog records on both models.
+Flash was unchanged. The library had no HOME attachment and Stock rejected
+`123 ATTACH` for this fixture. A second run used ARMToolbox library 275. Stock attached it to HOME during
+warmstart. Purging the same preceding backup left both HOME fields pointing
+to their original main-RAM ACPTRs. The payloads of those two pointers moved
+from `0x40321` and `0x400ab` to `0x402ef` and `0x40079`. The library header
+moved from `0x40094` to `0x40062`. Both models preserved the switch words,
+library bytes and Flash. The C ACPTR resolver and relocation planner reproduced
+both payload updates from the saved states. The Port 1 host regression checks
+this two-pointer case. Other live references, including suspended execution,
+still need coverage before public editing.
+
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
 preserve this difference from HP49g+/HP50g rather than fabricating three ports
