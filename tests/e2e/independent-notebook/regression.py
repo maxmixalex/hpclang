@@ -286,6 +286,13 @@ def main():
     assert staged[0x21000 : 0x21000 + len(image)] == image
     font = ui["font_rows"](ROOT / "runtime/fonts/generated/newrpl_6a.S")
     hashes = {}
+    card = dest / "notebook.img"
+    media = runpy.run_path(str(ROOT / "tools/e2e-stock-media.py"))
+    files = {
+        "initial_files": {"KEEP.TXT": "Retained card content\n"},
+        "expected_files": {"HPCNOTE.TXT": "202\n"},
+    }
+    media["prepare"](files, card)
     source = "setup"
     save_keys = "4300 tap two\n4900 tap zero\n5500 tap down\n6200 tap enter\n7600 capture saved\n"
     for name, program, package, editor in (
@@ -299,12 +306,11 @@ def main():
                 "3500 capture editor\n" + (save_keys if name == "save" else "") + "8500 tap on\n"
             )
         if name == "reload":
-            # Leave HOME unchanged and back up a distinct edit through the UI.
-            # Focus moves from the editor past Save, Reload, Clock and Export.
+            # Move past Save, Reload and Clock to export the edit, then back it up to Port 0.
             actions = (
                 "3500 capture editor\n4300 tap two\n"
-                + "".join(f"{5000 + 700 * i} tap down\n" for i in range(5))
-                + "9000 tap enter\n11500 tap on\n"
+                + "".join(f"{5000 + 700 * i} tap down\n" for i in range(4))
+                + "8000 tap enter\n9200 tap down\n10100 tap enter\n12300 tap on\n"
             )
         transfer(
             spec,
@@ -318,6 +324,7 @@ def main():
             remote_commands=[f"HOME '{program}' RCL CKCOPY"],
             actions=actions + "15000 capture returned\n",
             execution_ms=18000,
+            sd_image=card if name == "reload" else None,
         )
         hashes[name] = {
             "editor": editor,
@@ -327,6 +334,8 @@ def main():
             ),
         }
         source = name
+    media["verify"](files, card)
+    hashes["reload"]["export"] = files["expected_files"]
     hashes["low-memory"].update(exit_status=1, rw_bytes=20480)
     recall = dest / "port0-recall"
     transfer(

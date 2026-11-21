@@ -10,8 +10,8 @@ on `5898f704`, including HP50g independent persistence and installed SDK checks.
 
 M8.6 local verification on HP49g+ and HP50g covers independent Notebook
 launch from original ROM, saving `20` in HOME, a low-memory application exit
-and normal relaunch from that state. Notebook backs up an edit to Port 0;
-Stock recalls `202` while HOME retains `20`. Both fixtures check lease
+and normal relaunch from that state. Notebook exports the edit to a FAT16 card
+and backs it up to Port 0. Both contain `202` while HOME retains `20`. Both fixtures check lease
 release, GC and settled Stock return. HP39 Aplet entry, HP48gII application-sized
 allocation and wider native services remain open.
 

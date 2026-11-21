@@ -1,7 +1,7 @@
 # HP49g+ and HP50g independent Notebook save and relaunch
 
 Run from the repository with the pinned ATfE toolchain, prepared x50ng bundle,
-Kermit and socat. Use a new output directory:
+Kermit, socat, dosfstools and mtools. Use a new output directory:
 
 ```sh
 dist="$PWD/build/x50ng/dist"
@@ -29,12 +29,14 @@ memory advertised to the runtime, including its 8 KiB stack. Notebook returns
 checks every KOS release, reallocates and releases equivalents, then checks
 the application status. A distinct RPL result identifies this failure run.
 
-The last application launch uses the state left by the failure and recalls the original
-32 KiB program. It must show `20` in the editor. Key events append another `2`, activate
-the Port 0 backup button and exit normally. A fresh Stock session recalls
-`:0:HPCNOTE` and verifies that the backup contains `202` while HOME retains
-`20`. The verifier
-checks the versioned HOME string, GC witness, RPL return and two settled Stock
-frames in all three processes. It independently checks editor pixels on the
-two successful launches. See `report.json` for the phase results. The GC
-witness runs after application exit while the leases are still held.
+On relaunch the original 32 KiB program must show `20` in the editor.
+Key events append a second `2`, export the edit to the FAT16 card, activate
+the Port 0 backup button and exit. A fresh Stock session recalls `:0:HPCNOTE`.
+The backup must contain `202` and HOME must still contain `20`. The card
+verifier reads `HPCNOTE.TXT` and a pre-existing file and checks their bytes.
+
+The Stock verifier checks the versioned HOME string, GC witness, RPL return
+and two settled Stock frames after each application exit. It also checks the
+editor pixels on the two successful launches. The GC witness runs after
+application exit while the leases are still held. See `report.json` for the
+phase results.

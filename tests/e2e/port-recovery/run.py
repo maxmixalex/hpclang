@@ -127,6 +127,7 @@ def transfer(
     execution_ms=17000,
     actions="",
     extra_files=(),
+    sd_image=None,
 ):
     if execution_ms < 2000:
         raise ValueError("Execution budget must allow the final checkpoint")
@@ -171,7 +172,8 @@ def transfer(
         recovery / "socat.log",
     ) as bridge:
         wait_for(lambda: xtty.exists() and ktty.exists(), [bridge], 10, "PTY creation")
-        with emulator(args, recovery, sequence, usb=xtty, power_cut=power_cut) as child:
+        extra = [f"--sd-dir={sd_image}"] if sd_image is not None else []
+        with emulator(args, recovery, sequence, extra, usb=xtty, power_cut=power_cut) as child:
             wait_for(
                 lambda: (recovery / "stock-server-usb.pgm").exists(),
                 [bridge, child],

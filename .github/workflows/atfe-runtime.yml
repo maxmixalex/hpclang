@@ -35,6 +35,7 @@ on:
       - "tools/build-e2e.sh"
       - "tools/build-launchers.py"
       - "tools/install-ci-packages.sh"
+      - "tools/e2e-stock-media.py"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/prepare-hp39-aplet.py"
@@ -86,6 +87,7 @@ on:
       - "tools/build-e2e.sh"
       - "tools/build-launchers.py"
       - "tools/install-ci-packages.sh"
+      - "tools/e2e-stock-media.py"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/prepare-hp39-aplet.py"
@@ -128,6 +130,8 @@ jobs:
           lfs: true
       - uses: ./.github/actions/setup-atfe
       - uses: ./.github/actions/setup-x50ng
+      - name: Install FAT image tools
+        run: bash tools/install-ci-packages.sh dosfstools mtools
       - name: Run original-ROM regression from fresh firmware
         run: |
           dist="$GITHUB_WORKSPACE/build/x50ng/dist"
