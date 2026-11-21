@@ -15,10 +15,15 @@ from run import completed, emulator, transfer  # noqa: E402
 from verify import home_string  # noqa: E402
 
 
-def check_editor(phase, initial):
+def check_editor(phase, initial, *, repeat_save=False):
     ui = runpy.run_path(str(E2E / "notebook/verify.py"))
     font = ui["font_rows"](E2E.parents[1] / "runtime/fonts/generated/newrpl_6a.S")
-    for name, text in (("editor", initial), ("typed", initial + "20")):
+    frames = [("editor", initial, True), ("typed", initial + "20", True)]
+    if repeat_save:
+        frames.extend(
+            [("first-save", initial + "20", False), ("second-save", initial + "202", False)]
+        )
+    for name, text, focused in frames:
         path = phase / f"stock-{name}.pgm"
         magic, dims, limit, pixels = path.read_bytes().split(b"\n", 3)
         width, height = map(int, dims.split())
@@ -32,7 +37,9 @@ def check_editor(phase, initial):
             raise ValueError(f"unexpected HP48gII display capture: {path}")
         pixels = b"".join(pixels[row * width : row * width + 131] for row in range(height))
         ui["check_line"](pixels, font, 0, "Notebook", path)
-        ui["check_line"](pixels, font, 24, text, path, focused=True)
+        ui["check_line"](pixels, font, 24, text, path, focused=focused)
+        if not focused:
+            ui["check_line"](pixels, font, 32, "Saved; exit normally", path)
     returned = (phase / "stock-returned.pgm").read_bytes()
     if returned != (phase / "stock-checkpoint.pgm").read_bytes():
         raise ValueError("Stock display did not settle after Notebook exit")
@@ -95,11 +102,13 @@ def main():
         spec, out / "clean", "2000 tap f6\n4000 tap f6\n7000 capture home\n9000 finish-install\n"
     ) as child:
         completed(child, 90)
+    type_digits = "3500 capture editor\n4300 tap two\n4900 tap zero\n6000 capture typed\n"
+    save = "6600 tap down\n7300 tap enter\n"
     actions = ""
     if args.notebook:
         actions = (
-            "3500 capture editor\n4300 tap two\n4900 tap zero\n6000 capture typed\n"
-            + ("6600 tap down\n7300 tap enter\n9500 tap on\n" if args.port0 else "8500 tap on\n")
+            type_digits
+            + (save + "9500 tap on\n" if args.port0 else "8500 tap on\n")
             + "14000 capture returned\n"
         )
     transfer(
@@ -128,6 +137,13 @@ def main():
                 "wrap_docstr"
             ]
             (artifact / "NOTE.HP").write_bytes(wrap(seed))
+        resume_actions = actions
+        if args.port0:
+            resume_actions = (
+                type_digits + save + "9500 capture first-save\n"
+                "10200 tap up\n11000 tap two\n11800 tap down\n12600 tap enter\n"
+                "14700 capture second-save\n15500 tap on\n19500 capture returned\n"
+            )
         transfer(
             spec,
             out / "resume",
@@ -137,11 +153,12 @@ def main():
             installed=True,
             remote_commands=["-95 CF HOME :0:ENTRY48 RCL"] if args.port0 else None,
             extra_files=[] if args.port0 else [("NOTE.HP", "HPCNOTE")],
-            actions=actions,
+            actions=resume_actions,
+            execution_ms=23000 if args.port0 else 17000,
         )
-        check_editor(out / "resume", "20" if args.port0 else "314")
+        check_editor(out / "resume", "20" if args.port0 else "314", repeat_save=args.port0)
         snapshot = out / "resume/state"
-        check_home_note(snapshot, b"hpclang-notebook/1\n2020" if args.port0 else seed)
+        check_home_note(snapshot, b"hpclang-notebook/1\n20202" if args.port0 else seed)
         subprocess.run(
             [
                 sys.executable,

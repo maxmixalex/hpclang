@@ -6,21 +6,14 @@ Accepted main: `002fb5e3` ([#53](https://github.com/maxmixalex/hpclang/pull/53))
 [#50](https://github.com/maxmixalex/hpclang/pull/50) records production Notebook
 release acceptance.
 
-M8.6 local verification on HP49g+ and HP50g covers independent Notebook
-launch from original ROM, saving `20` in HOME, a low-memory application exit
-and normal relaunch from that state. Notebook exports the edit to a FAT16 card
-and backs it up to Port 0. Both contain `202` while HOME retains `20`.
-All 20 code pages map directly from Port 1, reducing aligned KOS usage from
-21 to nine pages on normal launch. When a 35-page request is only partly
-satisfied, the loader releases the blocks and returns to Stock. Both models
-check reacquisition, GC and relaunch from that state. On HP48gII, the independent launcher runs the installed SDK Notebook in 29 pages.
-In the Port 0 variant, the application created a HOME note containing `20`,
-then loaded it in a second Stock process and saved `2020`. Both snapshots
-verified the note, normal return, backup CRC, mappings and moving GC after
-exit. All 20 corrupted snapshots were rejected. The HOME-resident variant
-continues to read Stock-written notes. These results passed locally and are
-submitted for CI in [#54](https://github.com/maxmixalex/hpclang/pull/54).
-GC during active ARM execution, HP39 Aplet entry and wider native services remain open.
+M8.6: HP49g+ and HP50g independent Notebook save, low-memory exit and Port 0
+backup are accepted on main. FAT16 export and HP48gII HOME creation and
+replacement are in [#54](https://github.com/maxmixalex/hpclang/pull/54).
+An HP48gII local follow-up exercises two saves during the second launch of
+the Port 0 Notebook. It checks both save messages, the final HOME note,
+the resident backup CRC, the restored mappings and moving GC after exit.
+HP39/40 SDK Aplet packaging is in #56. HP39 independent entry, active-execution
+GC and wider native services remain open.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.

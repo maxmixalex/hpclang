@@ -56,7 +56,9 @@ record the lower address and verify the tag at that location. This HOME-resident
 With both `--notebook` and `--port0`, the runner installs the Notebook as
 the first Port 0 backup named `ENTRY48` and recalls that same program twice.
 On the first launch the editor creates a HOME note containing `20`. On the
-second launch it reads that note and replaces it with `2020`. Each exit
+second launch it reads that note, saves `2020`, returns to the editor and
+saves `20202` before exiting. The two save captures check the edited text
+and the success message. Each exit
 checks the versioned HOME bytes directly in the Stock snapshot. The loader
 checks the Stock map and its executing Port 0 record before passing the live
 RPL stack bounds and saved return PC to the runtime. Port 0 remains read-only
