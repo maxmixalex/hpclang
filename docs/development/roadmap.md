@@ -2,7 +2,7 @@
 
 Current checkpoint: 2026-11-23. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `bd118262`. [#60](https://github.com/maxmixalex/hpclang/pull/60)
+Accepted main is `dd4f8d8a` after the [#65](https://github.com/maxmixalex/hpclang/pull/65) roadmap merge. [#60](https://github.com/maxmixalex/hpclang/pull/60)
 merged the installed HP49g+/HP50g independent Notebook packages after 197 checks
 passed and two skipped. Both Stock runs preserved the caller's RPN stack on
 save and reopen. [#59](https://github.com/maxmixalex/hpclang/pull/59) previously
@@ -12,22 +12,35 @@ merged the direct Port 1 stack guard.
   blocks edits that would invalidate a direct data-stack reference. [#61](https://github.com/maxmixalex/hpclang/pull/61)
   and [#63](https://github.com/maxmixalex/hpclang/pull/63) extend internal Port 1
   edits to remove and replace an owned, unregistered header-only library.
-  #63 at `496dbe23` checks configured Stock roots and both fields of top-level
-  data-stack ACPTRs. Host tests, focused sanitizers and both Stock ROM regressions
-  passed locally. #61 targets main; #61 and #63 await remote acceptance.
-  [#66](https://github.com/maxmixalex/hpclang/pull/66) at `c8478724` scans trailing
-  deleted Port 2 records and stages sector images. Local simulated Flash passed
-  interrupted erase, replay and reuse across a two-sector suffix. CI is pending.
-  Nested references, remaining execution roots, public library management
+  #63 checks configured Stock roots, ACPTRs, nested lists and tagged objects.
+  [#70](https://github.com/maxmixalex/hpclang/pull/70) also checks stack programs,
+  symbolic objects, units and matrices. All 180 host tests and the focused sanitizer
+  check passed locally. A program reference blocked replacement without changing
+  Port 1 on the HP49g+ and HP50g Stock emulators; both passed two relaunches.
+  #61, #63 and #70 await remote acceptance.
+  [#66](https://github.com/maxmixalex/hpclang/pull/66) at `e58a7132` plans append space across six banks,
+  preferring erased tails, then the fitting deleted suffix spanning the fewest
+  sectors. All 180 host tests passed locally, including interrupted erase and reuse.
+  HP49g+ and HP50g Stock snapshots retained the same slot; 16-bit reads per scan
+  fell from 1,570,009 to 549,433. Remote acceptance is pending.
+  Other reference paths, remaining execution roots, public library management
   and Port 2 installation, recovery and space reclamation remain open.
 - **M8.6 applications and release.** [#60](https://github.com/maxmixalex/hpclang/pull/60)
-  is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) now targets
-  main for the smaller HP48gII transfer, and [#64](https://github.com/maxmixalex/hpclang/pull/64)
-  compares all six launchers. Local measurements support retaining the
-  production SDK defaults. #64 at `a10d9aa9` covers Port 1 install-offset changes and
-  live KOS allocation measurements. Both models used 45,096 bytes in the editor
-  locally. Remote acceptance, peak resident memory, GC with
-  live native mappings, and final release acceptance remain open.
+  is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) reduces the HP48gII
+  Port 0 transfer to 122,333 bytes. Its HP39g+ emulator-setup timeout was requeued.
+  [#64](https://github.com/maxmixalex/hpclang/pull/64) compares startup on six models;
+  the production launchers remain the SDK defaults. The HP48gII Port 0 backup used
+  244,683 nibbles, including its 102,400-byte pool. On HP49g+ and HP50g the editor's
+  KOS blocks and Port 1 backup totaled 130,691 bytes. The Stock stack gap matched AVMEM.
+  [#67](https://github.com/maxmixalex/hpclang/pull/67) passed its remote installed-SDK check;
+  Windows and Linux produced identical archives locally. [#68](https://github.com/maxmixalex/hpclang/pull/68)
+  corrects live heap measurement on all six ROMs. Both PRs await full CI.
+  [#69](https://github.com/maxmixalex/hpclang/pull/69) combines #64 and #68. In all four HP49g+/HP50g save and
+  reopen runs, allocator returns showed 45,096 additional KOS bytes at peak and
+  Stock recovered all of them on exit. Both full local regressions passed; combined CI is pending.
+  On all three HP39/40 Stock emulators, local Save, Reset and copy runs verified
+  112,619–112,651 bytes for two saved Notebook entries and an 86,026-byte editor bitmap.
+  Other resident-memory costs, collection during active mappings and release acceptance remain open.
   [Launcher measurements](https://github.com/maxmixalex/hpclang/blob/aaca2595692db5608ac6d11bd43513b77895faba/docs/development/architecture.md#notebook-first-install-transfer-size)
   · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
 - **M8.1–M8.5** are accepted. Their regression requirements remain in the stage table below.
