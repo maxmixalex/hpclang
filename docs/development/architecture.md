@@ -401,7 +401,7 @@ six-model installed-SDK packaging and supported Stock workflows before proposing
 retirement. A successful probe build or a zero-extra-frame observation alone
 does not decide the outcome for a new layout.
 
-The [roadmap measurements](roadmap.md#current-work-balanced-m8-delivery) name
+The [November frame measurements](https://github.com/maxmixalex/hpclang/blob/119a779dd712d5f9937d4204cf7a837206a8e17e/docs/development/roadmap.md#current-work-balanced-m8-delivery) name
 the local per-frame reports and distinguish them from CI acceptance. The
 `tests/e2e/independent-hpc1` and `tests/e2e/independent-pool` fixture READMEs
 identify the independent execution and negative checks.

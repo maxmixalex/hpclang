@@ -78,6 +78,26 @@ int hpclang_rpl_stack_depth(const struct hpclang_rpl_reader *reader, uint32_t *d
     return stack_bounds(reader, NULL, depth);
 }
 
+int hpclang_rpl_stack_direct_overlap(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                     uint32_t end)
+{
+    if (first >= end || end > RPL_SATURN_MAX + 1u)
+        return HPCLANG_RPL_STACK_MALFORMED;
+    uint32_t top, depth;
+    int result = stack_bounds(reader, &top, &depth);
+    if (result)
+        return result;
+    for (uint32_t i = 0; i < depth; ++i) {
+        uint32_t target;
+        result = read_word5(reader, top + i * 5u, &target);
+        if (result)
+            return result;
+        if (target >= first && target < end)
+            return 1;
+    }
+    return 0;
+}
+
 int hpclang_rpl_stack_object_address(const struct hpclang_rpl_reader *reader, uint32_t level,
                                      uint32_t *object_address)
 {

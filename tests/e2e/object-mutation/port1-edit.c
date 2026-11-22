@@ -6,6 +6,7 @@
 #include "rpl-backup.h"
 #include "rpl-port.h"
 #include "rpl-port-mutation.h"
+#include "rpl-stack-view.h"
 #include "rpl-stock-memory.h"
 #include "saturn-view.h"
 
@@ -14,12 +15,18 @@ static const uint8_t first_name[] = "HPCE1A", tail_name[] = "HPCE1B";
 struct owned_tail
 {
     uint32_t first, end, calls;
-    int blocked;
+    uint32_t test_stack_slot, test_stack_target;
 };
 
 static int stock_nibble(void *context, uint32_t address, uint8_t *value)
 {
-    (void)context;
+    const struct owned_tail *owned = context;
+    /* Overlay one slot only for the live-reference refusal test. */
+    if (owned && owned->test_stack_slot && address >= owned->test_stack_slot &&
+        address - owned->test_stack_slot < 5u) {
+        *value = (owned->test_stack_target >> (4u * (address - owned->test_stack_slot))) & 15u;
+        return 1;
+    }
     return hpclang_saturn_read_nibble(hpclang_saturn_address_make(address), value);
 }
 
@@ -33,7 +40,7 @@ static int check_owned_tail(void *context, uint32_t first, uint32_t end)
     if (first < owned->first || first >= end || end > owned->end)
         return HPCLANG_RPL_MUTATION_MALFORMED;
     /* These HP49g+/HP50g Stock 2.15 fixtures use the ROM ERAM switch at 0x26c39. */
-    const struct hpclang_rpl_reader stock = {stock_nibble, NULL};
+    const struct hpclang_rpl_reader stock = {stock_nibble, owned};
     uint32_t selector = 0, home = 0;
     for (unsigned i = 0; i < 5; ++i) {
         uint8_t nibble;
@@ -53,7 +60,11 @@ static int check_owned_tail(void *context, uint32_t first, uint32_t end)
     int cache = hpclang_rpl_port1_home_overlap(&stock, home, 0x100000u - home, first, end);
     if (cache < 0)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
-    return owned->blocked || overlap || cache ? HPCLANG_RPL_MUTATION_BUSY : HPCLANG_RPL_MUTATION_OK;
+    /* A direct address in the bank window may designate ERAM. */
+    int stack = hpclang_rpl_stack_direct_overlap(&stock, 0x40000u + first, 0x40000u + end);
+    if (stack < 0)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    return overlap || cache || stack ? HPCLANG_RPL_MUTATION_BUSY : HPCLANG_RPL_MUTATION_OK;
 }
 
 static int chain_end(const struct hpclang_rpl_reader *reader, uint32_t *end)
@@ -116,6 +127,14 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
     struct owned_tail owned = {0};
     const struct hpclang_rpl_port1_guard guard = {check_owned_tail, &owned};
     unsigned step = 0;
+    const struct hpclang_rpl_reader stock = {stock_nibble, NULL};
+    uint32_t level_one;
+    /* The original calculator stack may be empty. Own one real slot for the probe. */
+    if (hpclang_stack_push_boolean(1))
+        return 0x1e0u;
+    if (hpclang_rpl_stack_object_address(&stock, 1, &level_one) ||
+        hpclang_rpl_stack_direct_overlap(&stock, level_one, level_one + 1u) != 1)
+        goto done;
     if (!hpclang_rpl_stock_port1_mutation_io(&io, &limit))
         goto done;
     const struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
@@ -153,9 +172,15 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
             uint32_t before;
             if (!fingerprint(&reader, owned.end + 6u, &before))
                 goto done;
-            owned.blocked = 1;
+            for (unsigned i = 0; i < 5; ++i) {
+                uint8_t nibble;
+                if (!stock_nibble(NULL, 0x806f8u + i, &nibble))
+                    goto done;
+                owned.test_stack_slot |= (uint32_t)nibble << (4u * i);
+            }
+            owned.test_stack_target = 0x40000u + owned.first;
             result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
-            owned.blocked = 0;
+            owned.test_stack_slot = 0;
             if (result != HPCLANG_RPL_MUTATION_BUSY ||
                 !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
                 goto done;
@@ -179,10 +204,11 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
     free(packed);
     hpclang_object_release(value);
     hpclang_object_release(tail);
-    return 0;
+    return hpclang_stack_drop(1) ? 0x1e8u : 0;
 done:
     free(packed);
     hpclang_object_release(value);
     hpclang_object_release(tail);
+    hpclang_stack_drop(1);
     return 0x1e0u + step;
 }
