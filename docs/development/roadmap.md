@@ -22,7 +22,7 @@ merged the direct Port 1 stack guard.
   and Port 2 installation, recovery and space reclamation remain open.
 - **M8.6 applications and release.** [#60](https://github.com/maxmixalex/hpclang/pull/60)
   is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) now targets
-  main for the smaller HP48gII transfer, and [#64](https://github.com/maxmixalex/hpclang/pull/64)
+  main for the 122,333-byte HP48gII Port 0 transfer (16 KiB smaller), and [#64](https://github.com/maxmixalex/hpclang/pull/64)
   compares all six launchers. Local measurements support retaining the
   production SDK defaults. #64 at `a10d9aa9` covers Port 1 install-offset changes and
   live KOS allocation measurements. Both models used 45,096 bytes in the editor

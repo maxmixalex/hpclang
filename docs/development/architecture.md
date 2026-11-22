@@ -223,6 +223,46 @@ replacement (`Seed42` to `Seed4220`). In each, the Save button reported
 SRAM contained the same serialized string in the named Aplet. Application
 return, IRQ/FIQ, SWI vector, L1 restoration and return to the library passed.
 
+#### Notebook first-install transfer size
+
+On 2026-11-22, the installed SDK from `a26cde72` built Notebook in
+`MinSizeRel` with ATfE 22.1.0 for each model. For each row, the production
+and independent packages contained the same model-specific application bytes.
+The totals count the calculator transfer files for a fresh installation,
+including Stock support files. The independent builds use the variants that
+can save a note.
+
+| Model | Production files | Production bytes | Independent files | Independent bytes | Extra bytes on first install |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HP39g+ | 5 | 51,911 | 4 | 56,530 | 4,619 |
+| HP39gs | 5 | 51,919 | 4 | 56,514 | 4,595 |
+| HP40gs | 5 | 51,915 | 4 | 56,522 | 4,607 |
+| HP48gII | 2 | 65,528 | 1 | 138,717 | 73,189 |
+| HP49g+ | 2 | 82,637 | 3 | 108,303 | 25,666 |
+| HP50g | 2 | 82,617 | 3 | 108,303 | 25,686 |
+
+The HP39/40 totals include the Aplet, two directory records and Reset. The
+production bundle also carries the 1,489-byte `LIB275L.000`. Its Aplet name
+was `Notebook`; the independent target uses `EntryProbe`. On HP48gII, the
+2,404-byte ARMToolbox48 library is a one-time production install. The single
+independent Port 0 program includes its writable arena in the transfer.
+On HP49g+/HP50g, production's 7,673-byte `SETUP.BIN` is shared across apps.
+The empty-Port-1 independent package consists of the 22,275-byte launcher,
+16-byte copy helper and 86,012-byte aligned code string. An occupied Port 1
+can change the required padding.
+
+After this baseline, the HP48gII Notebook builder reduced its writable
+reservation from twelve pages to eight. The observed editor heap used 9,924
+bytes. The new budget includes 12 KiB for that workload, the boot page,
+static data and the full 8 KiB stack. Larger static images can still use
+up to twelve writable pages. The same Notebook image now transfers in a
+122,333-byte Port 0 program, saving 16,384 bytes and leaving a 56,805-byte
+difference from the production first install.
+
+All six independent first installs transferred more bytes. HP39/40 and
+HP48gII each needed one fewer file. The remaining cost comparisons are peak
+resident RAM and time from launch to a usable editor.
+
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.
 Demonstrate disjoint storage for code, RW, stage, MMU and required native
@@ -246,7 +286,7 @@ This is an implementation assessment, not additional native execution evidence.
 | Family | Existing contract and consequence for an owned launcher |
 | --- | --- |
 | HP39g+/39gs/40gs | `runtime/core/hp39-aplet-frame.c` recognizes the Aplet `_Action` instruction sequence, including the library-275 `xPrRUN` ROMPTR, before exposing the custom-data slot. `tools/prepare-hp39-aplet.py` also installs Start/Reset views and restores the caller's program context around Reset. A new entry must provide an explicit equivalent Aplet data/return contract; replacing the ARM jump alone would leave persistence unavailable. Keep save/relaunch, copied-Aplet isolation and Reset in the comparison. |
-| HP48gII | `platform/armtoolbox/stage0.S` consumes the launcher's pool count and L2 table, rejects insufficient space before changing mappings, and releases its optional KOS allocation on both rejection and return. The independent model-4 launcher maps all 29 pages and runs the installed SDK Notebook editor. A fresh Stock boot accepted keyboard input and returned on ON. A trailer beyond the mapped pages records the code location relative to the Stock object in nibbles. After Stock stored a HOME note and moved the program, a second process recalled it and Notebook read the note. Each exit now runs Stock GC and checks a relocated tagged temporary. The independent Port 0 variant provides checked RPL bounds, keeps its own port read-only and saves HOME from the application. A second Stock process loads and replaces that note. Active-execution GC remains open. |
+| HP48gII | `platform/armtoolbox/stage0.S` consumes the launcher's pool count and L2 table, rejects insufficient space before changing mappings, and releases its optional KOS allocation on both rejection and return. The independent model-4 probe maps 29 pages. The installed SDK Notebook editor now runs with 25 pages. A fresh Stock boot accepted keyboard input and returned on ON. A trailer beyond the mapped pages records the code location relative to the Stock object in nibbles. After Stock stored a HOME note and moved the program, a second process recalled it and Notebook read the note. Each exit now runs Stock GC and checks a relocated tagged temporary. The independent Port 0 variant provides checked RPL bounds, keeps its own port read-only and saves HOME from the application. A second Stock process loads and replaces that note. Active-execution GC remains open. |
 | HP49g+/HP50g | `tests/e2e/independent-hpc1/loader.c` supplies one code page and four RW pages from its fixed arena, but sets both `saturn_state` and `platform_cookie` to zero. It proves the common HPC1 bootstrap boundary, not the native object/port services used by Notebook. Supplying those services requires a captured Stock context and equivalent relocation/allocation boundaries before the application comparison is meaningful. |
 
 Across families, `platform/armtoolbox/stage1.c` derives main/Port1 allocation

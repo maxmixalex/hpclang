@@ -17,11 +17,17 @@ def verify(artifact, state, baseline):
     require(model in ("hp48gii", "hp49gplus", "hp50g"), "unsupported fixture model")
     model_id = {"hp48gii": 4, "hp49gplus": 5, "hp50g": 6}[model]
     pages = manifest.get("pool_pages", 6)
-    require(pages == 6 or (model == "hp48gii" and pages == 29), "unsupported arena layout")
-    wide_pool = pages == 29
-    code_pages, rw_pages = (16, 12) if wide_pool else (1, 4)
-    rw_bytes = 4096 * rw_pages
     notebook = manifest.get("application") == "notebook"
+    wide_pool = pages != 6
+    if wide_pool:
+        require(
+            model == "hp48gii" and (25 <= pages <= 29 if notebook else pages == 29),
+            "unsupported HP48gII arena layout",
+        )
+        code_pages, rw_pages = 16, pages - 17
+    else:
+        code_pages, rw_pages = 1, 4
+    rw_bytes = 4096 * rw_pages
     rom_hash = module["ROM_SHA256_BY_MODEL"][model]
     for name, expected in manifest["outputs"].items():
         require(Path(name).name == name, "invalid artifact path")
