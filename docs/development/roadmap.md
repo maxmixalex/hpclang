@@ -2,24 +2,31 @@
 
 Current checkpoint: 2026-11-23. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `7b37cafb`. [PR #59](https://github.com/maxmixalex/hpclang/pull/59)
-merged the Port 1 data-stack reference check after 190 checks passed and two skipped.
-[PR #58](https://github.com/maxmixalex/hpclang/pull/58)
-merged named Port 1 Notebook lookup after 190 checks passed and two skipped.
+Accepted main is `bd118262`. [#60](https://github.com/maxmixalex/hpclang/pull/60)
+merged the installed HP49g+/HP50g independent Notebook packages after 197 checks
+passed and two skipped. Both Stock runs preserved the caller's RPN stack on
+save and reopen. [#59](https://github.com/maxmixalex/hpclang/pull/59) previously
+merged the direct Port 1 stack guard.
 
 - **M8.0 native ports.** [#59](https://github.com/maxmixalex/hpclang/pull/59)
   blocks edits that would invalidate a direct data-stack reference. [#61](https://github.com/maxmixalex/hpclang/pull/61)
   and [#63](https://github.com/maxmixalex/hpclang/pull/63) extend internal Port 1
   edits to remove and replace an owned, unregistered header-only library.
-  The configured Stock root check passed host and sanitizer tests and both
-  Stock ROM regressions locally. #61 now targets main. #61 and #63 await acceptance.
-  Indirect references, remaining execution roots, public library management
+  #63 at `496dbe23` checks configured Stock roots and both fields of top-level
+  data-stack ACPTRs. Host tests, focused sanitizers and both Stock ROM regressions
+  passed locally. #61 targets main; #61 and #63 await remote acceptance.
+  [#66](https://github.com/maxmixalex/hpclang/pull/66) at `c8478724` scans trailing
+  deleted Port 2 records and stages sector images. Local simulated Flash passed
+  interrupted erase, replay and reuse across a two-sector suffix. CI is pending.
+  Nested references, remaining execution roots, public library management
   and Port 2 installation, recovery and space reclamation remain open.
 - **M8.6 applications and release.** [#60](https://github.com/maxmixalex/hpclang/pull/60)
-  packages the HP49g+/HP50g Notebook, [#62](https://github.com/maxmixalex/hpclang/pull/62)
-  reduces the HP48gII transfer, and [#64](https://github.com/maxmixalex/hpclang/pull/64)
+  is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) now targets
+  main for the smaller HP48gII transfer, and [#64](https://github.com/maxmixalex/hpclang/pull/64)
   compares all six launchers. Local measurements support retaining the
-  production SDK defaults. Remote acceptance, peak resident memory, GC with
+  production SDK defaults. #64 at `a10d9aa9` covers Port 1 install-offset changes and
+  live KOS allocation measurements. Both models used 45,096 bytes in the editor
+  locally. Remote acceptance, peak resident memory, GC with
   live native mappings, and final release acceptance remain open.
   [Launcher measurements](https://github.com/maxmixalex/hpclang/blob/aaca2595692db5608ac6d11bd43513b77895faba/docs/development/architecture.md#notebook-first-install-transfer-size)
   · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).

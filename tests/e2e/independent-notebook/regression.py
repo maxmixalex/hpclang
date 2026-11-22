@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import runpy
-import struct
+import shutil
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -31,14 +31,11 @@ LOW_MEMORY_RESULT = 124276
 REFUSED_RESULT = 124277
 
 
-def pack(nibbles):
-    nibbles += "0" * (len(nibbles) % 2)
-    return b"HPHP49-C" + bytes.fromhex(
-        "".join(nibbles[i : i + 2][::-1] for i in range(0, len(nibbles), 2))
-    )
+builder = runpy.run_path(str(HERE / "build.py"))
+pack = builder["pack"]
 
 
-def build(dest, toolchain, profile, sdk):
+def build(dest, toolchain, profile, sdk, at):
     env = dict(os.environ, PATH=str(toolchain) + os.pathsep + os.environ["PATH"])
     if sdk is None:
         sdk = dest / "sdk"
@@ -61,23 +58,23 @@ def build(dest, toolchain, profile, sdk):
             "-DCMAKE_TOOLCHAIN_FILE="
             + str(sdk / "share/hpclang/cmake/toolchains/hpclang-armv4t.cmake"),
             "-DHPCLANG_BUILD_MODEL=" + profile["target"],
+            f"-DHPCLANG_NOTEBOOK_PORT1_OFFSET={at}",
         ],
-        ["cmake", "--build", dest / "app", "--target", "notebook_launchers", "-j4"],
+        [
+            "cmake",
+            "--build",
+            dest / "app",
+            "--target",
+            "notebook_launchers",
+            "notebook_independent_program",
+            "-j4",
+        ],
     ]:
         subprocess.run(cmd, env=env, check=True)
     hpc = (dest / "app/notebook.hpc").read_bytes()
-    image = hpc[16:]
-    magic, size, offset, rw = struct.unpack("<4sIII", hpc[:16])
-    if (
-        magic != b"HPC1"
-        or size != len(image)
-        or (size + 4095) // 4096 != 20
-        or rw + 8192 + 4096 > 20480
-    ):
-        raise ValueError("Notebook no longer fits the qualified fixture layout")
-    checksum = 2166136261
-    for b in image:
-        checksum = ((checksum ^ b) * 16777619) & 0xFFFFFFFF
+    image, checksum, offset = builder["read_image"](hpc)
+    for name in ("USER.HP", "COPY.HP", "DATA.HP"):
+        shutil.copyfile(dest / "app/notebook-independent" / name, dest / name)
     for package, rw_bytes, expected_status in (
         ("RUN.HP", 32768, 0),
         ("LOWMEM.HP", 20480, 1),
@@ -90,51 +87,40 @@ def build(dest, toolchain, profile, sdk):
             dest / package,
             toolchain,
             profile,
-            size,
+            len(image),
             checksum,
             offset,
             rw_bytes,
             expected_status,
         )
-    (dest / "COPY.HP").write_bytes(pack(word(0x2D9D) + word(0x6657) + word(0x312B)))
     return image
 
 
 def build_runner(
-    out, package, toolchain, profile, size, checksum, offset, rw_bytes, expected_status
+    out,
+    package,
+    toolchain,
+    profile,
+    size,
+    checksum,
+    offset,
+    rw_bytes,
+    expected_status,
 ):
-    parts = []
-    for phase in ("acquire", "check"):
-        source = out / (phase + ".c")
-        source.write_text(
-            f"#define NOTEBOOK_MODEL {profile['model']}u\n"
-            f"#define NOTEBOOK_RW_BYTES {rw_bytes}u\n"
-            f"#define NOTEBOOK_EXPECTED_STATUS {expected_status or 0}u\n"
-            f"#define REQUEST_PAGES {35 if expected_status is None else 'POOL_PAGES'}\n"
-            f"#define IMAGE_BYTES {size}u\n"
-            f"#define IMAGE_HASH {checksum}u\n"
-            f"#define ENTRY_OFFSET {offset}u\n"
-            f'#include "{(HERE / (phase + ".c")).as_posix()}"\n'
+    parts = [
+        builder["build_phase"](
+            out,
+            toolchain,
+            profile["target"],
+            size,
+            checksum,
+            offset,
+            rw_bytes,
+            expected_status,
+            phase,
         )
-        subprocess.run(
-            [
-                sys.executable,
-                E2E / "independent-entry/build.py",
-                "--model",
-                profile["target"],
-                "--toolchain",
-                toolchain,
-                "--stock-state",
-                "--stock-frame",
-                "--probe-source",
-                source,
-                "--output",
-                out / phase,
-            ],
-            check=True,
-        )
-        digits = "".join(word(b, 2) for b in (out / phase / "program.HP").read_bytes()[8:])
-        parts.append(digits[5 : 10 + int(digits[10:15][::-1], 16)])
+        for phase in ("acquire", "check")
+    ]
     gc = entry["moving_gc_program"]()
     package.write_bytes(
         pack(
@@ -159,10 +145,17 @@ def check_phase(phase, editor_text, flash, original, font, expected_result):
     assert bytes(home_string(read, b"HPCNOTE")) == b"hpclang-notebook/1\n20"
     assert original == ram[0x20000:0x40000]
     stack = read(0x806F8)
-    result = read(stack)
-    digits = sum(read(result + 10 + i, 1) * 10**i for i in range(6))
-    assert read(result) == 0x2614 and read(result + 5) == 12 and digits == expected_result
-    entry_verifier["moving_gc_result"](read, stack + 5)
+    if expected_result is None:
+        assert read(0x806FD) - stack == 15  # two values and the bottom marker
+        for level, value in enumerate((b"second", b"first")):
+            obj = read(stack + level * 5)
+            assert read(obj) == 0x2A2C and read(obj + 5) == 5 + 2 * len(value)
+            assert bytes(read(obj + 10 + 2 * i, 2) for i in range(len(value))) == value
+    else:
+        result = read(stack)
+        digits = sum(read(result + 10 + i, 1) * 10**i for i in range(6))
+        assert read(result) == 0x2614 and read(result + 5) == 12 and digits == expected_result
+        entry_verifier["moving_gc_result"](read, stack + 5)
     require_stock_pc(phase / "state")
     returned = (phase / "stock-returned.pgm").read_bytes()
     assert returned == (phase / "stock-checkpoint.pgm").read_bytes()
@@ -199,7 +192,6 @@ def main():
     dest = args.output.resolve()
     dest.mkdir(parents=True)
     profile = json.loads((E2E / "targets" / f"{args.model}.json").read_text())
-    image = build(dest, args.toolchain.resolve(), profile, args.sdk)
     spec = SimpleNamespace(
         model=args.model, profile=profile, dist=args.dist.resolve(), flash_busy_reads=0
     )
@@ -269,10 +261,7 @@ def main():
     assert offset % 2 == 0
     page = (offset // 2 + 4095) & ~4095
     assert page >= 8192
-    payload = bytes(page - offset // 2) + image + bytes(20 * 4096 - len(image))
-    (dest / "DATA.HP").write_bytes(
-        pack(word(0x2A2C) + word(5 + 2 * len(payload)) + "".join(word(b, 2) for b in payload))
-    )
+    image = build(dest, args.toolchain.resolve(), profile, args.sdk, at)
     transfer(
         spec,
         dest / "setup",
@@ -296,6 +285,31 @@ def main():
     media["prepare"](files, card)
     source = "setup"
     save_keys = "4300 tap two\n4900 tap zero\n5500 tap down\n6200 tap enter\n7600 capture saved\n"
+    for name, previous, editor in (("user-save", "setup", ""), ("user-reopen", "user-save", "20")):
+        installed = previous == "user-save"
+        transfer(
+            spec,
+            dest / name,
+            dest / previous / "state",
+            dest,
+            "NBUSER",
+            package_name="USER.HP",
+            installed=installed,
+            extra_files=[] if installed else [("COPY.HP", "CKCOPY")],
+            remote_commands=[
+                ("HOME " if installed else 'HOME CLEAR "first" "second" ') + "'NBUSER' RCL CKCOPY"
+            ],
+            actions="3500 capture editor\n"
+            + ("" if installed else save_keys)
+            + "8500 tap on\n15000 capture returned\n",
+            execution_ms=18000,
+        )
+        hashes[name] = {
+            "user_stack_top_first": ["second", "first"],
+            "settled_sha256": check_phase(
+                dest / name, editor, flash, staged[0x20000:0x40000], font, None
+            ),
+        }
     for name, program, package, editor in (
         ("save", "SPLITGC", "RUN.HP", ""),
         ("refused", "NBFULL", "REFUSE.HP", None),
