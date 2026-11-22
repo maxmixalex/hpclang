@@ -40,7 +40,11 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
                     }
         }
     }
-    out[60] = split(rec, 1, map, frame);
+    u32 code = notebook_code();
+    if (!code)
+        for (;;) {
+        }
+    out[60] = split(rec, 1, map, frame, code);
     u32 status = rec[40];
     out[3] = stock_call(201, 0x100, 1048576);
     if (out[3])

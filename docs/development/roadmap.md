@@ -1,85 +1,36 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-22. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+Current checkpoint: 2026-11-23. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `8cb52654`. [PR #57](https://github.com/maxmixalex/hpclang/pull/57)
-merged the Port 1 HOME cache guard, HP39/40 GC regressions and independent
-Notebook SDK targets. All 197 executed checks passed on `714b4d4e`; two skipped.
-[PR #49](https://github.com/maxmixalex/hpclang/pull/49) previously merged library
-discovery, guarded Port 1 edits and independent Notebook tests at `e8e09e93`.
+Accepted main is `dd4f8d8a` after the [#65](https://github.com/maxmixalex/hpclang/pull/65) roadmap merge. [#60](https://github.com/maxmixalex/hpclang/pull/60)
+merged the installed HP49g+/HP50g independent Notebook packages after 197 checks
+passed and two skipped. Both Stock runs preserved the caller's RPN stack on
+save and reopen. [#59](https://github.com/maxmixalex/hpclang/pull/59) previously
+merged the direct Port 1 stack guard.
 
-The HP49g+/HP50g independent launcher locates its Port 1 code backup by name.
-Both local Stock 2.15 runs executed from offset 8192 in Port 1, reopened the
-HOME note, exported the edit and recalled its Port 0 backup. After Stock
-purged the code, both returned the refusal result and preserved HOME and the
-remaining Port 1 bytes. Remote acceptance of this follow-up is pending.
-
-On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
-four library headers and objects. Appending a 28-byte fixture to a RAM copy
-changed only its slot. Tail recovery and duplicate retry performed no writes.
-Native installation and startup recovery remain open.
-
-Port 1 now has an internal guarded removal operation for a caller-owned,
-unregistered header-only library. Both local HP49g+ and HP50g Stock 2.15
-fixtures refused removal with an overlaid stack reference, then removed ID
-123 by number and read the following backup. The original Port 1 prefix and
-chain length were restored and both relaunches passed on each model. Public
-library removal and active-library management remain open pending wider
-reference handling. CI acceptance of this change is pending.
-
-On local original-ROM runs, the installed SDK's independent Notebook saved
-`Seed42` as `Seed4220` and reopened it on HP39g+ D1.55, HP39gs 2.22 and
-HP40gs 2.22. Stock Reset exposed a ROM reference to an empty list that
-previously caused error 134 on all three. Each model now opens an empty
-editor after Reset, saves `20`, reopens it and returns to the Stock library.
-The checks cover the LCD, named Aplet in SRAM and native return state.
-All three install/Save/Reset jobs passed CI on `7e87d081`. Locally, the
-84 KiB startup bitmap and smaller Aplet now allow two Notebooks to coexist:
-Stock copy `2` saved and reopened `2020` while its original retained `20` on
-all three models. HP39g+, HP39gs and HP40gs all passed the Save, Reset and
-copy CI gate on `25b4963b`. Locally, the relocated SDK's independent Notebook
-CMake target built each model from source and restored a missing Reset file.
-All 12 transfer files matched the accepted CI inputs byte for byte. A local
-test invokes Stock GC immediately before and after native editor entry/return.
-Save, Reset and independent copy passed with these calls on all three HP39/40
-ROMs. Collection while native mappings are live remains open.
-See the [launcher measurements](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19).
-The HP48gII CI size check failed on `54f6642b` and passed on `0cdc1bc0`.
-The current 64,672-byte Notebook fits the 65,536-byte code window and passed
-both local original-ROM entry paths, including consecutive Port 0 saves.
-The local HP48gII SDK builds separate independent HOME and Port 0 programs.
-The HOME reader preserves the user stack. The Port 0 program saved and
-reopened its HOME note when installed as `NOTES` behind another backup.
-Four local original-ROM launches covered user-stack return and post-exit GC.
-Two SDK builds produced identical transfers. The Port 0 transfer matched the
-stack-preserving program used in the emulator byte for byte.
-
-On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
-and remained readable after a one-byte move that produced the same PrRUN
-reinstall screen as native backup deletion. See the
-[Port 1 placement controls](object-service.md). Public edits that move a
-library remain gated. Locally, the internal guarded Port 1 edit can move
-a header-only library. On copies of both models' ERAM, deleting the backup
-before library 123 matched Stock's resulting chain; moving executable library
-275 was refused before writes. The guarded edit fixture now checks live ERAM
-catalog bindings and both HOME attachment cache fields. On both models, the
-HOME check located both targets of library 275 before and after native PURGE.
-It vetoes possible ERAM overlaps even through a Flash switch or alias. Guarded
-edits and two relaunches passed locally on each Stock 2.15 ROM.
-The local guarded edit now rejects direct RPL stack pointers into its affected
-Port 1 range. On each Stock 2.15 ROM a read-only test overlay caused refusal
-without changing the records; normal edits and two relaunches passed.
-Public edits still require other live roots, including suspended execution.
-The HP48gII Port 0 Notebook
-passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
-bundles matched the historical writer on all three models.
-
-The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
-current work. Earlier accepted deliveries remain in the validation history.
-
-Container housekeeping (2026-11-14): removed 109 obsolete CMake intermediate directories, 80 superseded host-test build directories and 104 untracked emulator object files, reclaiming 855.7 MiB in total from inside the container. The additional 1.6 MiB object-file cleanup retains sibling C sources, shared emulator binaries and directory aliases; report: /work/nov14-old-emulator-intermediates.json. Current 180-test ASan/UBSan validation, source trees and concise reports remain. No live-process or external-symlink dependencies were found; no archive was created. Old binaries require rebuilding. Reports: /work/nov14-cmake-cleanup-result.json, /work/nov14-old-host-cleanup-result.json and /work/nov14-old-oct-host-cleanup-result.json. Retain shared dependencies /work/oct7-next-probe/cpu/dist/runtime-lib and /work/oct25-watchdog-src/.cache/hp39-aplet. Earlier Windows download deletion remains blocked by execution policy.
-
-Container cleanup (2026-11-13): removed /work/oct30-stage-stack-matrix/runner/build from inside the container after confirming its completed audit, current six-model replacement coverage and absence of active process/external symlink dependencies. Reclaimed 48,915,552 bytes without an archive; source scripts, concise reports, original inputs and shared emulators remain.
+- **M8.0 native ports.** [#59](https://github.com/maxmixalex/hpclang/pull/59)
+  blocks edits that would invalidate a direct data-stack reference. [#61](https://github.com/maxmixalex/hpclang/pull/61)
+  and [#63](https://github.com/maxmixalex/hpclang/pull/63) extend internal Port 1
+  edits to remove and replace an owned, unregistered header-only library.
+  #63 at `496dbe23` checks configured Stock roots and both fields of top-level
+  data-stack ACPTRs. Host tests, focused sanitizers and both Stock ROM regressions
+  passed locally. #61 targets main; #61 and #63 await remote acceptance.
+  [#66](https://github.com/maxmixalex/hpclang/pull/66) at `c8478724` scans trailing
+  deleted Port 2 records and stages sector images. Local simulated Flash passed
+  interrupted erase, replay and reuse across a two-sector suffix. CI is pending.
+  Nested references, remaining execution roots, public library management
+  and Port 2 installation, recovery and space reclamation remain open.
+- **M8.6 applications and release.** [#60](https://github.com/maxmixalex/hpclang/pull/60)
+  is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) now targets
+  main for the smaller HP48gII transfer, and [#64](https://github.com/maxmixalex/hpclang/pull/64)
+  compares all six launchers. Local measurements support retaining the
+  production SDK defaults. #64 at `a10d9aa9` covers Port 1 install-offset changes and
+  live KOS allocation measurements. Both models used 45,096 bytes in the editor
+  locally. Remote acceptance, peak resident memory, GC with
+  live native mappings, and final release acceptance remain open.
+  [Launcher measurements](https://github.com/maxmixalex/hpclang/blob/aaca2595692db5608ac6d11bd43513b77895faba/docs/development/architecture.md#notebook-first-install-transfer-size)
+  · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
+- **M8.1–M8.5** are accepted. Their regression requirements remain in the stage table below.
 
 ## Scope and retained requirements
 
@@ -199,339 +150,17 @@ new hardware or universal-memory-bound claim. #43 follow-ups are accepted on mai
 
 ## Current work: balanced M8 delivery
 
-Rotate bounded delivery batches through M8.0, M8.2/M8.3, M8.4, M8.5 and
-M8.6; retain M8.1 regressions. Finish or record a blocker before switching,
-without expanding edge-case investigations. Other stages do not wait for
-complete Port2 qualification. Apply the approved resource deferral below; other acceptance conditions remain
-unchanged. Sound compatibility is independent of Port2.
+Advance native ports and release qualification in parallel. Keep the installed
+SDK, declarative UI, HPGCC and C++ regression suites running. Port 2 automatic
+recovery and space reclamation stay within M8. At the current checkpoint the
+unexplained HP39gs/HP40gs USB stalls and HP49g+ PWM IRQ failure remain historical
+observations. Their original causes are unknown.
 
-CI (2026-11-19): #46 at `16369f3b` passed all five triggered workflows (184 successes; Pages deploy and runtime evidence publication skipped by design). Merged as `e45f8461`; remote main verified. Earlier HP39gs transfer stalls remain unexplained. No post-merge run is claimed.
-
-M8.0 local: on HP49g+ and HP50g, the catalog relocation planner matched
-Stock's complete library catalog after native deletion of a backup preceding
-a registered Port 1 library. The [Port 1 observations](object-service.md)
-cover the header movement and a separate attached-library run: both native
-HOME cache pointers matched the C relocation plan on both models. The focused
-host regression passes. General root collection and live execution remain open.
-
-M8.0 / #47: merged as `516231c5`, whose tree matches accepted head `1cebf08d`.
-CI: 184 successful jobs, including both HP49g+ and HP50g Stock code-relocation
-jobs, and two configured publication skips. Local original-ROM runs at
-`310e8200` rejected an injected 15-nibble gap before writes, then registered
-library 123 using the real mapping. Native replay verified the new binding,
-unchanged existing bindings, Stock return and unchanged Flash on both models
-(`/work/nov19-registration-stock/independent-audit.json`). This accepts the
-boundary fix only; public registration and production reference collection
-remain open.
-
-M8.6 local (HP50g Stock, 2026-11-19): the full instrumented Notebook editor
-started and returned to settled Stock. Boot mapped 62 RW pages; heap reservation
-peaked at 13,660 bytes and touched stack at 1,880 of 8,192 bytes. For this run,
-20 code + 7 launcher/workspace + 8 RW pages cover the observed heap with the
-reserved stack (35 pages; the packaging minimum before heap is 32). Entry RPL
-bounds 560552..880707 leave 37 aligned virtual slots after the probe reserves.
-Fresh emulator-side observation with the same instrumented application resolved
-all 37 slots. For `i=0..36`, Saturn nibble address `0x8c000+i*0x2000`
-maps to SRAM byte address `0x08046000+i*0x1000`. Read and Write agree on both
-halves. No duplicate frames or other Saturn slots alias them. **All 37 already
-back the application's live ARM RW mapping**. None overlap code, launcher-only
-pages, the checked low SRAM/exception stack page, Saturn state page or the
-three stage/application coarse tables. Additional capacity from these slots
-on this production launch: zero. Do not combine them with the separate KOS
-or paused RPL probe capacities. This does not establish a new launcher's layout
-or a lease across Stock native calls. Local per-page audit:
-`/work/nov19-notebook-map/audit.json`; editor, ON exit and settled return passed.
-Evidence: `/work/nov19-notebook-occupancy/runner/build/hp50g-frame-memory-{1,2}.json`.
-
-Independent HP50g admission test (local original ROM without library 275):
-transferred the complete 79,168-byte plain Notebook HPC1 as `NBIMAGE` in HOME;
-the returned snapshot reproduces the installed-SDK image byte-for-byte.
-With that image resident, a fragmented KOS allocation trial held 8+8+4+1
-distinct aligned pages simultaneously (21/35). At peak ownership, RSKTOP
-555966 and DSKTOP 643021 permit only 9 aligned RPL candidates after reserves.
-Even treating all nine as disjoint and usable would leave a five-page deficit
-for this layout; no lease across Stock GC is inferred. Rejected admission
-released all four blocks in reverse order; a fresh eight-page allocation reused
-the first block. The probe returned to RPL with original control/SWI and Flash.
-Per-page owners and acquire/release order: `/work/nov19-resident-kos-gap/proof.json`.
-No Notebook code was entered: save, GC, application exit and reload are still
-open. Repeating with the production 59,210-byte HPCZ encoding (verified to
-expand to identical HPC1 bytes) keeps 21 KOS pages and exposes 14 distinct RPL
-frames at peak, disjoint from the KOS frames in the live Read/Write maps.
-This reaches 35 only numerically: no RPL frame is leased across a native
-service. Next qualify reservation and restoration of this RPL region under GC
-before entering the loader. Report: `/work/nov19-resident-kos-packed-map/proof.json`.
-
-HP50g GC gate (local original ROM, no library 275): a stack-rooted TEMP
-copy of the complete packed `NBIMAGE` does **not** pin physical frames.
-From copies of the post-KOS-release snapshot, the no-GC control retained
-its original address and payload at all 14 candidate frames. With Stock
-GARBAGECOL, the retained object moved from nibble `0x87f60` to `0x87871`;
-the updated root still read the complete original image, but all 13 whole
-payload pages changed at their former physical addresses. On the partial
-14th frame, 2,214 of 3,582 originally owned nibbles changed. DROP followed
-by GC restored the original data-stack depth (2) and top value; the HOME
-image and Flash matched the baseline. This tests release of the temporary
-root, not combined cleanup with KOS blocks still held. Per-frame evidence:
-`/work/nov19-root-lease-{control,gc}/pages.json`; release snapshot:
-`/work/nov19-root-lease-release/run/hp50g/state`. Reject TEMP-root pinning;
-full Notebook execution requires a GC-aware fence or a different page owner.
-
-A separate local no-275 HP50g run held four KOS blocks (8+8+4+1 aligned
-pages) while Stock GARBAGECOL moved a rooted witness from `0x87f8d` to
-`0x87871`. The second ARM entry validated every block's allocated header,
-footer and reciprocal links, the identity mapping and all 86,016 bytes of
-page-specific data before release. An extra 1 MiB request returned NULL;
-all four releases succeeded in reverse order. All four blocks were then
-reacquired simultaneously at the same addresses and released again. Returned
-RPL result, witness contents, packed HOME image and unchanged Flash were
-independently checked. Ledger: `/work/nov19-kos-gc-cycle-v2/audit.json`.
-KOS therefore covers 21 of the 35 editor-budget pages across this GC; the
-other 14 still lack a qualified owner. The initial transfer trial did not
-yield a verifiable completion marker and is excluded.
-
-HP50g Port 1 plus KOS (local no-275 original ROM): Stock `STO` appended a
-named `:1:NBLSE` backup containing a 60 KiB test string after two existing
-records. Its payload contained 14 whole aligned ERAM frames `[0x08021000,
-0x0802f000)`. The same 14 frame addresses and SHA-256 hashes were found
-before and after a GC that moved the TEMP witness `0x87f8f` to `0x87871`.
-All 21 concurrently held KOS frames were disjoint and passed the live owner,
-identity mapping and 86,016-byte content checks. Thus 35 distinct frames
-were accounted for during this GC. After the rejected 1 MiB allocation, all
-KOS blocks were released and reacquired; a subsequent Stock `PURGE` removed
-the test backup and restored the prior Port 1 chain and terminator. HOME
-Notebook and Flash remained intact. Evidence: `/work/nov19-port1-lease/`
-(`setup-pages.json`, `trial-pages.json`, `kos-audit.json` and release snapshot).
-The ERAM payload stayed unchanged: using it as writable application memory
-still requires preserving native backup integrity, preventing movement by Port
-edits, and safe teardown on failure. No general Port 1 lease API or independent
-Notebook run is accepted by this test.
-
-HP50g split-code entry (local original ROM, no 275): independently entered
-the plain installed-SDK Notebook (`_start`, VA `0x01220008`). Its 79,152-byte
-code image used 14 user-read-only Port 1 frames plus six user-read-only KOS
-frames, and eight KOS RW frames. This fixture stages the whole padded image
-in an enlarged Port 1 backup; only its first 14 frames are mapped from there.
-The first entry faulted on missing bootstrap table-view address `0x0121f010`.
-With the read-only table view restored, ON was accepted and Notebook returned
-zero. After restoring Stock mappings, GC moved a witness from `0x87f91` to
-`0x87871`; the second entry remapped and checked the entire code image
-(`0xd1729905`, FNV-1a). Snapshot verification passed the RPL return, unchanged
-backup, rejected allocation, four KOS release/reallocation checks and Port 1
-purge preserving earlier records. Report: `/work/nov19-split-enter-v2/audit.json`.
-This run used the captured Saturn state but no native mutation cookie. GC
-occurred between entries, not during an application save.
-
-HP50g independent HOME save/relaunch (local, no library 275): the fixture
-now passes the live Saturn map, main-stack fences, saved post-ARMSYS PC and
-classified execution roots, and denies Port 1 edits. A direct HOME-program
-trial wrote the note but failed on restart. Using a Stock TEMP copy of the
-entry program (not as a backing store for application pages), physical keys
-entered `20` and activated Save. A fresh emulator process resumed the saved
-state and recalled the same program without retransferring the application.
-The initially empty editor displayed `20` on relaunch; both native HOME
-records matched `hpclang-notebook/1\n20` byte-for-byte. Both ON exits
-returned the RPL witness; the two Stock frame captures one second apart
-matched within each run. Both GC witnesses moved, the full code mapping
-checksum and four KOS release/reuse checks passed, and the Port 1 backup
-and Flash remained unchanged. GC was exercised **after** each application
-exit with the frame leases still held. Evidence and per-launch frame hashes:
-`/work/nov19-save-context-run/audit.json`. Local fixture evidence only;
-production migration, other family qualification and release review remain open.
-
-The repository regression in `tests/e2e/independent-notebook` now reproduces
-this save and relaunch from a fresh HP50g firmware boot. In an offline clean
-container the installed SDK built the Notebook; both processes returned to
-Stock ROM, the native HOME bytes matched `hpclang-notebook/1\n20`, and the
-second editor showed `20` without retransferring the program. The GC witness,
-unchanged Port 1 region and stable Stock frames passed. The Core CI job runs
-the same firmware test and publishes the phase report. Local validation
-passed. The first [#48 CI attempt](https://github.com/maxmixalex/hpclang/actions/runs/44549769224/job/135650047342)
-at `0c0fb778` stopped before the emulator: SDK install rejected the Git LFS
-pointer for the font bundle. The job now requests an LFS checkout; remote
-acceptance of that correction is pending.
-
-HP48gII minimum-memory check (local original-ROM emulator, 2026-11-19):
-the installed-SDK Notebook editor used a 35-frame production pool: 16 code,
-12 RW and 7 stage/stack/MMU frames (4 KiB each). The 34 aligned RPL slots
-between the observed bounds 554930..845814 after reserves all alias that pool:
-16 code, 12 RW, 6 launcher, including one coarse-table frame. The separate
-6,144-byte native allocation `[0x080053ac,0x08006bac)` contains no whole
-aligned page. Neither source yields an additional exclusive frame. No other
-SRAM is assumed free. The pre-heap packaging minimum is 27 pages; the editor
-workload budget is 29 with 9,924 heap bytes and the full 8 KiB stack reserved.
-The editor and settled return passed; a different allocator/entry layout
-requires its own ownership evidence. Local capture: `/work/nov19-hp48-map/raw.txt`;
-per-frame reconciliation: `/work/nov19-hp48-map/audit.json`.
-
-Independent HP48gII admission (local, no library 275): the HP50g address
-conversion copied the probe but jumped outside 256 KiB SRAM. Using the
-HP48gII Stock main RAM map, the same bounded ARM probe executed and
-returned `124275` to RPL, with caller control and the SWI vector restored.
-With the complete 47,417-byte compressed Notebook in HOME, the tested
-fragmented KOS requests acquired **one** aligned 4 KiB frame against the
-29-frame editor budget. The probe checked allocation ownership and direct
-address overlap; the later inventory also checks SRAM mirrors. The
-contiguous 29-frame request was refused; the probe verified
-the held data, released the block, reacquired it at the same address and
-released it again. The HOME image decompresses to the exact SDK build and
-Flash is unchanged. Report: `/work/nov19-hp48-entry-admission-mainmap/audit.json`.
-This is a bounded clean rejection, not a general KOS capacity limit. No
-Notebook entry or HOME mutation was attempted in this layout.
-
-HP48gII image-absent control: the same ROM, probe binary and key sequence,
-without transferring `NBIMAGE`, also yielded **one of 29 pages** (28 short).
-The sole frame (`0x08005000`) had no direct address match in the Saturn maps;
-the later physical audit found a mirror outside the RPL gap. The
-122,879-byte contiguous allocation request was refused; all
-4,096 bytes of the held page passed the probe's check. Stock released the
-only block, reacquired it at the same pointer and released it again before
-returning `124275` to RPL. The final HOME snapshot had no `NBIMAGE`; Flash and
-the SWI vector were unchanged. In this paired test, removing the HOME image
-did not improve KOS capacity. An application-sized page source remains open.
-Evidence: `/work/nov19-hp48-entry-admission-control/audit.json`.
-
-HP48gII read-only frame inventory: all 64 external SRAM frames are covered
-by the Stock Saturn map in both saved return states. Eight frames appear
-through the emulator's SRAM mirror, not a separate bank. In particular,
-`0x08045000` aliases the already-counted KOS frame `0x08005000`. The model
-has no Port 1 ERAM source. The observed TTBR and LCD buffer are in separate
-on-chip SRAM, which is not counted as application memory.
-
-After excluding observed native state, stacks, probe storage, allocator
-metadata and mappings outside the reserved gap, the RPL gap contains 36
-whole frames with `NBIMAGE` resident and 47 without it. Neither snapshot
-proves a lease across Stock allocation or GC. The inspected KOS free lists
-are also not a non-KOS owner. This read-only audit qualifies **zero additional
-exclusive frames**, so the 28-page deficit remains. Inventory and input
-hashes: `/work/nov19-hp48-page-ownership.json`. No emulator rerun, guest
-memory writes or new container were needed.
-
-HP48gII HOME-backed reservation trial (local original ROM, no library 275):
-with `NBIMAGE` resident, Stock stored four test strings with 28 distinct
-whole physical pages, of which only 16 overlap the 36 original gap
-candidates. Creating one small HOME variable moved all four strings by
-79 Saturn nibbles: **0 of 28** pages retained their contents at the original
-physical addresses, although every logical string remained byte-identical.
-A separate GC-only replay moved the rooted TEMP witness (`0x87f4e` to
-`0x87828`) but kept the HOME object addresses and all 28 page hashes.
-Reject this reservation mechanism for mixed Stock allocation and GC: no
-additional frames are qualified. After the rejection, dropping the GC
-witness and purging only test variables restored the original HOME/Port 0
-bytes, read/write map and both stack slots. `NBIMAGE` and Flash matched
-throughout; observed `AVMEM` recovered from 8,539 to 61,277 (baseline
-61,138). This is logical cleanup, not byte-for-byte restoration of unused
-RAM. Evidence: `/work/nov19-hp48-home-lease/comparison.json` and saved
-setup, allocation, GC-only and cleanup snapshots.
-
-HP48gII allocator-quota trial (local original ROM, no library 275):
-with `NBIMAGE` in HOME, a disposable snapshot marked all 28 validated gap
-frames and capped Stock `AVMEM` from 61,050 to 6,817 cells, below either
-side's margin to the reservation. No HOME object owned the marked pages.
-Stock did not preserve the cap: the USB-only control, with no HOME creation
-or explicit GC, already restored credit to 61,050, and only 26 of 28 page
-hashes matched. HOME creation and the separate GC replay also retained only
-26 hashes; all phases changed `0x08010000` and `0x08011000`. GC moved the
-TEMP witness from `0x87f1b` to `0x87828`. The USB-only control rules out
-attributing those changes specifically to HOME creation or GC. Reject the
-quota as a physical fence. Stock cleanup restored HOME/Port 0 bytes, stack
-values and the Saturn map, and recovered `AVMEM` to 61,277 (baseline 61,138).
-The harness then restored and checked all 28 original page contents in the
-disposable snapshot; original inputs, `NBIMAGE` and Flash were unchanged.
-No additional page is qualified. Per-phase hashes and cleanup evidence:
-`/work/nov19-hp48-boundary-lease/`.
-
-HP39g+ Aplet boundary (local D1.55 original-ROM emulator, 2026-11-19):
-the installed-SDK Notebook reached its editor and returned to settled Stock.
-The 37 physical frames comprise 12 code, 16 RW, 7 launcher/stack/MMU and
-2 native Aplet workspace pages. After reserves, all 36 aligned RPL slots
-alias these frames (12 code, 16 RW, 6 launcher including one coarse-table
-frame, 2 native workspace). The separate 6,144-byte native block contains
-no whole aligned page. Additional exclusive pages from those sources: zero.
-Packaging requires at least 25 pages before heap; this editor workload budgets
-27 including a 9,460-byte heap reservation and the full 8 KiB stack (1,384
-bytes touched). A different Aplet entry/allocation layout requires separate
-qualification. Per-slot evidence: `/work/nov19-hp39plus-map/audit.json`.
-
-M8.6 local release check (2026-11-19, SDK from `e45f8461`): an offline
-consumer container with no repository mount built plain and resource-observed
-Notebook packages using the installed SDK. The observer links the unchanged
-application sources. Each observed package passed original-ROM editor pixels,
-ON exit and settled return. SHA-256 manifests checked before and after launch:
-`/work/nov19-clean-stock/outputs/checks.json`. Table values are bytes.
-
-| Family representative | Plain `.hp` bytes | Touched stack / reserved | Peak heap reservation / available |
-| --- | ---: | ---: | ---: |
-| HP 39gs | 48,404 | 1,384 / 8,192 | 9,460 / 48,024 |
-| HP 48gII | 62,828 | 1,744 / 8,192 | 9,924 / 35,736 |
-| HP 50g | 74,620 | 1,840 / 8,192 | 13,700 / 237,264 |
-
-This covers clean SDK consumption, model packaging and the measured entry/exit
-workload across three families. Resource measurements include observer overhead.
-Backup/export, failure recovery, independent-launcher evaluation and release
-documentation have separate acceptance records below.
-
-**Production Notebook release checks accepted on main `b3d86f65` (2026-11-21).**
-The audit rehashed six model packages and 15 outputs from two installation
-prefixes, checked the three HP39 Aplet transfer sets, and reran the maintained
-editor pixel, resource and Stock return verifier against captures for HP39gs,
-HP48gII and HP50g. All nine save-failure, retry and relaunch reports on these
-models recorded the expected phase and settled return. The installed transfer
-instructions shipped in [#48](https://github.com/maxmixalex/hpclang/pull/48).
-The evidence covers original-ROM emulation and the supported application flows.
-
-The independent HP50g Notebook save/relaunch prototype and the documented
-decision to retain the current launchers satisfy two launcher checklist items.
-Cross-family independent page ownership, native service coexistence and exit
-recovery remain open, including HP39 Aplet entry and the HP48gII memory budget.
-
-**M8.6 release reconciliation (2026-11-19).** Against the original
-[application and release checklist](roadmap-history.md#m86-application-and-release-acceptance):
-
-| Requirement | Evidence and remaining boundary |
-| --- | --- |
-| Integrated application and native backup | Six-model Stock primary persistence and three classic-model Port 0 backup/restore/replace/remove have historical CI evidence. The local backup audit covers nine launches; restoring an edit preserves the primary save. See `/work/nov14-final-notebook-backup-native/independent-audit.json`. |
-| Supported file export | HP49g+/HP50g original-ROM runs retain UTF-8 export across relaunch and refuse overwrite. Independent FAT image reads check the file and sentinel (`/work/nov14-open-stack-native/independent-audit.json`). Physical card testing remains a separate follow-up. |
-| Installation, assets and user instructions | From a second prefix and new client/build paths, the **installed** Notebook README's `CMAKE_PREFIX_PATH` configuration and default build succeeded offline for all three representatives. Generated font C, HPC1, raw and wrapped launchers and memory JSON matched the first plain build byte-for-byte (15/15, `/release/documented-rebuild/manifest.json` in the release container). HP39 Aplet envelopes are covered by the earlier SDK reproducibility gate. |
-| Resources, failures and restoration | Three-family entry/exit above; host sanitizer store/UI fault tests pass. Local HP39gs, HP48gII and HP50g Stock tests now also pass an injected replacement-string allocation failure: the Save action reports insufficient memory, retains the edit and rereads the prior native save. Retry persists the new note across exit/relaunch. All nine launch reports show settled Stock return. Reports: `/work/nov19-save-fault-<model>/runner/build/`. This covers pre-write allocation failure, not interrupted writes or power loss. |
-| Public documentation | The [installed guide](../sdk/getting-started.md) and Notebook README now distinguish the HP39 Aplet bundle, HP48gII Port 0 setup and HP49g+/HP50g Port 2 setup, with transport and storage limits. Local review rebuilt all six fixed-model launchers and all three HP39 Aplets from the unpacked SDK ZIP, checked its manifest and 15 installed links, and matched three representative families' saved Stock transfer artifacts and settled-return reports. Plain package and instrumented run identities were checked separately. Evidence: `/work/nov19-release-docs-audit/audit.json`. No new ROM or device runs; this is the public packaging/transfer review, not release-wide acceptance. |
-| Independent launcher and migration decision | [Three-family migration assessment](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19): retain production launchers. HP39g+, HP48gII and HP50g editor budgets are 27, 29 and 35 pages respectively; the measured RPL candidates add no frames to those production layouts. First qualify independently owned pages and native calls together on HP50g; model-specific entry, failure cleanup and six-model parity remain gates for retirement. |
-
-| Stage / delivery | Current evidence | Next gate |
-| --- | --- | --- |
-| M8.0 / #31 | Internal Port0 registration and Port1 owned-tail edits pass local host/native gates. Accepted and merged as 2a65079f: exact head c662b236 passes all nine workflows, 219 jobs and three skips. This accepts the bounded implementation, not all M8.0 requirements. | Production reference collection, public library management and Port1 edits remain open. Test-owned-tail guards do not authorize existing-object edits; execution collection in call-roots.c also depends on fixture-specific ROM addresses and trace counts, so it cannot be promoted directly. This investigation is bounded here while other stages advance. Earlier HP39gs transfer failure passes exact replay, original cause unresolved. Evidence: /work/nov14-port1-owned-edit-native-v2/independent-audit.json. |
-| M8.0 / Port2 | Both supported ID769 recovery/rejection matrices pass locally; explicit recovery-ID support is accepted in #25. | Trusted installation, authority lifecycle, startup and reclamation remain. Mutable-Flash configuration execution is unqualified; forty data targets retain separate execution obligations. |
-| M8.2/M8.3 / UI | Core/component milestones remain accepted complete. #43 merged the saved-user-SP observer, low-SRAM pool exclusion and report-schema repair; all six Stock UI cases pass at 712e60c6. | Preserve supported-flow budgets, isolation and failure handling. Comprehensive Stock stack capacities and whole-system worst-case memory proof remain deferred. #44 delivery is included in #43. |
-| M8.4 / compatibility #41 | **M8.4 accepted complete** on main 38e9472a: all five original requirements reconcile with the maintained adapter ledger, recorded original-source edits, KOS/RTC behavior and window/migration boundaries. #43 passes Storage and configured HPGCC/normal/exit/immediate-exit CI gates. | Retain source, signature and native regressions. Physical SD remains an approved nonblocking follow-up; six-model packaging does not imply SD availability. Final acceptance: docs/development/hpgcc-compat.md and docs/development/m8-validation-history.md. |
-| M8.5 / ownership #14 | **M8.5 accepted complete** on main 38e9472a: the original three requirements are reconciled against implementation, host lifecycle/destructor tests, native exit checks and accepted installed-SDK CI. | Retain ownership/error/lifetime, no-exceptions/no-RTTI, C/C++ example and deterministic-resource regressions. Requirement map: docs/development/m8-validation-history.md (M8.5 final acceptance); local reconciliation: research/nov14-m85-final-acceptance.json. |
-| M8.5 / migration #27 | Accepted within M8.5: installed migration guidance and read-only HP001–HP015 checker cover historical APIs, precision/ownership, target capabilities, text/fonts and raw hardware retirement. | Retain installed/relocated CLI, unchanged-input, encoding and incomplete-scan regressions. Evidence: /work/nov14-migration-window-lifetime.json and accepted Core run 43589087998. |
-| M8.6 / applications #14 | #43 merged; all six Stock Notebook cases and configured backup/export/entry gates pass at 712e60c6. File-open buffer reduction and Port2 README correction are included. Local backup checks cover nine launches across three classic models. | Final release audit and independent-launcher evaluation remain. Earlier export stack is 6656/8192 bytes, relaunch 3712/8192; these are bounded-workload measurements. Evidence: /work/nov14-open-stack-native/independent-audit.json and /work/nov14-final-notebook-backup-native/independent-audit.json. |
-| M8.6 / reproducibility #40 | Local KOS pool probe passes HP50g Stock. Follow-up now borrows/restores 28 main-RPL pages (112 KiB) with Stock/interrupts paused; saved-map, return and ten corruption checks pass. Default entry package remains unchanged. | Qualify combined ownership/fences and actual Notebook occupancy before claiming native-service coexistence. HP48/HP39 and release evaluation remain open. #46 merged; native snapshots remain local. |
-| Shared Stock harness / #39 | 1db47ca3 fixes premature host readiness timeout while retaining the outer emulator timeout; four tests, old-behavior negative, Bash syntax and Ruff pass. The same fix is included in #14. | Accepted and merged as 7d1a5bb9 on 2026-11-14: exact-head 1db47ca3 passes all ten workflows, with 376 successful jobs and two skips. Preceding #14 failures remain recorded below. |
-
-Current owner audit reports are
-/work/nov06-sum/ui-owner-native-runs/independent-audit.json and
-/work/nov06-sum/ui-owner-stock/independent-audit.json.
-Completed timer validation includes six-model Direct/Stock integrated and
-installed-example runs with independent artifact/pixel/return checks; its
-branch acceptance passed in #14; integration into main is accepted through #43. Emulator results do not claim physical
-hardware acceptance. Detailed historical results belong in the validation
-history and PRs, not repeated per-turn narratives here.
-
-## Pending delivery and unresolved failures
-
-- #43 is accepted and merged for compatibility, ownership, migration, SDK
-  distribution and applications. #40/#41/#44/#45 are included deliveries;
-  acceptance comes from #43, not cancelled duplicate runs.
-- #14 passed its allocation-branch CI (396 successful jobs, three skips);
-  its main integration is now accepted through #43. This does not close all M8 stages.
-- Earlier HP39gs/HP40gs USB transfer failures and HP49g+ system-services PWM IRQ
-  failure remain historical unresolved observations. Passing exact replay or
-  a later head does not establish the original cause.
-
-Detailed accepted commits, earlier failures and validation scope remain in
-[M8 validation history](m8-validation-history.md). All original completion
-conditions remain in the [requirements archive](roadmap-history.md#m8-stages).
+The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
+open deliveries. Detailed per-frame measurements, earlier CI failures and
+historical release checks remain in the
+[November checkpoint](https://github.com/maxmixalex/hpclang/blob/119a779dd712d5f9937d4204cf7a837206a8e17e/docs/development/roadmap.md#current-work-balanced-m8-delivery)
+and [M8 validation history](m8-validation-history.md).
 
 ## Delivery and evidence policy
 

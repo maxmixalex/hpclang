@@ -150,6 +150,23 @@ HP49g+/HP50g use HOME, expose the native Port operations permitted by the
 current launch, and support export to a writable FAT SD card. A successful
 USB transfer does not establish media availability or data persistence.
 
+### Independent HP49g+ and HP50g Notebook
+
+Configure the installed example for `hp49gplus` or `hp50g` and build
+`--target notebook_independent_program`. The experimental target produces
+three binary objects in `notebook-independent/` for the selected model on
+Stock 2.15. It defaults to an empty Port 1. For an occupied Port 1, set
+`-DHPCLANG_NOTEBOOK_PORT1_OFFSET=<nibbles>` to the known offset of the chain
+terminator from the start of Port 1. The offset must be even. Keep that
+layout until installation and use a Port without an existing `NBLSE`.
+
+1. Transfer `DATA.HP` in binary mode to HOME as `LEASRC`. In RPN mode run
+   `HOME LEASRC :1:NBLSE STO`. After a successful store, run `'LEASRC' PURGE`
+   to release the temporary HOME copy.
+2. Transfer `USER.HP` as `NBUSER` and `COPY.HP` as `CKCOPY` to HOME.
+3. Run `HOME 'NBUSER' RCL CKCOPY EVAL` to open the editor. Save a note, exit
+   with ON and repeat the command to reopen it with the caller's stack preserved.
+
 ### Application sizing
 
 The application selects picolibc's integer-only formatter because it displays
