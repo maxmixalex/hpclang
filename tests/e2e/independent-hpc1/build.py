@@ -8,14 +8,13 @@ import runpy
 import struct
 import subprocess
 
-FIXTURE = Path("tests/e2e/independent-hpc1")
+# Repo and installed builders both live three directories below the SDK root.
+_script = Path(__file__).resolve()
+FIXTURE = _script.parent.relative_to(_script.parents[3])
+ENTRY = FIXTURE.parent / "independent-entry"
 INPUTS = (
-    "tests/e2e/independent-hpc1/build.py",
-    "tests/e2e/independent-hpc1/app.c",
-    "tests/e2e/independent-hpc1/loader.c",
-    "tests/e2e/independent-hpc1/link.ld",
-    "tests/e2e/independent-entry/build.py",
-    "tests/e2e/independent-entry/entry.S",
+    *((FIXTURE / name).as_posix() for name in ("build.py", "app.c", "loader.c", "link.ld")),
+    *((ENTRY / name).as_posix() for name in ("build.py", "entry.S")),
     "include/hpclang/abi.h",
     "include/hpclang/image-capabilities.h",
     "include/hpclang/bootstrap.h",
@@ -34,7 +33,9 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build(source, tool, output, model="hp50g", notebook=None, port0=False):
+def build(source, tool, output, model="hp50g", notebook=None, port0=False, preserve_stack=False):
+    if preserve_stack and not notebook:
+        raise ValueError("stack-preserving return requires the HP48gII Notebook")
     model_id = {"hp48gii": 4, "hp49gplus": 5, "hp50g": 6}[model]
     output.mkdir(parents=True, exist_ok=False)
     inputs = {name: digest(source / name) for name in INPUTS}
@@ -113,7 +114,7 @@ def build(source, tool, output, model="hp50g", notebook=None, port0=False):
             struct.pack("<4sIII", b"HPC1", len(payload), entry, 12) + payload
         )
 
-    assembly = (source / "tests/e2e/independent-entry/entry.S").read_text()
+    assembly = (source / ENTRY / "entry.S").read_text()
     replacements = {
         " bl exercise": " ldr r2, arena_offset\n add r1, r6, r2\n ldr r2, image_offset\n add r2, r6, r2\n ldr r3, image_bytes\n bl exercise",
         "workspace_offset: .word workspace-entry": "workspace_offset: .word workspace-entry\narena_offset: .word arena-entry\nimage_offset: .word hpc-entry\nimage_bytes: .word hpc_end-hpc",
@@ -185,7 +186,7 @@ def build(source, tool, output, model="hp50g", notebook=None, port0=False):
     run([str(tool / "llvm-objcopy"), "-O", "binary", "-j", ".text", "probe.elf", "probe.bin"])
     blob = (output / "probe.bin").read_bytes()
     blob += bytes(-len(blob) % 8)
-    encoder = runpy.run_path(str(source / "tests/e2e/independent-entry/build.py"))
+    encoder = runpy.run_path(str(source / ENTRY / "build.py"))
     word, code_for = encoder["word"], encoder["code_for"]
     code = code_for(len(blob), len(code_for(len(blob), 0, model)) - 13, model)
     packed = "".join(f"{b & 15:x}{b >> 4:x}" for b in blob)
@@ -203,9 +204,11 @@ def build(source, tool, output, model="hp50g", notebook=None, port0=False):
         reserve = len(destination)
     body = code + packed + destination
     program = word(0x2D9D) + word(0x2DCC) + word(5 + len(body)) + body
-    if notebook:
-        program += encoder["moving_gc_program"]()
-    program += word(0x2614) + word(12) + "5724210" + word(0x312B)
+    if not preserve_stack:
+        if notebook:
+            program += encoder["moving_gc_program"]()
+        program += word(0x2614) + word(12) + "5724210"
+    program += word(0x312B)
     if len(program) & 1:
         program += "0"
     (output / "program.HP").write_bytes(
@@ -237,7 +240,9 @@ def build(source, tool, output, model="hp50g", notebook=None, port0=False):
         manifest["application"] = "notebook"
         manifest["scope"] = "HP48gII resident Notebook editor and Stock return"
         manifest["resident_image"] = True
-        manifest["post_exit_gc"] = True
+        manifest["post_exit_gc"] = not preserve_stack
+        if preserve_stack:
+            manifest["preserve_stack"] = True
     if port0:
         manifest["port0_backup"] = True
     if model == "hp48gii":
@@ -254,6 +259,9 @@ def main():
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--notebook", type=Path, help="installed-SDK HP48gII notebook.hpc")
     parser.add_argument("--port0", action="store_true", help="run in the ENTRY48 Port 0 backup")
+    parser.add_argument(
+        "--preserve-stack", action="store_true", help="return without diagnostic stack objects"
+    )
     args = parser.parse_args()
     build(
         args.source_root.resolve(),
@@ -262,6 +270,7 @@ def main():
         args.model,
         args.notebook,
         args.port0,
+        args.preserve_stack,
     )
 
 

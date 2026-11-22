@@ -133,6 +133,13 @@ int hpclang_rpl_home_attachments_visit(const struct hpclang_rpl_reader *reader, 
                                        uint32_t limit, hpclang_rpl_home_attachment_fn visit,
                                        void *context);
 
+/* Check both HOME cache fields of every attachment against [first,end) in ERAM.
+ * Caller qualifies the fixed-ROM/main-RAM mapping and offset-preserving bank windows.
+ * Return 1 for possible overlap, 0 for disjoint offsets, negative for unsupported caches
+ * or read errors. This check alone cannot authorize an edit. */
+int hpclang_rpl_port1_home_overlap(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                   uint32_t limit, uint32_t first, uint32_t end);
+
 /* Inspect the native HOME attachment prefix (DORRP, count, 13-nibble records).
  * Caller supplies the proven HOME address and readable extent. Validate every
  * encoded record, including records after a match. Return 1 attached, 0 absent

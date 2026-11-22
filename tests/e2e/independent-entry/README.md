@@ -245,6 +245,15 @@ uses Stock Save to create Aplet `2`, edits it to `2020`, reopens it and checks
 both named directories. The original must retain `20`. Each phase writes
 `verified.json` alongside its captures after both returns to Stock.
 
+To exercise Stock collection while the Aplet's ENTER handler is active, add
+`--gc-at-boundaries` when building the test Aplet with `--aplet-writeback`.
+Use the same installed `notebook.hpc`, entry binary and initial note. The
+handler invokes Stock GARBAGE after MAKEGROB and again immediately after the
+ARM call, before it drops the bitmap or publishes the edited list. Run the
+same Save/Reset/copy sequence against this transfer set. This covers the
+handoff on both sides of the borrowed ARM mappings. Collection during native
+execution and evidence of object movement require separate checks.
+
 For the Save-button regression, also pass `--aplet-writeback` to both builders.
 For HP39gs or HP40gs, build the installed Notebook with the matching
 `HPCLANG_BUILD_MODEL` and pass `--model hp39gs` or `--model hp40gs` to

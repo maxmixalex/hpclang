@@ -65,7 +65,12 @@ def main():
     parser.add_argument(
         "--port0", action="store_true", help="install and recall Notebook in Port 0"
     )
+    parser.add_argument(
+        "--preserve-stack", action="store_true", help="verify preservation of user stack values"
+    )
     args = parser.parse_args()
+    if args.preserve_stack and not args.notebook:
+        parser.error("--preserve-stack requires --notebook")
     if args.port0 and not args.notebook:
         parser.error("--port0 requires --notebook")
     if args.notebook and args.fixture != "independent-hpc1":
@@ -93,6 +98,7 @@ def main():
             args.toolchain.resolve(),
             "--output",
             artifact,
+            *(["--preserve-stack"] if args.preserve_stack else []),
             *(["--port0"] if args.port0 else []),
             *(["--notebook", args.notebook.resolve()] if args.notebook else []),
         ],
@@ -111,6 +117,12 @@ def main():
             + (save + "9500 tap on\n" if args.port0 else "8500 tap on\n")
             + "14000 capture returned\n"
         )
+    commands = ["-95 CF HOME"]
+    if args.preserve_stack:
+        commands.append('"first" "second"')
+    if args.port0:
+        commands.append("'ENTRY48' RCL 'ENTRY48' PURGE :0:NOTES STO 1 :0:TAG STO")
+    commands.append(":0:NOTES RCL" if args.port0 else "'ENTRY48' RCL")
     transfer(
         spec,
         out / "run",
@@ -119,13 +131,7 @@ def main():
         "ENTRY48",
         package_name="program.HP",
         actions=actions,
-        remote_commands=[
-            "-95 CF HOME",
-            "'ENTRY48' RCL 'ENTRY48' PURGE :0:ENTRY48 STO",
-            ":0:ENTRY48 RCL",
-        ]
-        if args.port0
-        else None,
+        remote_commands=commands if args.port0 or args.preserve_stack else None,
     )
     if args.notebook:
         check_editor(out / "run", "")
@@ -151,7 +157,7 @@ def main():
             artifact,
             "ENTRY48",
             installed=True,
-            remote_commands=["-95 CF HOME :0:ENTRY48 RCL"] if args.port0 else None,
+            remote_commands=["-95 CF HOME :0:NOTES RCL"] if args.port0 else None,
             extra_files=[] if args.port0 else [("NOTE.HP", "HPCNOTE")],
             actions=resume_actions,
             execution_ms=23000 if args.port0 else 17000,
@@ -190,6 +196,12 @@ def main():
             ],
             check=True,
         )
+
+    if args.port0:
+        for phase in ("report.json", "resume.json"):
+            snapshot = json.loads((out / phase).read_text())
+            if snapshot["port0_name"] != "NOTES" or snapshot["port0_preceding_records"] < 1:
+                raise ValueError(f"{phase}: expected NOTES behind another Port 0 record")
 
 
 if __name__ == "__main__":

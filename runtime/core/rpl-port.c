@@ -225,6 +225,57 @@ int hpclang_rpl_home_attachments_visit(const struct hpclang_rpl_reader *reader, 
     return 0;
 }
 
+struct home_cache_range
+{
+    const struct hpclang_rpl_reader *reader;
+    uint32_t first, end;
+    int hit;
+};
+
+static int check_home_cache(void *context, uint32_t record, uint32_t number, uint32_t first,
+                            uint32_t second)
+{
+    (void)record;
+    (void)number;
+    struct home_cache_range *range = context;
+    const uint32_t pointers[] = {first, second};
+    for (unsigned i = 0; i < 2; ++i) {
+        uint32_t at = pointers[i];
+        if (!at)
+            continue;
+        /* Only fixed ROM and main RAM have an unambiguous source mapping. */
+        if (at < 0x80000u && at > 0x40000u - 15u)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (at > 0x100000u - 15u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t prologue, pointer, bank_switch;
+        int result = word(range->reader, at, 5, &prologue);
+        if (!result)
+            result = word(range->reader, at + 5, 5, &pointer);
+        if (!result)
+            result = word(range->reader, at + 10, 5, &bank_switch);
+        if (result)
+            return result;
+        if (prologue != 0x02baau || !bank_switch || pointer < 0x40000u || pointer >= 0x80000u)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        /* ERAM can overlay a Flash window, including noncanonical Stock switches. */
+        uint32_t offset = pointer - 0x40000u;
+        if (range->first <= offset && offset < range->end)
+            range->hit = 1;
+    }
+    return 0;
+}
+
+int hpclang_rpl_port1_home_overlap(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                   uint32_t limit, uint32_t first, uint32_t end)
+{
+    if (first >= end || end > 0x40000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct home_cache_range range = {reader, first, end, 0};
+    int result = hpclang_rpl_home_attachments_visit(reader, home, limit, check_home_cache, &range);
+    return result ? result : range.hit;
+}
+
 struct attachment_search
 {
     uint32_t number;

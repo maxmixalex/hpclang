@@ -53,6 +53,15 @@ if "resident_trailer_nibble" in result:
 if "port0_crc_nibble" in result:
     cases["resident-boot-cookie"] = ("sram", cases["boot-data"][1] + 12)
     cases["port0-crc"] = ("sram", (result["port0_crc_nibble"] + 1) // 2)
+if "user_stack_top_first" in result:
+    ram = (state / "sram").read_bytes()
+    _, read = m.module["mapping"](ram, (state / "flash").read_bytes(), "hp48gii")
+    stack = read(0x806F8)
+    for level in range(2):
+        char = read(stack + 5 * level) + 10
+        # HP48gII main RAM starts at physical SRAM +0x8000, with a 256 KiB mirror.
+        offset = (0x8000 + (char + 1 - 0x80000) // 2) % len(ram)
+        cases[f"user-stack-level-{level + 1}"] = ("sram", offset)
 rejected = {}
 with tempfile.TemporaryDirectory(prefix="hpclang-entry-negative-") as temp:
     target = Path(temp)

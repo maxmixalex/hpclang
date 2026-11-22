@@ -94,6 +94,20 @@ HP50g**: HP48gII uses ARMToolbox48 in Port 0; HP49g+/HP50g use ARMToolbox
 in Port 2. Recall the transferred Notebook object in RPN mode and launch
 it from **ARMTo → PrRUN**.
 
+For the experimental independent HP48gII HOME launcher, configure the model
+as `hp48gii` and build `--target notebook_independent_program`. Transfer
+`notebook-independent.hp` in binary mode to HOME, recall it in RPN mode and
+press EVAL. The editor reads the existing HOME note. ON returns to Stock
+with the user's stack values in place. This HOME launcher supplies a
+read-only object store. Use the production launcher above to save edits.
+
+For an experimental HP48gII launcher that saves the HOME note, build
+`--target notebook_independent_port0_program`. Transfer
+`notebook-independent-port0.hp` to HOME under the name `ENTRY48`. In RPN
+mode, run `'ENTRY48' RCL 'ENTRY48' PURGE :0:NOTES STO` to install it in
+Port 0. Run `:0:NOTES RCL` and press EVAL to open the editor. You can
+choose another Port 0 name and use it in both commands.
+
 The default Notebook build does not produce an HP39 Aplet. Prepare the
 external HPGCC39 resources as described in the installed
 getting-started guide, then wrap the existing launcher:
@@ -111,6 +125,24 @@ transfer instructions. Do not send the intermediate `.hp` by itself.
 Keep the same installed Aplet across launches: it owns the save. Its
 **Reset** view clears its custom data, so use **Exit** or **ON** when you
 want to keep the last save.
+
+### Experimental independent HP39/40 Aplet
+
+The installed Notebook example can also build a four-file transfer set that
+runs without library 275. In the model-specific build above, configure the
+prepared Stock asset directory and build the independent target explicitly.
+
+```sh
+cmake -S notebook -B build/notebook-hp39gs \
+  -DHPCLANG_NOTEBOOK_APLET_ASSETS=/path/to/prepared-hpgcc39/data
+cmake --build build/notebook-hp39gs --target notebook_independent_aplet
+```
+
+Transfer the four files in `build/notebook-hp39gs/independent-aplet/` together.
+The experimental Aplet appears as **EntryProbe** in the Stock library and
+opens with the example note `Seed42`. Use ENTER to open the editor and save
+before exiting. The same target works with the hp39gplus and hp40gs model
+profiles. Its page layout is qualified for this example.
 
 HP39 Stock provides Aplet-owned persistence, not HOME or Port backups in
 Notebook. HP48gII provides HOME and Port 0 but no Port 1/2 or SD export.

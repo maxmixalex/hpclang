@@ -419,6 +419,35 @@ static void test_home_attachment(void)
     assert(hpclang_rpl_home_library_attached(&reader, 0x80000, 8, 123) == 0);
 }
 
+static void test_home_cache_overlap(void)
+{
+    struct image image = {.count = 64, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_home, &image};
+    const uint32_t home = 0x80000u;
+    put_word(&image, 0, 0x2a96, 5);
+    put_word(&image, 5, 1, 3);
+    put_word(&image, 11, home + 21, 5);
+    put_word(&image, 16, home + 36, 5);
+    put_word(&image, 21, 0x2baa, 5);
+    put_word(&image, 26, 0x40321, 5);
+    put_word(&image, 31, 0x23c21, 5);
+    put_word(&image, 36, 0x2baa, 5);
+    put_word(&image, 41, 0x400ab, 5);
+    put_word(&image, 46, 0x22e83, 5);
+    assert(hpclang_rpl_port1_home_overlap(&reader, home, 21, 0x321, 0x322) == 1);
+    assert(hpclang_rpl_port1_home_overlap(&reader, home, 21, 0xab, 0xac) == 1);
+    assert(!hpclang_rpl_port1_home_overlap(&reader, home, 21, 0xac, 0x321));
+    image.fail_at = 50;
+    assert(hpclang_rpl_port1_home_overlap(&reader, home, 21, 0x321, 0x322) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    image.fail_at = UINT32_MAX;
+    put_word(&image, 16, 0x40000, 5);
+    assert(hpclang_rpl_port1_home_overlap(&reader, home, 21, 0x321, 0x322) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    put_word(&image, 16, 0, 5);
+    assert(!hpclang_rpl_port1_home_overlap(&reader, home, 21, 0xab, 0xac));
+}
+
 static void test_catalog_removal(void)
 {
     struct image image = {.count = 56, .fail_at = UINT32_MAX};
@@ -1630,6 +1659,7 @@ int main(void)
     test_catalog_insertion();
     test_catalog_removal();
     test_home_attachment();
+    test_home_cache_overlap();
     test_acptr_resolution();
     test_flashptr_resolution();
     test_flashptr_bank();

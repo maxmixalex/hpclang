@@ -54,7 +54,13 @@ temporary, records a live tag's address and calls GARBAGECOL. The reports
 record the lower address and verify the tag at that location. This HOME-resident variant supplies a read-only object-store context.
 
 With both `--notebook` and `--port0`, the runner installs the Notebook as
-the first Port 0 backup named `ENTRY48` and recalls that same program twice.
+a Port 0 backup named `NOTES`, stores a separate `TAG` backup and recalls
+the Notebook twice. Both snapshots check its name and position in the chain.
+
+Pass `--preserve-stack` with either HP48gII Notebook run to exercise ordinary
+return to RPN. The runner places two distinct strings on the stack before
+the first recall and checks both in order after each exit. The default test
+program retains the moving-GC witness and its numeric result marker.
 On the first launch the editor creates a HOME note containing `20`. On the
 second launch it reads that note, saves `2020`, returns to the editor and
 saves `20202` before exiting. The two save captures check the edited text
