@@ -140,7 +140,14 @@ def build_runner(
     )
 
 
-def editor_pool_usage(ram, image, code_offset):
+def port1_field(ram, at, n):
+    assert 0 <= at <= 0x40000 - n
+    return sum(
+        ((ram[0x20000 + (at + i) // 2] >> (4 * ((at + i) % 2))) & 15) << (4 * i) for i in range(n)
+    )
+
+
+def editor_pool_usage(ram, image, code_offset, record_start):
     """Account for each live launcher allocation once, including allocator overhead."""
     base = 0x08000000
     assert len(ram) == 0x80000
@@ -182,12 +189,41 @@ def editor_pool_usage(ram, image, code_offset):
     code_pages = (len(image) + 4095) // 4096
     for i in range(code_pages):
         assert word_at(l2 + 4 * (256 + 32 + i)) == (base + code + i * 4096) | 0xAA2
+    # NBLSE is a named Stock backup containing a string. Measure its complete
+    # record and verify that every mapped code frame belongs to the string.
+    assert port1_field(ram, record_start, 5) == 0x2B62
+    record_end = record_start + 5 + port1_field(ram, record_start + 5, 5)
+    name_len = port1_field(ram, record_start + 10, 2)
+    assert name_len == 5
+    name = bytes(port1_field(ram, record_start + 12 + 2 * i, 2) for i in range(name_len))
+    assert name == b"NBLSE"
+    string = record_start + 14 + 2 * name_len
+    assert port1_field(ram, string - 2, 2) == name_len and port1_field(ram, string, 5) == 0x2A2C
+    string_end = string + 5 + port1_field(ram, string + 5, 5)
+    assert string + 10 <= 2 * code_offset < 2 * (code_offset + code_pages * 4096) <= string_end
+    assert string_end + 10 == record_end and port1_field(ram, record_end, 5) == 0
     return {
         "kos_blocks": count,
         "kos_resident_bytes": sum(end - start for start, end in extents),
         "pool_frame_bytes": pages * 4096,
         "port1_code_frame_bytes": code_pages * 4096,
+        "port1_record_nibbles": record_end - record_start,
     }
+
+
+def user_memory(prefix, phases, model, flash, image, page, record_start):
+    pools, gaps = {}, {}
+    for phase in ("deposited", *phases, "returned"):
+        ram = (prefix / f"mem-{phase}.sram").read_bytes()
+        _, read = entry_verifier["mapping"](ram, flash, model)
+        # Stock counts complete five-nibble cells between RSKTOP and DSKTOP in AVMEM.
+        rstk, dstk = read(0x806F3), read(0x806F8)
+        assert 0x80000 <= rstk <= dstk < 0x100000
+        gaps[phase] = dstk - rstk
+        assert read(0x80E9B) == gaps[phase] // 5
+        if phase in phases:
+            pools[phase] = editor_pool_usage(ram, image, page, record_start)
+    return pools, gaps
 
 
 def check_phase(phase, editor_text, flash, original, font, expected_result):
@@ -297,16 +333,10 @@ def main():
     ram = (baseline / "sram").read_bytes()
 
     # Stock appends NBLSE after the existing ERAM chain.
-    def field(at, n):
-        return sum(
-            ((ram[0x20000 + (at + i) // 2] >> (4 * ((at + i) % 2))) & 15) << (4 * i)
-            for i in range(n)
-        )
-
     at = 0
-    while field(at, 5):
-        assert field(at, 5) in (0x2B62, 0x2B40)
-        size = field(at + 5, 5) + 5
+    while port1_field(ram, at, 5):
+        assert port1_field(ram, at, 5) in (0x2B62, 0x2B40)
+        size = port1_field(ram, at + 5, 5) + 5
         assert 20 < size <= 0x40000 - at
         at += size
     offset = at + 34
@@ -359,14 +389,11 @@ def main():
                 execution_ms=18000,
                 resource_prefix=Path(tmp) / "mem",
             )
-            usage = {
-                phase: editor_pool_usage(
-                    (Path(tmp) / f"mem-{phase}.sram").read_bytes(), image, page
-                )
-                for phase in (("editor",) if installed else ("editor", "saved"))
-            }
+            phases = ("editor",) if installed else ("editor", "saved")
+            usage, gaps = user_memory(Path(tmp), phases, args.model, flash, image, page, at)
         hashes[name] = {
             "memory": usage,
+            "stock_free_gap_nibbles": gaps,
             "user_stack_top_first": ["second", "first"],
             "settled_sha256": check_phase(
                 dest / name, editor, flash, staged[0x20000:0x40000], font, None

@@ -375,10 +375,19 @@ allocations totaling 45,096 bytes on entry, after Save and on reopening the note
 pages and one page-table frame occupied 36,864 bytes within those blocks.
 Alignment slack and allocator metadata accounted for the other 8,232 bytes.
 The editor mapped another 81,920 bytes of code directly from its Port 1
-record. The verifier checked each block extent and both sets of page
-descriptors against SRAM. These checkpoints cover the launcher pool and
-mapped code; lifecycle peak accounting also needs the remaining Stock and
-launcher storage.
+record. With the preceding `NBPAD` record used in this regression, the complete
+`NBLSE` backup occupied 85,595 bytes, including those code pages. Its size
+plus the two disjoint KOS allocations was 130,691 bytes at each editor
+checkpoint. The verifier checked both sets of page descriptors and the extent
+of the named backup in SRAM.
+
+On both models, the free interval between Stock's return and data stacks
+measured 402,508 nibbles before EVAL, 402,409 in the empty editor, 402,334
+after Save and 400,746 after return. On reopening, those readings were
+402,339 before EVAL, 402,260 in the editor and 400,672 after return. Each
+reading agreed with Stock's AVMEM count of complete five-nibble cells.
+These samples track Stock workspace separately. Peak usage between captures
+remains open.
 
 **SDK default after the six-model startup comparison (2026-11-23).**
 Keep the existing production launchers as the SDK defaults. Independent entry
