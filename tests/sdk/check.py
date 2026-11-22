@@ -22,6 +22,28 @@ def run(*args, env):
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
 
 
+def check_notebook_port1_data(directory, append_nibbles):
+    """Decode the transfer object at its configured Stock installation address."""
+    data = (directory / "notebook-independent/DATA.HP").read_bytes()
+    image = (directory / "notebook.hpc").read_bytes()[16:]
+    # HP binary header followed by the five-nibble DOCSTR tag and length.
+    header = int.from_bytes(data[8:13], "little")
+    payload = data[13:]
+    if (
+        data[:8] != b"HPHP49-C"
+        or header & 0xFFFFF != 0x2A2C
+        or header >> 20 != 5 + 2 * len(payload)
+    ):
+        raise AssertionError("invalid Notebook Port 1 transfer string")
+    # The named backup and string occupy 34 nibbles before the payload.
+    start_bytes = (append_nibbles + 34) // 2
+    padding = -start_bytes % 4096
+    if not image or len(image) > 20 * 4096:
+        raise AssertionError("invalid Notebook image size")
+    if payload != bytes(padding) + image.ljust(20 * 4096, b"\x00"):
+        raise AssertionError(f"Notebook payload mispacked for Port 1 offset {append_nibbles}")
+
+
 def check_cpp_headers(package, work, env):
     """Compile each installed public C++ header alone with the shipped profile."""
     source = work / "public header client"
@@ -831,6 +853,28 @@ endforeach()
             for relative in sorted(outputs | font_sets[0]):
                 if (selected / relative).read_bytes() != (repeated / relative).read_bytes():
                     raise AssertionError(f"{model}: nonreproducible release output {relative}")
+            if model in ("hp49gplus", "hp50g"):
+                check_notebook_port1_data(selected, 0)
+                # Reconfigure in place for an occupied Port and check the actual transfer.
+                offset = 0x2080
+                run(
+                    "cmake",
+                    "-S",
+                    str(selected_source),
+                    "-B",
+                    str(selected),
+                    f"-DHPCLANG_NOTEBOOK_PORT1_OFFSET={offset}",
+                    env=env,
+                )
+                run(
+                    "cmake",
+                    "--build",
+                    str(selected),
+                    "--target",
+                    "notebook_independent_program",
+                    env=env,
+                )
+                check_notebook_port1_data(selected, offset)
             if args.independent_notebooks and aplet_options:
                 destination = notebooks / model
                 destination.mkdir(parents=True)
