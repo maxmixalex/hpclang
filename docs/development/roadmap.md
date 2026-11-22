@@ -1,8 +1,9 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-22. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+Current checkpoint: 2026-11-23. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `8cb52654`. [PR #57](https://github.com/maxmixalex/hpclang/pull/57)
+Accepted main is `119a779d`. [PR #58](https://github.com/maxmixalex/hpclang/pull/58)
+merged named Port 1 lookup on HP49g+ and HP50g after 190 checks passed and two skipped. [PR #57](https://github.com/maxmixalex/hpclang/pull/57)
 merged the Port 1 HOME cache guard, HP39/40 GC regressions and independent
 Notebook SDK targets. All 197 executed checks passed on `714b4d4e`; two skipped.
 [PR #49](https://github.com/maxmixalex/hpclang/pull/49) previously merged library
@@ -12,7 +13,7 @@ The HP49g+/HP50g independent launcher locates its Port 1 code backup by name.
 Both local Stock 2.15 runs executed from offset 8192 in Port 1, reopened the
 HOME note, exported the edit and recalled its Port 0 backup. After Stock
 purged the code, both returned the refusal result and preserved HOME and the
-remaining Port 1 bytes. Remote acceptance of this follow-up is pending.
+remaining Port 1 bytes. This placement check passed CI in #58.
 The HP49g+/HP50g user entry releases its KOS blocks before returning to RPN.
 On both local Stock 2.15 ROMs it saved and reopened `20`, preserving both
 user stack values across both launches. Its transfer is 22,275 bytes per
@@ -42,7 +43,12 @@ Two [HP48gII paired runs](architecture.md#hp48gii-editor-memory-and-startup)
 showed the same 4,984-byte application stack peak and the same 9,972-byte
 heap reservation after Save. The editor became visible in roughly 56–63 ms
 through PrRUN and 24–31 ms through independent Port 0 in the emulator.
-Cross-family timing and launcher/Stock peak resident RAM remain open.
+Two local [HP39/40 relaunch pairs](architecture.md#hp3940-editor-startup) on
+each model opened the saved note `20`, saved and reopened `2020`, and returned
+to the library. The independent editor appeared earlier on HP39g+ and HP40gs
+in both pairs. HP39gs intervals overlapped. The comparisons are tracked in
+[PR #64](https://github.com/maxmixalex/hpclang/pull/64). HP49/50 timing and
+launcher/Stock peak resident RAM remain open.
 
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy

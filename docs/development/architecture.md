@@ -297,8 +297,39 @@ preceded the timing window.
 | Second pair | 55.7–62.0 ms | 23.9–29.9 ms |
 
 These are elapsed emulator times rounded outwards to 0.1 ms. Both runs
-checked the saved HOME contents and returned display. The corresponding
-HP39/40 and HP49/50 comparisons remain open.
+checked the saved HOME contents and returned display. HP49g+/HP50g timing remains open.
+
+#### HP39/40 editor startup
+
+Each model ran the same ATfE 22.1.0 Notebook HPC1 image through the production
+ARMToolbox Aplet and the independent bitmap Aplet. Both started from the Stock
+library with Notebook selected and `20` saved. The first Enter opened the
+Aplet. Timing started at the capture immediately before the second Enter.
+The emulator sampled the LCD every 5 ms until both the Notebook title and
+the focused editor containing `20` appeared. Both paths then typed another
+`20`, saved, reopened `2020`, and returned to the same library display.
+
+| Model and ROM | Production, first pair | Independent, first pair | Production, repeat | Independent, repeat |
+| --- | ---: | ---: | ---: | ---: |
+| HP39g+ D1.55 | 64.9–71.0 ms | 46.9–53.0 ms | 77.0–83.0 ms | 52.8–58.9 ms |
+| HP39gs 2.22 | 34.8–40.9 ms | 34.9–41.0 ms | 52.7–58.8 ms | 48.0–54.1 ms |
+| HP40gs 2.22 | 29.8–35.8 ms | 22.9–29.0 ms | 41.8–47.9 ms | 22.8–28.8 ms |
+
+Intervals use the actual emulator timestamps on either side of the first
+matching capture, rounded outwards to 0.1 ms. The independent path showed
+the editor earlier in both pairs on HP39g+ and HP40gs. The HP39gs intervals
+overlap in both pairs. These runs measure editor relaunch after installation.
+
+To repeat a pair, save `20` in each installed Aplet, return to the Stock
+library with Notebook selected, and close the emulator to persist each state.
+Use the same model-specific Notebook image for both packages. The runner
+copies the two state directories and removes its temporary captures on exit.
+
+```sh
+python3 tests/e2e/independent-entry/measure-hp39-notebook.py \
+  --model hp39gs --dist "$dist" \
+  --production "$production_state" --independent "$independent_state"
+```
 
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.
