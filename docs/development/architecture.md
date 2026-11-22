@@ -247,7 +247,7 @@ This is an implementation assessment, not additional native execution evidence.
 | --- | --- |
 | HP39g+/39gs/40gs | `runtime/core/hp39-aplet-frame.c` recognizes the Aplet `_Action` instruction sequence, including the library-275 `xPrRUN` ROMPTR, before exposing the custom-data slot. `tools/prepare-hp39-aplet.py` also installs Start/Reset views and restores the caller's program context around Reset. A new entry must provide an explicit equivalent Aplet data/return contract; replacing the ARM jump alone would leave persistence unavailable. Keep save/relaunch, copied-Aplet isolation and Reset in the comparison. |
 | HP48gII | `platform/armtoolbox/stage0.S` consumes the launcher's pool count and L2 table, rejects insufficient space before changing mappings, and releases its optional KOS allocation on both rejection and return. The independent model-4 launcher maps all 29 pages and runs the installed SDK Notebook editor. A fresh Stock boot accepted keyboard input and returned on ON. A trailer beyond the mapped pages records the code location relative to the Stock object in nibbles. After Stock stored a HOME note and moved the program, a second process recalled it and Notebook read the note. Each exit now runs Stock GC and checks a relocated tagged temporary. The independent Port 0 variant provides checked RPL bounds, keeps its own port read-only and saves HOME from the application. A second Stock process loads and replaces that note. Active-execution GC remains open. |
-| HP49g+/HP50g | `tests/e2e/independent-hpc1/loader.c` supplies one code page and four RW pages from its fixed arena, but sets both `saturn_state` and `platform_cookie` to zero. It proves the common HPC1 bootstrap boundary, not the native object/port services used by Notebook. Supplying those services requires a captured Stock context and equivalent relocation/allocation boundaries before the application comparison is meaningful. |
+| HP49g+/HP50g | The independent Notebook passes the Stock map and suspended execution roots to the application, with its Port 1 code record protected from edits. In the GC regression, the launcher restores both Stock L1 entries before collection. The KOS allocations stay owned across moving GC. A second ARM entry checks the page contents, remaps the Port 1 image, verifies its hash and releases the blocks. Collection while the application's mappings are active remains open. |
 
 Across families, `platform/armtoolbox/stage1.c` derives main/Port1 allocation
 fences from the actual pool and publishes launcher and suspended-execution roots.
@@ -292,18 +292,9 @@ The follow-up `rpl-probe.c` now borrows and restores 28 main-RPL pages (112 KiB)
 while Stock execution and interrupts remain paused. Each page is checked against
 the saved native Read map, page-end contents are restored, and entry/return plus
 ten corruption negatives pass. Its optional state argument leaves the default
-entry package unchanged. This small-entry baseline does not establish combined
-KOS/RPL availability with the full Notebook resident, or a lease across native
-allocation/GC. Report: `/work/nov14-independent-rpl-pool-live/verified.json`. Then
-connect the captured Stock context and service fences to a service-capable
-HP49/50 Notebook prototype, followed by HP48gII application-sized ownership
-and the HP39 Aplet data boundary. Compare identical application
-sources and configuration; record package transfer cost, supported-flow memory
-use, allocation failure and settled return. This does not require the deferred
-whole-system worst-case memory proof. Until those comparisons exist, the
-installation-step benefit is established but a net memory, size or startup-time
-benefit is not. Production launchers remain in use and this evaluation remains
-open.
+entry package unchanged. The later Notebook uses Port 1 for code and KOS for writable pages and page
+tables. See the [family assessment](#source-level-family-assessment) for its
+Stock service and return checks.
 
 ## Common bootstrap
 
