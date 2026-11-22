@@ -838,7 +838,7 @@ int main(void)
     const unsigned positions[] = {1, total_programs / 2, total_programs};
     for (unsigned pattern = 0; pattern < 36; ++pattern) {
         uint16_t mask = pattern < 16    ? (uint16_t)(1u << pattern)
-                        : pattern < 32  ? (uint16_t) ~(1u << (pattern - 16))
+                        : pattern < 32  ? (uint16_t)~(1u << (pattern - 16))
                         : pattern == 32 ? 0
                         : pattern == 33 ? UINT16_MAX
                         : pattern == 34 ? 0x5555
