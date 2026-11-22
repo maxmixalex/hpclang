@@ -297,7 +297,7 @@ preceded the timing window.
 | Second pair | 55.7–62.0 ms | 23.9–29.9 ms |
 
 These are elapsed emulator times rounded outwards to 0.1 ms. Both runs
-checked the saved HOME contents and returned display. HP49g+/HP50g timing remains open.
+checked the saved HOME contents and returned display.
 
 #### HP39/40 editor startup
 
@@ -330,6 +330,46 @@ python3 tests/e2e/independent-entry/measure-hp39-notebook.py \
   --model hp39gs --dist "$dist" \
   --production "$production_state" --independent "$independent_state"
 ```
+
+#### HP49g+ and HP50g editor startup and application memory
+
+On each Stock 2.15 ROM the installed SDK built the production and independent
+packages from the same Notebook HPC1 image (HP49g+ `699685de3c37`, HP50g
+`48078d5f0892`, SHA-256 prefixes). Production used the installed ARMToolbox
+PrRUN softkey. The independent entry used EVAL with code in a named Port 1
+backup behind an existing record. Timing began at the LCD capture immediately
+before the launch key, after USB transfer, recall and menu selection. Captures
+scheduled every 5 ms bracketed the first matching Notebook title and focused
+editor using actual emulator timestamps.
+
+| Model and launch | Empty editor | Reopen `20` | Repeat from the same saved state |
+| --- | ---: | ---: | ---: |
+| HP49g+ PrRUN | 40.9–47.1 ms | 53.7–59.8 ms | 65.9–71.9 ms |
+| HP49g+ Port 1 | 22.6–28.0 ms | 23.8–29.9 ms | 23.8–29.9 ms |
+| HP50g PrRUN | 46.9–53.1 ms | 47.8–53.9 ms | 76.9–82.9 ms |
+| HP50g Port 1 | 29.0–35.5 ms | 23.8–29.9 ms | 28.8–34.9 ms |
+
+Each empty-editor run typed and saved `20`. Both subsequent launches reopened
+that HOME note. All twelve launches preserved the caller's two RPN strings
+in order, retained the Flash contents and returned to a settled Stock display.
+
+Both models gave the same memory readings. PrRUN mapped 155,648 writable
+bytes and the independent entry mapped 32,768. Heap reserved at the empty
+editor and after Save was 13,780 and 13,828 bytes through PrRUN, and 12,348
+and 12,396 bytes through independent entry. At both checkpoints the captured
+page tables reproduced the complete 20-page application payload. The mapped
+writable extent matched the boot descriptor; the heap figures use the ELF
+symbols `heap_next` and `__bss_end`. Peak resident RAM across Stock and the
+launcher remains open.
+
+**SDK default after the six-model startup comparison (2026-11-23).**
+Keep the existing production launchers as the SDK defaults. Independent entry
+showed the Notebook editor earlier on five models in the measured pairs.
+On HP39gs the timing intervals overlapped. The independent first install took
+more transfer bytes on all six models, including the revised HP48gII package.
+The remaining migration decision depends on measured peak resident memory and
+safe ownership of live native mappings during Stock collection. The independent
+targets remain available for evaluation through the SDK.
 
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.

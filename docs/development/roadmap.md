@@ -29,8 +29,8 @@ acceptance of the SDK transfer set is pending.
 The [six-model first-install comparison](architecture.md#notebook-first-install-transfer-size)
 now includes each production support library and every independent transfer
 file for the same Notebook image. The local builds at `a26cde72` measured
-4,595–73,189 extra bytes for independent first installs. Startup latency and
-peak resident RAM comparisons remain open.
+4,595–73,189 extra bytes for independent first installs before the HP48gII
+layout reduction described below.
 
 The HP48gII independent Notebook now maps 25 pages for the same application
 image. The SDK's writable Port 0 transfer shrank by 16 KiB to 122,333 bytes.
@@ -47,8 +47,11 @@ Two local [HP39/40 relaunch pairs](architecture.md#hp3940-editor-startup) on
 each model opened the saved note `20`, saved and reopened `2020`, and returned
 to the library. The independent editor appeared earlier on HP39g+ and HP40gs
 in both pairs. HP39gs intervals overlapped. The comparisons are tracked in
-[PR #64](https://github.com/maxmixalex/hpclang/pull/64). HP49/50 timing and
-launcher/Stock peak resident RAM remain open.
+[PR #64](https://github.com/maxmixalex/hpclang/pull/64). The [HP49g+/HP50g measurements](architecture.md#hp49g-and-hp50g-editor-startup-and-application-memory)
+add twelve local Stock launches. Independent entry displayed the editor earlier
+in all six pairs. Both paths preserved the saved note and both RPN stack values.
+All six models now have local startup comparisons. Launcher/Stock peak resident
+RAM and release acceptance remain open.
 
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy
