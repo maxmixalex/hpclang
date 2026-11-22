@@ -687,16 +687,30 @@ static int bank_nibble(void *context, uint32_t at, uint8_t *value)
 
 static void reclaim_published_sector_test(void)
 {
-    const struct hpclang_rpl_reader bank = {bank_nibble, flash};
+    uint32_t journal = 17;
     const uint32_t live_end = 0x105u + sizeof library;
     prepare_preflight();
     memcpy(flash + 0x105, library, sizeof library);
     memcpy(flash + live_end, backup, sizeof backup);
     flash[live_end] = 0;
-    assert(hpclang_rpl_flash_reclaim_sector_image(&bank, 0, desired, sizeof desired) == 1);
+    assert(hpclang_rpl_flash_prepare_reclaim_sector(&io.flash, FIRST + SECTOR, scratch,
+                                                    sizeof scratch,
+                                                    &journal) == HPCLANG_RPL_FLASH_NOT_FOUND);
+    assert(journal == 17 && !programs && !erases);
+    /* The other bank already holds a library: its header and body stay intact. */
+    memcpy(flash + SLOT - FIRST, library, sizeof library);
+    assert(!hpclang_rpl_flash_prepare_reclaim_sector(&io.flash, FIRST, scratch, sizeof scratch,
+                                                     &journal));
+    assert(journal == SLOT + sizeof library && !programs && !erases);
+    assert(!memcmp(flash + SLOT - FIRST, library, sizeof library));
+    memset(flash + SLOT - FIRST, 255, sizeof library);
+    assert(!hpclang_rpl_flash_prepare_reclaim_sector(&io.flash, FIRST, scratch, sizeof scratch,
+                                                     &journal));
+    assert(journal == SLOT && !programs && !erases);
+    memcpy(desired, flash, live_end);
+    memset(desired + live_end, 255, SECTOR - live_end);
     memcpy(original, flash, sizeof flash);
-    assert(!hpclang_rpl_flash_sector_encode(FIRST, END, SLOT, FIRST, desired,
-                                            original + SLOT - FIRST, sizeof scratch));
+    memcpy(original + journal - FIRST, scratch, sizeof scratch);
     publishing = 1;
     assert(publish() == HPCLANG_RPL_FLASH_WRITTEN);
     publishing = 0;

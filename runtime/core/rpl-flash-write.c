@@ -1044,6 +1044,43 @@ int hpclang_rpl_flash_plan_append_space(const struct hpclang_rpl_flash_io *io, u
     return HPCLANG_RPL_FLASH_WRITTEN;
 }
 
+int hpclang_rpl_flash_prepare_reclaim_sector(const struct hpclang_rpl_flash_io *io, uint32_t target,
+                                             uint8_t *record, uint32_t capacity, uint32_t *slot)
+{
+    if (!io || !record || !slot || capacity < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES ||
+        (io->first & 0x1ffffu) || target < io->first || target >= io->end ||
+        target % HPCLANG_RPL_FLASH_SECTOR_BYTES)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct erased_tail tails[6];
+    struct record_selection selection;
+    int result = scan_records(io, NULL, 0, 0, 0, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES, &selection,
+                              tails, NULL);
+    if (result)
+        return result;
+    uint32_t bank = target & ~0x1ffffu;
+    struct recovery_reader mapped = {io, bank};
+    const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
+    result = hpclang_rpl_flash_reclaim_sector_image(&reader, target - bank, record,
+                                                    HPCLANG_RPL_FLASH_SECTOR_BYTES);
+    if (!result)
+        return HPCLANG_RPL_FLASH_NOT_FOUND;
+    if (result < 0)
+        return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                      : HPCLANG_RPL_FLASH_DIRTY;
+    for (unsigned i = 0; i < 6; ++i) {
+        if (i == (bank - io->first) / 0x20000u ||
+            tails[i].bytes < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES)
+            continue;
+        result = hpclang_rpl_flash_sector_encode(io->first, io->end, tails[i].slot, target, record,
+                                                 record, capacity);
+        if (result)
+            return HPCLANG_RPL_FLASH_INVALID;
+        *slot = tails[i].slot;
+        return HPCLANG_RPL_FLASH_WRITTEN;
+    }
+    return HPCLANG_RPL_FLASH_NOSPACE;
+}
+
 static int select_record(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
                          uint32_t name_length, uint32_t prologue, uint32_t library_number,
                          uint32_t bytes, struct record_selection *selection,

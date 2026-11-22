@@ -226,6 +226,13 @@ static void plan_append_space(const struct hpclang_rpl_flash_io *io)
     assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record + 2u, &plan));
     assert(plan.slot == base + 0x105u && plan.sector_count == 32u);
 
+    uint8_t journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    uint32_t slot = 17;
+    assert(hpclang_rpl_flash_prepare_reclaim_sector(io, base + bank + 0x1f000u, journal,
+                                                    sizeof journal,
+                                                    &slot) == HPCLANG_RPL_FLASH_NOSPACE);
+    assert(slot == 17 && !writes);
+
     plan = (struct hpclang_rpl_flash_append_space){12, 34};
     assert(hpclang_rpl_flash_plan_append_space(io, 0x20000, &plan) == HPCLANG_RPL_FLASH_NOSPACE);
     assert(hpclang_rpl_flash_plan_append_space(io, 3, &plan) == HPCLANG_RPL_FLASH_INVALID);
