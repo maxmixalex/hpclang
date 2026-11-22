@@ -21,6 +21,10 @@ static const uint8_t backup[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03,
                                  0x4c, 0x41, 0x53, 0x48, 0x4f, 0x4e, 0x45, 0x08, 0x14, 0x26, 0x90,
                                  0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
 
+static const uint8_t library[] = {0x53, 0x36, 0x00, 0x10, 0x40, 0x2b, 0x60, 0x02, 0x00, 0x01,
+                                  0x58, 0x01, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                  0x00, 0x00, 0x00, 0xd0, 0xc5, 0xf2, 0xff, 0xff};
+
 static int read16(void *context, uint32_t address, uint16_t *value)
 {
     assert(context == flash && !(address & 1u) && address >= FIRST && address + 1 < END);
@@ -681,6 +685,51 @@ static int bank_nibble(void *context, uint32_t at, uint8_t *value)
     return 1;
 }
 
+static void reclaim_published_sector_test(void)
+{
+    const struct hpclang_rpl_reader bank = {bank_nibble, flash};
+    const uint32_t live_end = 0x105u + sizeof library;
+    prepare_preflight();
+    memcpy(flash + 0x105, library, sizeof library);
+    memcpy(flash + live_end, backup, sizeof backup);
+    flash[live_end] = 0;
+    assert(hpclang_rpl_flash_reclaim_sector_image(&bank, 0, desired, sizeof desired) == 1);
+    memcpy(original, flash, sizeof flash);
+    assert(!hpclang_rpl_flash_sector_encode(FIRST, END, SLOT, FIRST, desired,
+                                            original + SLOT - FIRST, sizeof scratch));
+    publishing = 1;
+    assert(publish() == HPCLANG_RPL_FLASH_WRITTEN);
+    publishing = 0;
+
+    erase_error = 1;
+    erase_prefix = 512;
+    assert(replay() == HPCLANG_RPL_FLASH_DIRTY);
+    /* The verifier starts again using only Flash and the six bank boundaries. */
+    reset_counters();
+    uint32_t slot = 0, target = 0;
+    uint8_t workspace[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == 1);
+    assert(slot == SLOT && target == FIRST && !programs && !erases);
+    assert(hpclang_rpl_flash_sector_replay_expected(&io, slot, workspace, sizeof scratch, scratch,
+                                                    sizeof scratch) == HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!memcmp(flash, original, live_end));
+    publishing = 1;
+    assert(hpclang_rpl_flash_retire_sector(&io.flash, slot, workspace, sizeof scratch) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    publishing = 0;
+    assert(!hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                               &target));
+    assert(hpclang_rpl_flash_create_backup(&io.flash, backup, sizeof backup, &slot) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    assert(slot == FIRST + live_end && !memcmp(flash + live_end, backup, sizeof backup));
+    reset_counters();
+    assert(!hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                               &target));
+    assert(!programs && !erases);
+    assert(!memcmp(flash, original, live_end));
+}
+
 static void reclaim_suffix_test(void)
 {
     const struct hpclang_rpl_reader bank = {bank_nibble, flash};
@@ -735,9 +784,6 @@ static void reclaim_suffix_test(void)
     assert(tail.address == 2 * live_end && !memcmp(flash, original, live_end));
     sector_address = FIRST;
     /* Reuse the released address for a distinct CRC-valid native library. */
-    static const uint8_t library[] = {0x53, 0x36, 0x00, 0x10, 0x40, 0x2b, 0x60, 0x02, 0x00, 0x01,
-                                      0x58, 0x01, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                      0x00, 0x00, 0x00, 0xd0, 0xc5, 0xf2, 0xff, 0xff};
     assert(hpclang_rpl_flash_append(&io.flash, FIRST + live_end, library, sizeof library) ==
            HPCLANG_RPL_FLASH_WRITTEN);
     assert(!memcmp(flash + live_end, library, sizeof library));
@@ -747,6 +793,7 @@ static void reclaim_suffix_test(void)
 
 int main(void)
 {
+    reclaim_published_sector_test();
     reclaim_suffix_test();
     for (unsigned i = 0; i < sizeof original; ++i)
         original[i] = (uint8_t)(i * 31u + 11u);
@@ -791,7 +838,7 @@ int main(void)
     const unsigned positions[] = {1, total_programs / 2, total_programs};
     for (unsigned pattern = 0; pattern < 36; ++pattern) {
         uint16_t mask = pattern < 16    ? (uint16_t)(1u << pattern)
-                        : pattern < 32  ? (uint16_t)~(1u << (pattern - 16))
+                        : pattern < 32  ? (uint16_t) ~(1u << (pattern - 16))
                         : pattern == 32 ? 0
                         : pattern == 33 ? UINT16_MAX
                         : pattern == 34 ? 0x5555
