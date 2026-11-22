@@ -213,6 +213,9 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
         hpclang_rpl_port1_create_backup(&io, limit, packed, span) ||
         !chain_end(&reader, &owned.end))
         goto done;
+    static const uint8_t renamed[] = {0x40, 0x2b, 0x80, 0x02, 0x00, 0x02, 0x58, 0x59,
+                                      0x02, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0x00, 0x90, 0x59, 0x02};
     step = 10;
     uint32_t before;
     if (!fingerprint(&reader, owned.end + 6u, &before))
@@ -220,11 +223,23 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
     owned.test_stack_slot = stack_slot;
     owned.test_stack_target = 0x40000u + owned.first;
     int refused = hpclang_rpl_port1_remove_library(&io, limit, 123, &guard);
+    int replace_refused = hpclang_rpl_port1_replace_library(&io, limit, 123, renamed, 45, &guard);
     owned.test_stack_slot = 0;
-    if (refused != HPCLANG_RPL_MUTATION_BUSY || !fingerprint(&reader, owned.end + 6u, &hash) ||
-        hash != before)
+    if (replace_refused != HPCLANG_RPL_MUTATION_BUSY || refused != HPCLANG_RPL_MUTATION_BUSY ||
+        !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
         goto done;
     step = 11;
+    if (hpclang_rpl_port1_replace_library(&io, limit, 123, renamed, 45, &guard) ||
+        !matches(tail_name, tail) || !chain_end(&reader, &owned.end))
+        goto done;
+    struct hpclang_object *copy = hpclang_port_library_get(1, 123);
+    int renamed_ok = copy && copy->nibble_count == 45 && !memcmp(copy->data, renamed, 22) &&
+                     (copy->data[22] & 15) == renamed[22];
+    hpclang_object_release(copy);
+    if (!renamed_ok || hpclang_rpl_port1_replace_library(&io, limit, 123, library, 43, &guard) ||
+        !matches(tail_name, tail) || !chain_end(&reader, &owned.end))
+        goto done;
+    step = 12;
     if (hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) || !matches(tail_name, tail) ||
         !chain_end(&reader, &owned.end) ||
         hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) !=

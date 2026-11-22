@@ -43,6 +43,11 @@ int hpclang_rpl_port1_remove_backup(const struct hpclang_rpl_mutation_io *io, ui
                                     const uint8_t *name, uint32_t name_length,
                                     const struct hpclang_rpl_port1_guard *guard);
 
+/* Replace an owned, unregistered and unattached header-only library with a
+ * CRC-valid header-only record of the same ID. The title may change length. */
+int hpclang_rpl_port1_replace_library(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
+                                      uint32_t number, const uint8_t *packed, uint32_t span,
+                                      const struct hpclang_rpl_port1_guard *guard);
 /* Remove a header-only library by 12-bit ID under the same range guard.
  * Caller owns the records and verifies the ID is neither registered nor attached. */
 int hpclang_rpl_port1_remove_library(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
