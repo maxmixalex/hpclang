@@ -27,8 +27,10 @@ Stock copy `2` saved and reopened `2020` while its original retained `20` on
 all three models. HP39g+, HP39gs and HP40gs all passed the Save, Reset and
 copy CI gate on `25b4963b`. Locally, the relocated SDK's independent Notebook
 CMake target built each model from source and restored a missing Reset file.
-All 12 transfer files matched the accepted CI inputs byte for byte. GC during
-execution remains open.
+All 12 transfer files matched the accepted CI inputs byte for byte. A local
+test invokes Stock GC immediately before and after native editor entry/return.
+Save, Reset and independent copy passed with these calls on all three HP39/40
+ROMs. Collection while native mappings are live remains open.
 See the [launcher measurements](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19).
 The HP48gII CI size check failed on `54f6642b` and passed on `0cdc1bc0`.
 The current 64,672-byte Notebook fits the 65,536-byte code window and passed

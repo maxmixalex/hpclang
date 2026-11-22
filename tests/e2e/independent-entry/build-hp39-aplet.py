@@ -104,7 +104,14 @@ def main():
     parser.add_argument(
         "--aplet-writeback", action="store_true", help="publish the editor's current Aplet data"
     )
+    parser.add_argument(
+        "--gc-at-boundaries",
+        action="store_true",
+        help="exercise Stock garbage collection just before and just after the native editor",
+    )
     args = parser.parse_args()
+    if args.gc_at_boundaries and not args.aplet_writeback:
+        parser.error("--gc-at-boundaries requires --aplet-writeback")
     if args.aplet_writeback and not args.bitmap_image:
         parser.error("--aplet-writeback requires --bitmap-image")
     if args.bitmap_image and not args.bitmap_pool:
@@ -145,7 +152,10 @@ def main():
             + word(rows(args.aplet_writeback))
             + word(0x1D622)
         )
-        action += arm_entry(args.bitmap_pool.read_bytes()) + word(0x3244)
+        # The live bitmap, source image and writeback list are still on the Stock
+        # stack at both boundaries. The native mappings exist only inside ARMSYS.
+        collect = word(0x6742) if args.gc_at_boundaries else ""
+        action += collect + arm_entry(args.bitmap_pool.read_bytes()) + collect + word(0x3244)
         if args.bitmap_image:
             action += word(0x3244)
     elif args.c_probe is not None:
