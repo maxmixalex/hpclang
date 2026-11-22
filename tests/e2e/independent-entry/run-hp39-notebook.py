@@ -6,8 +6,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import runpy
 import subprocess
 import sys
+import tempfile
 
 HERE = Path(__file__).resolve().parent
 E2E = HERE.parent
@@ -33,7 +35,7 @@ def save_sequence(model, output):
     output.write_text("\n".join(lines))
 
 
-def run_stock(dist, state, out, boot, env, timeout):
+def run_stock(dist, state, out, boot, env, timeout, samples):
     with (out / "emulator.log").open("w") as trace:
         subprocess.run(
             [
@@ -43,7 +45,7 @@ def run_stock(dist, state, out, boot, env, timeout):
                 f"--style={dist}/style-40g.css",
                 *boot,
             ],
-            env=env,
+            env={**env, "HPCLANG_X50NG_RESOURCE_SNAPSHOT": str(samples / out.name)},
             stdout=trace,
             stderr=subprocess.STDOUT,
             check=True,
@@ -53,7 +55,7 @@ def run_stock(dist, state, out, boot, env, timeout):
         raise ValueError("Stock Save sequence did not finish")
 
 
-def verify_save(data, state, out, after_reset=False, original_note=None):
+def verify_save(data, state, out, samples, after_reset=False, original_note=None):
     saved = "20" if after_reset else "Seed4220"
     if original_note is not None:
         saved = original_note + "20"
@@ -83,13 +85,27 @@ def verify_save(data, state, out, after_reset=False, original_note=None):
         text=True,
     )
     verified = json.loads(report)
+    resource = runpy.run_path(str(E2E / "harness/verify-resource-snapshots.py"))
+    stack_gap = runpy.run_path(str(E2E / "independent-pool/verify.py"))["stock_stack_gap_nibbles"]
+    gaps = {}
+    for phase in ("action", "saved", "returned", "editor2", "final"):
+        prefix = samples / f"{out.name}-{phase}"
+        ram = prefix.with_suffix(".sram").read_bytes()
+        info = json.loads(prefix.with_suffix(".json").read_text())
+        resource["metadata"](info, resource["MODELS"][data.name], phase, len(ram))
+        gaps[phase] = stack_gap(ram, verified["saturn_cpu"])
+    if gaps["final"] // 2 != verified["stock_stack_gap_bytes"]:
+        raise ValueError("library capture and settled Stock stack gap differ")
+    if gaps["editor2"] >= gaps["final"]:
+        raise ValueError("expected more Stock workspace after leaving the editor")
+    verified["stock_stack_gap_nibbles"] = gaps
     verified.update(model=data.name, after_reset=after_reset, reopened_note=saved)
     if original_note is not None:
         verified.update(copy_name="2", original_note=original_note)
     (out / "verified.json").write_text(json.dumps(verified, indent=2) + "\n")
 
 
-def replay_save(dist, state, out, env, sequence):
+def replay_save(dist, state, out, env, samples, sequence):
     out.mkdir()
     suffix = E2E / "sequences/hp39-independent-notebook-save.seq"
     for line in suffix.read_text().splitlines():
@@ -103,10 +119,10 @@ def replay_save(dist, state, out, env, sequence):
         HPCLANG_STOCK_PREFIX=str(out / "screen"),
         HPCLANG_STOCK_JSON=str(out / "result.json"),
     )
-    run_stock(dist, state, out, [], env, 120)
+    run_stock(dist, state, out, [], env, 120, samples)
 
 
-def main():
+def main(samples):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=("hp39gplus", "hp39gs", "hp40gs"))
     parser.add_argument("--inputs", type=Path, required=True, help="export from tests/sdk/check.py")
@@ -170,6 +186,7 @@ def main():
     env.update(
         PATH=f"{dist}/tools:{env['PATH']}",
         HPCLANG_X50NG_HARNESS="stock",
+        TARGET=args.model,
         HPCLANG_STOCK_MODE="install",
         HPCLANG_X50NG_LCD_HEIGHT=str(profile["lcd_height"]),
         HPCLANG_E2E_SEQUENCE=str(seq),
@@ -213,21 +230,24 @@ def main():
                 out / "gate.log",
             )
         )
-        run_stock(dist, state, out, boot, env, timeout + 120)
+        run_stock(dist, state, out, boot, env, timeout + 120, samples)
         if fetch.wait(timeout=5):
             raise RuntimeError("USB transfer did not complete")
-    verify_save(data, state, out)
+    verify_save(data, state, out, samples)
     del env["HPCLANG_X50NG_USB0"], env["HPCLANG_E2E_HOST_GATE_FILE"]
     reset = out / "reset"
-    replay_save(dist, state, reset, env, ["1000 tap f2", "3000 tap f6", "7000 tap aplet"])
-    verify_save(data, state, reset, after_reset=True)
+    replay_save(dist, state, reset, env, samples, ["1000 tap f2", "3000 tap f6", "7000 tap aplet"])
+    verify_save(data, state, reset, samples, after_reset=True)
     if args.edit_copy:
         copy = out / "copy"
-        replay_save(dist, state, copy, env, ["1000 tap f1", "3500 tap two", "4500 tap enter"])
-        verify_save(data, state, copy, original_note="20")
+        replay_save(
+            dist, state, copy, env, samples, ["1000 tap f1", "3500 tap two", "4500 tap enter"]
+        )
+        verify_save(data, state, copy, samples, original_note="20")
         print(f"{args.model}: copy 2 reopened 2020 and the original retained 20")
     print(f"{args.model}: saved and reopened Seed4220, reset the Aplet, then saved and reopened 20")
 
 
 if __name__ == "__main__":
-    main()
+    with tempfile.TemporaryDirectory(prefix="hpclang-hp39-sram-") as directory:
+        main(Path(directory))

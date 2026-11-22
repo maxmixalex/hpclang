@@ -67,6 +67,23 @@ def check_rpl_workspace(words, ram):
     )
 
 
+def stock_stack_gap_nibbles(ram, cpu):
+    require(0x08000000 <= cpu <= 0x08000000 + len(ram) - 1024, "invalid Saturn map")
+    # RSKTOP and DSKTOP are adjacent five-nibble words in the same mapped page.
+    # Read the snapshot's current gap independently of the earlier ARM result.
+    rsktop = 0x806F3
+    physical = struct.unpack_from("<I", ram, cpu - 0x08000000 + (rsktop >> 12) * 4)[0]
+    require(
+        0x08000000 <= physical <= 0x08000000 + len(ram) - 2048 and physical % 2048 == 0,
+        "invalid stack page",
+    )
+    offset = physical - 0x08000000 + (rsktop & 4095) // 2
+    pair = int.from_bytes(ram[offset : offset + 6], "little") >> 4
+    lower, upper = pair & 0xFFFFF, (pair >> 20) & 0xFFFFF
+    require(0x80000 <= lower <= upper < 0x100000, "invalid saved Stock stack bounds")
+    return upper - lower
+
+
 def check_bitmap_workspace(words, ram, rows=896):
     marker, status, cpu, top, obj, prologue, span, count, first, end = words[:10]
     require(marker == 0x47524F42 and status == 0, "bitmap inspection incomplete")
@@ -89,21 +106,13 @@ def check_bitmap_workspace(words, ram, rows=896):
         require(
             struct.unpack_from("<2I", ram, offset) == (page, page + 2048), "bitmap mapping changed"
         )
-    # RSKTOP and DSKTOP are adjacent five-nibble words in the same mapped page.
-    # Read the snapshot's current gap independently of the earlier ARM result.
-    rsktop = 0x806F3
-    physical = struct.unpack_from("<I", ram, cpu - 0x08000000 + (rsktop >> 12) * 4)[0]
-    require(0x08000000 <= physical <= 0x0807F800 and physical % 2048 == 0, "invalid stack page")
-    offset = physical - 0x08000000 + (rsktop & 4095) // 2
-    pair = int.from_bytes(ram[offset : offset + 6], "little") >> 4
-    lower, upper = pair & 0xFFFFF, (pair >> 20) & 0xFFFFF
-    require(0x80000 <= lower <= upper < 0x100000, "invalid saved Stock stack bounds")
     return {
         "bitmap_nibble_address": obj,
         "bitmap_object_nibbles": 5 + span,
         "aligned_frame_bytes": len(pages) * 4096,
         "pages": pages,
-        "stock_stack_gap_bytes": (upper - lower) // 2,
+        "stock_stack_gap_bytes": stock_stack_gap_nibbles(ram, cpu) // 2,
+        "saturn_cpu": cpu,
     }
 
 

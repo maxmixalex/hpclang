@@ -147,6 +147,21 @@ are read from RSKTOP and DSKTOP after returning to the library.
 | HP39gs 2.22 | 56,323 | 144,320 | 87,994 |
 | HP40gs 2.22 | 56,331 | 144,123 | 87,789 |
 
+The Stock gap while editing is smaller. These original-ROM samples compare the
+reset original with its saved copy. Values are whole bytes between RSKTOP and
+DSKTOP at the named LCD capture. The final library capture agreed with the
+settled SRAM reading in all nine initial, Reset and copy runs.
+
+| Model | Editing reset original | Editing copy | After Save in copy | Reopened copy |
+| --- | ---: | ---: | ---: | ---: |
+| HP39g+ | 63,072 | 6,727 | 6,727 | 6,723 |
+| HP39gs | 60,399 | 4,069 | 4,069 | 4,065 |
+| HP40gs | 60,202 | 3,864 | 3,864 | 3,860 |
+
+After ON returned from the editor, before leaving the Aplet, the copy runs
+had 6,251, 3,593 and 3,388 whole bytes respectively. The verifier reports
+the exact gap in nibbles at each capture.
+
 Stock Reset stores the five-nibble ROM reference `0x05da2` as the first item
 in the independent ENTER list. In the live D1.55 stack this was followed
 immediately by the padding object. The mapped D1.55 and both 2.22 ROMs
