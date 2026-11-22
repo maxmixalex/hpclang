@@ -128,7 +128,7 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
     const struct hpclang_rpl_port1_guard guard = {check_owned_tail, &owned};
     unsigned step = 0;
     const struct hpclang_rpl_reader stock = {stock_nibble, NULL};
-    uint32_t level_one;
+    uint32_t level_one, stack_slot = 0;
     /* The original calculator stack may be empty. Own one real slot for the probe. */
     if (hpclang_stack_push_boolean(1))
         return 0x1e0u;
@@ -176,8 +176,9 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
                 uint8_t nibble;
                 if (!stock_nibble(NULL, 0x806f8u + i, &nibble))
                     goto done;
-                owned.test_stack_slot |= (uint32_t)nibble << (4u * i);
+                stack_slot |= (uint32_t)nibble << (4u * i);
             }
+            owned.test_stack_slot = stack_slot;
             owned.test_stack_target = 0x40000u + owned.first;
             result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
             owned.test_stack_slot = 0;
@@ -200,6 +201,37 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
     step = 7;
     if (owned.calls != 6 || !chain_end(&reader, &end) || end != owned.first ||
         !fingerprint(&reader, end, &hash) || hash != original_hash)
+        goto done;
+    /* Store the unregistered header-only library 123 ahead of a named backup. */
+    static const uint8_t library[] = {0x40, 0x2b, 0x60, 0x02, 0x00, 0x01, 0x58, 0x01,
+                                      0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0xd0, 0xc5, 0x02};
+    step = 9;
+    if (hpclang_library_query(123) != 0 ||
+        hpclang_rpl_port1_create_library(&io, limit, library, 43) ||
+        !encode(tail_name, tail, &packed, &span) ||
+        hpclang_rpl_port1_create_backup(&io, limit, packed, span) ||
+        !chain_end(&reader, &owned.end))
+        goto done;
+    step = 10;
+    uint32_t before;
+    if (!fingerprint(&reader, owned.end + 6u, &before))
+        goto done;
+    owned.test_stack_slot = stack_slot;
+    owned.test_stack_target = 0x40000u + owned.first;
+    int refused = hpclang_rpl_port1_remove_library(&io, limit, 123, &guard);
+    owned.test_stack_slot = 0;
+    if (refused != HPCLANG_RPL_MUTATION_BUSY || !fingerprint(&reader, owned.end + 6u, &hash) ||
+        hash != before)
+        goto done;
+    step = 11;
+    if (hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) || !matches(tail_name, tail) ||
+        !chain_end(&reader, &owned.end) ||
+        hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) !=
+            HPCLANG_RPL_MUTATION_NOT_FOUND ||
+        hpclang_rpl_port1_remove_backup(&io, limit, tail_name, 6, &guard) ||
+        !chain_end(&reader, &end) || end != owned.first || !fingerprint(&reader, end, &hash) ||
+        hash != original_hash)
         goto done;
     free(packed);
     hpclang_object_release(value);

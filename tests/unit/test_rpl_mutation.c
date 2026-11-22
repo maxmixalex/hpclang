@@ -2112,6 +2112,23 @@ static void test_port1_edit_owned_suffix(void)
     assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.library_number == 123);
     assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
 
+    before = writes;
+    assert(hpclang_rpl_port1_remove_library(&io, 256, 124, &guard) ==
+           HPCLANG_RPL_MUTATION_NOT_FOUND);
+    assert(hpclang_rpl_port1_remove_library(&io, 256, 4096, &guard) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    fixture.result = HPCLANG_RPL_MUTATION_BUSY;
+    assert(hpclang_rpl_port1_remove_library(&io, 256, 123, &guard) == HPCLANG_RPL_MUTATION_BUSY);
+    assert(writes == before);
+    fixture.result = HPCLANG_RPL_MUTATION_OK;
+    assert(!hpclang_rpl_port1_create_backup(&io, 256, small, small_span));
+    assert(!hpclang_rpl_port1_remove_library(&io, 256, 123, &guard));
+    assert(fixture.start == 0 && fixture.end == sizeof(header) + small_span);
+    cursor = (struct hpclang_rpl_port_cursor){0, 256, 0};
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == 0);
+    assert(entry.name_length == 4 && !memcmp(entry.name, "DATA", 4));
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
+
     /* A CRC-valid nonzero offset or even a single unreferenced body nibble
      * precludes movement. A same-size replacement leaves either library fixed. */
     for (unsigned body = 0; body <= 1; ++body) {
@@ -2131,6 +2148,10 @@ static void test_port1_edit_owned_suffix(void)
         assert(hpclang_rpl_port1_replace_backup(&io, 256, large, large_span, &guard) ==
                HPCLANG_RPL_MUTATION_UNSUPPORTED);
         assert(hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA", 4, &guard) ==
+               HPCLANG_RPL_MUTATION_UNSUPPORTED);
+        assert(hpclang_rpl_port1_remove_library(&io, 256, 123, &guard) ==
+               HPCLANG_RPL_MUTATION_UNSUPPORTED);
+        assert(hpclang_rpl_port1_remove_library(&io, 256, 124, &guard) ==
                HPCLANG_RPL_MUTATION_UNSUPPORTED);
         assert(writes == before);
         assert(!hpclang_rpl_port1_replace_backup(&io, 256, same, same_span, &guard));

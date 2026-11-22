@@ -19,6 +19,14 @@ four library headers and objects. Appending a 28-byte fixture to a RAM copy
 changed only its slot. Tail recovery and duplicate retry performed no writes.
 Native installation and startup recovery remain open.
 
+Port 1 now has an internal guarded removal operation for a caller-owned,
+unregistered header-only library. Both local HP49g+ and HP50g Stock 2.15
+fixtures refused removal with an overlaid stack reference, then removed ID
+123 by number and read the following backup. The original Port 1 prefix and
+chain length were restored and both relaunches passed on each model. Public
+library removal and active-library management remain open pending wider
+reference handling. CI acceptance of this change is pending.
+
 On local original-ROM runs, the installed SDK's independent Notebook saved
 `Seed42` as `Seed4220` and reopened it on HP39g+ D1.55, HP39gs 2.22 and
 HP40gs 2.22. Stock Reset exposed a ROM reference to an empty list that
