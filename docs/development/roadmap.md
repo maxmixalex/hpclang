@@ -2,21 +2,18 @@
 
 Current checkpoint: 2026-11-22. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `43d5aac9` (#55). Port 1 HOME cache relocation passed all five workflows on `771646cd`. The current integration candidate combines
-M8.0 library discovery (#49) and Port 1 cache relocation (#55) with M8.6
-independent Notebook (#54) and HP39/40 SDK packaging (#56). Head `25b4963b`
-is submitted for CI. Local checks cover all 180 host tests, native Port
-sanitizers, the installed SDK on all six models (613 identical release
-outputs), HP48gII Notebook save/relaunch and strict documentation.
-[#49](https://github.com/maxmixalex/hpclang/pull/49) carries the combined CI gate.
-On `7e87d081`, [HP39gs Stock dialogs](https://github.com/maxmixalex/hpclang/actions/runs/44940273064/job/136957048225) stopped before application entry after 90 seconds without a Kermit ACK. A local replay with that job's emulator, SDK payload and transfer files passed through Stock return. The source of the transfer stall remains open.
+Accepted main is `e8e09e93`. [PR #49](https://github.com/maxmixalex/hpclang/pull/49)
+merged library discovery, guarded Port 1 edits and independent Notebook tests.
+All 207 executed CI jobs passed on `25b4963b`; three jobs were skipped.
+The HP39gs Stock dialogs job that stalled on the previous head also passed.
+Branch `m8-notebook-sdk-home-guard` carries the Port 1 HOME cache guard
+and the installed independent Notebook target. Local verification passed;
+remote acceptance is pending.
 
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy
 changed only its slot. Tail recovery and duplicate retry performed no writes.
-Native installation and startup recovery remain open. The combined candidate's
-Quality job flagged test formatting on `de3e2a02`. The corrected reference test
-passed locally with CI's clang-format 22.1.0 and ASan/UBSan.
+Native installation and startup recovery remain open.
 
 On local original-ROM runs, the installed SDK's independent Notebook saved
 `Seed42` as `Seed4220` and reopened it on HP39g+ D1.55, HP39gs 2.22 and
@@ -27,8 +24,12 @@ The checks cover the LCD, named Aplet in SRAM and native return state.
 All three install/Save/Reset jobs passed CI on `7e87d081`. Locally, the
 84 KiB startup bitmap and smaller Aplet now allow two Notebooks to coexist:
 Stock copy `2` saved and reopened `2020` while its original retained `20` on
-all three models. CI acceptance of the copy case and GC during execution
-remain open. See the [launcher measurements](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19).
+all three models. HP39g+, HP39gs and HP40gs all passed the Save, Reset and
+copy CI gate on `25b4963b`. Locally, the relocated SDK's independent Notebook
+CMake target built each model from source and restored a missing Reset file.
+All 12 transfer files matched the accepted CI inputs byte for byte. GC during
+execution remains open.
+See the [launcher measurements](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19).
 The HP48gII CI size check failed on `54f6642b` and passed on `0cdc1bc0`.
 The current 64,672-byte Notebook fits the 65,536-byte code window and passed
 both local original-ROM entry paths, including consecutive Port 0 saves.

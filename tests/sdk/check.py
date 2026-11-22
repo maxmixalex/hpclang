@@ -22,49 +22,6 @@ def run(*args, env):
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
 
 
-def build_independent_hp39_notebook(directory, fixture, toolchain, assets, model, env):
-    image = directory / "notebook.hpc"
-    probe = directory / "independent-entry"
-    bundle = directory / "independent-aplet"
-    run(
-        sys.executable,
-        fixture / "build.py",
-        "--toolchain",
-        toolchain / "bin",
-        "--model",
-        model,
-        "--hp39-notebook-editor",
-        "--aplet-writeback",
-        "--bitmap-image",
-        image,
-        "--output",
-        probe,
-        env=env,
-    )
-    run(
-        sys.executable,
-        fixture / "build-hp39-aplet.py",
-        "--assets",
-        assets,
-        "--bitmap-pool",
-        probe / "probe.bin",
-        "--bitmap-image",
-        image,
-        "--initial-note",
-        "Seed42",
-        "--aplet-writeback",
-        "--output",
-        bundle,
-        env=env,
-    )
-    expected = {"HPGCC000.000", "HP39DIR.000", "HP39DIR.CUR", "HPCRESET.000"}
-    if {p.name for p in bundle.iterdir()} != expected:
-        raise AssertionError("unexpected independent Notebook transfer set")
-    return {Path("independent-aplet") / name for name in expected} | {
-        Path("independent-entry/probe.bin")
-    }
-
-
 def check_cpp_headers(package, work, env):
     """Compile each installed public C++ header alone with the shipped profile."""
     source = work / "public header client"
@@ -704,6 +661,7 @@ endforeach()
                     )
                 aplet_options = [
                     f"-DAPLET_ASSETS={args.aplet_assets.resolve()}",
+                    f"-DHPCLANG_NOTEBOOK_APLET_ASSETS={args.aplet_assets.resolve()}",
                 ]
             run(
                 "cmake",
@@ -756,16 +714,32 @@ endforeach()
             }
             if aplet_options:
                 for directory in (selected, repeated):
-                    outputs.update(
-                        build_independent_hp39_notebook(
-                            directory,
-                            root / "tests/e2e/independent-entry",
-                            toolchain,
-                            args.aplet_assets,
-                            model,
-                            env,
-                        )
+                    run(
+                        "cmake",
+                        "--build",
+                        str(directory),
+                        "--target",
+                        "notebook_independent_aplet",
+                        env=env,
                     )
+                independent = Path("independent-aplet")
+                files = {"HPGCC000.000", "HP39DIR.000", "HP39DIR.CUR", "HPCRESET.000"}
+                # Recover a missing companion before comparing the two transfer sets.
+                (selected / independent / "HPCRESET.000").unlink()
+                run(
+                    "cmake",
+                    "--build",
+                    str(selected),
+                    "--target",
+                    "notebook_independent_aplet",
+                    env=env,
+                )
+                for directory in (selected, repeated):
+                    if {p.name for p in (directory / independent).iterdir()} != files:
+                        raise AssertionError("unexpected independent Notebook transfer set")
+                outputs.update(independent / name for name in files)
+                entry = Path("CMakeFiles/notebook-independent/entry")
+                outputs.add(entry / "probe.bin")
                 bundle = Path("notebook-aplet") / model
                 files = (
                     "HPGCC000.000",
@@ -837,7 +811,7 @@ endforeach()
                 probe = destination / "independent-entry"
                 probe.mkdir()
                 for name in ("metadata.json", "probe.bin", "build.json"):
-                    shutil.copyfile(selected / "independent-entry" / name, probe / name)
+                    shutil.copyfile(selected / entry / name, probe / name)
             # Keep the installed SDK for subsequent models; completed build
             # trees are temporary and no longer needed after byte comparison.
             shutil.rmtree(selected)

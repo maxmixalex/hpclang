@@ -420,7 +420,10 @@ The resulting `my_application-aplet/hp39gs/` contains `HPGCC000.000`,
 `HPCRESET.000`, `LIB275L.000` and the Connectivity Kit directory files.
 For an existing `.hp` launcher, such as the one built by the unmodified
 Notebook example, the installed `tools/package-aplet.py` can create the same
-bundle without changing CMake. See the installed Notebook README for its command.
+bundle without changing CMake. The installed Notebook example also offers an
+experimental `notebook_independent_aplet` target for the three HP39/40 models.
+It builds a four-file transfer set using the prepared Stock assets and runs
+without library 275. The installed Notebook README gives both build commands.
 
 ### Transfer and start the HP39 Aplet
 

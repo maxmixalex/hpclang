@@ -112,6 +112,24 @@ Keep the same installed Aplet across launches: it owns the save. Its
 **Reset** view clears its custom data, so use **Exit** or **ON** when you
 want to keep the last save.
 
+### Experimental independent HP39/40 Aplet
+
+The installed Notebook example can also build a four-file transfer set that
+runs without library 275. In the model-specific build above, configure the
+prepared Stock asset directory and build the independent target explicitly.
+
+```sh
+cmake -S notebook -B build/notebook-hp39gs \
+  -DHPCLANG_NOTEBOOK_APLET_ASSETS=/path/to/prepared-hpgcc39/data
+cmake --build build/notebook-hp39gs --target notebook_independent_aplet
+```
+
+Transfer the four files in `build/notebook-hp39gs/independent-aplet/` together.
+The experimental Aplet appears as **EntryProbe** in the Stock library and
+opens with the example note `Seed42`. Use ENTER to open the editor and save
+before exiting. The same target works with the hp39gplus and hp40gs model
+profiles. Its page layout is qualified for this example.
+
 HP39 Stock provides Aplet-owned persistence, not HOME or Port backups in
 Notebook. HP48gII provides HOME and Port 0 but no Port 1/2 or SD export.
 HP49g+/HP50g use HOME, expose the native Port operations permitted by the
