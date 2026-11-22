@@ -25,6 +25,9 @@ from verify import home_string, require_stock_pc  # noqa: E402
 entry_verifier = runpy.run_path(str(E2E / "independent-entry/verify.py"))
 free_list_covers = runpy.run_path(str(E2E / "ui/verify.py"))["free_list_covers"]
 allocator = runpy.run_path(str(E2E / "harness/verify-resource-snapshots.py"))
+verify_observations = runpy.run_path(str(E2E / "harness/verify-native-heap-trace.py"))[
+    "verify_observations"
+]
 no_toolbox = entry_verifier["no_toolbox"]
 ui = runpy.run_path(str(E2E / "notebook/verify.py"))
 
@@ -213,12 +216,19 @@ def editor_pool_usage(ram, image, code_offset, record_start):
     }, extents
 
 
-def user_memory(prefix, phases, model, flash, image, page, record_start):
-    roots, _ = allocator["allocator_root"](flash, allocator["MODELS"][model])
+def user_memory(prefix, phases, model, flash, image, page, record_start, profile, trace):
+    roots = profile["free_list_roots"]
+    verify_observations(trace, profile)
+    timeline = trace["phases"]
+    names = [row["phase"] for row in timeline]
+    deposited = names.index("deposited")
+    assert names[deposited:] == ["deposited", *phases, "returned", "checkpoint", "installed"]
+    free = {}
     pools, gaps = {}, {}
     owned = []
     for phase in ("deposited", *phases, "returned"):
         ram = (prefix / f"mem-{phase}.sram").read_bytes()
+        free[phase] = allocator["free_capacity"](ram, roots)[0]["usable_bytes"]
         _, read = entry_verifier["mapping"](ram, flash, model)
         # Stock counts complete five-nibble cells between RSKTOP and DSKTOP in AVMEM.
         rstk, dstk = read(0x806F3), read(0x806F8)
@@ -238,8 +248,8 @@ def user_memory(prefix, phases, model, flash, image, page, record_start):
 
             assert owned
             for start, end, heap in owned:
-                assert heap in (0x100, 0x200)
-                head = read32(roots + ((heap >> 8) - 1) * 16)
+                assert heap == 0x100
+                head = read32(roots)
                 assert free_list_covers(read32, head, base, base + len(ram), heap, start, end), (
                     "Notebook allocation missing from Stock free list after return"
                 )
@@ -247,7 +257,26 @@ def user_memory(prefix, phases, model, flash, image, page, record_start):
                 "kos_released_bytes": sum(end - start for start, end, _ in owned),
                 "kos_released_blocks": len(owned),
             }
-    return pools, gaps
+    admission = timeline[deposited]
+    assert admission["accepted"] - admission["failed_allocations"] >= pools["editor"]["kos_blocks"]
+    active = timeline[deposited : deposited + len(phases) + 1]
+    minimum = min(row["minimum_total_usable"] for row in active if row["accepted"])
+    assert admission["latest"][0]["usable"] == free["editor"], "trace and editor snapshot disagree"
+    peak = free["deposited"] - minimum
+    assert peak == pools["editor"]["kos_resident_bytes"], "unexpected peak KOS usage"
+    assert all(free[phase] == free["editor"] for phase in phases)
+    assert free["returned"] == free["deposited"], "Stock free capacity changed across user launch"
+    return (
+        pools,
+        gaps,
+        {
+            "checkpoint_free_bytes": free,
+            "allocator_returns": sum(row["accepted"] for row in active),
+            "failed_allocations": sum(row["failed_allocations"] for row in active),
+            "minimum_free_at_allocator_return_bytes": minimum,
+            "peak_additional_kos_bytes": peak,
+        },
+    )
 
 
 def check_phase(phase, editor_text, flash, original, font, expected_result):
@@ -391,6 +420,7 @@ def main():
     media["prepare"](files, card)
     source = "setup"
     save_keys = "4300 tap two\n4900 tap zero\n5500 tap down\n6200 tap enter\n7600 capture saved\n"
+    heap_profile = allocator["allocator_profile"](flash, allocator["MODELS"][args.model])
     for name, previous, editor in (("user-save", "setup", ""), ("user-reopen", "user-save", "20")):
         installed = previous == "user-save"
         with tempfile.TemporaryDirectory(dir=dest) as tmp:
@@ -412,11 +442,16 @@ def main():
                 + "8500 tap on\n15000 capture returned\n",
                 execution_ms=18000,
                 resource_prefix=Path(tmp) / "mem",
+                native_heap_profile=heap_profile,
             )
             phases = ("editor",) if installed else ("editor", "saved")
-            usage, gaps = user_memory(Path(tmp), phases, args.model, flash, image, page, at)
+            trace = json.loads((dest / name / "native-heap.json").read_text())
+            usage, gaps, heap = user_memory(
+                Path(tmp), phases, args.model, flash, image, page, at, heap_profile, trace
+            )
         hashes[name] = {
             "memory": usage,
+            "kos_heap": heap,
             "stock_free_gap_nibbles": gaps,
             "user_stack_top_first": ["second", "first"],
             "settled_sha256": check_phase(

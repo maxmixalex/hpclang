@@ -43,6 +43,15 @@ def verify(trace, profile, status):
         all(status.get(key) is True for key in ("saw_pass", "returned", "return_settled")),
         "Stock execution/settled return missing",
     )
+    report = verify_observations(trace, profile)
+    names = [phase["phase"] for phase in trace["phases"]]
+    require(
+        "application-pass" in names and names[-1] == "settled-return", "incomplete lifecycle phases"
+    )
+    return report
+
+
+def verify_observations(trace, profile):
     require(
         type(trace.get("version")) is int and trace["version"] in (1, 2),
         "unsupported trace version",
@@ -70,9 +79,6 @@ def verify(trace, profile, status):
             for name in names
         ),
         "invalid phase name",
-    )
-    require(
-        "application-pass" in names and names[-1] == "settled-return", "incomplete lifecycle phases"
     )
     available = profile["end"] - profile["begin"]
     accepted = failed = 0

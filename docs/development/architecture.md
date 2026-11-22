@@ -381,7 +381,11 @@ plus the two disjoint KOS allocations was 130,691 bytes at each editor
 checkpoint. The verifier checked both sets of page descriptors and the extent
 of the named backup in SRAM. After each user launch (Save and reopen), it
 checked that the Stock free list for each allocation's heap covered the entire
-original block, including its header and footer.
+original block, including its header and footer. Across each Save and reopen launch, the
+ROM-qualified allocator returned twice. Heap 0x100 had 104,072 usable bytes
+before EVAL, reached a sampled minimum of 58,976 bytes and returned to
+104,072 bytes on exit. The 45,096-byte decrease matched the live blocks on
+both models.
 
 On both models, the free interval between Stock's return and data stacks
 measured 402,508 nibbles before EVAL, 402,409 in the empty editor, 402,334
