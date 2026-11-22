@@ -2,7 +2,7 @@
 
 Current checkpoint: 2026-11-23. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `8d266a89` after [#67](https://github.com/maxmixalex/hpclang/pull/67).
+Accepted main is `b11c1e6a` after [#62](https://github.com/maxmixalex/hpclang/pull/62).
 
 - **M8.0 native ports.** [#59](https://github.com/maxmixalex/hpclang/pull/59)
   blocks edits that would invalidate a direct data-stack reference. [#61](https://github.com/maxmixalex/hpclang/pull/61)
@@ -21,15 +21,15 @@ Accepted main is `8d266a89` after [#67](https://github.com/maxmixalex/hpclang/pu
   Other reference paths, remaining execution roots, public library management
   and Port 2 installation, recovery and space reclamation remain open.
 - **M8.6 applications and release.** [#60](https://github.com/maxmixalex/hpclang/pull/60)
-  is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) reduces the HP48gII
-  Port 0 transfer to 122,333 bytes. Its HP39g+ emulator-setup timeout was requeued.
+  is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) reduced the HP48gII
+  Port 0 transfer by 16 KiB to 122,333 bytes. It merged after 190 checks passed and two skipped.
   [#64](https://github.com/maxmixalex/hpclang/pull/64) compares startup on six models;
   the production launchers remain the SDK defaults. The HP48gII Port 0 backup used
   244,683 nibbles, including its 102,400-byte pool. The Stock stack gap matched AVMEM on HP49g+ and HP50g.
   [#67](https://github.com/maxmixalex/hpclang/pull/67) merged after all 25 remote checks passed;
-  Windows and Linux produced identical archives locally. On the integrated branches
-  (`71ec17c0`), 180 host tests passed and the relocated SDK reproduced all 613
-  release outputs byte for byte. [#68](https://github.com/maxmixalex/hpclang/pull/68)
+  Windows and Linux produced identical archives locally. The #62 merge tree (`93f8c629`) reproduced all 613
+  release outputs after SDK relocation, including HP39/40 C and C++ Aplets.
+  All six Notebook targets built. The earlier integrated branches passed 180 host tests. [#68](https://github.com/maxmixalex/hpclang/pull/68)
   corrects live heap measurement on all six ROMs. #68 awaits full CI.
   [#69](https://github.com/maxmixalex/hpclang/pull/69) at `3b5bcd9c` reduced the HP49g+/HP50g
   Notebook KOS peak from 45,096 to 40,980 bytes across Save and reopen. Both ROMs

@@ -38,6 +38,16 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
               unsigned bytes)
 #endif
 {
+    enum
+    {
+        code_count = HPCLANG_PROBE_MODEL == 4 ? 16 : 1,
+#ifdef HPCLANG_NOTEBOOK
+        rw_count = NOTEBOOK_RW_PAGES,
+#else
+        rw_count = HPCLANG_PROBE_MODEL == 4 ? 12 : 4,
+#endif
+        pool_bytes = (1 + code_count + rw_count) * 4096
+    };
     for (unsigned i = 0; i < 134; i++)
         out[i] = 0;
     out[0] = 0x32435048u;
@@ -47,7 +57,7 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
     unsigned pos;
     enum
     {
-        trailer = 30 * 4096 * 2
+        trailer = (pool_bytes + 4096u) * 2u
     };
     for (pos = trailer; pos <= trailer + 7; pos++) {
         for (unsigned i = 0; i < sizeof(header); i++)
@@ -65,12 +75,6 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
         return;
 #endif
     unsigned start = ((unsigned)arena + 4095u) & ~4095u;
-    enum
-    {
-        code_count = HPCLANG_PROBE_MODEL == 4 ? 16 : 1,
-        rw_count = HPCLANG_PROBE_MODEL == 4 ? 12 : 4,
-        pool_bytes = (1 + code_count + rw_count) * 4096
-    };
     const unsigned sram_end = HPCLANG_PROBE_MODEL == 4 ? 0x08040000u : 0x08080000u;
     if (start < 0x08000000u || start + pool_bytes > sram_end ||
         start + pool_bytes > (unsigned)arena + (pool_bytes + 4096u))
