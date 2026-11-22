@@ -2442,6 +2442,26 @@ static void test_list_overlap(void)
            HPCLANG_RPL_SPAN_UNSUPPORTED);
 }
 
+static void test_sequence_stack_overlap(void)
+{
+    const uint32_t types[] = {0x2d9d, 0x2ab8, 0x2ada, 0x2686};
+    struct image image = {.size = 25, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    for (unsigned i = 0; i < sizeof types / sizeof *types; ++i) {
+        /* Direct target, inline binary integer with the same bits, SEMI. */
+        const uint32_t words[] = {types[i], 0x41008, 0x2911, 0x41008, 0x312b};
+        for (unsigned j = 0; j < sizeof words / sizeof *words; ++j)
+            put(&image, j * 5u, words[j], 5);
+        assert(hpclang_rpl_reference_composite_overlap(&reader, 0, types[i], 0x41008, 0x41009) ==
+               1);
+        put(&image, 5, 0x41009, 5);
+        assert(!hpclang_rpl_reference_composite_overlap(&reader, 0, types[i], 0x41008, 0x41009));
+        image.fail = 20;
+        assert(hpclang_rpl_reference_composite_overlap(&reader, 0, types[i], 0x41008, 0x41009) < 0);
+        image.fail = UINT32_MAX;
+    }
+}
+
 static void test_tagged_overlap(void)
 {
     struct image image = {.size = 34, .fail = UINT32_MAX};
@@ -2467,6 +2487,7 @@ static void test_tagged_overlap(void)
 int main(void)
 {
     test_list_overlap();
+    test_sequence_stack_overlap();
     test_tagged_overlap();
     test_execution_plans();
     mapped_graph_traversal();

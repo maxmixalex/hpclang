@@ -178,8 +178,8 @@ int hpclang_rpl_reference_visit_nested(const struct hpclang_rpl_reader *reader,
                                        uint32_t capacity, uint32_t node_budget,
                                        hpclang_rpl_reference_visit_fn visit, void *context);
 
-/* Stack inspector for lists and tagged objects. Check native address fields in inline descendants.
- * Other root types are handled by the caller. External targets are not traversed;
+/* Stack inspector for native sequences and tagged objects. Check native address fields in inline
+ * descendants. Other root types are handled by the caller. External targets are not traversed;
  * unresolved opaque or indexed edges in an inspected object reject the check. */
 int hpclang_rpl_reference_composite_overlap(const struct hpclang_rpl_reader *reader,
                                             uint32_t address, uint32_t prologue, uint32_t first,
