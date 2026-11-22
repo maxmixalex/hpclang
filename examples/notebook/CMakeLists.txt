@@ -76,4 +76,27 @@ if(HPCLANG_BUILD_MODEL STREQUAL "hp48gii")
     endfunction()
     add_independent_program(notebook_independent_program notebook-independent.hp)
     add_independent_program(notebook_independent_port0_program notebook-independent-port0.hp --port0)
+elseif(HPCLANG_BUILD_MODEL MATCHES "^(hp49gplus|hp50g)$")
+    set(HPCLANG_NOTEBOOK_PORT1_OFFSET 0 CACHE STRING "Port 1 append offset in nibbles")
+    set(builder "${HPCLANG_ROOT}/tools/experimental/independent-notebook")
+    set(entry "${builder}/../independent-entry")
+    set(image "${CMAKE_CURRENT_BINARY_DIR}/notebook.hpc")
+    set(stage "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/notebook-independent")
+    set(bundle "${CMAKE_CURRENT_BINARY_DIR}/notebook-independent")
+    get_filename_component(tool_bin "${CMAKE_C_COMPILER}" DIRECTORY)
+    set(outputs "${bundle}/USER.HP" "${bundle}/DATA.HP" "${bundle}/COPY.HP")
+    file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/notebook-port1-offset.txt"
+        CONTENT "@HPCLANG_NOTEBOOK_PORT1_OFFSET@")
+    add_custom_command(OUTPUT ${outputs}
+        COMMAND "${Python3_EXECUTABLE}" -B "${builder}/build.py" --model "${HPCLANG_BUILD_MODEL}"
+            --toolchain "${tool_bin}" --notebook "${image}" --port1-offset "${HPCLANG_NOTEBOOK_PORT1_OFFSET}"
+            --output "${stage}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${bundle}"
+        COMMAND "${CMAKE_COMMAND}" -E copy "${stage}/USER.HP" "${stage}/DATA.HP" "${stage}/COPY.HP" "${bundle}"
+        DEPENDS notebook_hpc "${image}" "${builder}/build.py" "${builder}/acquire.c" "${builder}/loader.h"
+            "${entry}/build.py" "${entry}/entry.S" "${entry}/link.ld"
+            "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c" "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.h"
+            "${HPCLANG_ROOT}/runtime/bootstrap/sync.S" "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/notebook-port1-offset.txt"
+        VERBATIM)
+    add_custom_target(notebook_independent_program DEPENDS ${outputs})
 endif()

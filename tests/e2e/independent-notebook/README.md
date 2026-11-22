@@ -18,7 +18,8 @@ Both models can share one SDK installation. Pass its prefix with
 `--sdk /path/to/sdk` when testing the same source revision.
 
 The test boots firmware 2.15, checks that library 275 is absent, installs
-the SDK and builds its plain Notebook example. Stock creates a named Port 1
+the SDK and builds its Notebook example. The installed CMake target produces
+`USER.HP`, `COPY.HP` and `DATA.HP` using the measured append offset. Stock creates a named Port 1
 backup containing the staged code after a 4,500-byte padding string in its
 own backup. The loader finds `NBLSE` in the native record chain, verifies its
 image and maps all 20 code pages read-only from that record. After Stock
