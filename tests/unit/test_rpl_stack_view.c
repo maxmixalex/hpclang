@@ -98,10 +98,28 @@ static void test_malformed_bounds(void)
     assert(hpclang_rpl_stack_depth(&reader, &depth) == HPCLANG_RPL_STACK_MALFORMED);
 }
 
+static void test_direct_overlap(void)
+{
+    reset_stack(0x70000u, 2);
+    put_word5(0x70000u, 0x88000u);
+    put_word5(0x70005u, 0x41234u);
+    put_word5(0x7000au, 0x41500u); /* marker, not a level */
+    assert(hpclang_rpl_stack_direct_overlap(&reader, 0x41234u, 0x41235u) == 1);
+    assert(!hpclang_rpl_stack_direct_overlap(&reader, 0x41000u, 0x41234u));
+    assert(!hpclang_rpl_stack_direct_overlap(&reader, 0x41235u, 0x41600u));
+    image[0x70005u] = 16;
+    assert(hpclang_rpl_stack_direct_overlap(&reader, 0x41000u, 0x42000u) ==
+           HPCLANG_RPL_STACK_MALFORMED);
+    reset_stack(IMAGE_NIBBLES - 5, 2);
+    assert(hpclang_rpl_stack_direct_overlap(&reader, 0x41000u, 0x42000u) ==
+           HPCLANG_RPL_STACK_UNAVAILABLE);
+}
+
 int main(void)
 {
     test_empty_stack();
     test_levels();
+    test_direct_overlap();
     test_malformed_bounds();
     return 0;
 }
