@@ -18,11 +18,10 @@ merged the direct Port 1 stack guard.
   check passed locally. A program reference blocked replacement without changing
   Port 1 on the HP49g+ and HP50g Stock emulators; both passed two relaunches.
   #61, #63 and #70 await remote acceptance.
-  [#66](https://github.com/maxmixalex/hpclang/pull/66) at `e58a7132` plans append space across six banks,
-  preferring erased tails, then the fitting deleted suffix spanning the fewest
-  sectors. All 180 host tests passed locally, including interrupted erase and reuse.
-  HP49g+ and HP50g Stock snapshots retained the same slot; 16-bit reads per scan
-  fell from 1,570,009 to 549,433. Remote acceptance is pending.
+  [#66](https://github.com/maxmixalex/hpclang/pull/66) at `fe64d5c1` plans Port 2 append
+  space across six banks and prepares a sector recovery journal in a separate bank.
+  All 180 host tests passed locally, including interrupted erase, restart and reuse.
+  HP49g+ and HP50g snapshot overlays preserved the live prefix. CI submitted.
   Other reference paths, remaining execution roots, public library management
   and Port 2 installation, recovery and space reclamation remain open.
 - **M8.6 applications and release.** [#60](https://github.com/maxmixalex/hpclang/pull/60)
@@ -30,16 +29,17 @@ merged the direct Port 1 stack guard.
   Port 0 transfer to 122,333 bytes. Its HP39g+ emulator-setup timeout was requeued.
   [#64](https://github.com/maxmixalex/hpclang/pull/64) compares startup on six models;
   the production launchers remain the SDK defaults. The HP48gII Port 0 backup used
-  244,683 nibbles, including its 102,400-byte pool. On HP49g+ and HP50g the editor's
-  KOS blocks and Port 1 backup totaled 130,691 bytes. The Stock stack gap matched AVMEM.
+  244,683 nibbles, including its 102,400-byte pool. The Stock stack gap matched AVMEM on HP49g+ and HP50g.
   [#67](https://github.com/maxmixalex/hpclang/pull/67) passed its remote installed-SDK check;
   Windows and Linux produced identical archives locally. [#68](https://github.com/maxmixalex/hpclang/pull/68)
   corrects live heap measurement on all six ROMs. Both PRs await full CI.
-  [#69](https://github.com/maxmixalex/hpclang/pull/69) combines #64 and #68. In all four HP49g+/HP50g save and
-  reopen runs, allocator returns showed 45,096 additional KOS bytes at peak and
-  Stock recovered all of them on exit. Both full local regressions passed; combined CI is pending.
-  On all three HP39/40 Stock emulators, local Save, Reset and copy runs verified
-  112,619–112,651 bytes for two saved Notebook entries and an 86,026-byte editor bitmap.
+  [#69](https://github.com/maxmixalex/hpclang/pull/69) at `3b5bcd9c` reduced the HP49g+/HP50g
+  Notebook KOS peak from 45,096 to 40,980 bytes across Save and reopen. Both ROMs
+  recovered all 104,072 free bytes at exit. The empty-Port-1 package grew by 176 bytes.
+  Both full Stock regressions and 180 host tests passed locally. CI submitted.
+  [#71](https://github.com/maxmixalex/hpclang/pull/71) measures the HP39/40 editor bitmap
+  and saved Aplets. Its SDK guide lists the independent targets for all six models.
+  The documented build produced all seven packages from a local SDK installation.
   Other resident-memory costs, collection during active mappings and release acceptance remain open.
   [Launcher measurements](https://github.com/maxmixalex/hpclang/blob/aaca2595692db5608ac6d11bd43513b77895faba/docs/development/architecture.md#notebook-first-install-transfer-size)
   · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).

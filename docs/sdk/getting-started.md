@@ -3,8 +3,9 @@
 The initial M8 SDK is a relocatable source package. It includes public headers,
 runtime sources, generated fonts, CMake integration and launcher packaging tools. The
 runtime library is compiled once in each application build with the selected
-toolchain. Calculator packaging uses explicit external ARMToolbox dependencies;
-the SDK does not redistribute those historical libraries or firmware.
+toolchain. The default Stock launchers use external ARMToolbox libraries. The installed
+Notebook example also provides model-specific experimental launchers. Obtain
+the historical libraries and calculator firmware separately.
 
 Read [API contracts and ownership](api-conventions.md) for result conventions,
 versioned structures and C/C++ resource lifetimes before combining services.
@@ -476,8 +477,36 @@ This is the production path validated in original-ROM emulators. The HP48gII
 validation uses a 256 KiB USB-capable unit profile; the repository also has a
 UART transfer path. HP49g+/HP50g have an SD workflow for supported storage
 cases, but SD transfer or export is not an HP48gII or HP39 feature. Development
-fixtures such as `ZZE2E` are not needed for a user installation. Experimental
-no-library entry tests do not remove these production dependencies.
+fixtures such as `ZZE2E` are not needed for a user installation.
+
+## Run Notebook without library 275
+
+For regular application builds, use the SDK's default Stock launcher. The
+installed Notebook example has separate experimental CMake targets for running
+this editor without library 275. Choose the target for your calculator and
+where you want to save the note.
+
+| Calculator | Notebook build target | Installation and note storage |
+| --- | --- | --- |
+| HP39g+, HP39gs, HP40gs | `notebook_independent_aplet` | Set `HPCLANG_NOTEBOOK_APLET_ASSETS` to the prepared HPGCC39 data directory. Transfer the four files in `independent-aplet/` together. Open **EntryProbe** in the Aplet library. Each copy saves its own note. |
+| HP48gII | `notebook_independent_port0_program` | Transfer `notebook-independent-port0.hp` to HOME, store it in Port 0, then recall it onto the RPN stack and press EVAL. This version saves and reopens the HOME note. |
+| HP48gII | `notebook_independent_program` | Transfer `notebook-independent.hp` to HOME and run it with EVAL. The editor can read the existing HOME note. Saving requires the Port 0 target above or the production launcher. |
+| HP49g+, HP50g | `notebook_independent_program` | Use the three files in `notebook-independent/`. The code resides in Port 1 and notes are saved in HOME. For an occupied Port 1, configure `HPCLANG_NOTEBOOK_PORT1_OFFSET` with the chain terminator's offset in nibbles before building. |
+
+For example, with `SDK` set to the installation prefix and the ATfE tools on
+`PATH`, build the writable HP48gII version from a clean directory:
+
+```sh
+cmake -S "$SDK/share/hpclang/examples/notebook" -B build/notebook-hp48gii \
+  -DCMAKE_PREFIX_PATH="$SDK" \
+  -DCMAKE_TOOLCHAIN_FILE="$SDK/share/hpclang/cmake/toolchains/hpclang-armv4t.cmake" \
+  -DCMAKE_BUILD_TYPE=MinSizeRel -DHPCLANG_BUILD_MODEL=hp48gii
+cmake --build build/notebook-hp48gii --target notebook_independent_port0_program
+```
+
+The installed `share/hpclang/examples/notebook/README.md` gives the transfer
+names and RPN installation commands for each target. Use a separate build
+directory for each calculator model.
 
 ## Choose services at runtime
 
