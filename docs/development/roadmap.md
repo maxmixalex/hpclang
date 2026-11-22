@@ -12,8 +12,7 @@ merged the direct Port 1 stack guard.
   blocks edits that would invalidate a direct data-stack reference. [#61](https://github.com/maxmixalex/hpclang/pull/61)
   and [#63](https://github.com/maxmixalex/hpclang/pull/63) extend internal Port 1
   edits to remove and replace an owned, unregistered header-only library.
-  #63 at `496dbe23` checks configured Stock roots and both fields of top-level
-  data-stack ACPTRs. Host tests, focused sanitizers and both Stock ROM regressions
+  #63 checks configured Stock roots, top-level data-stack ACPTRs and address fields inside nested lists. Host tests, focused sanitizers and both Stock ROM regressions
   passed locally. #61 targets main; #61 and #63 await remote acceptance.
   [#66](https://github.com/maxmixalex/hpclang/pull/66) at `c8478724` scans trailing
   deleted Port 2 records and stages sector images. Local simulated Flash passed
