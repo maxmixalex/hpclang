@@ -27,7 +27,8 @@ def package(prefix, output):
             path = Path(directory) / name
             if path.is_symlink():
                 raise ValueError("installed SDK contains a symbolic link: " + str(path))
-        files.extend(Path(directory) / name for name in names)
+        parent = Path(directory).relative_to(prefix)
+        files.extend((parent / name).as_posix() for name in names)
     entries = {}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
@@ -44,10 +45,10 @@ def package(prefix, output):
                 info.external_attr = (0o100000 | mode) << 16
                 archive.writestr(info, data)
 
-            for path in sorted(files):
+            for name in sorted(files):
+                path = prefix / name
                 if not path.is_file():
                     raise ValueError("installed SDK contains a non-file: " + str(path))
-                name = path.relative_to(prefix).as_posix()
                 data = path.read_bytes()
                 mode = 0o755 if data.startswith(b"#!") or path.suffix == ".sh" else 0o644
                 entries[name] = dict(
