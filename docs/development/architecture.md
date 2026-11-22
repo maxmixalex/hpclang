@@ -370,27 +370,25 @@ writable extent matched the boot descriptor; the heap figures use the ELF
 symbols `heap_next` and `__bss_end`. Peak resident RAM across Stock and the
 launcher remains open.
 
-On HP49g+ and HP50g, the independent Notebook editor held two live KOS
-allocations totaling 45,096 bytes on entry, after Save and on reopening the note. The eight writable
-pages and one page-table frame occupied 36,864 bytes within those blocks.
-Alignment slack and allocator metadata accounted for the other 8,232 bytes.
-The editor mapped another 81,920 bytes of code directly from its Port 1
-record. With the preceding `NBPAD` record used in this regression, the complete
-`NBLSE` backup occupied 85,595 bytes, including those code pages. Its size
-plus the two disjoint KOS allocations was 130,691 bytes at each editor
-checkpoint. The verifier checked both sets of page descriptors and the extent
-of the named backup in SRAM. After each user launch (Save and reopen), it
-checked that the Stock free list for each allocation's heap covered the entire
-original block, including its header and footer. Across each Save and reopen launch, the
-ROM-qualified allocator returned twice. Heap 0x100 had 104,072 usable bytes
-before EVAL, reached a sampled minimum of 58,976 bytes and returned to
-104,072 bytes on exit. The 45,096-byte decrease matched the live blocks on
-both models.
+The independent user launcher requests its eight writable pages and page table
+as one nine-page KOS allocation. A refused request or insufficient space before
+the first aligned page for lease metadata falls back to smaller allocations.
+On HP49g+ and HP50g Stock 2.15, Save and reopen each acquired one block.
+Heap 0x100 had 104,072 usable bytes before EVAL, reached 63,092 on allocator
+return and recovered all 104,072 on exit. The verifier matched the block to the
+mapped frames and checked its return to the free list, including header and footer.
+
+The 40,980-byte block contains 36,864 bytes of frames. The preceding two-block
+launcher consumed 45,096 bytes for those same frames. With the preceding
+`NBPAD` record, the 85,595-byte `NBLSE` backup and the new KOS block together
+occupied 126,575 bytes at the editor. The backup includes 81,920 bytes of
+directly mapped code. At the empty-Port-1 offset, the new three-file transfer
+is 108,479 bytes, 176 more than the launcher in the first-install table.
 
 On both models, the free interval between Stock's return and data stacks
-measured 402,508 nibbles before EVAL, 402,409 in the empty editor, 402,334
-after Save and 400,746 after return. On reopening, those readings were
-402,339 before EVAL, 402,260 in the editor and 400,672 after return. Each
+measured 401,804 nibbles before EVAL, 401,705 in the empty editor, 401,630
+after Save and 400,042 after return. On reopening, those readings were
+401,635 before EVAL, 401,556 in the editor and 399,968 after return. Each
 reading agreed with Stock's AVMEM count of complete five-nibble cells.
 These samples track Stock workspace separately. Peak usage between captures
 remains open.

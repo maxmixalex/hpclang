@@ -175,7 +175,7 @@ def editor_pool_usage(ram, image, code_offset, record_start):
     for i in range(count):
         ptr, n = struct.unpack_from("<II", ram, record + 16 + 8 * i)
         at = ptr - base
-        assert 16 <= at < 0x20000 and 1 <= n <= 8
+        assert 16 <= at < 0x20000 and 1 <= n <= pages
         size, flags = struct.unpack_from("<II", ram, at - 16)
         assert flags & 0xF000 in (0x1000, 0x2000)
         assert n * 4096 + 4095 <= size and at + size + 4 <= 0x20000
@@ -449,6 +449,8 @@ def main():
             usage, gaps, heap = user_memory(
                 Path(tmp), phases, args.model, flash, image, page, at, heap_profile, trace
             )
+        if args.baseline is None:
+            assert usage["editor"]["kos_blocks"] == 1, "fresh Stock launch used a split pool"
         hashes[name] = {
             "memory": usage,
             "kos_heap": heap,
