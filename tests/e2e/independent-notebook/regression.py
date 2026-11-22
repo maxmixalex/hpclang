@@ -38,12 +38,18 @@ def pack(nibbles):
     )
 
 
-def build(dest, toolchain, profile):
+def build(dest, toolchain, profile, sdk):
     env = dict(os.environ, PATH=str(toolchain) + os.pathsep + os.environ["PATH"])
-    sdk = dest / "sdk"
+    if sdk is None:
+        sdk = dest / "sdk"
+        subprocess.run(
+            ["cmake", "-S", ROOT, "-B", dest / "install", "-DCMAKE_INSTALL_PREFIX=" + str(sdk)],
+            env=env,
+            check=True,
+        )
+        subprocess.run(["cmake", "--install", dest / "install"], env=env, check=True)
+    sdk = sdk.resolve()
     for cmd in [
-        ["cmake", "-S", ROOT, "-B", dest / "install", "-DCMAKE_INSTALL_PREFIX=" + str(sdk)],
-        ["cmake", "--install", dest / "install"],
         [
             "cmake",
             "-S",
@@ -151,7 +157,7 @@ def check_phase(phase, editor_text, flash, original, font, expected_result):
     assert (phase / "state/flash").read_bytes() == flash
     _, read, _ = no_toolbox(ram, flash)
     assert bytes(home_string(read, b"HPCNOTE")) == b"hpclang-notebook/1\n20"
-    assert original == ram[0x20000:0x35000]
+    assert original == ram[0x20000:0x40000]
     stack = read(0x806F8)
     result = read(stack)
     digits = sum(read(result + 10 + i, 1) * 10**i for i in range(6))
@@ -185,6 +191,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dist", type=Path, required=True)
     parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
+    parser.add_argument("--sdk", type=Path, help="reuse an installed SDK from the current sources")
     parser.add_argument(
         "--baseline", type=Path, help="optional no-275 Stock snapshot for the selected model"
     )
@@ -192,7 +199,7 @@ def main():
     dest = args.output.resolve()
     dest.mkdir(parents=True)
     profile = json.loads((E2E / "targets" / f"{args.model}.json").read_text())
-    image = build(dest, args.toolchain.resolve(), profile)
+    image = build(dest, args.toolchain.resolve(), profile, args.sdk)
     spec = SimpleNamespace(
         model=args.model, profile=profile, dist=args.dist.resolve(), flash_busy_reads=0
     )
@@ -229,8 +236,23 @@ def main():
     else:
         raise ValueError("baseline contains HPCNOTE")
 
-    # Stock appends NBLSE after the existing ERAM chain. Derive the
-    # string payload alignment; reject an incompatible assumed mapping.
+    # Put another backup across the first page boundary before installing code.
+    padding = "ab" * 4500
+    (dest / "PAD.HP").write_bytes(pack(word(0x2A2C) + word(5 + len(padding)) + padding))
+    transfer(
+        spec,
+        dest / "padding",
+        baseline,
+        dest,
+        "NBPAD",
+        package_name="PAD.HP",
+        execute=False,
+        remote_commands=["-95 CF HOME NBPAD :1:NBPAD STO", "'NBPAD' PURGE"],
+    )
+    baseline = dest / "padding/state"
+    ram = (baseline / "sram").read_bytes()
+
+    # Stock appends NBLSE after the existing ERAM chain.
     def field(at, n):
         return sum(
             ((ram[0x20000 + (at + i) // 2] >> (4 * ((at + i) % 2))) & 15) << (4 * i)
@@ -244,8 +266,10 @@ def main():
         assert 20 < size <= 0x40000 - at
         at += size
     offset = at + 34
-    assert offset % 2 == 0 and offset // 2 < 4096
-    payload = bytes(4096 - offset // 2) + image + bytes(20 * 4096 - len(image))
+    assert offset % 2 == 0
+    page = (offset // 2 + 4095) & ~4095
+    assert page >= 8192
+    payload = bytes(page - offset // 2) + image + bytes(20 * 4096 - len(image))
     (dest / "DATA.HP").write_bytes(
         pack(word(0x2A2C) + word(5 + 2 * len(payload)) + "".join(word(b, 2) for b in payload))
     )
@@ -260,7 +284,7 @@ def main():
         remote_commands=["-95 CF HOME LEASRC :1:NBLSE STO", "'LEASRC' PURGE"],
     )
     staged = (dest / "setup/state/sram").read_bytes()
-    assert staged[0x21000 : 0x21000 + len(image)] == image
+    assert staged[0x20000 + page : 0x20000 + page + len(image)] == image
     font = ui["font_rows"](ROOT / "runtime/fonts/generated/newrpl_6a.S")
     hashes = {}
     card = dest / "notebook.img"
@@ -313,7 +337,7 @@ def main():
                 dest / name,
                 editor,
                 flash,
-                staged[0x20000:0x35000],
+                staged[0x20000:0x40000],
                 font,
                 {"refused": REFUSED_RESULT, "low-memory": LOW_MEMORY_RESULT}.get(
                     name, NORMAL_RESULT
@@ -343,9 +367,40 @@ def main():
     saved = home_string(read, b"HPCNOTE")
     backup = home_string(read, b"NBREAD")
     assert saved == b"hpclang-notebook/1\n20" and backup == b"hpclang-notebook/1\n202"
-    assert ram[0x20000:0x35000] == staged[0x20000:0x35000]
+    assert ram[0x20000:0x40000] == staged[0x20000:0x40000]
     require_stock_pc(recall / "state")
     hashes["port0-recall"] = {"home_hex": saved.hex(), "backup_hex": backup.hex()}
+    purge = dest / "purge"
+    transfer(
+        spec,
+        purge,
+        recall / "state",
+        dest,
+        "SPLITGC",
+        installed=True,
+        execute=False,
+        remote_commands=["HOME :1:NBLSE PURGE"],
+        execution_ms=4000,
+    )
+    after = (purge / "state/sram").read_bytes()[0x20000:0x40000]
+    assert after[: at // 2] == staged[0x20000 : 0x20000 + at // 2]
+    assert int.from_bytes(after[at // 2 : at // 2 + 3], "little") & 0xFFFFF == 0
+    removed = dest / "removed"
+    transfer(
+        spec,
+        removed,
+        purge / "state",
+        dest,
+        "SPLITGC",
+        installed=True,
+        remote_commands=["HOME 'SPLITGC' RCL CKCOPY"],
+        actions="15000 capture returned\n",
+        execution_ms=18000,
+    )
+    hashes["removed"] = {
+        "code_offset": page,
+        "settled_sha256": check_phase(removed, None, flash, after, font, REFUSED_RESULT),
+    }
     (dest / "report.json").write_text(json.dumps(hashes, indent=2))
     print(
         f"PASS independent {args.model} Notebook HOME bytes, editor reload, GC and settled return"

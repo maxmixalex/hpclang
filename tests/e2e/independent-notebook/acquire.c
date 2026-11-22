@@ -1,6 +1,9 @@
 #include "loader.h"
 void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
 {
+    u32 code = notebook_code();
+    if (!code)
+        return;
     hpclang_irq_restore(control[0]);
     unsigned count = 0, total = 0;
     for (unsigned n = 8; n; n /= 2)
@@ -57,6 +60,6 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
     record[3] = desc(out[8]);
     for (unsigned i = 0; i < count * 2; i++)
         record[4 + i] = out[8 + i];
-    split(record, 0, map, frame);
+    split(record, 0, map, frame, code);
     control[1] = hpclang_irq_save_disable() | 0xc0;
 }

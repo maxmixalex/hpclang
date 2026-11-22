@@ -14,10 +14,16 @@ The default target is HP50g. Add `--model hp49gplus` and select a fresh
 output directory to run HP49g+. The selected target determines the SDK build,
 the model ID passed to the application, the bootloader and the expected ROM
 fingerprint.
+Both models can share one SDK installation. Pass its prefix with
+`--sdk /path/to/sdk` when testing the same source revision.
 
 The test boots firmware 2.15, checks that library 275 is absent, installs
 the SDK and builds its plain Notebook example. Stock creates a named Port 1
-backup containing the staged code. All 20 code pages map read-only from that record.
+backup containing the staged code after a 4,500-byte padding string in its
+own backup. The loader finds `NBLSE` in the native record chain, verifies its
+image and maps all 20 code pages read-only from that record. After Stock
+purges `NBLSE`, the same entry must return its refusal result, preserve the
+HOME note and leave the remaining Port 1 contents intact.
 The normal entry requests nine aligned KOS pages (eight writable pages and one
 page for the two coarse page tables). The low-memory entry requests six
 (five writable pages and one table page). These counts exclude alignment

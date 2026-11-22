@@ -2,14 +2,17 @@
 
 Current checkpoint: 2026-11-22. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `e8e09e93`. [PR #49](https://github.com/maxmixalex/hpclang/pull/49)
-merged library discovery, guarded Port 1 edits and independent Notebook tests.
-All 207 executed CI jobs passed on `25b4963b`; three jobs were skipped.
-The HP39gs Stock dialogs job that stalled on the previous head also passed.
-Branch `m8-notebook-sdk-home-guard` carries the Port 1 HOME cache guard
-and the installed independent Notebook targets. Its follow-up batch through
-`475c28d7` adds the HP39/40 GC checks and both HP48gII SDK programs.
-Local verification passed; PR #57 is pending remote acceptance.
+Accepted main is `8cb52654`. [PR #57](https://github.com/maxmixalex/hpclang/pull/57)
+merged the Port 1 HOME cache guard, HP39/40 GC regressions and independent
+Notebook SDK targets. All 197 executed checks passed on `714b4d4e`; two skipped.
+[PR #49](https://github.com/maxmixalex/hpclang/pull/49) previously merged library
+discovery, guarded Port 1 edits and independent Notebook tests at `e8e09e93`.
+
+The HP49g+/HP50g independent launcher locates its Port 1 code backup by name.
+Both local Stock 2.15 runs executed from offset 8192 in Port 1, reopened the
+HOME note, exported the edit and recalled its Port 0 backup. After Stock
+purged the code, both returned the refusal result and preserved HOME and the
+remaining Port 1 bytes. Remote acceptance of this follow-up is pending.
 
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy
