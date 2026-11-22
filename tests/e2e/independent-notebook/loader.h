@@ -54,7 +54,45 @@ enum
     POOL_PAGES = RW_PAGES + 1
 };
 _Static_assert(NOTEBOOK_RW_BYTES % 4096 == 0, "Notebook RW mapping requires whole pages");
-static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame)
+/* Stock stores Port 1 records consecutively in the 128 KiB ERAM bank. */
+static u32 eram_word(u32 at, unsigned width)
+{
+    const volatile unsigned char *ram = (const void *)0x08020000;
+    u32 value = 0;
+    for (unsigned i = 0; i < width; i++, at++)
+        value |= ((ram[at / 2] >> (4 * (at & 1))) & 15u) << (4 * i);
+    return value;
+}
+
+static u32 notebook_code(void)
+{
+    for (u32 at = 0; at <= 0x40000 - 10;) {
+        u32 kind = eram_word(at, 5);
+        if (kind != 0x2b62 && kind != 0x2b40)
+            return 0;
+        u32 end = at + 5 + eram_word(at + 5, 5);
+        if (end > 0x40000 || end < at + 29)
+            return 0;
+        if (kind == 0x2b62 && end >= at + 44 && eram_word(at + 10, 2) == 5 &&
+            eram_word(at + 12, 6) == 0x4c424e && eram_word(at + 18, 4) == 0x4553) {
+            u32 payload = at + 34, page = (payload + 8191) & ~8191u;
+            u32 pages = (IMAGE_BYTES + 4095) / 4096;
+            if (eram_word(at + 22, 2) != 5 || eram_word(at + 24, 5) != 0x2a2c ||
+                at + 29 + eram_word(at + 29, 5) != end - 10 || eram_word(end - 10, 5) != 0x2911 ||
+                page + pages * 8192 > end - 10)
+                return 0;
+            u32 code = 0x08020000 + page / 2;
+            u32 hash = 2166136261u;
+            for (unsigned i = 0; i < IMAGE_BYTES; i++)
+                hash = (hash ^ ((const volatile unsigned char *)code)[i]) * 16777619u;
+            return hash == IMAGE_HASH ? code : 0;
+        }
+        at = end;
+    }
+    return 0;
+}
+
+static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame, u32 code)
 {
     u32 pg[POOL_PAGES], cnt = 0;
     for (unsigned i = 0; i < rec[1]; i++)
@@ -70,24 +108,18 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame)
     unsigned irq = hpclang_irq_save_disable();
     volatile u32 *l1 = (void *)0x07f00000, *l2 = (void *)pg[RW_PAGES];
     u32 oldrw = l1[17], oldcode = l1[18];
-    unsigned hash = 2166136261u;
-    for (unsigned j = 0; j < IMAGE_BYTES; j++)
-        hash = (hash ^ ((volatile unsigned char *)0x08021000u)[j]) * 16777619u;
-    if (hash != IMAGE_HASH)
-        for (;;) {
-        }
     for (unsigned i = 0; i < 512; i++)
         l2[i] = 0;
     /* The entire staged image is page aligned in the leased Port 1 record. */
     for (unsigned i = 0; i < (IMAGE_BYTES + 4095) / 4096; i++)
-        l2[256 + 32 + i] = (0x08021000 + i * 4096) | 0xaa2;
+        l2[256 + 32 + i] = (code + i * 4096) | 0xaa2;
     for (unsigned i = 0; i < RW_PAGES; i++)
         l2[i] = pg[i] | 0xff2;
     l2[256 + 31] = pg[RW_PAGES] | 0xaa2;
     l1[17] = pg[RW_PAGES] | 0x11;
     l1[18] = (pg[RW_PAGES] + 1024) | 0x11;
     hpclang_mmu_sync(l2, l1);
-    hash = 2166136261u;
+    unsigned hash = 2166136261u;
     for (unsigned j = 0; j < IMAGE_BYTES; j++)
         hash = (hash ^ ((volatile unsigned char *)0x01220000u)[j]) * 16777619u;
     for (unsigned i = 0; i < RW_PAGES; i++) {
