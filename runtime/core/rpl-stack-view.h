@@ -30,11 +30,11 @@ extern "C"
      */
     int hpclang_rpl_stack_depth(const struct hpclang_rpl_reader *reader, uint32_t *depth);
 
-    /* Return 1 if a native stack slot points into [first, end), 0 if none do,
-     * or a negative stack result. Includes launcher-private levels, excludes
-     * the bottom marker. Does not follow pointers inside the stack objects. */
-    int hpclang_rpl_stack_direct_overlap(const struct hpclang_rpl_reader *reader, uint32_t first,
-                                         uint32_t end);
+    /* Return 1 if a stack slot or either field of its top-level ACPTR points into [first, end), 0
+     * if none do, or a negative stack result. Includes launcher-private levels, excludes the bottom
+     * marker. Nested objects are not traversed. */
+    int hpclang_rpl_stack_reference_overlap(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                            uint32_t end);
 
     /* Resolve a 1-based stack level to its Saturn object address. */
     int hpclang_rpl_stack_object_address(const struct hpclang_rpl_reader *reader, uint32_t level,
