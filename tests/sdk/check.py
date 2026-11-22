@@ -720,9 +720,12 @@ endforeach()
                         str(directory),
                         "--target",
                         "notebook_independent_program",
+                        "notebook_independent_port0_program",
                         env=env,
                     )
-                outputs.add(Path("notebook-independent.hp"))
+                outputs.update(
+                    (Path("notebook-independent.hp"), Path("notebook-independent-port0.hp"))
+                )
             if aplet_options:
                 for directory in (selected, repeated):
                     run(

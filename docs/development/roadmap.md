@@ -35,10 +35,12 @@ See the [launcher measurements](architecture.md#migration-decision-after-the-ful
 The HP48gII CI size check failed on `54f6642b` and passed on `0cdc1bc0`.
 The current 64,672-byte Notebook fits the 65,536-byte code window and passed
 both local original-ROM entry paths, including consecutive Port 0 saves.
-A local installed SDK target packages the independent HP48gII HOME reader.
-Its transfer matched two separate builds and the program exercised in Stock.
-Both HOME and Port 0 runs preserved two user stack values across two launches;
-the Port 0 run also saved and reopened the note.
+The local HP48gII SDK builds separate independent HOME and Port 0 programs.
+The HOME reader preserves the user stack. The Port 0 program saved and
+reopened its HOME note when installed as `NOTES` behind another backup.
+Four local original-ROM launches covered user-stack return and post-exit GC.
+Two SDK builds produced identical transfers. The Port 0 transfer matched the
+stack-preserving program used in the emulator byte for byte.
 
 On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
 and remained readable after a one-byte move that produced the same PrRUN

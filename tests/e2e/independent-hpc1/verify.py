@@ -200,24 +200,26 @@ def verify(artifact, state, baseline):
         report["resident_trailer_nibble"] = trailer
     if manifest.get("port0_backup"):
         record = word(0x80716)
-        require(
-            model == "hp48gii" and 0x80000 <= record <= 0xF0000 - 28,
-            "Port 0 record address",
+        require(model == "hp48gii", "Port 0 model")
+        program = owners[0] + 0x70000
+        preceding = 0
+        while True:
+            require(0x80000 <= record <= min(program, 0xF0000 - 10), "Port 0 record address")
+            kind = word(record)
+            require(kind in (0x2B62, 0x2B40), "Port 0 record type")
+            end = record + 5 + word(record + 5)
+            require(record + 29 <= end <= 0xF0000, "Port 0 record extent")
+            if program < end:
+                break
+            record = end
+            preceding += 1
+        length = word(record + 10, 2)
+        require(kind == 0x2B62 and program == record + 14 + 2 * length, "Port 0 program owner")
+        require(word(program - 2, 2) == length and word(end - 10) == 0x2911, "Port 0 backup")
+        report["port0_name"] = bytes(word(record + 12 + 2 * i, 2) for i in range(length)).decode(
+            "latin-1"
         )
-        end = record + 5 + word(record + 5)
-        require(
-            record + 38 < end <= 0xF0000 and word(record) == 0x2B62,
-            "Port 0 backup extent",
-        )
-        name = bytes(word(record + 12 + 2 * i, 2) for i in range(7))
-        require(
-            word(record + 10, 2) == word(record + 26, 2) == 7 and name == b"ENTRY48",
-            "Port 0 backup name",
-        )
-        require(
-            record + 28 - 0x70000 == owners[0] and word(end - 10) == 0x2911,
-            "executing program is outside the Port 0 backup",
-        )
+        report["port0_preceding_records"] = preceding
         crc = 0
         for at in range(record + 5, end - 4):
             crc = (crc >> 4) ^ (((crc ^ nib(at)) & 15) * 0x1081)

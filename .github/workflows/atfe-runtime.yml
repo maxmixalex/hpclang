@@ -220,7 +220,7 @@ jobs:
           cmake -S "$sdk/share/hpclang/examples/notebook" -B "$app" -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DCMAKE_PREFIX_PATH="$sdk" -DCMAKE_TOOLCHAIN_FILE="$sdk/share/hpclang/cmake/toolchains/hpclang-armv4t.cmake" \
             -DHPCLANG_BUILD_MODEL=hp48gii
-          cmake --build "$app" --target notebook_launchers notebook_independent_program -j4
+          cmake --build "$app" --target notebook_launchers notebook_independent_program notebook_independent_port0_program -j4
           python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
             --fixture independent-hpc1 --notebook "$app/notebook.hpc" --dist "$dist" \
             --toolchain "$ATFE/bin" --output build/independent-hp48-notebook
@@ -231,6 +231,10 @@ jobs:
             --fixture independent-hpc1 --notebook "$app/notebook.hpc" --dist "$dist" --preserve-stack \
             --toolchain "$ATFE/bin" --output build/independent-hp48-user
           cmp "$app/notebook-independent.hp" build/independent-hp48-user/artifact/program.HP
+          python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
+            --fixture independent-hpc1 --notebook "$app/notebook.hpc" --dist "$dist" --port0 --preserve-stack \
+            --toolchain "$ATFE/bin" --output build/independent-hp48-port0-user
+          cmp "$app/notebook-independent-port0.hp" build/independent-hp48-port0-user/artifact/program.HP
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -242,6 +246,7 @@ jobs:
             build/independent-hp48-notebook/*/stock-*.pgm
             build/independent-hp48-notebook/*/emulator.log
             build/independent-hp48-port0/*.json
+            build/independent-hp48-port0-user/*.json
             build/independent-hp48-port0/*/emulator.log
             build/independent-hp48-user/*.json
             build/independent-hp48-user/*/emulator.log

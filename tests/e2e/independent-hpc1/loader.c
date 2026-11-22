@@ -184,8 +184,7 @@ void exercise(unsigned *out, unsigned char *arena, const struct hpclang_image_he
 }
 
 #ifdef HPCLANG_NOTEBOOK_PORT0
-/* Stock 2.15 HP48gII fixture. Only the first Port 0 backup, named ENTRY48,
- * may own this entry. The runner installs it on a fresh Stock state. */
+/* Stock 2.15 HP48gII backup records use nibble addresses. */
 static unsigned backup_word(const unsigned char *ram, unsigned at, unsigned width)
 {
     unsigned value = 0;
@@ -201,23 +200,35 @@ static unsigned owner_record(const unsigned *map, unsigned entry, unsigned last)
     for (unsigned i = 128; i < 240; ++i)
         if (map[i] != (unsigned)ram + (i - 128) * 2048 || map[257 + i] != map[i])
             return 0;
+    if (entry < (unsigned)ram || last < entry || last >= 0x08040000)
+        return 0;
+    unsigned pc = 0x80000 + 2 * (entry - (unsigned)ram);
     unsigned record = backup_word(ram, 0x80716, 5);
-    if (record < 0x80000 || record > 0xf0000 - 29 || backup_word(ram, record, 5) != 0x2b62 ||
-        backup_word(ram, record + 10, 2) != 7)
-        return 0;
-    /* The name is encoded as ENT, RY4, then 8 and the repeated length byte. */
-    if (backup_word(ram, record + 12, 6) != 0x544e45 ||
-        backup_word(ram, record + 18, 6) != 0x345952 || backup_word(ram, record + 24, 4) != 0x0738)
-        return 0;
-    unsigned end = record + 5 + backup_word(ram, record + 5, 5);
-    unsigned program = record + 28;
-    if (end > 0xf0000 || end < program + 25 || backup_word(ram, program, 5) != 0x2d9d ||
-        backup_word(ram, program + 5, 5) != 0x2dcc || backup_word(ram, end - 10, 5) != 0x2911)
+    unsigned end;
+    for (;;) {
+        if (record < 0x80000 || record > 0xf0000 - 10 || record > pc)
+            return 0;
+        unsigned type = backup_word(ram, record, 5);
+        if (type != 0x2b62 && type != 0x2b40)
+            return 0;
+        end = record + 5 + backup_word(ram, record + 5, 5);
+        if (end < record + 29 || end > 0xf0000)
+            return 0;
+        if (pc < end) {
+            if (type != 0x2b62)
+                return 0;
+            break;
+        }
+        record = end;
+    }
+    unsigned name_length = backup_word(ram, record + 10, 2);
+    unsigned program = record + 14 + 2 * name_length;
+    if (end < program + 25 || backup_word(ram, program - 2, 2) != name_length ||
+        backup_word(ram, program, 5) != 0x2d9d || backup_word(ram, program + 5, 5) != 0x2dcc ||
+        backup_word(ram, end - 10, 5) != 0x2911)
         return 0;
     unsigned code_end = program + 10 + backup_word(ram, program + 10, 5);
-    unsigned pc = 0x80000 + 2 * (entry - (unsigned)ram);
-    if (entry < (unsigned)ram || entry >= 0x08040000 || code_end > end - 10 || pc < program + 15 ||
-        pc >= code_end || last < entry || last >= 0x08040000 ||
+    if (code_end > end - 10 || pc < program + 15 || pc >= code_end ||
         0x80000 + 2 * (last - (unsigned)ram) + 1 >= code_end)
         return 0;
     return record;

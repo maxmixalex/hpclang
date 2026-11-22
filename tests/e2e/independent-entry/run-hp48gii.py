@@ -121,8 +121,8 @@ def main():
     if args.preserve_stack:
         commands.append('"first" "second"')
     if args.port0:
-        commands.append("'ENTRY48' RCL 'ENTRY48' PURGE :0:ENTRY48 STO")
-    commands.append(":0:ENTRY48 RCL" if args.port0 else "'ENTRY48' RCL")
+        commands.append("'ENTRY48' RCL 'ENTRY48' PURGE :0:NOTES STO 1 :0:TAG STO")
+    commands.append(":0:NOTES RCL" if args.port0 else "'ENTRY48' RCL")
     transfer(
         spec,
         out / "run",
@@ -157,7 +157,7 @@ def main():
             artifact,
             "ENTRY48",
             installed=True,
-            remote_commands=["-95 CF HOME :0:ENTRY48 RCL"] if args.port0 else None,
+            remote_commands=["-95 CF HOME :0:NOTES RCL"] if args.port0 else None,
             extra_files=[] if args.port0 else [("NOTE.HP", "HPCNOTE")],
             actions=resume_actions,
             execution_ms=23000 if args.port0 else 17000,
@@ -196,6 +196,12 @@ def main():
             ],
             check=True,
         )
+
+    if args.port0:
+        for phase in ("report.json", "resume.json"):
+            snapshot = json.loads((out / phase).read_text())
+            if snapshot["port0_name"] != "NOTES" or snapshot["port0_preceding_records"] < 1:
+                raise ValueError(f"{phase}: expected NOTES behind another Port 0 record")
 
 
 if __name__ == "__main__":

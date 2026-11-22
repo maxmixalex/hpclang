@@ -101,6 +101,13 @@ press EVAL. The editor reads the existing HOME note. ON returns to Stock
 with the user's stack values in place. This HOME launcher supplies a
 read-only object store. Use the production launcher above to save edits.
 
+For an experimental HP48gII launcher that saves the HOME note, build
+`--target notebook_independent_port0_program`. Transfer
+`notebook-independent-port0.hp` to HOME under the name `ENTRY48`. In RPN
+mode, run `'ENTRY48' RCL 'ENTRY48' PURGE :0:NOTES STO` to install it in
+Port 0. Run `:0:NOTES RCL` and press EVAL to open the editor. You can
+choose another Port 0 name and use it in both commands.
+
 The default Notebook build does not produce an HP39 Aplet. Prepare the
 external HPGCC39 resources as described in the installed
 getting-started guide, then wrap the existing launcher:
