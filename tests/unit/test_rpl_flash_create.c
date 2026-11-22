@@ -179,6 +179,46 @@ static void fill_bank(uint32_t index)
     flash[at + 3u] = (uint8_t)(0xf0u | (extent >> 16u));
 }
 
+static void plan_append_space(const struct hpclang_rpl_flash_io *io)
+{
+    struct hpclang_rpl_flash_append_space plan;
+    init();
+    fill_bank(0);
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan));
+    assert(plan.slot == base + 0x20105u && !plan.sector_count);
+
+    for (unsigned bank = 1; bank < 6; ++bank)
+        fill_bank(bank);
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan));
+    assert(plan.slot == base + 0x105u && plan.sector_count == 32u);
+
+    /* Put a live backup between two deleted records in bank 10. Only its
+     * trailing backup may be reclaimed, which needs just the final sector. */
+    uint32_t bank = 2u * 0x20000u;
+    uint32_t at = bank + 0x105u;
+    uint32_t extent = ((0x40000u - 0x20au - 2u) & ~3u) - 2u - 4u * sizeof record;
+    flash[at + 1] = (uint8_t)extent;
+    flash[at + 2] = (uint8_t)(extent >> 8);
+    flash[at + 3] = (uint8_t)(0xf0u | (extent >> 16));
+    at += 1u + extent / 2u;
+    memcpy(flash + at, record, sizeof record);
+    at += sizeof record;
+    memcpy(flash + at, record, sizeof record);
+    flash[at] = 0;
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan));
+    assert(plan.slot == base + at && plan.sector_count == 1u);
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record + 2u, &plan));
+    assert(plan.slot == base + 0x105u && plan.sector_count == 32u);
+
+    plan = (struct hpclang_rpl_flash_append_space){12, 34};
+    assert(hpclang_rpl_flash_plan_append_space(io, 0x20000, &plan) == HPCLANG_RPL_FLASH_NOSPACE);
+    assert(hpclang_rpl_flash_plan_append_space(io, 3, &plan) == HPCLANG_RPL_FLASH_INVALID);
+    flash[5u * 0x20000u + 0x100u] = 0;
+    assert(hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(plan.slot == 12 && plan.sector_count == 34 && !writes);
+}
+
 static int string_nibble(void *context, uint32_t address, uint8_t *value)
 {
     uint32_t length = *(uint32_t *)context;
@@ -1041,6 +1081,7 @@ static void create_libraries(const struct hpclang_rpl_flash_io *io)
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {0, read16, program16, base, base + sizeof flash};
+    plan_append_space(&io);
     init();
     uint32_t attempted = UINT32_MAX;
     flash[5u * 0x20000u + 0x110u] = 0;
