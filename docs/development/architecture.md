@@ -223,6 +223,38 @@ replacement (`Seed42` to `Seed4220`). In each, the Save button reported
 SRAM contained the same serialized string in the named Aplet. Application
 return, IRQ/FIQ, SWI vector, L1 restoration and return to the library passed.
 
+#### Notebook first-install transfer size
+
+On 2026-11-22, the installed SDK from `a26cde72` built Notebook in
+`MinSizeRel` with ATfE 22.1.0 for each model. For each row, the production
+and independent packages contained the same model-specific application bytes.
+The totals count the calculator transfer files for a fresh installation,
+including Stock support files. The independent builds use the variants that
+can save a note.
+
+| Model | Production files | Production bytes | Independent files | Independent bytes | Extra bytes on first install |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HP39g+ | 5 | 51,911 | 4 | 56,530 | 4,619 |
+| HP39gs | 5 | 51,919 | 4 | 56,514 | 4,595 |
+| HP40gs | 5 | 51,915 | 4 | 56,522 | 4,607 |
+| HP48gII | 2 | 65,528 | 1 | 138,717 | 73,189 |
+| HP49g+ | 2 | 82,637 | 3 | 108,303 | 25,666 |
+| HP50g | 2 | 82,617 | 3 | 108,303 | 25,686 |
+
+The HP39/40 totals include the Aplet, two directory records and Reset. The
+production bundle also carries the 1,489-byte `LIB275L.000`. Its Aplet name
+was `Notebook`; the independent target uses `EntryProbe`. On HP48gII, the
+2,404-byte ARMToolbox48 library is a one-time production install. The single
+independent Port 0 program includes its writable arena in the transfer.
+On HP49g+/HP50g, production's 7,673-byte `SETUP.BIN` is shared across apps.
+The empty-Port-1 independent package consists of the 22,275-byte launcher,
+16-byte copy helper and 86,012-byte aligned code string. An occupied Port 1
+can change the required padding.
+
+All six independent first installs transferred more bytes. HP39/40 and
+HP48gII each needed one fewer file. The remaining cost comparisons are peak
+resident RAM and time from launch to a usable editor.
+
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.
 Demonstrate disjoint storage for code, RW, stage, MMU and required native

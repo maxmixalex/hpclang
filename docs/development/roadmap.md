@@ -25,6 +25,12 @@ save/reopen, low memory, export, Port 0 recall and refusal after code removal.
 The local SDK archive and six-model reproducibility suite passed. Remote
 acceptance of the SDK transfer set is pending.
 
+The [six-model first-install comparison](architecture.md#notebook-first-install-transfer-size)
+now includes each production support library and every independent transfer
+file for the same Notebook image. The local builds at `a26cde72` measured
+4,595–73,189 extra bytes for independent first installs. Startup latency and
+peak resident RAM comparisons remain open.
+
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy
 changed only its slot. Tail recovery and duplicate retry performed no writes.
