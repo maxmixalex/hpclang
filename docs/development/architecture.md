@@ -285,6 +285,14 @@ offset in `hpclang_rpl_stock_memory_read`. These measurements cover the
 application's writable mapping, heap checkpoints and user stack. Peak
 resident RAM across the launcher and Stock still needs separate accounting.
 
+On HP48gII, Stock stores the installed user's 122,333-byte transfer as a
+244,683-nibble `NOTES` backup in Port 0 (122,341½ bytes). The diagnostic
+variant occupies 245,872 nibbles. The snapshot verifier walks past the preceding
+record, checks the backup CRC and places the complete 102,400-byte page pool
+inside each backup. That pool contains one table page, sixteen code pages and
+eight writable pages. Counting it again would overstate resident usage.
+These figures measure the saved record after Stock regains control.
+
 For startup, the emulator captured the Stock screen immediately before the
 PrRUN or EVAL key event, then captured the LCD at scheduled 5 ms intervals.
 The actual capture timestamps bracket the first screen with both the Notebook

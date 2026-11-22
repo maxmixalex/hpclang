@@ -213,25 +213,31 @@ def verify(artifact, state, baseline):
             require(0x80000 <= record <= min(program, 0xF0000 - 10), "Port 0 record address")
             kind = word(record)
             require(kind in (0x2B62, 0x2B40), "Port 0 record type")
-            end = record + 5 + word(record + 5)
-            require(record + 29 <= end <= 0xF0000, "Port 0 record extent")
-            if program < end:
+            record_end = record + 5 + word(record + 5)
+            require(record + 29 <= record_end <= 0xF0000, "Port 0 record extent")
+            if program < record_end:
                 break
-            record = end
+            record = record_end
             preceding += 1
         length = word(record + 10, 2)
         require(kind == 0x2B62 and program == record + 14 + 2 * length, "Port 0 program owner")
-        require(word(program - 2, 2) == length and word(end - 10) == 0x2911, "Port 0 backup")
+        require(word(program - 2, 2) == length and word(record_end - 10) == 0x2911, "Port 0 backup")
         report["port0_name"] = bytes(word(record + 12 + 2 * i, 2) for i in range(length)).decode(
             "latin-1"
         )
         report["port0_preceding_records"] = preceding
+        # HP48gII Saturn address 0x80000 starts at SRAM byte offset 0x8000.
+        pool_start = 0x70000 + 2 * base
+        pool_end = pool_start + 2 * (end - arena)
+        require(program <= pool_start < pool_end <= record_end - 10, "pool outside Port 0 program")
+        report["port0_record_nibbles"] = record_end - record
+        report["mapped_pool_bytes"] = end - arena
         crc = 0
-        for at in range(record + 5, end - 4):
+        for at in range(record + 5, record_end - 4):
             crc = (crc >> 4) ^ (((crc ^ nib(at)) & 15) * 0x1081)
-        require(crc == word(end - 4, 4), "Port 0 backup CRC mismatch")
+        require(crc == word(record_end - 4, 4), "Port 0 backup CRC mismatch")
         report["port0_crc"] = crc
-        report["port0_crc_nibble"] = end - 4 - 0x70000
+        report["port0_crc_nibble"] = record_end - 4 - 0x70000
     if manifest.get("post_exit_gc"):
         report["post_exit_gc"] = module["moving_gc_result"](word, word(0x806F8) + 5)
     if manifest.get("preserve_stack"):
