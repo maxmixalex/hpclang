@@ -712,6 +712,17 @@ endforeach()
                 Path("notebook-launchers") / f"{model}.hp",
                 Path("notebook-launchers/memory.json"),
             }
+            if model == "hp48gii":
+                for directory in (selected, repeated):
+                    run(
+                        "cmake",
+                        "--build",
+                        str(directory),
+                        "--target",
+                        "notebook_independent_program",
+                        env=env,
+                    )
+                outputs.add(Path("notebook-independent.hp"))
             if aplet_options:
                 for directory in (selected, repeated):
                     run(

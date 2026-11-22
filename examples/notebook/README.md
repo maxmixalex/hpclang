@@ -94,6 +94,13 @@ HP50g**: HP48gII uses ARMToolbox48 in Port 0; HP49g+/HP50g use ARMToolbox
 in Port 2. Recall the transferred Notebook object in RPN mode and launch
 it from **ARMTo → PrRUN**.
 
+For the experimental independent HP48gII HOME launcher, configure the model
+as `hp48gii` and build `--target notebook_independent_program`. Transfer
+`notebook-independent.hp` in binary mode to HOME, recall it in RPN mode and
+press EVAL. The editor reads the existing HOME note. ON returns to Stock
+with the user's stack values in place. This HOME launcher supplies a
+read-only object store. Use the production launcher above to save edits.
+
 The default Notebook build does not produce an HP39 Aplet. Prepare the
 external HPGCC39 resources as described in the installed
 getting-started guide, then wrap the existing launcher:

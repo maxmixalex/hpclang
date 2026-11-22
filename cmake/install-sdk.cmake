@@ -19,6 +19,9 @@ install(FILES tests/e2e/independent-entry/build.py tests/e2e/independent-entry/b
     tests/e2e/independent-entry/probe.c DESTINATION "${sdk_root}/tools/experimental/independent-entry")
 install(FILES tests/e2e/independent-pool/hp39-bitmap-probe.c
     DESTINATION "${sdk_root}/tools/experimental/independent-pool")
+install(FILES tests/e2e/independent-hpc1/build.py tests/e2e/independent-hpc1/app.c
+    tests/e2e/independent-hpc1/loader.c tests/e2e/independent-hpc1/link.ld
+    DESTINATION "${sdk_root}/tools/experimental/independent-hpc1")
 install(FILES LICENSE DESTINATION "${sdk_root}")
 install(DIRECTORY examples DESTINATION "${sdk_root}")
 install(FILES docs/sdk/getting-started.md DESTINATION "${sdk_root}/docs")

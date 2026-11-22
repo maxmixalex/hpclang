@@ -40,15 +40,21 @@ def verify(artifact, state, baseline):
     )
     module["no_toolbox"]((baseline / "sram").read_bytes(), flash, model)
     nib, word, count = module["no_toolbox"](ram, flash, model)
-    obj = word(word(526072))
-    require(
-        word(obj) == 9748 and word(obj + 5) == 12 and (nib(obj + 16) == 0),
-        "word(obj) == 9748 and word(obj + 5) == 12 and (nib(obj + 16) == 0)",
-    )
-    require(
-        sum((nib(obj + 10 + i) * 10**i for i in range(6))) == 124275,
-        "sum((nib(obj + 10 + i) * 10 ** i for i in range(6))) == 124275",
-    )
+    stack = word(0x806F8)
+    if manifest.get("preserve_stack"):
+        for level, value in enumerate((b"second", b"first")):
+            obj = word(stack + 5 * level)
+            require(
+                word(obj) == 0x2A2C and word(obj + 5) == 5 + 2 * len(value), "user stack string"
+            )
+            require(
+                bytes(word(obj + 10 + 2 * i, 2) for i in range(len(value))) == value,
+                "user stack value or order changed",
+            )
+    else:
+        obj = word(stack)
+        require(word(obj) == 9748 and word(obj + 5) == 12 and nib(obj + 16) == 0, "result integer")
+        require(sum(nib(obj + 10 + i) * 10**i for i in range(6)) == 124275, "result marker")
     meta = json.loads((artifact / "metadata.json").read_text())
     symbols = meta["symbols"]
     expected = bytes.fromhex(meta["blob"])
@@ -220,6 +226,8 @@ def verify(artifact, state, baseline):
         report["port0_crc_nibble"] = end - 4 - 0x70000
     if manifest.get("post_exit_gc"):
         report["post_exit_gc"] = module["moving_gc_result"](word, word(0x806F8) + 5)
+    if manifest.get("preserve_stack"):
+        report["user_stack_top_first"] = ["second", "first"]
     return report
 
 

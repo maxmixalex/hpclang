@@ -50,3 +50,26 @@ if(HPCLANG_NOTEBOOK_APLET_ASSETS)
     add_custom_target(notebook_independent_aplet DEPENDS ${outputs}
         "${stage}/entry/probe.bin" "${stage}/entry/metadata.json" "${stage}/entry/build.json")
 endif()
+
+if(HPCLANG_BUILD_MODEL STREQUAL "hp48gii")
+    set(builder "${HPCLANG_ROOT}/tools/experimental/independent-hpc1")
+    set(entry "${HPCLANG_ROOT}/tools/experimental/independent-entry")
+    set(stage "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/notebook-independent-hp48")
+    set(image "${CMAKE_CURRENT_BINARY_DIR}/notebook.hpc")
+    set(program "${CMAKE_CURRENT_BINARY_DIR}/notebook-independent.hp")
+    get_filename_component(tool_bin "${CMAKE_C_COMPILER}" DIRECTORY)
+    file(GLOB headers CONFIGURE_DEPENDS "${HPCLANG_ROOT}/include/hpclang/*.h")
+    add_custom_command(OUTPUT "${program}"
+        COMMAND "${CMAKE_COMMAND}" -E rm -rf "${stage}"
+        COMMAND "${Python3_EXECUTABLE}" -B "${builder}/build.py" --toolchain "${tool_bin}"
+            --model hp48gii --notebook "${image}" --preserve-stack --output "${stage}"
+        COMMAND "${CMAKE_COMMAND}" -E copy "${stage}/program.HP" "${program}"
+        DEPENDS notebook_hpc "${image}" ${headers} "${builder}/build.py" "${builder}/loader.c"
+            "${builder}/app.c" "${builder}/link.ld" "${entry}/entry.S" "${entry}/build.py"
+            "${HPCLANG_ROOT}/runtime/bootstrap/sync.S" "${HPCLANG_ROOT}/runtime/bootstrap/enter.S"
+            "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c" "${HPCLANG_ROOT}/runtime/bootstrap/run.c"
+            "${HPCLANG_ROOT}/platform/armtoolbox/stage-image.c"
+            "${HPCLANG_ROOT}/platform/armtoolbox/stage-image.h" "${HPCLANG_ROOT}/third_party/tinf/tinf.h"
+        VERBATIM)
+    add_custom_target(notebook_independent_program DEPENDS "${program}")
+endif()
