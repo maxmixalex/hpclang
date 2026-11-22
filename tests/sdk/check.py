@@ -726,6 +726,20 @@ endforeach()
                 outputs.update(
                     (Path("notebook-independent.hp"), Path("notebook-independent-port0.hp"))
                 )
+            if model in ("hp49gplus", "hp50g"):
+                for directory in (selected, repeated):
+                    run(
+                        "cmake",
+                        "--build",
+                        str(directory),
+                        "--target",
+                        "notebook_independent_program",
+                        env=env,
+                    )
+                outputs.update(
+                    Path("notebook-independent") / name
+                    for name in ("USER.HP", "COPY.HP", "DATA.HP")
+                )
             if aplet_options:
                 for directory in (selected, repeated):
                     run(
