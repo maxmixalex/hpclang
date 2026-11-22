@@ -218,6 +218,35 @@ static void test_tail(void)
     assert(space.address == source.base + 128u && space.nibbles == 0);
 }
 
+static void test_deleted_suffix(void)
+{
+    uint8_t bank[4 * sizeof native_record + 8];
+    struct image source = {bank, sizeof bank * 2u, 0x20a, 0, UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &source};
+    const uint32_t first = source.base, end = first + source.nibbles;
+    const uint32_t span = 2 * sizeof native_record;
+    struct hpclang_rpl_flash_space suffix;
+    memset(bank, 255, sizeof bank);
+    assert(!hpclang_rpl_flash_deleted_suffix(&reader, first, end, &suffix));
+    assert(suffix.address == first && !suffix.nibbles);
+    for (unsigned i = 0; i < 4; ++i)
+        memcpy(bank + i * sizeof native_record, native_record, sizeof native_record);
+    bank[0] = 0;
+    assert(!hpclang_rpl_flash_deleted_suffix(&reader, first, end, &suffix));
+    assert(suffix.address == first + 4 * span && !suffix.nibbles);
+    bank[2 * sizeof native_record] = bank[3 * sizeof native_record] = 0;
+    assert(!hpclang_rpl_flash_deleted_suffix(&reader, first, end, &suffix));
+    assert(suffix.address == first + 2 * span && suffix.nibbles == 2 * span);
+    bank[sizeof native_record] = 0;
+    assert(!hpclang_rpl_flash_deleted_suffix(&reader, first, end, &suffix));
+    assert(suffix.address == first && suffix.nibbles == 4 * span);
+    bank[sizeof bank - 1] = 0;
+    suffix = (struct hpclang_rpl_flash_space){123, 456};
+    assert(hpclang_rpl_flash_deleted_suffix(&reader, first, end, &suffix) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(suffix.address == 123 && suffix.nibbles == 456);
+}
+
 static void test_discard(void)
 {
     uint8_t bank[128], before[128];
@@ -517,6 +546,7 @@ int main(void)
     test_native_word_padding();
     test_allocation_find();
     test_tail();
+    test_deleted_suffix();
     test_discard();
     struct image source = {native_record + 4, 54, 0x100, 0, UINT32_MAX};
     const struct hpclang_rpl_reader reader = {read_nibble, &source};

@@ -229,6 +229,14 @@ int hpclang_rpl_flash_allocation_find(const struct hpclang_rpl_reader *reader, u
 int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
                            struct hpclang_rpl_flash_space *space);
 
+/* Locate consecutive deleted allocations immediately before the erased tail.
+ * Success reports the exact native allocation range in nibbles (zero length
+ * when absent). The entire chain and erased tail must validate. This range
+ * can still contain referenced payloads and retired recovery infrastructure.
+ * Reuse requires separate ownership, reference and erase-sector checks. */
+int hpclang_rpl_flash_deleted_suffix(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                     uint32_t end, struct hpclang_rpl_flash_space *space);
+
 struct hpclang_rpl_flash_discard
 {
     uint32_t address;

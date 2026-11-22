@@ -470,15 +470,17 @@ int hpclang_rpl_flash_discard_plan(const struct hpclang_rpl_reader *reader, uint
     return HPCLANG_RPL_SPAN_MALFORMED;
 }
 
-int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
-                           struct hpclang_rpl_flash_space *space)
+static int scan_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
+                     struct hpclang_rpl_flash_space *space, int deleted_suffix)
 {
     if (!reader || !reader->read_nibble || !space || ((first | end) & 1u))
         return HPCLANG_RPL_SPAN_MALFORMED;
     struct hpclang_rpl_port_cursor cursor = {first, end, 0};
     struct hpclang_rpl_port_entry entry;
+    uint32_t last_live_end = first;
     int result;
     while ((result = hpclang_rpl_flash_next(reader, &cursor, &entry)) > 0) {
+        last_live_end = cursor.address;
     }
     if (result)
         return result;
@@ -491,8 +493,24 @@ int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t fir
         if (nibble != 15u)
             return HPCLANG_RPL_SPAN_MALFORMED;
     }
+    if (deleted_suffix) {
+        *space = (struct hpclang_rpl_flash_space){last_live_end, cursor.address - last_live_end};
+        return HPCLANG_RPL_SPAN_OK;
+    }
     *space = (struct hpclang_rpl_flash_space){cursor.address, (end - cursor.address - 2u) & ~3u};
     return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
+                           struct hpclang_rpl_flash_space *space)
+{
+    return scan_tail(reader, first, end, space, 0);
+}
+
+int hpclang_rpl_flash_deleted_suffix(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                     uint32_t end, struct hpclang_rpl_flash_space *space)
+{
+    return scan_tail(reader, first, end, space, 1);
 }
 
 int hpclang_rpl_flash_allocation_find(const struct hpclang_rpl_reader *reader, uint32_t first,
