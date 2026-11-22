@@ -89,8 +89,8 @@ def check_sdk_archive(root, prefix, sdk, work, env):
         raise AssertionError("Nonreproducible SDK distribution archive")
     with zipfile.ZipFile(archives[0]) as archive:
         manifest = json.loads(archive.read("hpclang-sdk-manifest.json"))
-        if set(archive.namelist()) != set(manifest["files"]) | {"hpclang-sdk-manifest.json"}:
-            raise AssertionError("SDK archive manifest does not cover every entry")
+        if archive.namelist() != [*sorted(manifest["files"]), "hpclang-sdk-manifest.json"]:
+            raise AssertionError("SDK entries must match the manifest in canonical path order")
         for name, entry in manifest["files"].items():
             data = archive.read(name)
             if len(data) != entry["size"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:

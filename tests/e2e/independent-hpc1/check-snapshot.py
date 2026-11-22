@@ -44,7 +44,7 @@ if result["application"] == "notebook":
 if result["code_pages"] == 16:
     table = result["arena"][0] - 0x08000000
     cases["last-code-page"] = ("sram", table + (256 + 32 + 15) * 4)
-    cases["last-rw-page"] = ("sram", table + 11 * 4)
+    cases["last-rw-page"] = ("sram", table + (result["rw_pages"] - 1) * 4)
 if "resident_trailer_nibble" in result:
     cases["resident-code-location"] = (
         "sram",

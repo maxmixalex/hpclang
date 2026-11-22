@@ -75,6 +75,9 @@ def build(source, tool, output, model="hp50g", notebook=None, port0=False, prese
         if not notebook or model != "hp48gii":
             raise ValueError("Port 0 execution requires the HP48gII Notebook")
         common.append("-DHPCLANG_NOTEBOOK_PORT0")
+    # The independent Notebook maps 16 code pages and one MMU page.
+    # Keep the broader 29-page HP48gII reservation for the general pool probe.
+    pool_pages = 29 if model == "hp48gii" else 6
     if notebook:
         application = notebook.read_bytes()
         if model != "hp48gii" or len(application) < 16:
@@ -87,6 +90,11 @@ def build(source, tool, output, model="hp50g", notebook=None, port0=False, prese
             or rw + 8192 + 4096 > 49152
         ):
             raise ValueError("Notebook exceeds the HP48gII layout or has an invalid HPC1 header")
+        # Budget 12 KiB for the editor's measured 9,924-byte heap, plus its
+        # stack and boot page. Keep the previous 48 KiB ceiling for large images.
+        rw_pages = min(12, max(8, (rw + 8192 + 4096 + 12288 + 4095) // 4096))
+        pool_pages = 1 + 16 + rw_pages
+        common.append(f"-DNOTEBOOK_RW_PAGES={rw_pages}")
         (output / "app.hpc").write_bytes(application)
         common += ["-DHPCLANG_NOTEBOOK", f"-DNOTEBOOK_BYTES={size}", f"-DNOTEBOOK_ENTRY={entry}"]
     else:
@@ -139,7 +147,7 @@ def build(source, tool, output, model="hp50g", notebook=None, port0=False, prese
         if assembly.count(old) != 1:
             raise ValueError("shared entry no longer has the expected call/offset structure")
         assembly = assembly.replace(old, new)
-    arena_bytes = 30 * 4096 if model == "hp48gii" else 7 * 4096
+    arena_bytes = (pool_pages + 1) * 4096
     arena = (
         f".balign 8\n.global arena\narena: .space {arena_bytes}\n.global arena_end\narena_end:\n"
     )
@@ -246,7 +254,7 @@ def build(source, tool, output, model="hp50g", notebook=None, port0=False, prese
     if port0:
         manifest["port0_backup"] = True
     if model == "hp48gii":
-        manifest["pool_pages"] = 29
+        manifest["pool_pages"] = pool_pages
     (output / "build.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Built {len(blob)}-byte payload in {output}")
 
