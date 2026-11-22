@@ -13,6 +13,10 @@ Both local Stock 2.15 runs executed from offset 8192 in Port 1, reopened the
 HOME note, exported the edit and recalled its Port 0 backup. After Stock
 purged the code, both returned the refusal result and preserved HOME and the
 remaining Port 1 bytes. Remote acceptance of this follow-up is pending.
+The HP49g+/HP50g user entry releases its KOS blocks before returning to RPN.
+On both local Stock 2.15 ROMs it saved and reopened `20`, preserving both
+user stack values across both launches. Its transfer is 22,275 bytes per
+model, excluding the separate Port 1 code backup.
 
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy
