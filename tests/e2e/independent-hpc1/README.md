@@ -14,6 +14,11 @@ aligned pages: one for the L2 tables, 16 for code and 12 for writable memory
 (48 KiB). All three models use a 4 KiB entry stack. The build reuses the maintained
 independent entry and common bootstrap sources.
 
+For the installed HP48gII Notebook, the builder reserves eight writable
+pages (32 KiB), giving the editor 25 mapped pages in total. The budget covers
+the boot page, static data, the 8 KiB stack and the measured editor heap.
+Images with larger static data can use up to twelve writable pages.
+
 ```sh
 python3 tests/e2e/independent-hpc1/build.py \
   --toolchain "$ATFE/bin" --output /tmp/hpc1-build

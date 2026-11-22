@@ -31,6 +31,13 @@ file for the same Notebook image. The local builds at `a26cde72` measured
 4,595–73,189 extra bytes for independent first installs. Startup latency and
 peak resident RAM comparisons remain open.
 
+The HP48gII independent Notebook now maps 25 pages for the same application
+image. The SDK's writable Port 0 transfer shrank by 16 KiB to 122,333 bytes.
+Both HOME and Port 0 binaries matched the local Stock runs byte for byte.
+Ordinary return preserved the caller's stack and both diagnostic variants
+passed their post-return moving-GC checks. The Port 0 runs saved, reopened
+and replaced the HOME note. Remote acceptance of the smaller layout is pending.
+
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy
 changed only its slot. Tail recovery and duplicate retry performed no writes.
