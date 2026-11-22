@@ -2215,7 +2215,9 @@ lists, orphan sidecars, missing PASS/return captures, invalid lifecycle order or
 an unsettled/failed execution. It requires an earlier snapshot before PASS; it
 does not infer that every possible intermediate phase or transient peak was
 captured. Reports fingerprint the ROM, status and each SRAM image and preserve
-phase/time and both heaps' free totals/largest blocks. Report creation is
+phase/time, total free bytes and the largest block in heap 0x100.
+The reviewed allocator links allocated blocks at the global immediately after
+its free-list descriptor. Report creation is
 exclusive so a prior result cannot silently be overwritten.
 
 The optional native allocator-return observer complements these snapshots.
@@ -2244,7 +2246,7 @@ python3 tests/e2e/harness/verify-native-heap-trace.py /path/to/hp50g-heap.json \
 ```
 
 This verifier checks the ROM profile, execution/settled-return result, phase
-intervals, rejected-event counts and paired-heap minima. Allocation failures
+intervals, rejected-event counts and minimum sampled free capacity. Allocation failures
 are reported separately from invalid observations. Unsampled phases have no
 measured minimum, rather than zero free capacity. Boot events before the first
 phase, other allocation functions and native exception stacks remain outside
@@ -2259,8 +2261,7 @@ truncated SRAM and unsettled execution. Evidence is in
 HP39g+ also passes Stock execution and all nine captured phases through the
 maintained verifier. Heap 0x100 usable bytes are 13,212 before transfer,
 12,168 during USB, 13,212 after fetch, 7,048 at application PASS and 13,212
-after settled return. Each sample has two free blocks and an empty heap 0x200;
-the largest free block is 1,024 bytes smaller than the usable total. The
+after settled return. Each sample has two free blocks. The largest free block is 1,024 bytes smaller than the usable total. The
 6,164-byte application interval difference does not by itself identify an
 allocation owner. Evidence:
 `/work/oct26-resource-snapshot-matrix/hp39gplus/verified-lifecycle.json`.
