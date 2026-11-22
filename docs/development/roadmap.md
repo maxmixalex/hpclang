@@ -30,7 +30,7 @@ Accepted main is `b11c1e6a` after [#62](https://github.com/maxmixalex/hpclang/pu
   Windows and Linux produced identical archives locally. The #62 merge tree (`93f8c629`) reproduced all 613
   release outputs after SDK relocation, including HP39/40 C and C++ Aplets.
   All six Notebook targets built. The earlier integrated branches passed 180 host tests. [#68](https://github.com/maxmixalex/hpclang/pull/68)
-  corrects live heap measurement on all six ROMs. #68 awaits full CI.
+  corrects live heap measurement on all six ROMs.
   [#69](https://github.com/maxmixalex/hpclang/pull/69) at `3b5bcd9c` reduced the HP49g+/HP50g
   Notebook KOS peak from 45,096 to 40,980 bytes across Save and reopen. Both ROMs
   recovered all 104,072 free bytes at exit. The empty-Port-1 package grew by 176 bytes.
@@ -38,6 +38,8 @@ Accepted main is `b11c1e6a` after [#62](https://github.com/maxmixalex/hpclang/pu
   [#71](https://github.com/maxmixalex/hpclang/pull/71) measures the HP39/40 editor bitmap
   and saved Aplets. Its SDK guide lists the independent targets for all six models.
   The documented build produced all seven packages from a local SDK installation.
+  After integrating #62, #68 (`07db469c`) and #71 (`56bcefec`) each passed all
+  180 host tests and the strict documentation build locally. Both await remote acceptance.
   [#72](https://github.com/maxmixalex/hpclang/pull/72) verifies moving Stock GC with Notebook
   mappings installed after editor exit on HP49g+ and HP50g. Save and reopen passed
   on both ROMs locally, including mapping restoration and release. CI submitted.
