@@ -11,7 +11,7 @@ static const uint8_t record[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03,
                                  0x4c, 0x41, 0x53, 0x48, 0x4f, 0x4e, 0x45, 0x08, 0x14, 0x26, 0x90,
                                  0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
 static uint8_t flash[6u * 0x20000u];
-static unsigned writes;
+static unsigned writes, reads;
 static uint32_t fail_address;
 static unsigned write_failures;
 static unsigned fail_write_at;
@@ -25,6 +25,7 @@ static int read16(void *context, uint32_t address, uint16_t *value)
 {
     (void)context;
     assert(!(address & 1u) && address >= base && address - base < sizeof flash);
+    ++reads;
     if (address == fail_address)
         return 0;
     if (fail_read_after_write && writes) {
@@ -67,7 +68,7 @@ static void init(void)
         flash[i * 0x20000u + 0x100u] = 0xf0;
         flash[i * 0x20000u + 0x101u] = (uint8_t)(i + 8u);
     }
-    writes = 0;
+    reads = writes = 0;
     write_failures = 0;
     fail_write_at = UINT32_MAX;
     fail_address = UINT32_MAX;
@@ -182,6 +183,21 @@ static void fill_bank(uint32_t index)
 static void plan_append_space(const struct hpclang_rpl_flash_io *io)
 {
     struct hpclang_rpl_flash_append_space plan;
+    init();
+    /* Even on empty Flash the last bank must be checked. Each tail halfword
+     * needs only one bus read, apart from the header and end-marker probes. */
+    flash[0x104] = 0;
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan));
+    assert(plan.slot == base + 0x105u && !plan.sector_count);
+    assert(reads <= 6u * ((0x20000u - 0x104u) / 2u + 4u));
+    fail_address = base + sizeof flash - 2u;
+    assert(hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan) ==
+           HPCLANG_RPL_FLASH_FAILED);
+    fail_address = UINT32_MAX;
+    flash[sizeof flash - 1u] = 0xfe;
+    assert(hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(!writes);
     init();
     fill_bank(0);
     assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan));
