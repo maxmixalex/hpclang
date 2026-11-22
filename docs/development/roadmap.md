@@ -37,7 +37,9 @@ Accepted main is `b11c1e6a` after [#62](https://github.com/maxmixalex/hpclang/pu
   Both full Stock regressions and 180 host tests passed locally. CI submitted.
   [#71](https://github.com/maxmixalex/hpclang/pull/71) measures the HP39/40 editor bitmap
   and saved Aplets. Its SDK guide lists the independent targets for all six models.
-  The documented build produced all seven packages from a local SDK installation.
+  All seven documented packages built locally. In nine original-ROM runs, the follow-up
+  (`89c56c44`) measured 6,727 / 4,069 / 3,864 whole bytes of Stock stack space while
+  editing the copy on HP39g+ / HP39gs / HP40gs. CI submitted.
   After integrating #62, #68 (`07db469c`) and #71 (`56bcefec`) each passed all
   180 host tests and the strict documentation build locally. Both await remote acceptance.
   [#72](https://github.com/maxmixalex/hpclang/pull/72) verifies moving Stock GC with Notebook
