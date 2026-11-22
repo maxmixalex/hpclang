@@ -2698,6 +2698,17 @@ static void test_root_sources(void)
     put_word(0x86128, 5, 0);
     put_word(0x86133, 5, 0x41234);
     put_word(0x86138, 5, 0x22f5a);
+    /* A return cursor may point inside the bank window without identifying
+     * an object header. The upper endpoint itself is outside the edit. */
+    put_word(0x84ffbu, 5u, 0x4789au);
+    assert(hpclang_rpl_mutation_check_root_range(&io, 0x47899u, 0x4789bu) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+    assert(hpclang_rpl_mutation_check_root_range(&io, 0x47899u, 0x4789au) == 0);
+    io.library_table = 0xfffffu;
+    assert(hpclang_rpl_mutation_check_root_range(&io, 0x47899u, 0x4789bu) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    io.library_table = 0x8611du;
+    put_word(0x84ffbu, 5u, pair.object_b);
     struct source_visit_state state = {0};
     uint8_t *before = malloc(sizeof memory);
     assert(before);

@@ -1,8 +1,9 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-22. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+Current checkpoint: 2026-11-23. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `8cb52654`. [PR #57](https://github.com/maxmixalex/hpclang/pull/57)
+Accepted main is `119a779d`. [PR #58](https://github.com/maxmixalex/hpclang/pull/58)
+merged named Port 1 Notebook lookup after 190 checks passed and two skipped. [PR #57](https://github.com/maxmixalex/hpclang/pull/57)
 merged the Port 1 HOME cache guard, HP39/40 GC regressions and independent
 Notebook SDK targets. All 197 executed checks passed on `714b4d4e`; two skipped.
 [PR #49](https://github.com/maxmixalex/hpclang/pull/49) previously merged library
@@ -26,7 +27,8 @@ clearing it, they changed library 123's title from `X` to `XY`, read it
 back by ID, restored the original record and removed it. The following
 backup survived both moves. The original Port 1 prefix and chain length
 were restored and both relaunches passed on each model. Removal is in
-PR #61. Replacement has passed local tests. Public mutation and management
+[PR #61](https://github.com/maxmixalex/hpclang/pull/61). Replacement and the direct
+root check are in [PR #63](https://github.com/maxmixalex/hpclang/pull/63) for CI. Public mutation and management
 of active libraries remain open.
 
 On local original-ROM runs, the installed SDK's independent Notebook saved
@@ -71,7 +73,11 @@ edits and two relaunches passed locally on each Stock 2.15 ROM.
 The local guarded edit now rejects direct RPL stack pointers into its affected
 Port 1 range. On each Stock 2.15 ROM a read-only test overlay caused refusal
 without changing the records; normal edits and two relaunches passed.
-Public edits still require other live roots, including suspended execution.
+A local follow-up checks all direct roots configured by the Stock mutation
+backend before an owned edit. The return-cursor refusal passed host and
+sanitizer tests. HP49g+ and HP50g passed the editing fixture and two
+relaunches each. Indirect references and remaining execution roots still
+gate public edits.
 The HP48gII Port 0 Notebook
 passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
 bundles matched the historical writer on all three models.

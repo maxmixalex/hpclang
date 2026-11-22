@@ -64,7 +64,13 @@ static int check_owned_tail(void *context, uint32_t first, uint32_t end)
     int stack = hpclang_rpl_stack_direct_overlap(&stock, 0x40000u + first, 0x40000u + end);
     if (stack < 0)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
-    return overlap || cache || stack ? HPCLANG_RPL_MUTATION_BUSY : HPCLANG_RPL_MUTATION_OK;
+    if (overlap || cache || stack)
+        return HPCLANG_RPL_MUTATION_BUSY;
+    struct hpclang_rpl_stock_memory memory;
+    struct hpclang_rpl_mutation_io roots;
+    if (!hpclang_rpl_stock_mutation_io(&roots, &memory))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    return hpclang_rpl_mutation_check_root_range(&roots, 0x40000u + first, 0x40000u + end);
 }
 
 static int chain_end(const struct hpclang_rpl_reader *reader, uint32_t *end)
