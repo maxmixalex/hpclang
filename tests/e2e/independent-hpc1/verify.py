@@ -1,4 +1,4 @@
-"""Verify the bounded independent HPC1 fixture against a real HP50g snapshot."""
+"""Verify the bounded independent HPC1 fixture against the selected model's Stock snapshot."""
 
 import argparse
 import hashlib
@@ -14,8 +14,14 @@ require = module["require"]
 def verify(artifact, state, baseline):
     manifest = json.loads((artifact / "build.json").read_text())
     model = manifest.get("model", "hp50g")
-    require(model in ("hp49gplus", "hp50g"), "unsupported fixture model")
-    model_id = 5 if model == "hp49gplus" else 6
+    require(model in ("hp48gii", "hp49gplus", "hp50g"), "unsupported fixture model")
+    model_id = {"hp48gii": 4, "hp49gplus": 5, "hp50g": 6}[model]
+    pages = manifest.get("pool_pages", 6)
+    require(pages == 6 or (model == "hp48gii" and pages == 29), "unsupported arena layout")
+    wide_pool = pages == 29
+    code_pages, rw_pages = (16, 12) if wide_pool else (1, 4)
+    rw_bytes = 4096 * rw_pages
+    notebook = manifest.get("application") == "notebook"
     rom_hash = module["ROM_SHA256_BY_MODEL"][model]
     for name, expected in manifest["outputs"].items():
         require(Path(name).name == name, "invalid artifact path")
@@ -32,8 +38,8 @@ def verify(artifact, state, baseline):
         hashlib.sha256(flash[:1310720]).hexdigest() == rom_hash,
         f"unexpected {model} firmware",
     )
-    module["no_toolbox"]((baseline / "sram").read_bytes(), flash)
-    nib, word, count = module["no_toolbox"](ram, flash)
+    module["no_toolbox"]((baseline / "sram").read_bytes(), flash, model)
+    nib, word, count = module["no_toolbox"](ram, flash, model)
     obj = word(word(526072))
     require(
         word(obj) == 9748 and word(obj + 5) == 12 and (nib(obj + 16) == 0),
@@ -59,12 +65,14 @@ def verify(artifact, state, baseline):
     result = struct.unpack_from("<134I", ram, start + symbols["workspace"])
     require(result[0] == 843272264 and result[1] == 0, result[:16])
     require(
-        result[2] == 42 and result[3:5] == result[5:7] and (result[7] == result[8]),
-        "result[2] == 42 and result[3:5] == result[5:7] and (result[7] == result[8])",
+        result[2] == (0 if notebook else 42)
+        and result[3:5] == result[5:7]
+        and (result[7] == result[8]),
+        "incorrect application status or Stock mappings/vector after return",
     )
     require(
-        result[11:14] == (model_id, 16384, 826495048),
-        "result[11:14] == (model_id, 16384, 826495048)",
+        result[11:13] == (model_id, rw_bytes) and (notebook or result[13] == 826495048),
+        "unexpected application boot metadata",
     )
     require(
         result[14] & 255 == result[15] & 255 == 208, "result[14] & 255 == result[15] & 255 == 208"
@@ -79,26 +87,46 @@ def verify(artifact, state, baseline):
     arena = result[9]
     end = result[10]
     require(
-        arena % 4096 == 0 and end - arena == 24576, "arena % 4096 == 0 and end - arena == 24576"
+        arena % 4096 == 0 and end - arena == 4096 * (1 + code_pages + rw_pages),
+        "incorrect pool alignment or size",
     )
     require(
         physical + symbols["arena"] <= arena < end <= physical + symbols["arena_end"],
         "physical + symbols['arena'] <= arena < end <= physical + symbols['arena_end']",
     )
+    base = arena - 0x08000000
+    if wide_pool:
+        for index, first, count in ((256 + 32, 1, code_pages), (0, 1 + code_pages, rw_pages)):
+            actual_pages = struct.unpack_from(f"<{count}I", ram, base + 4 * index)
+            expected_pages = tuple((arena + (first + i) * 4096) | 0xFFE for i in range(count))
+            require(actual_pages == expected_pages, "unexpected HPC1 page descriptors")
     hpc = (artifact / "app.hpc").read_bytes()
     magic, size, entry, rw = struct.unpack_from("<4sIII", hpc)
     require(
-        magic == b"HPC1" and rw == 12 and entry & 1 and (len(hpc) == size + 16),
-        "magic == b'HPC1' and rw == 12 and entry & 1 and (len(hpc) == size + 16)",
+        magic == b"HPC1"
+        and len(hpc) == size + 16
+        and 0 < entry < size
+        and (notebook or (rw == 12 and entry & 1)),
+        "invalid application image header",
     )
     require(
         ram[arena - 134217728 + 4096 : arena - 134217728 + 4096 + size] == hpc[16:],
         "ram[arena - 134217728 + 4096:arena - 134217728 + 4096 + size] == hpc[16:]",
     )
-    require(
-        struct.unpack_from("<III", ram, arena - 134217728 + 12288) == (model_id, 16384, 826495048),
-        "struct.unpack_from('<III', ram, arena - 134217728 + 12288) == (model_id, 16384, 826495048)",
-    )
+    if notebook:
+        boot = struct.unpack_from("<IIII", ram, base + (1 + code_pages) * 4096)
+        require(
+            boot[:2] == (model_id, rw_bytes)
+            and boot[2]
+            and (boot[3] & 1 if manifest.get("port0_backup") else boot[3] == 0),
+            "Notebook boot context",
+        )
+    else:
+        require(
+            struct.unpack_from("<III", ram, arena - 134217728 + (2 + code_pages) * 4096)
+            == (model_id, rw_bytes, 826495048),
+            "struct.unpack_from('<III', ram, arena - 134217728 + (2 + code_pages) * 4096) == (model_id, rw_bytes, 826495048)",
+        )
     mutable = [
         (symbols["control"], symbols["control"] + 20),
         (symbols["workspace"], symbols["workspace"] + 536),
@@ -121,7 +149,10 @@ def verify(artifact, state, baseline):
         for i in range(len(packed))
         if packed.startswith(prefix, i)
         and i + len(prefix) <= start * 2
-        and (start * 2 + meta["size"] * 2 <= i + len(prefix) + meta["reserve"])
+        and (
+            start * 2 + max(meta["size"], symbols["arena_end"]) * 2
+            <= i + len(prefix) + meta["reserve"]
+        )
     ]
     require(len(owners) == 1, "len(owners) == 1")
     report = dict(
@@ -129,9 +160,12 @@ def verify(artifact, state, baseline):
         model=model,
         payload_physical=physical,
         app_result=result[2],
+        application="notebook" if notebook else "probe",
         boot_model=result[11],
         rw_bytes=result[12],
         arena=[arena, end],
+        code_pages=code_pages,
+        rw_pages=rw_pages,
         entry_control=[control[0] & 255, control[2] & 255],
         entry_swi=list(control[3:]),
         l1_before=list(result[3:5]),
@@ -143,10 +177,49 @@ def verify(artifact, state, baseline):
         no_library_275=True,
         unchanged_flash=True,
         owned_storage=True,
-        scope="Bounded embedded HPC1/Thumb program through common bootstrap from independent Stock entry; not arbitrary apps, service coexistence or other families.",
+        scope="HP48gII Notebook editor and Stock return"
+        if notebook
+        else "Embedded Thumb probe through common bootstrap from independent Stock entry",
         program_sha256=hashlib.sha256((artifact / "program.HP").read_bytes()).hexdigest(),
         sram_sha256=hashlib.sha256(ram).hexdigest(),
     )
+    if manifest.get("resident_image"):
+        # The persistent trailer and its distance move together with the Stock object.
+        trailer = owners[0] + len(prefix) + meta["reserve"] - 40
+        require(
+            packed[trailer : trailer + 32] == nibbles(hpc[:16]), "resident image header changed"
+        )
+        distance = sum(int(packed[trailer + 32 + i], 16) << (4 * i) for i in range(8))
+        require(trailer - distance == 2 * (base + 4096), "resident image location changed")
+        report["resident_trailer_nibble"] = trailer
+    if manifest.get("port0_backup"):
+        record = word(0x80716)
+        require(
+            model == "hp48gii" and 0x80000 <= record <= 0xF0000 - 28,
+            "Port 0 record address",
+        )
+        end = record + 5 + word(record + 5)
+        require(
+            record + 38 < end <= 0xF0000 and word(record) == 0x2B62,
+            "Port 0 backup extent",
+        )
+        name = bytes(word(record + 12 + 2 * i, 2) for i in range(7))
+        require(
+            word(record + 10, 2) == word(record + 26, 2) == 7 and name == b"ENTRY48",
+            "Port 0 backup name",
+        )
+        require(
+            record + 28 - 0x70000 == owners[0] and word(end - 10) == 0x2911,
+            "executing program is outside the Port 0 backup",
+        )
+        crc = 0
+        for at in range(record + 5, end - 4):
+            crc = (crc >> 4) ^ (((crc ^ nib(at)) & 15) * 0x1081)
+        require(crc == word(end - 4, 4), "Port 0 backup CRC mismatch")
+        report["port0_crc"] = crc
+        report["port0_crc_nibble"] = end - 4 - 0x70000
+    if manifest.get("post_exit_gc"):
+        report["post_exit_gc"] = module["moving_gc_result"](word, word(0x806F8) + 5)
     return report
 
 

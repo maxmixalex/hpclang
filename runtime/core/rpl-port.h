@@ -125,6 +125,14 @@ int hpclang_rpl_library_registration_plan(const struct hpclang_rpl_reader *port_
                                           uint32_t catalog, uint32_t catalog_limit, uint32_t number,
                                           struct hpclang_rpl_library_registration *plan);
 
+/* Visit each validated 13-nibble HOME attachment, including zero pointer fields.
+ * The two targets remain in their original mappings. Discard partial output on error. */
+typedef int (*hpclang_rpl_home_attachment_fn)(void *context, uint32_t record, uint32_t number,
+                                              uint32_t first, uint32_t second);
+int hpclang_rpl_home_attachments_visit(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                       uint32_t limit, hpclang_rpl_home_attachment_fn visit,
+                                       void *context);
+
 /* Inspect the native HOME attachment prefix (DORRP, count, 13-nibble records).
  * Caller supplies the proven HOME address and readable extent. Validate every
  * encoded record, including records after a match. Return 1 attached, 0 absent
@@ -132,6 +140,11 @@ int hpclang_rpl_library_registration_plan(const struct hpclang_rpl_reader *port_
  * liveness or validation of the directory's stored objects. No writes. */
 int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, uint32_t home,
                                       uint32_t limit, uint32_t number);
+
+/* As above. With a non-null output require a unique matching record and
+ * publish its address only after validating the whole attachment prefix. */
+int hpclang_rpl_home_library_find(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                  uint32_t limit, uint32_t number, uint32_t *unique_record);
 
 /* Plan removal from the strictly ID-ordered catalog. Validate the entire table,
  * including entries after the match, before publishing its slot and binding.
@@ -153,6 +166,15 @@ typedef int (*hpclang_rpl_catalog_visit_fn)(void *context, uint32_t record, uint
                                             const struct hpclang_rpl_library_binding *binding);
 int hpclang_rpl_catalog_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
                               uint32_t limit, hpclang_rpl_catalog_visit_fn visit, void *context);
+
+/* Check all catalog payload fields selected by the caller-verified ERAM switch.
+ * first/end are half-open ERAM nibble offsets. Return 1 for a binding in range,
+ * 0 for none, or a negative span error (including unreadable later records).
+ * Other bank selectors, switch code, HOME caches and execution roots require
+ * independent mapping/coverage before a caller may authorize a Port 1 edit. */
+int hpclang_rpl_port1_catalog_overlap(const struct hpclang_rpl_reader *reader, uint32_t catalog,
+                                      uint32_t limit, uint32_t eram_switch, uint32_t first,
+                                      uint32_t end);
 
 /* Resolve a library ID in a bounded classic Stock catalog (3-nibble count,
  * 16-nibble records). Preserve the bank-switch identity: address alone is not

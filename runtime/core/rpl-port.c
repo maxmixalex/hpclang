@@ -53,6 +53,39 @@ int hpclang_rpl_catalog_visit(const struct hpclang_rpl_reader *reader, uint32_t 
     return 0;
 }
 
+struct port1_catalog_range
+{
+    uint32_t bank_switch, first, end;
+    int hit;
+};
+
+static int port1_catalog_binding(void *context, uint32_t record, uint32_t number,
+                                 const struct hpclang_rpl_library_binding *binding)
+{
+    (void)record;
+    (void)number;
+    struct port1_catalog_range *range = context;
+    if (binding->bank_switch != range->bank_switch)
+        return 0;
+    if (binding->address < 0x40000u || binding->address >= 0x80000u)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t offset = binding->address - 0x40000u;
+    if (range->first <= offset && offset < range->end)
+        range->hit = 1;
+    return 0;
+}
+
+int hpclang_rpl_port1_catalog_overlap(const struct hpclang_rpl_reader *reader, uint32_t catalog,
+                                      uint32_t limit, uint32_t eram_switch, uint32_t first,
+                                      uint32_t end)
+{
+    if (!eram_switch || eram_switch > 0xfffffu || first >= end || end > 0x40000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct port1_catalog_range range = {eram_switch, first, end, 0};
+    int result = hpclang_rpl_catalog_visit(reader, catalog, limit, port1_catalog_binding, &range);
+    return result ? result : range.hit;
+}
+
 struct catalog_rebind_search
 {
     const struct hpclang_rpl_catalog_rebind *rebind;
@@ -158,15 +191,14 @@ struct catalog_removal_search
     int found;
 };
 
-int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, uint32_t home,
-                                      uint32_t limit, uint32_t number)
+int hpclang_rpl_home_attachments_visit(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                       uint32_t limit, hpclang_rpl_home_attachment_fn visit,
+                                       void *context)
 {
-    if (!reader || !reader->read_nibble)
+    if (!reader || !reader->read_nibble || !visit)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     if (home < 0x80000u || home >= 0x100000u || limit > 0x100000u - home || limit < 8)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    if (number > 0xfffu)
-        return HPCLANG_RPL_SPAN_MALFORMED;
     uint32_t prologue, count;
     int result = word(reader, home, 5, &prologue);
     if (result)
@@ -178,19 +210,61 @@ int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, u
         return result;
     if (count > (limit - 8) / 13)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    int found = 0;
     for (uint32_t i = 0; i < count; ++i) {
-        uint32_t record = home + 8 + 13 * i, id, ignored;
+        uint32_t record = home + 8 + 13 * i, id, first, second;
         result = word(reader, record, 3, &id);
         if (!result)
-            result = word(reader, record + 3, 5, &ignored);
+            result = word(reader, record + 3, 5, &first);
         if (!result)
-            result = word(reader, record + 8, 5, &ignored);
+            result = word(reader, record + 8, 5, &second);
+        if (!result)
+            result = visit(context, record, id, first, second);
         if (result)
             return result;
-        found |= id == number;
     }
-    return found;
+    return 0;
+}
+
+struct attachment_search
+{
+    uint32_t number;
+    uint32_t record, matches;
+};
+
+static int find_attachment(void *context, uint32_t record, uint32_t id, uint32_t first,
+                           uint32_t second)
+{
+    (void)first;
+    (void)second;
+    struct attachment_search *search = context;
+    if (id == search->number) {
+        search->record = record;
+        ++search->matches;
+    }
+    return 0;
+}
+
+int hpclang_rpl_home_library_find(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                  uint32_t limit, uint32_t number, uint32_t *unique_record)
+{
+    if (number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct attachment_search search = {.number = number};
+    int result = hpclang_rpl_home_attachments_visit(reader, home, limit, find_attachment, &search);
+    if (result || !search.matches)
+        return result;
+    if (unique_record) {
+        if (search.matches != 1)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        *unique_record = search.record;
+    }
+    return 1;
+}
+
+int hpclang_rpl_home_library_attached(const struct hpclang_rpl_reader *reader, uint32_t home,
+                                      uint32_t limit, uint32_t number)
+{
+    return hpclang_rpl_home_library_find(reader, home, limit, number, NULL);
 }
 
 static int catalog_removal_visit(void *context, uint32_t record, uint32_t number,

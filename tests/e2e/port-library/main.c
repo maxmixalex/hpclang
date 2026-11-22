@@ -2,6 +2,7 @@
 #include <hpclang/port.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 #include "object-snapshot.h"
 
 volatile uint32_t hpclang_e2e_result;
@@ -30,12 +31,36 @@ static void hold(void)
         __asm__ volatile("nop");
 }
 
+static int check_inventory(int launcher_state)
+{
+    int count = hpclang_library_list(NULL, 0);
+    if (count <= 0)
+        return 0;
+    struct hpclang_library_info *entries = malloc((unsigned)count * sizeof(*entries));
+    if (!entries)
+        return 0;
+    int valid = hpclang_library_list(entries, (unsigned)count) == count;
+    int found = 0;
+    for (int i = 0; valid && i < count; i++) {
+        valid = (!i || entries[i - 1].number < entries[i].number) && entries[i].number != 123;
+        if (entries[i].number == 275)
+            found = entries[i].flags == launcher_state;
+    }
+    free(entries);
+    return valid && found;
+}
+
 int main(void)
 {
     struct hpclang_rpl_reader reader = {read_nibble, NULL};
     struct hpclang_object *source = NULL, *copy = NULL, *witness = NULL;
     struct hpclang_object_store *home = NULL;
     unsigned failure = 1, phase = 0;
+    failure = 0x40;
+    int launcher_state = hpclang_library_query(275);
+    if (launcher_state < 0 || !(launcher_state & HPCLANG_LIBRARY_REGISTERED))
+        goto done;
+    failure = 1;
     if (hpclang_object_snapshot_copy(&reader, 0, sizeof encoding - 1, &source))
         goto done;
     for (uint32_t port = 0; port < 3; ++port) {
@@ -53,6 +78,9 @@ int main(void)
             phase = copy != NULL;
         if (!phase) {
             if (copy || errno != ENOENT || hpclang_port_library_create(port, source))
+                goto done;
+            failure = 0x41 + port;
+            if (hpclang_library_query(123) != 0)
                 goto done;
             copy = hpclang_port_library_get(port, 123);
         } else {
@@ -77,6 +105,9 @@ int main(void)
         hpclang_object_release(witness);
         witness = NULL;
     }
+    failure = 0x45;
+    if (!check_inventory(launcher_state))
+        goto done;
     hpclang_e2e_result = 0x4f53d000u | phase;
     hold();
     failure = 0;

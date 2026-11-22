@@ -35,6 +35,7 @@ on:
       - "tools/build-e2e.sh"
       - "tools/build-launchers.py"
       - "tools/install-ci-packages.sh"
+      - "tools/e2e-stock-media.py"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/prepare-hp39-aplet.py"
@@ -43,10 +44,20 @@ on:
       - "tools/package-aplet.py"
       - "tools/package-recovery.py"
       - "tools/package-sdk.py"
+      - "tools/run-hp39-kermit-server.sh"
+      - "tools/prepare-nor-fixture.py"
+      - "tests/e2e/fixtures/hp39gplus/**"
+      - "tests/e2e/fixtures/ui/hp39-memory-clear.pgm"
+      - "tests/e2e/sequences/hp39*-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp40gs-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp39-independent-notebook-save.seq"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - "tools/build-ckermit.sh"
+      - "tools/prepare-hp48gii-nor.py"
+      - "tools/hp-rpl-string-wrap.py"
+      - "tests/e2e/sequences/hp48gii-stock-usb-run.seq"
       - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/ckermit-*.patch"
@@ -86,6 +97,7 @@ on:
       - "tools/build-e2e.sh"
       - "tools/build-launchers.py"
       - "tools/install-ci-packages.sh"
+      - "tools/e2e-stock-media.py"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/prepare-hp39-aplet.py"
@@ -94,10 +106,20 @@ on:
       - "tools/package-aplet.py"
       - "tools/package-recovery.py"
       - "tools/package-sdk.py"
+      - "tools/run-hp39-kermit-server.sh"
+      - "tools/prepare-nor-fixture.py"
+      - "tests/e2e/fixtures/hp39gplus/**"
+      - "tests/e2e/fixtures/ui/hp39-memory-clear.pgm"
+      - "tests/e2e/sequences/hp39*-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp40gs-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp39-independent-notebook-save.seq"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - "tools/build-ckermit.sh"
+      - "tools/prepare-hp48gii-nor.py"
+      - "tools/hp-rpl-string-wrap.py"
+      - "tests/e2e/sequences/hp48gii-stock-usb-run.seq"
       - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/ckermit-*.patch"
@@ -114,6 +136,113 @@ env:
   HPCLANG_RECOVERY_JOURNAL_SLOT: "0x160105"
 
 jobs:
+  independent-hp39-notebook:
+    name: ${{ matrix.model }} independent Notebook save and relaunch
+    needs: runtime
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [hp39gplus, hp39gs, hp40gs]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+      - uses: ./.github/actions/setup-x50ng
+      - uses: actions/download-artifact@v7
+        with:
+          name: independent-hp39-inputs
+          path: build/independent-hp39-inputs
+      - name: Save and reopen the installed SDK Notebook in Stock
+        env:
+          MODEL: ${{ matrix.model }}
+        run: |
+          firmware=()
+          if [[ "$MODEL" != hp39gplus ]]; then
+            profile="tests/e2e/targets/$MODEL.json"
+            archive=$(jq -r .firmware.archive "$profile")
+            member=$(jq -r .firmware.member "$profile")
+            curl -fL --retry 3 "https://www.hpcalc.org/hp39/pc/$archive" -o "$RUNNER_TEMP/update.zip"
+            unzip -p "$RUNNER_TEMP/update.zip" "$member" > "$RUNNER_TEMP/update.bin"
+            firmware=(--firmware "$RUNNER_TEMP/update.bin")
+          fi
+          python3 tests/e2e/independent-entry/run-hp39-notebook.py \
+            --model "$MODEL" --inputs build/independent-hp39-inputs --dist build/x50ng/dist \
+            --output build/independent-hp39-run --edit-copy "${firmware[@]}"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: independent-notebook-${{ matrix.model }}
+          retention-days: 7
+          path: |
+            build/independent-hp39-run/*.json
+            build/independent-hp39-run/screen-*.pgm
+            build/independent-hp39-run/emulator.log
+            build/independent-hp39-run/gate.log
+            build/independent-hp39-run/reset/*.json
+            build/independent-hp39-run/reset/screen-*.pgm
+            build/independent-hp39-run/reset/emulator.log
+            build/independent-hp39-run/copy/*.json
+            build/independent-hp39-run/copy/screen-*.pgm
+            build/independent-hp39-run/copy/emulator.log
+
+  independent-hp48-entry:
+    name: HP48gII independent Stock entry and return
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+      - uses: ./.github/actions/setup-atfe
+      - uses: ./.github/actions/setup-x50ng
+      - name: Run from fresh HP48gII NOR
+        run: |
+          dist="$GITHUB_WORKSPACE/build/x50ng/dist"
+          export PATH="$dist/tools:$PATH"
+          export LD_LIBRARY_PATH="$dist/runtime-lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          curl -fL --retry 3 https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin -o "$RUNNER_TEMP/48gii.bin"
+          echo "4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937  $RUNNER_TEMP/48gii.bin" | sha256sum -c -
+          python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
+            --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-entry
+          python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
+            --fixture independent-hpc1 --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-hpc1
+      - name: Build and exercise the installed HP48gII Notebook
+        run: |
+          sdk="$RUNNER_TEMP/hp48-sdk"
+          app="$RUNNER_TEMP/hp48-notebook"
+          dist="$GITHUB_WORKSPACE/build/x50ng/dist"
+          export PATH="$ATFE/bin:$dist/tools:$PATH"
+          export LD_LIBRARY_PATH="$dist/runtime-lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          cmake -S . -B "$RUNNER_TEMP/hp48-install" -DCMAKE_INSTALL_PREFIX="$sdk"
+          cmake --install "$RUNNER_TEMP/hp48-install"
+          cmake -S "$sdk/share/hpclang/examples/notebook" -B "$app" -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_PREFIX_PATH="$sdk" -DCMAKE_TOOLCHAIN_FILE="$sdk/share/hpclang/cmake/toolchains/hpclang-armv4t.cmake" \
+            -DHPCLANG_BUILD_MODEL=hp48gii
+          cmake --build "$app" --target notebook_launchers -j4
+          python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
+            --fixture independent-hpc1 --notebook "$app/notebook.hpc" --dist "$dist" \
+            --toolchain "$ATFE/bin" --output build/independent-hp48-notebook
+          python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
+            --fixture independent-hpc1 --notebook "$app/notebook.hpc" --dist "$dist" --port0 \
+            --toolchain "$ATFE/bin" --output build/independent-hp48-port0
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: independent-hp48-entry
+          path: |
+            build/independent-hp48-entry/*.json
+            build/independent-hp48-entry/*/*.log
+            build/independent-hp48-notebook/*.json
+            build/independent-hp48-notebook/*/stock-*.pgm
+            build/independent-hp48-notebook/*/emulator.log
+            build/independent-hp48-port0/*.json
+            build/independent-hp48-port0/*/emulator.log
+            build/independent-hp48-hpc1/*.json
+            build/independent-hp48-hpc1/*/*.log
+          if-no-files-found: warn
+
   independent-notebook:
     name: ${{ matrix.model }} independent Notebook save and relaunch
     strategy:
@@ -128,6 +257,8 @@ jobs:
           lfs: true
       - uses: ./.github/actions/setup-atfe
       - uses: ./.github/actions/setup-x50ng
+      - name: Install FAT image tools
+        run: bash tools/install-ci-packages.sh dosfstools mtools
       - name: Run original-ROM regression from fresh firmware
         run: |
           dist="$GITHUB_WORKSPACE/build/x50ng/dist"
@@ -225,10 +356,21 @@ jobs:
           trap 'rm -rf "$host_tool"' EXIT
           clang -O2 .cache/hp39-aplet/sdk/src/hp2aplet.c -o "$host_tool/hp2aplet"
           python3 tests/sdk/check.py --aplet-tool "$host_tool/hp2aplet" \
-            --aplet-assets .cache/hp39-aplet/sdk/data
+            --aplet-assets .cache/hp39-aplet/sdk/data \
+            --independent-notebooks build/independent-hp39-inputs
 
-      - name: Verify independent HP50g entry build reproducibility
-        run: python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: independent-hp39-inputs
+          path: build/independent-hp39-inputs/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Verify independent classic entry and HP39 C Aplet build reproducibility
+        run: |
+          python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin" --model hp48gii \
+            --hp39-assets .cache/hp39-aplet/sdk/data
+          python3 tests/e2e/independent-entry/check-build.py --toolchain "$ATFE/bin" --model hp50g
 
       - name: Build independent Stock allocation experiment
         run: |
@@ -241,6 +383,7 @@ jobs:
 
       - name: Verify independent HPC1 build reproducibility
         run: |
+          python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp48gii
           python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp49gplus
           python3 tests/e2e/independent-hpc1/check-build.py --toolchain "$ATFE/bin" --model hp50g
 

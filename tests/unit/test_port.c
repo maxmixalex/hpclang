@@ -202,6 +202,66 @@ static void fixture(void)
         memory[0xfffc0 + i] = (uint8_t)(hex[i] <= '9' ? hex[i] - '0' : hex[i] - 'a' + 10);
 }
 
+static void test_library_query(void)
+{
+    struct hpclang_boot_info saved_boot = boot;
+    struct hpclang_device_info saved_device = device;
+    const uint32_t catalog = 0x8611du, home = 0x90000u, id = 0x345u;
+    fixture();
+    put_word(0x80711u, home);
+    put_word(home, 0x2a96u);
+    put_word(home + 8, id);
+    put_word(catalog + 3, id);
+    for (uint32_t model = HPCLANG_MODEL_HP48GII; model <= HPCLANG_MODEL_HP50G; ++model) {
+        boot.model = device.model = model;
+        for (unsigned registered = 0; registered <= 1; ++registered) {
+            memory[catalog] = registered;
+            for (unsigned attached = 0; attached <= 1; ++attached) {
+                memory[home + 5] = attached;
+                assert(hpclang_library_query(id) ==
+                       (int)(registered * HPCLANG_LIBRARY_REGISTERED +
+                             attached * HPCLANG_LIBRARY_HOME_ATTACHED));
+                assert(hpclang_library_query(id + 1) == 0);
+            }
+        }
+    }
+    struct hpclang_library_info entries[3] = {{0}};
+    memory[home + 5] = 3;
+    put_word(home + 21, 0xfff);
+    put_word(home + 34, 0xfff);
+    memory[catalog] = 2;
+    put_word(catalog + 3, 0);
+    put_word(catalog + 19, id);
+    assert(hpclang_library_list(NULL, 0) == 3);
+    entries[0].flags = 99;
+    assert(hpclang_library_list(entries, 2) == -1 && errno == ENOSPC && entries[0].flags == 99);
+    assert(hpclang_library_list(NULL, 1) == -1 && errno == EINVAL);
+    assert(hpclang_library_list(entries, 3) == 3);
+    assert(entries[0].number == 0 && entries[0].flags == HPCLANG_LIBRARY_REGISTERED);
+    assert(entries[1].number == id && entries[1].flags == hpclang_library_query(id));
+    assert(entries[2].number == 0xfff && entries[2].flags == HPCLANG_LIBRARY_HOME_ATTACHED);
+    put_word(catalog + 3, id);
+    memory[catalog] = 1;
+    memory[home + 5] = 1;
+    memory[home] = 0;
+    assert(hpclang_library_query(id) == -1 && errno == EILSEQ);
+    put_word(home, 0x2a96u);
+    memory[catalog] = 2;
+    put_word(catalog + 19, id);
+    assert(hpclang_library_query(id) == -1 && errno == EILSEQ);
+    assert(hpclang_library_list(entries, 3) == -1 && errno == EILSEQ);
+    unavailable = 1;
+    assert(hpclang_library_list(NULL, 0) == -1 && errno == EIO);
+    assert(hpclang_library_query(id) == -1 && errno == EIO);
+    unavailable = 0;
+    boot.model = device.model = HPCLANG_MODEL_HP39GS;
+    assert(hpclang_library_query(id) == -1 && errno == ENOSYS);
+    assert(hpclang_library_list(NULL, 0) == -1 && errno == ENOSYS);
+    assert(hpclang_library_query(0x1000u) == -1 && errno == EINVAL);
+    device = saved_device;
+    boot = saved_boot;
+}
+
 static void test_discovery(void)
 {
     struct hpclang_boot_info saved_boot = boot;
@@ -236,6 +296,18 @@ static void test_discovery(void)
                         HPCLANG_PORT_REPLACE_BACKUP | HPCLANG_PORT_CREATE_LIBRARY));
         }
     }
+    device.model = boot.model = HPCLANG_MODEL_HP48GII;
+    device.family = HPCLANG_FAMILY_HP48;
+    bounds.magic = HPCLANG_RPL_BOUNDS_PORT0_RESIDENT;
+    assert(!hpclang_port_query(0, &info) && info.available == reads && info.implemented != reads);
+    struct hpclang_object library = {.kind = HPCLANG_OBJECT_LIBRARY};
+    assert(hpclang_port_backup_create(0, NULL, 0, &library) == -1 && errno == ENOSYS);
+    assert(hpclang_port_backup_replace(0, NULL, 0, &library) == -1 && errno == ENOSYS);
+    assert(hpclang_port_backup_remove(0, NULL, 0) == -1 && errno == ENOSYS);
+    assert(hpclang_port_library_create(0, &library) == -1 && errno == ENOSYS);
+    device.model = boot.model = HPCLANG_MODEL_HP50G;
+    device.family = HPCLANG_FAMILY_HP4950;
+    bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC;
     // Zero writable headroom means supported-but-full, not an unavailable API.
     assert(hpclang_port_query(1, &info) == 0 && (info.available & HPCLANG_PORT_CREATE_BACKUP));
     bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V4;
@@ -497,6 +569,7 @@ static void check_port1_terminal(const struct hpclang_object *value,
 int main(void)
 {
     test_discovery();
+    test_library_query();
     test_flash();
     fixture();
     test_port_cpp(invalidate_cpp_fixture);

@@ -264,16 +264,6 @@ struct hpclang_rpl_reference_patch
     uint32_t value; /* Replacement five-nibble word. */
 };
 
-/* For a caller-identified classic HOME attachment record in stable main RAM, plan
- * its two distinct ACPTR payloads into the same relocated Port 1 library. first
- * and end are offsets within ERAM. Both targets must be inside the old library.
- * Only the two payload fields change; callers retain ownership of all mappings.
- * Returns zero with both patches, or a negative span result with neither. */
-int hpclang_rpl_port1_attachment_plan(const struct hpclang_rpl_reader *ram, uint32_t record,
-                                      const struct hpclang_rpl_reader *rom, uint32_t flash_table,
-                                      uint32_t eram_entry, uint32_t first, uint32_t end,
-                                      int32_t delta, struct hpclang_rpl_reference_patch patches[2]);
-
 /* Plan one edge previously validated by reference_visit, for relocation of
  * [first,end) by delta within the same Saturn mapping. Return 1 with a patch,
  * 0 when its encoding does not change, or a negative span result. Output only
@@ -341,6 +331,19 @@ struct hpclang_rpl_reference_edit
 {
     uint32_t mapping, field, expected, value, width; /* Explicit 1..5 nibbles. */
 };
+
+/* For a unique library number attached to classic HOME in stable main RAM, plan
+ * its two distinct ACPTR payloads into the same relocated Port 1 library. first
+ * and end are offsets within ERAM. Both targets must be inside the old library.
+ * Only the two payload fields change; callers retain ownership of all mappings.
+ * Returns zero with both five-nibble edits in ram_mapping, or a negative span result with neither.
+ */
+int hpclang_rpl_port1_attachment_plan(const struct hpclang_rpl_reader *ram, uint32_t home,
+                                      uint32_t home_limit, uint32_t number,
+                                      const struct hpclang_rpl_reader *rom, uint32_t flash_table,
+                                      uint32_t eram_entry, uint32_t first, uint32_t end,
+                                      int32_t delta, uint32_t ram_mapping,
+                                      struct hpclang_rpl_reference_edit edits[2]);
 
 struct hpclang_rpl_reference_edit_builder
 {

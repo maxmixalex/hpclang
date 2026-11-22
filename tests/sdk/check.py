@@ -1,6 +1,7 @@
 """Build external examples after relocating an installed SDK."""
 
 import argparse
+from contextlib import ExitStack
 import hashlib
 import json
 import os
@@ -19,6 +20,49 @@ def run(*args, env):
     result = subprocess.run(args, env=env, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
+
+
+def build_independent_hp39_notebook(directory, fixture, toolchain, assets, model, env):
+    image = directory / "notebook.hpc"
+    probe = directory / "independent-entry"
+    bundle = directory / "independent-aplet"
+    run(
+        sys.executable,
+        fixture / "build.py",
+        "--toolchain",
+        toolchain / "bin",
+        "--model",
+        model,
+        "--hp39-notebook-editor",
+        "--aplet-writeback",
+        "--bitmap-image",
+        image,
+        "--output",
+        probe,
+        env=env,
+    )
+    run(
+        sys.executable,
+        fixture / "build-hp39-aplet.py",
+        "--assets",
+        assets,
+        "--bitmap-pool",
+        probe / "probe.bin",
+        "--bitmap-image",
+        image,
+        "--initial-note",
+        "Seed42",
+        "--aplet-writeback",
+        "--output",
+        bundle,
+        env=env,
+    )
+    expected = {"HPGCC000.000", "HP39DIR.000", "HP39DIR.CUR", "HPCRESET.000"}
+    if {p.name for p in bundle.iterdir()} != expected:
+        raise AssertionError("unexpected independent Notebook transfer set")
+    return {Path("independent-aplet") / name for name in expected} | {
+        Path("independent-entry/probe.bin")
+    }
 
 
 def check_cpp_headers(package, work, env):
@@ -313,14 +357,26 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--aplet-tool", type=Path)
     parser.add_argument("--aplet-assets", type=Path)
+    parser.add_argument(
+        "--independent-notebooks", type=Path, help="export verified HP39/40 ROM test inputs"
+    )
     args = parser.parse_args()
+    if args.independent_notebooks and not args.aplet_assets:
+        parser.error("--independent-notebooks requires the Aplet tools and assets")
     if bool(args.aplet_tool) != bool(args.aplet_assets):
         parser.error("--aplet-tool and --aplet-assets must be provided together")
     root = Path(__file__).resolve().parents[2]
     toolchain = Path(os.environ["ATFE"])
     env = dict(os.environ, PATH=str(toolchain / "bin") + os.pathsep + os.environ["PATH"])
-    with tempfile.TemporaryDirectory(prefix="hpclang sdk ") as directory:
+    with tempfile.TemporaryDirectory(prefix="hpclang sdk ") as directory, ExitStack() as cleanup:
         work = Path(directory)
+        if args.independent_notebooks:
+            export_dir = args.independent_notebooks.resolve()
+            if export_dir.exists():
+                parser.error(f"export directory already exists: {export_dir}")
+            export_dir.parent.mkdir(parents=True, exist_ok=True)
+            staging = cleanup.enter_context(tempfile.TemporaryDirectory(dir=export_dir.parent))
+            notebooks = Path(staging) / "inputs"
         prefix = work / "original prefix"
         sdk = work / "relocated sdk"
         run("cmake", "-S", str(root), "-B", str(work / "installer"), env=env)
@@ -644,10 +700,9 @@ endforeach()
                     source.write(
                         "\nhpclang_target_aplet(notebook MODEL ${HPCLANG_BUILD_MODEL}"
                         ' NAME "SDK example" AUTHOR hpclang'
-                        ' TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")\n'
+                        ' ASSETS "${APLET_ASSETS}")\n'
                     )
                 aplet_options = [
-                    f"-DAPLET_TOOL={args.aplet_tool.resolve()}",
                     f"-DAPLET_ASSETS={args.aplet_assets.resolve()}",
                 ]
             run(
@@ -700,6 +755,17 @@ endforeach()
                 Path("notebook-launchers/memory.json"),
             }
             if aplet_options:
+                for directory in (selected, repeated):
+                    outputs.update(
+                        build_independent_hp39_notebook(
+                            directory,
+                            root / "tests/e2e/independent-entry",
+                            toolchain,
+                            args.aplet_assets,
+                            model,
+                            env,
+                        )
+                    )
                 bundle = Path("notebook-aplet") / model
                 files = (
                     "HPGCC000.000",
@@ -709,6 +775,23 @@ endforeach()
                     "HP39DIR.CUR",
                 )
                 outputs.update(bundle / name for name in (*files, "footprint.json"))
+                reference = work / f"historical-aplet-{model}"
+                run(
+                    sys.executable,
+                    str(package / "tools/package-aplet.py"),
+                    str(launchers / f"{model}.hp"),
+                    str(reference),
+                    "--tool",
+                    str(args.aplet_tool.resolve()),
+                    "--assets",
+                    str(args.aplet_assets.resolve()),
+                    "--name",
+                    "SDK example",
+                    env=env,
+                )
+                for name in (*files, "footprint.json"):
+                    if (selected / bundle / name).read_bytes() != (reference / name).read_bytes():
+                        raise AssertionError(f"{model}: historical Aplet mismatch in {name}")
                 for directory in (selected, repeated):
                     wrapped = (directory / "notebook-launchers" / f"{model}.hp").read_bytes()
                     aplet = (directory / bundle / "HPGCC000.000").read_bytes()
@@ -746,6 +829,15 @@ endforeach()
             for relative in sorted(outputs | font_sets[0]):
                 if (selected / relative).read_bytes() != (repeated / relative).read_bytes():
                     raise AssertionError(f"{model}: nonreproducible release output {relative}")
+            if args.independent_notebooks and aplet_options:
+                destination = notebooks / model
+                destination.mkdir(parents=True)
+                shutil.copyfile(selected / "notebook.hpc", destination / "notebook.hpc")
+                shutil.copytree(selected / "independent-aplet", destination / "independent-aplet")
+                probe = destination / "independent-entry"
+                probe.mkdir()
+                for name in ("metadata.json", "probe.bin", "build.json"):
+                    shutil.copyfile(selected / "independent-entry" / name, probe / name)
             # Keep the installed SDK for subsequent models; completed build
             # trees are temporary and no longer needed after byte comparison.
             shutil.rmtree(selected)
@@ -784,6 +876,8 @@ endforeach()
             )
             if result.returncode == 0 or diagnostic not in result.stdout + result.stderr:
                 raise AssertionError(f"Model configuration did not reject {model}: {result}")
+        if args.independent_notebooks:
+            notebooks.rename(export_dir)
         print("Installed SDK: C/C++, fonts, HPC1, six-model launchers and relocation PASS")
         if args.aplet_tool:
             print("Installed SDK: HP39g+/HP39gs/HP40gs C/C++ Aplet packaging PASS")

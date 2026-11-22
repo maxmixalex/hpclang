@@ -1,4 +1,4 @@
-"""Build a bounded HP50g HPC1 experiment without library 275 or ROM inputs."""
+"""Build the model-specific HPC1 experiment without library 275 or ROM inputs."""
 
 import argparse
 import hashlib
@@ -34,8 +34,8 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build(source, tool, output, model="hp50g"):
-    model_id = {"hp49gplus": 5, "hp50g": 6}[model]
+def build(source, tool, output, model="hp50g", notebook=None, port0=False):
+    model_id = {"hp48gii": 4, "hp49gplus": 5, "hp50g": 6}[model]
     output.mkdir(parents=True, exist_ok=False)
     inputs = {name: digest(source / name) for name in INPUTS}
     common = [
@@ -69,41 +69,85 @@ def build(source, tool, output, model="hp50g"):
                 result[fields[2]] = int(fields[0], 16)
         return result
 
-    compile_file(source / FIXTURE / "app.c", "app.o", True)
     compile_file(source / "runtime/bootstrap/sync.S", "sync.o")
-    run(
-        common
-        + [
-            "-mthumb",
-            "-nostdlib",
-            "-Wl,--gc-sections",
-            "-Wl,-Ttext,0x01220000",
-            "-Wl,-e,app",
-            "app.o",
-            "sync.o",
-            "-o",
-            "app.elf",
-        ]
-    )
-    run([str(tool / "llvm-objcopy"), "-O", "binary", "-j", ".text", "app.elf", "app.bin"])
-    payload = (output / "app.bin").read_bytes()
-    entry = (symbols("app.elf")["app"] - 0x01220000) | 1
-    if not 0 < entry < len(payload) <= 4096:
-        raise ValueError("fixture app exceeds the single-page HPC1 contract")
-    (output / "app.hpc").write_bytes(
-        struct.pack("<4sIII", b"HPC1", len(payload), entry, 12) + payload
-    )
+    if port0:
+        if not notebook or model != "hp48gii":
+            raise ValueError("Port 0 execution requires the HP48gII Notebook")
+        common.append("-DHPCLANG_NOTEBOOK_PORT0")
+    if notebook:
+        application = notebook.read_bytes()
+        if model != "hp48gii" or len(application) < 16:
+            raise ValueError("expected an HP48gII Notebook image")
+        magic, size, entry, rw = struct.unpack_from("<4sIII", application)
+        if (
+            magic != b"HPC1"
+            or size != len(application) - 16
+            or not 0 < entry < size <= 65536
+            or rw + 8192 + 4096 > 49152
+        ):
+            raise ValueError("Notebook exceeds the HP48gII layout or has an invalid HPC1 header")
+        (output / "app.hpc").write_bytes(application)
+        common += ["-DHPCLANG_NOTEBOOK", f"-DNOTEBOOK_BYTES={size}", f"-DNOTEBOOK_ENTRY={entry}"]
+    else:
+        compile_file(source / FIXTURE / "app.c", "app.o", True)
+        run(
+            common
+            + [
+                "-mthumb",
+                "-nostdlib",
+                "-Wl,--gc-sections",
+                "-Wl,-Ttext,0x01220000",
+                "-Wl,-e,app",
+                "app.o",
+                "sync.o",
+                "-o",
+                "app.elf",
+            ]
+        )
+        run([str(tool / "llvm-objcopy"), "-O", "binary", "-j", ".text", "app.elf", "app.bin"])
+        payload = (output / "app.bin").read_bytes()
+        entry = (symbols("app.elf")["app"] - 0x01220000) | 1
+        if not 0 < entry < len(payload) <= 4096:
+            raise ValueError("fixture app exceeds the single-page HPC1 contract")
+        (output / "app.hpc").write_bytes(
+            struct.pack("<4sIII", b"HPC1", len(payload), entry, 12) + payload
+        )
 
     assembly = (source / "tests/e2e/independent-entry/entry.S").read_text()
     replacements = {
         " bl exercise": " ldr r2, arena_offset\n add r1, r6, r2\n ldr r2, image_offset\n add r2, r6, r2\n ldr r3, image_bytes\n bl exercise",
         "workspace_offset: .word workspace-entry": "workspace_offset: .word workspace-entry\narena_offset: .word arena-entry\nimage_offset: .word hpc-entry\nimage_bytes: .word hpc_end-hpc",
     }
+    if notebook:
+        replacements[" bl exercise"] = (
+            " ldr r2, arena_offset\n add r1, r6, r2\n ldr r2, [r4, #4]\n bl exercise"
+        )
+        replacements["workspace_offset: .word workspace-entry"] = (
+            "workspace_offset: .word workspace-entry\narena_offset: .word arena-entry"
+        )
+    if port0:
+        # Use the original ARM stack after the last workspace write. All record
+        # bytes must be stable while the CRC is calculated, including stack data.
+        replacements[" bl exercise"] = replacements[" bl exercise"].replace(
+            " bl exercise", " mov r3, r4\n bl exercise"
+        )
+        replacements[" mov sp, r4"] = (
+            " bic sp, r4, #7\n ldr r0, [r4, #4]\n mov r1, r6\n bl finish_port0_backup\n mov sp, r4"
+        )
     for old, new in replacements.items():
         if assembly.count(old) != 1:
             raise ValueError("shared entry no longer has the expected call/offset structure")
         assembly = assembly.replace(old, new)
-    assembly += '\n.balign 8\n.global arena\narena: .space 28672\n.global arena_end\narena_end:\n.balign 4\n.global hpc\nhpc: .incbin "app.hpc"\nhpc_end:\n'
+    arena_bytes = 30 * 4096 if model == "hp48gii" else 7 * 4096
+    arena = (
+        f".balign 8\n.global arena\narena: .space {arena_bytes}\n.global arena_end\narena_end:\n"
+    )
+    image = '.balign 4\n.global hpc\nhpc: .incbin "app.hpc"\nhpc_end:\n'
+    if model == "hp48gii":
+        # Only initialized bytes need a transfer copy beside the program-owned destination.
+        assembly += "\n" + ("" if notebook else image) + '.section .bss,"aw",%nobits\n' + arena
+    else:
+        assembly += "\n" + arena + image
     (output / "entry.S").write_text(assembly)
     compile_file(output / "entry.S", "entry.o")
     run(
@@ -143,11 +187,24 @@ def build(source, tool, output, model="hp50g"):
     blob += bytes(-len(blob) % 8)
     encoder = runpy.run_path(str(source / "tests/e2e/independent-entry/build.py"))
     word, code_for = encoder["word"], encoder["code_for"]
-    code = code_for(len(blob), len(code_for(len(blob), 0)) - 13)
+    code = code_for(len(blob), len(code_for(len(blob), 0, model)) - 13, model)
     packed = "".join(f"{b & 15:x}{b >> 4:x}" for b in blob)
-    reserve = len(packed) + 7
-    body = code + packed + "0" * reserve
+    layout = symbols("probe.elf")
+    reserve = 2 * max(len(blob), layout["arena_end"]) + 7
+    destination = "0" * reserve
+    if notebook:
+        # The header stays beyond the writable arena. Its backwards distance to the
+        # code is in Saturn nibbles, so a moved HOME object can execute again.
+        pos = 2 * layout["arena"] + 64
+        payload = "".join(f"{b & 15:x}{b >> 4:x}" for b in application[16:])
+        trailer = application[:16] + struct.pack("<I", reserve - pos)
+        destination = destination[:pos] + payload + destination[pos + len(payload) :]
+        destination += "".join(f"{b & 15:x}{b >> 4:x}" for b in trailer)
+        reserve = len(destination)
+    body = code + packed + destination
     program = word(0x2D9D) + word(0x2DCC) + word(5 + len(body)) + body
+    if notebook:
+        program += encoder["moving_gc_program"]()
     program += word(0x2614) + word(12) + "5724210" + word(0x312B)
     if len(program) & 1:
         program += "0"
@@ -158,7 +215,7 @@ def build(source, tool, output, model="hp50g"):
         )
     )
     metadata = dict(
-        symbols=symbols("probe.elf"),
+        symbols=layout,
         size=len(blob),
         prefix=15 + len(code) + len(packed),
         reserve=reserve,
@@ -168,12 +225,23 @@ def build(source, tool, output, model="hp50g"):
     if any(digest(source / name) != expected for name, expected in inputs.items()):
         raise ValueError("build inputs changed")
     manifest = dict(
-        scope="HP49g+/HP50g bounded embedded HPC1 experiment; no native-service context",
+        scope=f"{model} bounded embedded HPC1 experiment; no native-service context",
         model=model,
         inputs=inputs,
-        outputs={name: digest(output / name) for name in OUTPUTS},
+        outputs={
+            name: digest(output / name) for name in OUTPUTS if not notebook or name != "app.elf"
+        },
         compiler=subprocess.check_output([str(tool / "clang"), "--version"], text=True),
     )
+    if notebook:
+        manifest["application"] = "notebook"
+        manifest["scope"] = "HP48gII resident Notebook editor and Stock return"
+        manifest["resident_image"] = True
+        manifest["post_exit_gc"] = True
+    if port0:
+        manifest["port0_backup"] = True
+    if model == "hp48gii":
+        manifest["pool_pages"] = 29
     (output / "build.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Built {len(blob)}-byte payload in {output}")
 
@@ -182,10 +250,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--toolchain", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
+    parser.add_argument("--model", choices=("hp48gii", "hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[3])
+    parser.add_argument("--notebook", type=Path, help="installed-SDK HP48gII notebook.hpc")
+    parser.add_argument("--port0", action="store_true", help="run in the ENTRY48 Port 0 backup")
     args = parser.parse_args()
-    build(args.source_root.resolve(), args.toolchain.resolve(), args.output.resolve(), args.model)
+    build(
+        args.source_root.resolve(),
+        args.toolchain.resolve(),
+        args.output.resolve(),
+        args.model,
+        args.notebook,
+        args.port0,
+    )
 
 
 if __name__ == "__main__":

@@ -95,6 +95,31 @@ extern "C"
     struct hpclang_object *hpclang_port_backup_get(uint32_t port, const uint8_t *name,
                                                    uint32_t name_length);
 
+    enum hpclang_library_state
+    {
+        HPCLANG_LIBRARY_REGISTERED = 1,
+        HPCLANG_LIBRARY_HOME_ATTACHED = 2
+    };
+
+    /* Inspect the classic Stock catalog and HOME by 12-bit ID. Returns the
+     * combined state flags, zero if neither contains the ID, or -1 with
+     * EINVAL (ID), ENOSYS (context), EIO (read) or EILSEQ (invalid encoding).
+     * Port contents, including banked payloads, are never accessed. */
+    int hpclang_library_query(uint32_t library_number);
+
+    struct hpclang_library_info
+    {
+        uint16_t number;
+        uint16_t flags; /* HPCLANG_LIBRARY_REGISTERED and/or HPCLANG_LIBRARY_HOME_ATTACHED */
+    };
+
+    /* List distinct classic Stock library IDs in ascending order with their status flags.
+     * (NULL, 0) returns the required entry count. Otherwise return the count copied,
+     * or -1 with ENOSPC if capacity is too small. On error the array is unchanged.
+     * A null array with nonzero capacity is EINVAL. Uses about 1 KiB of temporary heap
+     * (ENOMEM on failure). Context and native read errors match hpclang_library_query. */
+    int hpclang_library_list(struct hpclang_library_info *entries, uint32_t capacity);
+
     /* Copy a complete library encoding by its 12-bit native library number.
      * This does not attach, install or execute the library. */
     struct hpclang_object *hpclang_port_library_get(uint32_t port, uint32_t library_number);

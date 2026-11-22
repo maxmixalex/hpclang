@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package an HP39 Aplet using an explicitly supplied historical host tool/assets."""
+"""Package an HP39 Aplet from a wrapped launcher and prepared HPGCC39 resources."""
 
 from __future__ import annotations
 
@@ -22,15 +22,55 @@ def label(value: str, maximum: int, field: str) -> bytes:
     return value.encode("ascii")
 
 
-def package(payload: Path, output: Path, tool: Path, assets: Path, name: str, author: str) -> None:
+def encode_aplet(
+    launcher: bytes,
+    data: dict[str, bytes],
+    title: bytes,
+    author: bytes,
+    initial_string: bytes | None = None,
+) -> bytes:
+    # Stock strings carry a five-nibble prologue and a five-nibble span.
+    def string(text: bytes) -> bytes:
+        return (0x2A2C | ((5 + 2 * len(text)) << 20)).to_bytes(5, "little") + text
+
+    graphic = data["blank.gro"]
+    if not graphic.startswith(b"HPHP49-C"):
+        raise ValueError("expected a wrapped splash graphic")
+    origin = (0x2911).to_bytes(5, "little")
+    empty_list = (0x2A74 | (0x312B << 20)).to_bytes(5, "little")
+    fields = (
+        (0x2A740).to_bytes(3, "little")
+        + launcher
+        + string(title)
+        + string(author)
+        + graphic[8:]
+        + origin * 2
+        + (empty_list if initial_string is None else string(initial_string))
+    )
+    # Offsets use Saturn nibbles. The views link includes its six-nibble bias.
+    views_link = (0x312B | ((2 * len(fields) + 6) << 20)).to_bytes(6, "little")
+    body = data["apletcode.bin"] + fields + views_link + data["apletepilog.bin"]
+    return (
+        b"HP39BinB"
+        + bytes([len(title)])
+        + title
+        + (0x11302A96).to_bytes(4, "little")
+        + (2 * len(body)).to_bytes(6, "little")
+        + body
+    )
+
+
+def package(
+    payload: Path, output: Path, tool: Path | None, assets: Path, name: str, author: str
+) -> None:
     title = label(name, 48, "name")
     # The historical splash uses 66 - 2*length without clipping negative x.
-    label(author, 33, "author")
+    author_bytes = label(author, 33, "author")
     image = payload.read_bytes()
-    if image[:8] != b"HPHP49-C":
+    if image[:8] != b"HPHP49-C" or len(image) == 8:
         raise ValueError("expected a wrapped ARMToolbox launcher")
     data = {name: (assets / name).read_bytes() for name in ASSETS}
-    # Bound the historical writer's 300000-byte buffer before invoking it.
+    # Keep both writers within the historical writer's supported package size.
     extent = len(image) + sum(len(data[name]) for name in ASSETS[:3])
     if extent + 2 * len(title) + len(author) + 128 > 300000:
         raise ValueError("application exceeds the historical Aplet writer capacity")
@@ -38,19 +78,23 @@ def package(payload: Path, output: Path, tool: Path, assets: Path, name: str, au
         raise ValueError("assets must include the prepared Aplet Reset program")
     with tempfile.TemporaryDirectory(prefix="hpclang-aplet-") as directory:
         work = Path(directory)
-        (work / "hp39prj.dat").write_text(
-            f"HP39 Aplet Project\n{name}\n{author}\nN\n", encoding="ascii"
-        )
-        result = subprocess.run(
-            [str(tool.resolve()), str(payload.resolve())],
-            cwd=work,
-            env=dict(os.environ, HPGCC=str(assets.resolve())),
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode:
-            raise RuntimeError(f"Aplet writer failed:\n{result.stdout}\n{result.stderr}")
-        aplet = (work / "HPGCC000.000").read_bytes()
+        if tool is None:
+            aplet = encode_aplet(image[8:], data, title, author_bytes)
+            (work / "HPGCC000.000").write_bytes(aplet)
+        else:
+            (work / "hp39prj.dat").write_text(
+                f"HP39 Aplet Project\n{name}\n{author}\nN\n", encoding="ascii"
+            )
+            result = subprocess.run(
+                [str(tool.resolve()), str(payload.resolve())],
+                cwd=work,
+                env=dict(os.environ, HPGCC=str(assets.resolve())),
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode:
+                raise RuntimeError(f"Aplet writer failed:\n{result.stdout}\n{result.stderr}")
+            aplet = (work / "HPGCC000.000").read_bytes()
         if not aplet.startswith(b"HP39BinB" + bytes([len(title)]) + title):
             raise ValueError("Aplet writer produced an invalid title/header")
         if image[8:] not in aplet:
@@ -101,7 +145,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("payload", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--tool", type=Path, required=True)
+    parser.add_argument("--tool", type=Path, help="optional external hp2aplet writer")
     parser.add_argument("--assets", type=Path, required=True)
     parser.add_argument("--name", required=True)
     parser.add_argument("--author", default="hpclang")

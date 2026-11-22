@@ -5,7 +5,8 @@
   "lcd_height": 64,
   "firmware": {
     "archive": "hp40gs222.zip",
-    "member": "HP40GS_2.22/hp40gs_v2.22.bin"
+    "member": "HP40GS_2.22/hp40gs_v2.22.bin",
+    "sha256": "6fcf63b4d0cae2e59fa8b24b74052bf33812cbea960294429b1032cb98585f7b"
   },
   "stock_transport": "usb",
   "boot_dialog": "../fixtures/ui/hp39-memory-clear.pgm"

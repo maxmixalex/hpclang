@@ -45,6 +45,24 @@ int main(void)
     uint32_t slot = 0;
     setup();
     assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == 0 && slot == 0x90005u);
+    assert(hpclang_hp39_bitmap_aplet_data_slot(&reader, &slot) == -1 && errno == ENOSYS);
+    /* D1.55 independent ENTER: bitmap, HPC1 string, data, view, caller. */
+    put(0x806fdu, 5, 0x90019u);
+    put(0x84ffbu, 5, 0x8801eu);
+    put(0x88019u, 5, 0x0775cu);
+    put(0x8801eu, 5, 0x12ca1u);
+    put(0x88023u, 5, 0x03244u);
+    put(0x88028u, 5, 0x0312bu);
+    put(0x90000u, 5, 0x87000u);
+    put(0x87000u, 5, 0x02b1eu);
+    put(0x90005u, 5, 0x89000u);
+    put(0x9000au, 5, 0x85000u);
+    put(0x9000fu, 5, 0x04049u);
+    assert(hpclang_hp39_bitmap_aplet_data_slot(&reader, &slot) == 0 && slot == 0x9000au);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == -1 && errno == ENOSYS);
+    put(0x87000u, 5, 0x02a2cu);
+    assert(hpclang_hp39_bitmap_aplet_data_slot(&reader, &slot) == -1 && errno == ENOSYS);
+    setup();
     /* The bootstrap may explicitly hide the launcher pointer. The data slot
      * stays put, and
      * must not depend on whether the saved value is a string. */

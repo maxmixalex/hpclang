@@ -67,6 +67,44 @@ def check_rpl_workspace(words, ram):
     )
 
 
+def check_bitmap_workspace(words, ram, rows=896):
+    marker, status, cpu, top, obj, prologue, span, count, first, end = words[:10]
+    require(marker == 0x47524F42 and status == 0, "bitmap inspection incomplete")
+    require(0x08000000 <= cpu <= 0x0807FC00 and 0x80000 <= top <= 0xFFFFA, "invalid Stock stack")
+    require(prologue == 0x2B1E and span == rows * 256 + 15, "unexpected native bitmap")
+    require(0x80000 <= obj < obj + 5 + span <= 0x100000, "bitmap outside RPL address space")
+    require(
+        first == (obj + 20 + 8191) & ~8191 and end == (obj + 5 + span) & ~8191,
+        "bitmap bounds changed",
+    )
+    pages = words[12 : 12 + count]
+    require(
+        rows // 32 - 1 <= count <= rows // 32 and end - first == count * 8192,
+        "invalid bitmap page count",
+    )
+    require(len(set(pages)) == count, "aliased bitmap pages")
+    for i, page in enumerate(pages):
+        require(page % 4096 == 0 and 0x08001000 <= page <= 0x0807F000, "invalid bitmap frame")
+        offset = cpu - 0x08000000 + ((first + i * 8192) >> 12) * 4
+        require(
+            struct.unpack_from("<2I", ram, offset) == (page, page + 2048), "bitmap mapping changed"
+        )
+    # RSKTOP and DSKTOP are adjacent five-nibble words in the same mapped page.
+    # Read the snapshot's current gap independently of the earlier ARM result.
+    rsktop = 0x806F3
+    physical = struct.unpack_from("<I", ram, cpu - 0x08000000 + (rsktop >> 12) * 4)[0]
+    require(0x08000000 <= physical <= 0x0807F800 and physical % 2048 == 0, "invalid stack page")
+    offset = physical - 0x08000000 + (rsktop & 4095) // 2
+    pair = int.from_bytes(ram[offset : offset + 6], "little") >> 4
+    lower, upper = pair & 0xFFFFF, (pair >> 20) & 0xFFFFF
+    require(0x80000 <= lower <= upper < 0x100000, "invalid saved Stock stack bounds")
+    return {
+        "bitmap_nibble_address": obj,
+        "pages": pages,
+        "stock_stack_gap_bytes": (upper - lower) // 2,
+    }
+
+
 def verify(artifact, state, baseline, *, rpl=False):
     allocations = []
     borrowed = {}

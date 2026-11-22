@@ -28,6 +28,7 @@ ui = runpy.run_path(str(E2E / "notebook/verify.py"))
 # A distinct RPL result proves that the new program reached its cleanup check.
 NORMAL_RESULT = 124275
 LOW_MEMORY_RESULT = 124276
+REFUSED_RESULT = 124277
 
 
 def pack(nibbles):
@@ -71,14 +72,18 @@ def build(dest, toolchain, profile):
     checksum = 2166136261
     for b in image:
         checksum = ((checksum ^ b) * 16777619) & 0xFFFFFFFF
-    for package, rw_bytes, expected_status in (("RUN.HP", 32768, 0), ("LOWMEM.HP", 20480, 1)):
+    for package, rw_bytes, expected_status in (
+        ("RUN.HP", 32768, 0),
+        ("LOWMEM.HP", 20480, 1),
+        ("REFUSE.HP", 32768, None),
+    ):
         out = dest / package.removesuffix(".HP").lower()
         out.mkdir()
         build_runner(
             out,
             dest / package,
             toolchain,
-            profile["model"],
+            profile,
             size,
             checksum,
             offset,
@@ -90,15 +95,16 @@ def build(dest, toolchain, profile):
 
 
 def build_runner(
-    out, package, toolchain, model_id, size, checksum, offset, rw_bytes, expected_status
+    out, package, toolchain, profile, size, checksum, offset, rw_bytes, expected_status
 ):
     parts = []
     for phase in ("acquire", "check"):
         source = out / (phase + ".c")
         source.write_text(
-            f"#define NOTEBOOK_MODEL {model_id}u\n"
+            f"#define NOTEBOOK_MODEL {profile['model']}u\n"
             f"#define NOTEBOOK_RW_BYTES {rw_bytes}u\n"
-            f"#define NOTEBOOK_EXPECTED_STATUS {expected_status}u\n"
+            f"#define NOTEBOOK_EXPECTED_STATUS {expected_status or 0}u\n"
+            f"#define REQUEST_PAGES {35 if expected_status is None else 'POOL_PAGES'}\n"
             f"#define IMAGE_BYTES {size}u\n"
             f"#define IMAGE_HASH {checksum}u\n"
             f"#define ENTRY_OFFSET {offset}u\n"
@@ -108,6 +114,8 @@ def build_runner(
             [
                 sys.executable,
                 E2E / "independent-entry/build.py",
+                "--model",
+                profile["target"],
                 "--toolchain",
                 toolchain,
                 "--stock-state",
@@ -121,52 +129,24 @@ def build_runner(
         )
         digits = "".join(word(b, 2) for b in (out / phase / "program.HP").read_bytes()[8:])
         parts.append(digits[5 : 10 + int(digits[10:15][::-1], 16)])
-    # Make an unreachable temporary and capture the tagged object's address
-    # before the original GARBAGECOL, so actual movement is observable.
-    dead = word(0x2A4E) + word(1029) + "0" * 1024
-    target = word(0x2A4E) + word(37) + "12345678" * 4
-    seed = (
-        "8f"
-        + word(0x679B)
-        + "20"
-        + "143"
-        + "1b"
-        + word(0x8078E)
-        + "146136"
-        + "16f" * 6
-        + "163"
-        + "140"
-        + "8f"
-        + word(0x67D2)
-        + "142164808c"
-    )
-    gc = (
-        dead
-        + word(0x6657)
-        + word(0x3244)
-        + target
-        + word(0x6657)
-        + word(0x2DCC)
-        + word(5 + len(seed))
-        + seed
-        + word(0x5F42)
-    )
+    gc = entry["moving_gc_program"]()
     package.write_bytes(
         pack(
             word(0x2D9D)
             + parts[0]
             + gc
-            + parts[1]
             + word(0x2614)
             + word(12)
-            + str(LOW_MEMORY_RESULT if expected_status else NORMAL_RESULT)[::-1]
+            + str(REFUSED_RESULT)[::-1]
             + "0"
+            + word(0x6657)  # NEWOB: private writable copy of the refusal result
+            + parts[1]
             + word(0x312B)
         )
     )
 
 
-def check_phase(phase, editor_text, flash, original, font):
+def check_phase(phase, editor_text, flash, original, font, expected_result):
     ram = (phase / "state/sram").read_bytes()
     assert (phase / "state/flash").read_bytes() == flash
     _, read, _ = no_toolbox(ram, flash)
@@ -174,12 +154,9 @@ def check_phase(phase, editor_text, flash, original, font):
     assert original == ram[0x20000:0x35000]
     stack = read(0x806F8)
     result = read(stack)
-    expected_result = LOW_MEMORY_RESULT if editor_text is None else NORMAL_RESULT
     digits = sum(read(result + 10 + i, 1) * 10**i for i in range(6))
     assert read(result) == 0x2614 and read(result + 5) == 12 and digits == expected_result
-    moved = read(stack + 5)
-    assert moved != read(read(0x8078E) + 100) and read(moved) == 0x2A4E and read(moved + 5) == 37
-    assert [read(moved + 10 + i, 1) for i in range(32)] == [int(x, 16) for x in "12345678" * 4]
+    entry_verifier["moving_gc_result"](read, stack + 5)
     require_stock_pc(phase / "state")
     returned = (phase / "stock-returned.pgm").read_bytes()
     assert returned == (phase / "stock-checkpoint.pgm").read_bytes()
@@ -286,10 +263,18 @@ def main():
     assert staged[0x21000 : 0x21000 + len(image)] == image
     font = ui["font_rows"](ROOT / "runtime/fonts/generated/newrpl_6a.S")
     hashes = {}
+    card = dest / "notebook.img"
+    media = runpy.run_path(str(ROOT / "tools/e2e-stock-media.py"))
+    files = {
+        "initial_files": {"KEEP.TXT": "Retained card content\n"},
+        "expected_files": {"HPCNOTE.TXT": "202\n"},
+    }
+    media["prepare"](files, card)
     source = "setup"
     save_keys = "4300 tap two\n4900 tap zero\n5500 tap down\n6200 tap enter\n7600 capture saved\n"
     for name, program, package, editor in (
         ("save", "SPLITGC", "RUN.HP", ""),
+        ("refused", "NBFULL", "REFUSE.HP", None),
         ("low-memory", "SPLITERR", "LOWMEM.HP", None),
         ("reload", "SPLITGC", None, "20"),
     ):
@@ -299,12 +284,11 @@ def main():
                 "3500 capture editor\n" + (save_keys if name == "save" else "") + "8500 tap on\n"
             )
         if name == "reload":
-            # Leave HOME unchanged and back up a distinct edit through the UI.
-            # Focus moves from the editor past Save, Reload, Clock and Export.
+            # Move past Save, Reload and Clock to export the edit, then back it up to Port 0.
             actions = (
                 "3500 capture editor\n4300 tap two\n"
-                + "".join(f"{5000 + 700 * i} tap down\n" for i in range(5))
-                + "9000 tap enter\n11500 tap on\n"
+                + "".join(f"{5000 + 700 * i} tap down\n" for i in range(4))
+                + "8000 tap enter\n9200 tap down\n10100 tap enter\n12300 tap on\n"
             )
         transfer(
             spec,
@@ -315,18 +299,31 @@ def main():
             installed=package is None,
             package_name=package,
             extra_files=[("COPY.HP", "CKCOPY")] if name == "save" else [],
-            remote_commands=[f"HOME '{program}' RCL CKCOPY"],
+            remote_commands=[
+                f"HOME '{program}' RCL CKCOPY" + (" 'NBFULL' PURGE" if name == "refused" else "")
+            ],
             actions=actions + "15000 capture returned\n",
             execution_ms=18000,
+            sd_image=card if name == "reload" else None,
         )
         hashes[name] = {
             "editor": editor,
             "home_hex": b"hpclang-notebook/1\n20".hex(),
             "settled_sha256": check_phase(
-                dest / name, editor, flash, staged[0x20000:0x35000], font
+                dest / name,
+                editor,
+                flash,
+                staged[0x20000:0x35000],
+                font,
+                {"refused": REFUSED_RESULT, "low-memory": LOW_MEMORY_RESULT}.get(
+                    name, NORMAL_RESULT
+                ),
             ),
         }
         source = name
+    media["verify"](files, card)
+    hashes["reload"]["export"] = files["expected_files"]
+    hashes["refused"].update(requested_pages=35, rpl_result=REFUSED_RESULT)
     hashes["low-memory"].update(exit_status=1, rw_bytes=20480)
     recall = dest / "port0-recall"
     transfer(

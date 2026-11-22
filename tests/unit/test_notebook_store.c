@@ -131,6 +131,8 @@ int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
 
 int hpclang_device_capability(enum hpclang_capability capability)
 {
+    if (capability == HPCLANG_CAPABILITY_APLET_DATA && !aplet)
+        return HPCLANG_CAPABILITY_UNSUPPORTED;
     if (!supported)
         return HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE;
     return (capability == HPCLANG_CAPABILITY_APLET_DATA) == aplet ? HPCLANG_CAPABILITY_SUPPORTED
@@ -149,6 +151,10 @@ void hpclang_object_store_close(struct hpclang_object_store *store)
 }
 int hpclang_aplet_data_get(struct hpclang_object **out)
 {
+    if (!supported) {
+        errno = ENOSYS;
+        return -1;
+    }
     if (fault) {
         errno = fault;
         return -1;

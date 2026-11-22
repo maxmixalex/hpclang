@@ -1,29 +1,52 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-21. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+Current checkpoint: 2026-11-22. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main: `002fb5e3` ([#53](https://github.com/maxmixalex/hpclang/pull/53)). All five workflows passed on `a022c359` (186 jobs passed, two skipped). Notebook low-memory exit and Port 0 backup are accepted on HP49g+ and HP50g. #52 accepted the Port 1 relocation regression. #51 added the HP49g+ independent Notebook save and relaunch regression.
-[#50](https://github.com/maxmixalex/hpclang/pull/50) records production Notebook
-release acceptance.
+Accepted main is `43d5aac9` (#55). Port 1 HOME cache relocation passed all five workflows on `771646cd`. The current integration candidate combines
+M8.0 library discovery (#49) and Port 1 cache relocation (#55) with M8.6
+independent Notebook (#54) and HP39/40 SDK packaging (#56). Local validation
+on `3604db84` passed all 180 host tests, three native Port sanitizer tests,
+the installed SDK on all six models (613 identical release outputs), the
+HP48gII independent Notebook save/relaunch and the strict documentation build.
+[#49](https://github.com/maxmixalex/hpclang/pull/49) carries the combined CI gate.
+On `7e87d081`, [HP39gs Stock dialogs](https://github.com/maxmixalex/hpclang/actions/runs/44940273064/job/136957048225) stopped before application entry after 90 seconds without a Kermit ACK. A local replay with that job's emulator, SDK payload and transfer files passed through Stock return. The source of the transfer stall remains open.
 
-M8.6 local verification on HP49g+ and HP50g covers independent Notebook
-launch from original ROM, saving `20` in HOME, a low-memory application exit
-and normal relaunch from that state. Notebook exports the edit to a FAT16 card
-and backs it up to Port 0. Both contain `202` while HOME retains `20`.
-All 20 code pages map directly from Port 1, reducing aligned KOS usage from
-21 to nine pages on normal launch. When a 35-page request is only partly
-satisfied, the loader releases the blocks and returns to Stock. Both models
-check reacquisition, GC and relaunch from that state. On HP48gII the independent launcher now runs the installed SDK's
-64,264-byte Notebook in 29 pages owned by the executing program (one table,
-16 code, 12 writable). Two Stock processes ran one USB-installed program. On recall the editor
-read `314` from a Stock-written HOME note, displayed `31420` after keyboard
-input and returned with status zero. Both return snapshots verified the code and
-page mappings. After each exit, Stock GC moved a tagged temporary and preserved
-its payload. The resident Notebook relaunched after the first collection. This
-passed locally at `7b29e9f2` and is submitted for CI in #54. Application-originated
-HOME save and GC during active execution remain open. A local HP48gII Save-button replay confirmed that both create and replace report ENOSYS. The independent loader supplies the Saturn state for reads but no RPL mutation bounds. A Port 0 placement trial installed the full 137,279-byte Notebook package with a valid backup CRC. A smaller entry probe executed inside its Port 0 record, which stayed at the same address across a Stock HOME insertion. In-place workspace writes invalidated the backup CRC. Independent HOME save still requires a launch context and an owner that retains its integrity. HP39 Aplet entry and wider native services remain open.
+On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
+four library headers and objects. Appending a 28-byte fixture to a RAM copy
+changed only its slot. Tail recovery and duplicate retry performed no writes.
+Native installation and startup recovery remain open. The combined candidate's
+Quality job flagged test formatting on `de3e2a02`. The corrected reference test
+passed locally with CI's clang-format 22.1.0 and ASan/UBSan.
 
-M8.0 Port 1: the attachment planner reads a HOME record and resolves both cache pointers through the ROM bank table. Local reference tests and HP49g+/HP50g snapshot replays matched both addresses after native backup deletion. All 180 host tests, strict documentation and the ARMv4T Thumb compilation passed locally. Live writes and wider reference collection remain open.
+On local original-ROM runs, the installed SDK's independent Notebook saved
+`Seed42` as `Seed4220` and reopened it on HP39g+ D1.55, HP39gs 2.22 and
+HP40gs 2.22. Stock Reset exposed a ROM reference to an empty list that
+previously caused error 134 on all three. Each model now opens an empty
+editor after Reset, saves `20`, reopens it and returns to the Stock library.
+The checks cover the LCD, named Aplet in SRAM and native return state.
+All three install/Save/Reset jobs passed CI on `7e87d081`. Locally, the
+84 KiB startup bitmap and smaller Aplet now allow two Notebooks to coexist:
+Stock copy `2` saved and reopened `2020` while its original retained `20` on
+all three models. CI acceptance of the copy case and GC during execution
+remain open. See the [launcher measurements](architecture.md#migration-decision-after-the-full-notebook-measurements-2026-11-19).
+The HP48gII CI size check failed on `54f6642b` and passed on `0cdc1bc0`.
+The current 64,672-byte Notebook fits the 65,536-byte code window and passed
+both local original-ROM entry paths, including consecutive Port 0 saves.
+
+On HP49g+ and HP50g, Port 1 library 275 executed after a four-byte move
+and remained readable after a one-byte move that produced the same PrRUN
+reinstall screen as native backup deletion. See the
+[Port 1 placement controls](object-service.md). Public edits that move a
+library remain gated. Locally, the internal guarded Port 1 edit can move
+a header-only library. On copies of both models' ERAM, deleting the backup
+before library 123 matched Stock's resulting chain; moving executable library
+275 was refused before writes. The guarded edit fixture now checks live ERAM
+catalog bindings. It tracked both libraries before and after native PURGE on
+both models. Guarded backup replacement and deletion passed on both Stock 2.15
+ROMs, including two relaunches. Public edits still require other live roots.
+The HP48gII Port 0 Notebook
+passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet
+bundles matched the historical writer on all three models.
 
 The [development board](https://github.com/maxmixalex/hpclang/issues/1) tracks
 current work. Earlier accepted deliveries remain in the validation history.

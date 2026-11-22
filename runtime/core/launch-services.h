@@ -23,7 +23,9 @@ hpclang_launch_rpl_bounds(const struct hpclang_boot_info *boot)
     if ((bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC &&
          bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V2 &&
          bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V4 &&
-         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V5) ||
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V5 &&
+         !(bounds->magic == HPCLANG_RPL_BOUNDS_PORT0_RESIDENT &&
+           boot->model == HPCLANG_MODEL_HP48GII)) ||
         bounds->temp_limit <= 0x80000u || bounds->temp_limit > 0x100000u ||
         bounds->user_limit < 0x80000u || bounds->user_limit >= 0x100000u ||
         bounds->stack_reserve_nibbles > 0x100000u - bounds->user_limit ||
@@ -80,6 +82,24 @@ hpclang_launch_hp39_context(const struct hpclang_boot_info *boot)
     if (context->magic != HPCLANG_HP39_PLATFORM_MAGIC || context->portal_entry == 0u)
         return NULL;
     return context;
+}
+
+static inline const struct hpclang_hp39_aplet_list_context *
+hpclang_launch_hp39_aplet_list(const struct hpclang_boot_info *boot)
+{
+#ifdef HPCLANG_COMPILED_MODEL
+    if (HPCLANG_COMPILED_MODEL < HPCLANG_MODEL_HP39GPLUS ||
+        HPCLANG_COMPILED_MODEL > HPCLANG_MODEL_HP40GS)
+        return NULL;
+#endif
+    if (!boot || !boot->saturn_state ||
+        (boot->model != HPCLANG_MODEL_HP39GPLUS && boot->model != HPCLANG_MODEL_HP39GS &&
+         boot->model != HPCLANG_MODEL_HP40GS) ||
+        (boot->platform_cookie & 3u) != HPCLANG_PLATFORM_COOKIE_HP39_TAG)
+        return NULL;
+    const struct hpclang_hp39_aplet_list_context *context =
+        (const void *)(boot->platform_cookie & ~(uintptr_t)3u);
+    return context && context->magic == HPCLANG_HP39_APLET_LIST_MAGIC ? context : NULL;
 }
 
 #endif

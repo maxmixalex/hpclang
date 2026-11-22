@@ -71,7 +71,10 @@ static int open_destination(struct destination *destination, int write, int port
         destination->available = info.available;
         return 0;
     }
-    if (hpclang_device_capability(HPCLANG_CAPABILITY_APLET_DATA) == HPCLANG_CAPABILITY_SUPPORTED) {
+    int aplet = hpclang_device_capability(HPCLANG_CAPABILITY_APLET_DATA);
+    /* HP39 can read the active ENTER frame even without the native mutation portal. */
+    if (aplet == HPCLANG_CAPABILITY_SUPPORTED ||
+        (!write && aplet == HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE)) {
         destination->aplet = 1;
         return 0;
     }

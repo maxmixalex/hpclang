@@ -2089,24 +2089,56 @@ static void test_port1_edit_owned_suffix(void)
     assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"TAIL", 4, &guard) == 0);
     assert(get_word(0, 5) == 0 && memory[limit] == 11);
 
-    // A following library must not move; same-size replacement may leave it fixed.
+    /* Only a header-only library can follow a size-changing edit. Even then
+     * the guard must cover the original library and can refuse before writes. */
     io = setup(1);
     assert(hpclang_rpl_port1_create_backup(&io, 256, small, small_span) == 0);
     const char *library = "04b2062000108510b7000000000000000000000d5c2";
-    for (uint32_t i = 0; i < 43; ++i)
-        memory[small_span + i] = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+    uint8_t header[43];
+    for (unsigned i = 0; i < sizeof(header); ++i)
+        header[i] = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+    memcpy(memory + small_span, header, sizeof(header));
     before = writes;
+    fixture.result = HPCLANG_RPL_MUTATION_BUSY;
     assert(hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA", 4, &guard) ==
-           HPCLANG_RPL_MUTATION_UNSUPPORTED);
-    assert(hpclang_rpl_port1_replace_backup(&io, 256, large, large_span, &guard) ==
-           HPCLANG_RPL_MUTATION_UNSUPPORTED);
-    assert(writes == before);
-    assert(hpclang_rpl_port1_replace_backup(&io, 256, same, same_span, &guard) == 0);
-    assert(fixture.start == 0 && fixture.end == small_span);
-    cursor = (struct hpclang_rpl_port_cursor){0, 0x40000u, 0};
-    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
-    assert_char_at(entry.value_address, 'B');
-    assert(get_word(small_span, 5) == 0x02b40);
+           HPCLANG_RPL_MUTATION_BUSY);
+    assert(fixture.start == 0 && fixture.end == small_span + sizeof(header) && writes == before);
+    fixture.result = HPCLANG_RPL_MUTATION_OK;
+    assert(!hpclang_rpl_port1_replace_backup(&io, 256, large, large_span, &guard));
+    assert(!memcmp(memory + large_span, header, sizeof(header)));
+    assert(!hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA", 4, &guard));
+    assert(!memcmp(memory, header, sizeof(header)));
+    cursor = (struct hpclang_rpl_port_cursor){0, 256, 0};
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.library_number == 123);
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
+
+    /* A CRC-valid nonzero offset or even a single unreferenced body nibble
+     * precludes movement. A same-size replacement leaves either library fixed. */
+    for (unsigned body = 0; body <= 1; ++body) {
+        io = setup(1);
+        assert(!hpclang_rpl_port1_create_backup(&io, 256, small, small_span));
+        memcpy(memory + small_span, header, sizeof(header));
+        uint32_t fixed_at = small_span + sizeof(header);
+        memcpy(memory + fixed_at, header, sizeof(header));
+        put_word(fixed_at + 16, 3, 124);
+        put_word(fixed_at + 5, 5, sizeof(header) - 5 + body);
+        memory[fixed_at + (body ? 39 : 19)] = 1;
+        uint32_t crc = 0;
+        for (unsigned i = 5; i < sizeof(header) - 4 + body; ++i)
+            crc = (crc >> 4) ^ (((crc ^ memory[fixed_at + i]) & 15u) * 0x1081u);
+        put_word(fixed_at + sizeof(header) - 4 + body, 4, crc);
+        before = writes;
+        assert(hpclang_rpl_port1_replace_backup(&io, 256, large, large_span, &guard) ==
+               HPCLANG_RPL_MUTATION_UNSUPPORTED);
+        assert(hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA", 4, &guard) ==
+               HPCLANG_RPL_MUTATION_UNSUPPORTED);
+        assert(writes == before);
+        assert(!hpclang_rpl_port1_replace_backup(&io, 256, same, same_span, &guard));
+        assert(fixture.start == 0 && fixture.end == small_span);
+        cursor = (struct hpclang_rpl_port_cursor){0, 256, 0};
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
+        assert_char_at(entry.value_address, 'B');
+    }
     /* Growth, shrinkage, same-size replacement and deletion must distinguish
      * interrupted commits from preflight I/O errors at every write boundary. */
     for (unsigned mode = 0; mode < 4; ++mode) {

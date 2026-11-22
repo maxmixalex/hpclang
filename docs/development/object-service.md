@@ -608,6 +608,19 @@ Flash allocation records use the separate slot traversal described below;
 their write transactions remain open. The RAM iterator must not be applied
 to raw Flash records.
 
+On Stock HP48gII, HP49g+ and HP50g, `hpclang_library_query(id)` looks up a
+12-bit library number in the system catalog and the HOME attachment list.
+Check for a negative return before testing `HPCLANG_LIBRARY_REGISTERED` and
+`HPCLANG_LIBRARY_HOME_ATTACHED`. Zero means the ID is absent from both lists.
+A library stored in a port can still return zero.
+
+Applications can enumerate both lists with `hpclang_library_list(NULL, 0)` to
+obtain the count, then call it again with an array of `struct hpclang_library_info`.
+Each row contains one library number and its combined status flags. The numbers
+are sorted in ascending order. If the list grows between calls, the second call
+reports `ENOSPC` and leaves the array intact. Use the port iterator to discover
+stored library records, including those awaiting registration.
+
 The initial `<hpclang/port.h>` API provides `hpclang_port_iterator_open/read/close`
 and `hpclang_port_backup_get`. Iterators own their metadata; returned values are
 independent `hpclang_object` snapshots released with `hpclang_object_release`.
@@ -1049,8 +1062,10 @@ UI retains a return-stack address inside a main-RAM copy of the program.
 These probes cover ordinary program execution; library and other banked
 references still require their own checks before public replacement/removal.
 Internal ERAM edit primitives now validate complete backup chains, resize or
-remove records within the launcher ownership fence, and refuse to move a
-following library. Their caller must establish reference safety; they are not
+remove records within the launcher ownership fence, and can move a following
+library if its validated encoding contains only its header, four zero table
+offsets and CRC. The guard must cover the whole shifted suffix. A body or
+nonzero table offset prevents the move. Their caller must establish reference safety; they are not
 yet connected to the public write API. Host/sanitizer tests cover growth,
 shrinkage, same-size replacement, removal, CRC damage, I/O failure and bounds.
 
@@ -1072,6 +1087,40 @@ library bytes and Flash. The C ACPTR resolver and relocation planner reproduced
 both payload updates from the saved states. The Port 1 host regression checks
 this two-pointer case. Other live references, including suspended execution,
 still need coverage before public editing.
+
+The guarded edit fixture checks the live library catalog before each backup edit.
+It reads the ERAM switch from the Stock 2.15 ROM table and compares each binding
+using that switch with the affected ERAM nibble range. Read failure anywhere in
+the catalog prevents approval, even after an earlier match. On saved HP49g+ and
+HP50g states, the check located library 123 at offset `0x42` before native purge
+and `0x10` afterward, and library 275 at `0x94` and `0x62` respectively. Adjacent
+ranges excluded those bindings. The fixture retains its separate proof that Stock
+has never seen the newly appended records. Public editing still requires coverage
+of other bank mappings, HOME caches and live execution references.
+
+A combined replay on HP49g+ and HP50g Stock 2.15 moved library 275 and its
+terminator down 50 nibbles in an offline ERAM copy, then applied the C catalog
+and HOME cache edits to the same SRAM image. All 62 catalog records and both
+cache words matched the original-ROM purge. After resuming each image, Stock
+executed `:1:275 RCL 'MOVEDLIB' STO`. The HOME copy matched all 13,671 nibbles
+of the original library.
+
+Execution has a separate gate. Before relocation, invoking the attached
+library's `PrRUN` launched an SDK program that created the HOME string
+`MOVEDRUN` with value `Port1 PrRUN` and returned to Stock on both models.
+After relocation the same call displayed `PrRUN Error: Reinstall ARMToolbox`
+and the marker was absent. Native `:1:BEFORE PURGE` produced the same screen
+pixel for pixel on both models. A warmstart of the replayed state reproduced
+the error on both. Two smaller moves distinguish the placements on both models.
+Shortening the preceding CRC-valid backup name from `BEFORE` to `BE` moved
+the library from ERAM offset 50 to 42 nibbles. Stock recalled all 13,671
+library nibbles, then PrRUN executed the SDK program, created its HOME marker
+and returned. Shortening the name to `BEFOR` moved the same library to offset
+48. Recall passed but the reinstall screen matched the native purge pixel
+for pixel. The unmodified offset-50 controls passed on both models. These
+observations qualify the tested word-preserving move for this library.
+The executable's internal placement requirement and general live-reference
+coverage remain open. Public size-changing edits that move libraries stay gated.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must

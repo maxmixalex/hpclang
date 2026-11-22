@@ -51,7 +51,7 @@ int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
             result.available = reads;
             const struct hpclang_rpl_memory_bounds *bounds =
                 port < 2 ? hpclang_launch_rpl_bounds(boot) : NULL;
-            if (port == 0 && bounds)
+            if (port == 0 && bounds && bounds->magic != HPCLANG_RPL_BOUNDS_PORT0_RESIDENT)
                 result.available = result.implemented;
             else if (port == 1 && bounds &&
                      (bounds->magic == HPCLANG_RPL_BOUNDS_MAGIC ||
@@ -86,6 +86,140 @@ static int port_error(int result)
             : result == HPCLANG_RPL_SPAN_UNSUPPORTED ? ENOTSUP
                                                      : EILSEQ;
     return -1;
+}
+
+static int read_pointer(uint32_t address, uint32_t *pointer)
+{
+    uint32_t value = 0;
+    for (uint32_t i = 0; i < 5; ++i) {
+        uint8_t nibble;
+        if (!read_nibble(NULL, address + i, &nibble))
+            return port_error(HPCLANG_RPL_SPAN_UNAVAILABLE);
+        if (nibble > 15)
+            return port_error(HPCLANG_RPL_SPAN_MALFORMED);
+        value |= (uint32_t)nibble << (4 * i);
+    }
+    *pointer = value;
+    return 0;
+}
+
+static int library_context(void)
+{
+    const struct hpclang_device_info *device = hpclang_device_info();
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (!device || !boot || boot->model != device->model || !boot->saturn_state ||
+        device->model < HPCLANG_MODEL_HP48GII || device->model > HPCLANG_MODEL_HP50G) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return 0;
+}
+
+int hpclang_library_query(uint32_t library_number)
+{
+    if (library_number > 0xfffu) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (library_context())
+        return -1;
+    const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+    struct hpclang_rpl_library_binding binding;
+    const uint32_t catalog = 0x8611du;
+    int registered =
+        hpclang_rpl_library_lookup(&reader, catalog, 0x100000u - catalog, library_number, &binding);
+    if (registered < 0)
+        return port_error(registered);
+    uint32_t home;
+    if (read_pointer(0x80711u, &home))
+        return -1;
+    int attached =
+        hpclang_rpl_home_library_attached(&reader, home, 0x100000u - home, library_number);
+    if (attached < 0)
+        return port_error(attached);
+    return (registered ? HPCLANG_LIBRARY_REGISTERED : 0) |
+           (attached ? HPCLANG_LIBRARY_HOME_ATTACHED : 0);
+}
+
+/* Four 12-bit library IDs per byte, with two independent status bits per ID. */
+struct library_inventory
+{
+    uint8_t flags[1024];
+    unsigned count;
+};
+
+static int inventory_add(struct library_inventory *inventory, uint32_t id, unsigned flag)
+{
+    unsigned shift = 2 * (id % 4);
+    uint8_t *byte = &inventory->flags[id / 4];
+    unsigned existing = (*byte >> shift) & 3u;
+    if (flag == HPCLANG_LIBRARY_REGISTERED && (existing & flag))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (!existing)
+        inventory->count++;
+    *byte |= flag << shift;
+    return 0;
+}
+
+static int list_registered(void *context, uint32_t record, uint32_t id,
+                           const struct hpclang_rpl_library_binding *binding)
+{
+    (void)record;
+    (void)binding;
+    return inventory_add(context, id, HPCLANG_LIBRARY_REGISTERED);
+}
+
+static int list_attached(void *context, uint32_t record, uint32_t id, uint32_t first,
+                         uint32_t second)
+{
+    (void)record;
+    (void)first;
+    (void)second;
+    return inventory_add(context, id, HPCLANG_LIBRARY_HOME_ATTACHED);
+}
+
+int hpclang_library_list(struct hpclang_library_info *entries, uint32_t capacity)
+{
+    if (!entries && capacity) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (library_context())
+        return -1;
+    uint32_t home;
+    if (read_pointer(0x80711u, &home))
+        return -1;
+    struct library_inventory *inventory = calloc(1, sizeof(*inventory));
+    if (!inventory) {
+        errno = ENOMEM;
+        return -1;
+    }
+    const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+    const uint32_t catalog = 0x8611du;
+    int result = hpclang_rpl_catalog_visit(&reader, catalog, 0x100000u - catalog, list_registered,
+                                           inventory);
+    if (!result)
+        result = hpclang_rpl_home_attachments_visit(&reader, home, 0x100000u - home, list_attached,
+                                                    inventory);
+    if (result) {
+        free(inventory);
+        return port_error(result);
+    }
+    unsigned count = inventory->count;
+    if (entries && capacity < count) {
+        free(inventory);
+        errno = ENOSPC;
+        return -1;
+    }
+    if (entries) {
+        for (uint32_t id = 0; id < 4096; ++id) {
+            unsigned flags = (inventory->flags[id / 4] >> (2 * (id % 4))) & 3;
+            if (flags)
+                *entries++ = (struct hpclang_library_info){id, flags};
+        }
+    }
+    free(inventory);
+    return count;
 }
 
 static int open_cursor(uint32_t port, struct hpclang_rpl_reader *reader,
@@ -126,15 +260,9 @@ static int open_cursor(uint32_t port, struct hpclang_rpl_reader *reader,
         return 0;
     }
     *reader = (struct hpclang_rpl_reader){read_nibble, NULL};
-    uint32_t start = 0;
-    for (uint32_t i = 0; i < 5; ++i) {
-        uint8_t nibble;
-        if (!read_nibble(NULL, 0x80716 + i, &nibble))
-            return port_error(HPCLANG_RPL_SPAN_UNAVAILABLE);
-        if (nibble > 15)
-            return port_error(HPCLANG_RPL_SPAN_MALFORMED);
-        start |= (uint32_t)nibble << (4 * i);
-    }
+    uint32_t start;
+    if (read_pointer(0x80716u, &start))
+        return -1;
     /* Port 0 belongs to main RAM. Its terminating zero is model dependent. */
     if (start < 0x80000 || start > 0xffffb)
         return port_error(HPCLANG_RPL_SPAN_BOUNDS);

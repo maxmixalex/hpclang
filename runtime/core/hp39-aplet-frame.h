@@ -13,4 +13,6 @@
 int hpclang_hp39_aplet_data_slot(const struct hpclang_rpl_reader *reader, uint32_t incoming_span,
                                  int launcher_hidden, uint32_t *slot);
 
+/* Independent ENTER frame with a rooted bitmap and HPC1 source string above the data cell. */
+int hpclang_hp39_bitmap_aplet_data_slot(const struct hpclang_rpl_reader *reader, uint32_t *slot);
 #endif
