@@ -260,8 +260,45 @@ up to twelve writable pages. The same Notebook image now transfers in a
 difference from the production first install.
 
 All six independent first installs transferred more bytes. HP39/40 and
-HP48gII each needed one fewer file. The remaining cost comparisons are peak
-resident RAM and time from launch to a usable editor.
+HP48gII each needed one fewer file.
+
+#### HP48gII editor memory and startup
+
+Two local Stock paths ran the same uninstrumented SDK Notebook image
+(`88885b9a6501`, ATfE 22.1.0) from the same starting NOR. One installed
+ARMToolbox48 and launched through PrRUN. The other recalled the independent
+Port 0 program and launched through EVAL. Each opened an empty editor, typed
+`20`, saved to HOME and returned to a settled Stock display.
+
+| Measured application resource | PrRUN | Independent Port 0 |
+| --- | ---: | ---: |
+| Mapped writable region | 49,152 bytes | 32,768 bytes |
+| Heap reserved at first editor display | 9,924 bytes | 9,924 bytes |
+| Heap reserved after Save | 9,972 bytes | 9,972 bytes |
+| Deepest observed user-mode application stack | 4,984 bytes | 4,984 bytes |
+
+The page tables in each captured SRAM image resolved all 16 code pages to
+the original Notebook payload. The ELF symbols `heap_next` and `__bss_end`
+gave the reserved heap at each checkpoint. The emulator traced application
+stack-pointer writes through exit. Both paths reached the same lowest stack
+offset in `hpclang_rpl_stock_memory_read`. These measurements cover the
+application's writable mapping, heap checkpoints and user stack. Peak
+resident RAM across the launcher and Stock still needs separate accounting.
+
+For startup, the emulator captured the Stock screen immediately before the
+PrRUN or EVAL key event, then captured the LCD at scheduled 5 ms intervals.
+The actual capture timestamps bracket the first screen with both the Notebook
+title and the focused empty editor. Installation, recall and menu navigation
+preceded the timing window.
+
+| Emulator run | PrRUN editor visible | Independent Port 0 editor visible |
+| --- | ---: | ---: |
+| First pair | 56.8–63.0 ms | 24.9–31.0 ms |
+| Second pair | 55.7–62.0 ms | 23.9–29.9 ms |
+
+These are elapsed emulator times rounded outwards to 0.1 ms. Both runs
+checked the saved HOME contents and returned display. The corresponding
+HP39/40 and HP49/50 comparisons remain open.
 
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.

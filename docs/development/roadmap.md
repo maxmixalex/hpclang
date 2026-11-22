@@ -38,6 +38,12 @@ Ordinary return preserved the caller's stack and both diagnostic variants
 passed their post-return moving-GC checks. The Port 0 runs saved, reopened
 and replaced the HOME note. Remote acceptance of the smaller layout is pending.
 
+Two [HP48gII paired runs](architecture.md#hp48gii-editor-memory-and-startup)
+showed the same 4,984-byte application stack peak and the same 9,972-byte
+heap reservation after Save. The editor became visible in roughly 56–63 ms
+through PrRUN and 24–31 ms through independent Port 0 in the emulator.
+Cross-family timing and launcher/Stock peak resident RAM remain open.
+
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy
 changed only its slot. Tail recovery and duplicate retry performed no writes.
