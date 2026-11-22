@@ -2,7 +2,7 @@
 
 Current checkpoint: 2026-11-23. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `bd118262`. [#60](https://github.com/maxmixalex/hpclang/pull/60)
+Accepted main is `dd4f8d8a` after the [#65](https://github.com/maxmixalex/hpclang/pull/65) roadmap merge. [#60](https://github.com/maxmixalex/hpclang/pull/60)
 merged the installed HP49g+/HP50g independent Notebook packages after 197 checks
 passed and two skipped. Both Stock runs preserved the caller's RPN stack on
 save and reopen. [#59](https://github.com/maxmixalex/hpclang/pull/59) previously
@@ -22,7 +22,7 @@ merged the direct Port 1 stack guard.
   and Port 2 installation, recovery and space reclamation remain open.
 - **M8.6 applications and release.** [#60](https://github.com/maxmixalex/hpclang/pull/60)
   is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) now targets
-  main for the smaller HP48gII transfer, and [#64](https://github.com/maxmixalex/hpclang/pull/64)
+  main for the 122,333-byte HP48gII Port 0 transfer (16 KiB smaller), and [#64](https://github.com/maxmixalex/hpclang/pull/64)
   compares all six launchers. Local measurements support retaining the
   production SDK defaults. #64 at `a10d9aa9` covers Port 1 install-offset changes and
   live KOS allocation measurements. Both models used 45,096 bytes in the editor

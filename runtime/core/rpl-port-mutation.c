@@ -129,8 +129,8 @@ static int port1_library_header_only(const struct hpclang_rpl_reader *reader,
 }
 
 static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, const uint8_t *name,
-                      uint32_t name_length, const uint8_t *packed, uint32_t span,
-                      const struct hpclang_rpl_port1_guard *guard)
+                      uint32_t name_length, const uint32_t *library_id, const uint8_t *packed,
+                      uint32_t span, const struct hpclang_rpl_port1_guard *guard)
 {
     if (!io || !io->read_nibble || !io->write_nibble || !guard || !guard->check)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -153,15 +153,17 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
     int fixed_library = 0;
     int result;
     while ((result = hpclang_rpl_port_next(&reader, &cursor, &entry)) > 0) {
-        if (entry.prologue == 0x02b40u) {
-            if (target.span && span != target.span && !fixed_library) {
-                int movable = port1_library_header_only(&reader, &entry);
-                if (movable < 0)
-                    return movable;
-                fixed_library = !movable;
-            }
-        } else if (entry.name_length == name_length &&
-                   (!name_length || !memcmp(entry.name, name, name_length))) {
+        int library = entry.prologue == 0x02b40u;
+        int match = library ? library_id && entry.library_number == *library_id
+                            : !library_id && entry.name_length == name_length &&
+                                  (!name_length || !memcmp(entry.name, name, name_length));
+        if (library && (match || (target.span && span != target.span)) && !fixed_library) {
+            int movable = port1_library_header_only(&reader, &entry);
+            if (movable < 0)
+                return movable;
+            fixed_library = !movable;
+        }
+        if (match) {
             if (target.span)
                 return HPCLANG_RPL_MUTATION_MALFORMED;
             target = entry;
@@ -216,14 +218,22 @@ int hpclang_rpl_port1_replace_backup(const struct hpclang_rpl_mutation_io *io, u
 {
     if (!packed)
         return HPCLANG_RPL_MUTATION_MALFORMED;
-    return port1_edit(io, limit, NULL, 0, packed, span, guard);
+    return port1_edit(io, limit, NULL, 0, NULL, packed, span, guard);
 }
 
 int hpclang_rpl_port1_remove_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
                                     const uint8_t *name, uint32_t name_length,
                                     const struct hpclang_rpl_port1_guard *guard)
 {
-    return port1_edit(io, limit, name, name_length, NULL, 0, guard);
+    return port1_edit(io, limit, name, name_length, NULL, NULL, 0, guard);
+}
+
+int hpclang_rpl_port1_remove_library(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
+                                     uint32_t number, const struct hpclang_rpl_port1_guard *guard)
+{
+    if (number > 0xfffu)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    return port1_edit(io, limit, NULL, 0, &number, NULL, 0, guard);
 }
 
 static int port_start(const struct hpclang_rpl_mutation_io *io, uint32_t *start)
