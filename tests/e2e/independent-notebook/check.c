@@ -34,6 +34,8 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
             if (desc(p) != rec[3])
                 for (;;) {
                 }
+            if (NOTEBOOK_MAPPED_GC)
+                continue; /* split checks the live pages before restoring their mappings. */
             for (unsigned j = 0; j < 1024; j++)
                 if (((volatile u32 *)p)[j] != mark(p, j))
                     for (;;) {
