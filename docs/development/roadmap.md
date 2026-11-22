@@ -2,7 +2,7 @@
 
 Current checkpoint: 2026-11-23. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `bd118262`. [#60](https://github.com/maxmixalex/hpclang/pull/60)
+Accepted main is `dd4f8d8a` after the [#65](https://github.com/maxmixalex/hpclang/pull/65) roadmap merge. [#60](https://github.com/maxmixalex/hpclang/pull/60)
 merged the installed HP49g+/HP50g independent Notebook packages after 197 checks
 passed and two skipped. Both Stock runs preserved the caller's RPN stack on
 save and reopen. [#59](https://github.com/maxmixalex/hpclang/pull/59) previously
