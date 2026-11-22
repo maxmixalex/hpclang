@@ -7,8 +7,9 @@ merged library discovery, guarded Port 1 edits and independent Notebook tests.
 All 207 executed CI jobs passed on `25b4963b`; three jobs were skipped.
 The HP39gs Stock dialogs job that stalled on the previous head also passed.
 Branch `m8-notebook-sdk-home-guard` carries the Port 1 HOME cache guard
-and the installed independent Notebook target. Local verification passed;
-remote acceptance is pending.
+and the installed independent Notebook targets. Its follow-up batch through
+`475c28d7` adds the HP39/40 GC checks and both HP48gII SDK programs.
+Local verification passed; PR #57 is pending remote acceptance.
 
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy
