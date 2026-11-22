@@ -23,6 +23,8 @@ from run import emulator, completed, transfer  # noqa: E402
 from verify import home_string, require_stock_pc  # noqa: E402
 
 entry_verifier = runpy.run_path(str(E2E / "independent-entry/verify.py"))
+free_list_covers = runpy.run_path(str(E2E / "ui/verify.py"))["free_list_covers"]
+allocator = runpy.run_path(str(E2E / "harness/verify-resource-snapshots.py"))
 no_toolbox = entry_verifier["no_toolbox"]
 ui = runpy.run_path(str(E2E / "notebook/verify.py"))
 
@@ -175,7 +177,7 @@ def editor_pool_usage(ram, image, code_offset, record_start):
         assert flags & 0xF000 in (0x1000, 0x2000)
         assert n * 4096 + 4095 <= size and at + size + 4 <= 0x20000
         assert word_at(at + size) == size
-        extents.append((at - 16, at + size + 4))
+        extents.append((ptr - 16, ptr + size + 4, flags & 0x300))
         first = (ptr + 4095) & ~4095
         frames.extend(first + 4096 * j for j in range(n))
     extents.sort()
@@ -204,15 +206,17 @@ def editor_pool_usage(ram, image, code_offset, record_start):
     assert string_end + 10 == record_end and port1_field(ram, record_end, 5) == 0
     return {
         "kos_blocks": count,
-        "kos_resident_bytes": sum(end - start for start, end in extents),
+        "kos_resident_bytes": sum(end - start for start, end, _ in extents),
         "pool_frame_bytes": pages * 4096,
         "port1_code_frame_bytes": code_pages * 4096,
         "port1_record_nibbles": record_end - record_start,
-    }
+    }, extents
 
 
 def user_memory(prefix, phases, model, flash, image, page, record_start):
+    roots, _ = allocator["allocator_root"](flash, allocator["MODELS"][model])
     pools, gaps = {}, {}
+    owned = []
     for phase in ("deposited", *phases, "returned"):
         ram = (prefix / f"mem-{phase}.sram").read_bytes()
         _, read = entry_verifier["mapping"](ram, flash, model)
@@ -222,7 +226,27 @@ def user_memory(prefix, phases, model, flash, image, page, record_start):
         gaps[phase] = dstk - rstk
         assert read(0x80E9B) == gaps[phase] // 5
         if phase in phases:
-            pools[phase] = editor_pool_usage(ram, image, page, record_start)
+            pools[phase], extents = editor_pool_usage(ram, image, page, record_start)
+            assert not owned or owned == extents, "Notebook lease moved while live"
+            owned = extents
+        elif phase == "returned":
+            base = 0x08000000
+
+            def read32(address):
+                assert base <= address <= base + len(ram) - 4 and address % 4 == 0
+                return struct.unpack_from("<I", ram, address - base)[0]
+
+            assert owned
+            for start, end, heap in owned:
+                assert heap in (0x100, 0x200)
+                head = read32(roots + ((heap >> 8) - 1) * 16)
+                assert free_list_covers(read32, head, base, base + len(ram), heap, start, end), (
+                    "Notebook allocation missing from Stock free list after return"
+                )
+            pools[phase] = {
+                "kos_released_bytes": sum(end - start for start, end, _ in owned),
+                "kos_released_blocks": len(owned),
+            }
     return pools, gaps
 
 

@@ -379,7 +379,9 @@ record. With the preceding `NBPAD` record used in this regression, the complete
 `NBLSE` backup occupied 85,595 bytes, including those code pages. Its size
 plus the two disjoint KOS allocations was 130,691 bytes at each editor
 checkpoint. The verifier checked both sets of page descriptors and the extent
-of the named backup in SRAM.
+of the named backup in SRAM. After each user launch (Save and reopen), it
+checked that the Stock free list for each allocation's heap covered the entire
+original block, including its header and footer.
 
 On both models, the free interval between Stock's return and data stacks
 measured 402,508 nibbles before EVAL, 402,409 in the empty editor, 402,334
