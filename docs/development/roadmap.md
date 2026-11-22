@@ -58,6 +58,9 @@ catalog bindings and both HOME attachment cache fields. On both models, the
 HOME check located both targets of library 275 before and after native PURGE.
 It vetoes possible ERAM overlaps even through a Flash switch or alias. Guarded
 edits and two relaunches passed locally on each Stock 2.15 ROM.
+The local guarded edit now rejects direct RPL stack pointers into its affected
+Port 1 range. On each Stock 2.15 ROM a read-only test overlay caused refusal
+without changing the records; normal edits and two relaunches passed.
 Public edits still require other live roots, including suspended execution.
 The HP48gII Port 0 Notebook
 passed consecutive HOME saves locally, including post-exit GC. HP39/40 Aplet

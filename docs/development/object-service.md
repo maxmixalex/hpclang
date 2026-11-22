@@ -1114,6 +1114,15 @@ cache words matched the original-ROM purge. After resuming each image, Stock
 executed `:1:275 RCL 'MOVEDLIB' STO`. The HOME copy matched all 13,671 nibbles
 of the original library.
 
+The guarded Port 1 edit also reads the raw RPL data-stack pointer cells from
+DSKTOP up to the bottom marker. A cell pointing into the affected part of the
+bank window blocks the edit. This includes launcher-private levels. In the
+Stock fixture, the test pushes a Boolean, then substitutes a Port 1 pointer
+for that slot in the guard's reader only. The replacement must return busy
+and preserve the record bytes. Restoring the reader allows the ordinary
+replacement, growth, contraction and deletion cases to run. Indirect object
+references and suspended execution still require separate handling.
+
 Execution has a separate gate. Before relocation, invoking the attached
 library's `PrRUN` launched an SDK program that created the HOME string
 `MOVEDRUN` with value `Port1 PrRUN` and returned to Stock on both models.
