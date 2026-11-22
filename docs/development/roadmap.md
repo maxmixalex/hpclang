@@ -24,9 +24,10 @@ merged the direct Port 1 stack guard.
   is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) now targets
   main for the 122,333-byte HP48gII Port 0 transfer (16 KiB smaller), and [#64](https://github.com/maxmixalex/hpclang/pull/64)
   compares all six launchers. Local measurements support retaining the
-  production SDK defaults. #64 at `a10d9aa9` covers Port 1 install-offset changes and
-  live KOS allocation measurements. Both models used 45,096 bytes in the editor
-  locally. On HP48gII the installed Port 0 backup used 244,683 nibbles after save and reopen, including the 102,400-byte mapped pool. Remote acceptance, peak resident memory, GC with
+  production SDK defaults. #64 checks Port 1 install-offset changes. In local
+  HP49g+ and HP50g runs the editor's two KOS blocks and Port 1 backup totaled
+  130,691 bytes. After both Save and reopen the Stock allocator reclaimed all
+  45,096 KOS bytes. On HP48gII the installed Port 0 backup used 244,683 nibbles after save and reopen, including the 102,400-byte mapped pool. Remote acceptance, peak resident memory, GC with
   live native mappings, and final release acceptance remain open.
   [Launcher measurements](https://github.com/maxmixalex/hpclang/blob/aaca2595692db5608ac6d11bd43513b77895faba/docs/development/architecture.md#notebook-first-install-transfer-size)
   · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
