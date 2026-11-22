@@ -1069,6 +1069,36 @@ static int nested_reference(void *context, const struct hpclang_rpl_reference *e
     return 0;
 }
 
+static int list_range_edge(void *context, const struct hpclang_rpl_reference *edge)
+{
+    const uint32_t *range = context;
+    switch (edge->kind) {
+    case HPCLANG_RPL_REFERENCE_INLINE:
+    case HPCLANG_RPL_REFERENCE_COMPACT:
+        return 0;
+    case HPCLANG_RPL_REFERENCE_ACPTR:
+    case HPCLANG_RPL_REFERENCE_DIRECT:
+    case HPCLANG_RPL_REFERENCE_EXECUTION:
+    case HPCLANG_RPL_REFERENCE_ATTACHMENT:
+        return edge->target >= range[0] && edge->target < range[1];
+    default:
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+}
+
+int hpclang_rpl_reference_list_overlap(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                       uint32_t prologue, uint32_t first, uint32_t end)
+{
+    if (prologue != 0x2a74u)
+        return 0;
+    if (address >= 0x100000u || first >= end || end > 0x100000u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_reference_node work[32];
+    const struct hpclang_rpl_reference_node root = {address, 0x100000u - address, 0};
+    uint32_t range[] = {first, end};
+    return hpclang_rpl_reference_visit_nested(reader, &root, work, 32, 128, list_range_edge, range);
+}
+
 int hpclang_rpl_reference_visit_nested(const struct hpclang_rpl_reader *reader,
                                        const struct hpclang_rpl_reference_node *root,
                                        struct hpclang_rpl_reference_node *workspace,

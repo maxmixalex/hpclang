@@ -7,6 +7,7 @@
 #include "rpl-port.h"
 #include "rpl-port-mutation.h"
 #include "rpl-stack-view.h"
+#include "rpl-reference.h"
 #include "rpl-stock-memory.h"
 #include "saturn-view.h"
 
@@ -16,6 +17,7 @@ struct owned_tail
 {
     uint32_t first, end, calls;
     uint32_t test_stack_slot, test_stack_target, test_acptr;
+    int test_list;
 };
 
 static int stock_nibble(void *context, uint32_t address, uint8_t *value)
@@ -28,9 +30,12 @@ static int stock_nibble(void *context, uint32_t address, uint8_t *value)
         return 1;
     }
     if (owned && owned->test_acptr && address >= owned->test_acptr &&
-        address - owned->test_acptr < 15u) {
+        address - owned->test_acptr < (owned->test_list ? 35u : 15u)) {
         uint32_t offset = address - owned->test_acptr;
-        const uint32_t fields[] = {0x02baau, owned->test_stack_target, 0x23c21u};
+        const uint32_t fields[] = {0x2a74u,  0x2a74u, 0x02baau, owned->test_stack_target,
+                                   0x23c21u, 0x312bu, 0x312bu};
+        if (!owned->test_list)
+            offset += 10u;
         *value = (fields[offset / 5u] >> (4u * (offset % 5u))) & 15u;
         return 1;
     }
@@ -68,7 +73,8 @@ static int check_owned_tail(void *context, uint32_t first, uint32_t end)
     if (cache < 0)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
     /* A stack reference into the bank window may designate ERAM. */
-    int stack = hpclang_rpl_stack_reference_overlap(&stock, 0x40000u + first, 0x40000u + end);
+    int stack = hpclang_rpl_stack_reference_overlap(&stock, 0x40000u + first, 0x40000u + end,
+                                                    hpclang_rpl_reference_list_overlap);
     if (stack < 0)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
     if (overlap || cache || stack)
@@ -146,7 +152,7 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
     if (hpclang_stack_push_boolean(1))
         return 0x1e0u;
     if (hpclang_rpl_stack_object_address(&stock, 1, &level_one) ||
-        hpclang_rpl_stack_reference_overlap(&stock, level_one, level_one + 1u) != 1)
+        hpclang_rpl_stack_reference_overlap(&stock, level_one, level_one + 1u, NULL) != 1)
         goto done;
     if (!hpclang_rpl_stock_port1_mutation_io(&io, &limit))
         goto done;
@@ -201,6 +207,11 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
             /* Present the level-one object as an ACPTR without changing Stock RAM. */
             owned.test_acptr = level_one;
             result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
+            if (result != HPCLANG_RPL_MUTATION_BUSY ||
+                !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
+                goto done;
+            owned.test_list = 1;
+            result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
             owned.test_acptr = 0;
             if (result != HPCLANG_RPL_MUTATION_BUSY ||
                 !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
@@ -219,7 +230,7 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
         hpclang_rpl_port1_remove_backup(&io, limit, tail_name, 6, &guard))
         goto done;
     step = 7;
-    if (owned.calls != 7 || !chain_end(&reader, &end) || end != owned.first ||
+    if (owned.calls != 8 || !chain_end(&reader, &end) || end != owned.first ||
         !fingerprint(&reader, end, &hash) || hash != original_hash)
         goto done;
     /* Store the unregistered header-only library 123 ahead of a named backup. */

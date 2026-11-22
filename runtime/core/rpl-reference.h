@@ -178,6 +178,12 @@ int hpclang_rpl_reference_visit_nested(const struct hpclang_rpl_reader *reader,
                                        uint32_t capacity, uint32_t node_budget,
                                        hpclang_rpl_reference_visit_fn visit, void *context);
 
+/* Stack inspector for lists. Check native address fields in inline descendants.
+ * Non-list levels are handled by the caller. External targets are not traversed;
+ * unresolved opaque or indexed edges in a list reject the check. */
+int hpclang_rpl_reference_list_overlap(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                       uint32_t prologue, uint32_t first, uint32_t end);
+
 /* Observe each successful native nibble read during the same nested traversal,
  * including prologues, lengths and structural metadata. Repeated reads may
  * repeat observations; compact synthetic prologues are not native dependencies.

@@ -104,27 +104,27 @@ static void test_reference_overlap(void)
     put_word5(0x70000u, 0x78000u);
     put_word5(0x70005u, 0x41234u);
     put_word5(0x7000au, 0x41500u); /* marker, not a level */
-    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41234u, 0x41235u) == 1);
-    assert(!hpclang_rpl_stack_reference_overlap(&reader, 0x41000u, 0x41234u));
-    assert(!hpclang_rpl_stack_reference_overlap(&reader, 0x41235u, 0x41600u));
+    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41234u, 0x41235u, NULL) == 1);
+    assert(!hpclang_rpl_stack_reference_overlap(&reader, 0x41000u, 0x41234u, NULL));
+    assert(!hpclang_rpl_stack_reference_overlap(&reader, 0x41235u, 0x41600u, NULL));
     put_word5(0x78005u, 0x41111u);
     put_word5(0x7800au, 0x41122u);
-    assert(!hpclang_rpl_stack_reference_overlap(&reader, 0x41111u, 0x41123u));
+    assert(!hpclang_rpl_stack_reference_overlap(&reader, 0x41111u, 0x41123u, NULL));
     put_word5(0x78000u, 0x02baau);
-    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41111u, 0x41112u) == 1);
-    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41122u, 0x41123u) == 1);
-    assert(!hpclang_rpl_stack_reference_overlap(&reader, 0x41112u, 0x41122u));
+    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41111u, 0x41112u, NULL) == 1);
+    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41122u, 0x41123u, NULL) == 1);
+    assert(!hpclang_rpl_stack_reference_overlap(&reader, 0x41112u, 0x41122u, NULL));
     put_word5(0x70000u, IMAGE_NIBBLES - 5u);
     put_word5(IMAGE_NIBBLES - 5u, 0x02baau);
-    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41000u, 0x42000u) ==
+    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41000u, 0x42000u, NULL) ==
            HPCLANG_RPL_STACK_UNAVAILABLE);
     put_word5(0x70000u, 0x78000u);
     put_word5(0x78000u, 0);
     image[0x70005u] = 16;
-    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41000u, 0x42000u) ==
+    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41000u, 0x42000u, NULL) ==
            HPCLANG_RPL_STACK_MALFORMED);
     reset_stack(IMAGE_NIBBLES - 5, 2);
-    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41000u, 0x42000u) ==
+    assert(hpclang_rpl_stack_reference_overlap(&reader, 0x41000u, 0x42000u, NULL) ==
            HPCLANG_RPL_STACK_UNAVAILABLE);
 }
 

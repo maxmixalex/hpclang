@@ -30,11 +30,15 @@ extern "C"
      */
     int hpclang_rpl_stack_depth(const struct hpclang_rpl_reader *reader, uint32_t *depth);
 
+    typedef int (*hpclang_rpl_stack_inspect_fn)(const struct hpclang_rpl_reader *, uint32_t address,
+                                                uint32_t prologue, uint32_t first, uint32_t end);
+
     /* Return 1 if a stack slot or either field of its top-level ACPTR points into [first, end), 0
-     * if none do, or a negative stack result. Includes launcher-private levels, excludes the bottom
-     * marker. Nested objects are not traversed. */
+     * if none do, or a negative error. Includes launcher-private levels, excludes the bottom
+     * marker. An optional inspector checks the decoded object for additional references
+     * and returns 1 for overlap, zero to continue, or a negative error. */
     int hpclang_rpl_stack_reference_overlap(const struct hpclang_rpl_reader *reader, uint32_t first,
-                                            uint32_t end);
+                                            uint32_t end, hpclang_rpl_stack_inspect_fn inspect);
 
     /* Resolve a 1-based stack level to its Saturn object address. */
     int hpclang_rpl_stack_object_address(const struct hpclang_rpl_reader *reader, uint32_t level,
