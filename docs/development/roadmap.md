@@ -13,6 +13,17 @@ Both local Stock 2.15 runs executed from offset 8192 in Port 1, reopened the
 HOME note, exported the edit and recalled its Port 0 backup. After Stock
 purged the code, both returned the refusal result and preserved HOME and the
 remaining Port 1 bytes. Remote acceptance of this follow-up is pending.
+The HP49g+/HP50g user entry releases its KOS blocks before returning to RPN.
+On both local Stock 2.15 ROMs it saved and reopened `20`, preserving both
+user stack values across both launches. Its transfer is 22,275 bytes per
+model, excluding the separate Port 1 code backup. The installed SDK now builds
+all three transfer files for either model. Local independent builds matched
+at the tested Port 1 append offset of 9,044 nibbles (code starts at byte 8,192).
+Both default builds also regenerated a missing companion byte for byte. Both
+Stock 2.15 regressions passed with the installed transfer set, including
+save/reopen, low memory, export, Port 0 recall and refusal after code removal.
+The local SDK archive and six-model reproducibility suite passed. Remote
+acceptance of the SDK transfer set is pending.
 
 On the HP49g+ ROM dump, local Port 2 decoding and re-encoding matched all
 four library headers and objects. Appending a 28-byte fixture to a RAM copy

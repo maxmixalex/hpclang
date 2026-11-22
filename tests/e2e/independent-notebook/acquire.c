@@ -61,5 +61,13 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
     for (unsigned i = 0; i < count * 2; i++)
         record[4 + i] = out[8 + i];
     split(record, 0, map, frame, code);
+#ifdef NOTEBOOK_USER_RETURN
+    /* Return the first block last: it holds the allocation list in its alignment slack. */
+    record[0] = 0;
+    for (unsigned i = count; i; i--)
+        if (stock_call(101, record[4 + (i - 1) * 2], 0))
+            for (;;) {
+            }
+#endif
     control[1] = hpclang_irq_save_disable() | 0xc0;
 }
