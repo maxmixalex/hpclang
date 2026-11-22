@@ -7,8 +7,10 @@ import os
 from pathlib import Path
 import runpy
 import shutil
+import struct
 import subprocess
 import sys
+import tempfile
 from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
@@ -136,6 +138,56 @@ def build_runner(
             + word(0x312B)
         )
     )
+
+
+def editor_pool_usage(ram, image, code_offset):
+    """Account for each live launcher allocation once, including allocator overhead."""
+    base = 0x08000000
+    assert len(ram) == 0x80000
+
+    def word_at(offset):
+        return struct.unpack_from("<I", ram, offset)[0]
+
+    # The launcher places its lease record in the leading slack of its first block.
+    records = [
+        at
+        for at in range(16, 0x20000 - 168, 4)
+        if word_at(at) == 0x4B4C4541 and word_at(at + 16) == base + at
+    ]
+    assert len(records) == 1
+    record = records[0]
+    count, pages = struct.unpack_from("<II", ram, record + 4)
+    assert 1 <= count <= 12 and pages == 9
+    extents = []
+    frames = []
+    for i in range(count):
+        ptr, n = struct.unpack_from("<II", ram, record + 16 + 8 * i)
+        at = ptr - base
+        assert 16 <= at < 0x20000 and 1 <= n <= 8
+        size, flags = struct.unpack_from("<II", ram, at - 16)
+        assert flags & 0xF000 in (0x1000, 0x2000)
+        assert n * 4096 + 4095 <= size and at + size + 4 <= 0x20000
+        assert word_at(at + size) == size
+        extents.append((at - 16, at + size + 4))
+        first = (ptr + 4095) & ~4095
+        frames.extend(first + 4096 * j for j in range(n))
+    extents.sort()
+    assert all(prev[1] <= cur[0] for prev, cur in zip(extents, extents[1:]))
+    assert len(set(frames)) == len(frames) == pages
+    # The last frame holds both L2 tables. Code stays in its separate Port 1 record.
+    l2 = frames[-1] - base
+    assert [word_at(l2 + 4 * i) for i in range(8)] == [p | 0xFF2 for p in frames[:8]]
+    code = 0x20000 + code_offset
+    assert ram[code : code + len(image)] == image
+    code_pages = (len(image) + 4095) // 4096
+    for i in range(code_pages):
+        assert word_at(l2 + 4 * (256 + 32 + i)) == (base + code + i * 4096) | 0xAA2
+    return {
+        "kos_blocks": count,
+        "kos_resident_bytes": sum(end - start for start, end in extents),
+        "pool_frame_bytes": pages * 4096,
+        "port1_code_frame_bytes": code_pages * 4096,
+    }
 
 
 def check_phase(phase, editor_text, flash, original, font, expected_result):
@@ -287,24 +339,34 @@ def main():
     save_keys = "4300 tap two\n4900 tap zero\n5500 tap down\n6200 tap enter\n7600 capture saved\n"
     for name, previous, editor in (("user-save", "setup", ""), ("user-reopen", "user-save", "20")):
         installed = previous == "user-save"
-        transfer(
-            spec,
-            dest / name,
-            dest / previous / "state",
-            dest,
-            "NBUSER",
-            package_name="USER.HP",
-            installed=installed,
-            extra_files=[] if installed else [("COPY.HP", "CKCOPY")],
-            remote_commands=[
-                ("HOME " if installed else 'HOME CLEAR "first" "second" ') + "'NBUSER' RCL CKCOPY"
-            ],
-            actions="3500 capture editor\n"
-            + ("" if installed else save_keys)
-            + "8500 tap on\n15000 capture returned\n",
-            execution_ms=18000,
-        )
+        with tempfile.TemporaryDirectory(dir=dest) as tmp:
+            transfer(
+                spec,
+                dest / name,
+                dest / previous / "state",
+                dest,
+                "NBUSER",
+                package_name="USER.HP",
+                installed=installed,
+                extra_files=[] if installed else [("COPY.HP", "CKCOPY")],
+                remote_commands=[
+                    ("HOME " if installed else 'HOME CLEAR "first" "second" ')
+                    + "'NBUSER' RCL CKCOPY"
+                ],
+                actions="3500 capture editor\n"
+                + ("" if installed else save_keys)
+                + "8500 tap on\n15000 capture returned\n",
+                execution_ms=18000,
+                resource_prefix=Path(tmp) / "mem",
+            )
+            usage = {
+                phase: editor_pool_usage(
+                    (Path(tmp) / f"mem-{phase}.sram").read_bytes(), image, page
+                )
+                for phase in (("editor",) if installed else ("editor", "saved"))
+            }
         hashes[name] = {
+            "memory": usage,
             "user_stack_top_first": ["second", "first"],
             "settled_sha256": check_phase(
                 dest / name, editor, flash, staged[0x20000:0x40000], font, None

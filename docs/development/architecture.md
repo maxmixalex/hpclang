@@ -362,6 +362,16 @@ writable extent matched the boot descriptor; the heap figures use the ELF
 symbols `heap_next` and `__bss_end`. Peak resident RAM across Stock and the
 launcher remains open.
 
+On HP49g+ and HP50g, the independent Notebook editor held two live KOS
+allocations totaling 45,096 bytes on entry, after Save and on reopening the note. The eight writable
+pages and one page-table frame occupied 36,864 bytes within those blocks.
+Alignment slack and allocator metadata accounted for the other 8,232 bytes.
+The editor mapped another 81,920 bytes of code directly from its Port 1
+record. The verifier checked each block extent and both sets of page
+descriptors against SRAM. These checkpoints cover the launcher pool and
+mapped code; lifecycle peak accounting also needs the remaining Stock and
+launcher storage.
+
 **SDK default after the six-model startup comparison (2026-11-23).**
 Keep the existing production launchers as the SDK defaults. Independent entry
 showed the Notebook editor earlier on five models in the measured pairs.

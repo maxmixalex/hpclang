@@ -37,7 +37,12 @@ A separate `USER.HP` program runs the editor and releases its KOS blocks
 in the same native invocation. Its two launches start from an independent
 copy of the installation snapshot. The first saves `20`, the second reopens
 it, and both check that the original two RPN strings are still the only
-values on the stack, in the original order. The diagnostic `RUN.HP` program
+values on the stack, in the original order. At editor entry, after Save and on
+reopen, the host reads the live KOS block headers and trailers, checks that the
+blocks are disjoint and verifies the writable and code page mappings. The
+report records the total allocator footprint, its aligned page pool and the
+separate Port 1 code pages. The temporary SRAM captures are discarded.
+The diagnostic `RUN.HP` program
 keeps its separate cleanup phase to exercise moving GC between native calls.
 A second launch asks KOS for 35 aligned pages. On partial allocation the
 loader releases every acquired block before installing any mappings. The test
