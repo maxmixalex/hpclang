@@ -11,12 +11,15 @@ Accepted main is `b0949411` after [#63](https://github.com/maxmixalex/hpclang/pu
   symbolic objects, units and matrices. [#75](https://github.com/maxmixalex/hpclang/pull/75) adds
   arrays, directories and backups. Both passed local host, sanitizer and Stock regressions and await CI.
   [#66](https://github.com/maxmixalex/hpclang/pull/66) plans append space across six Port 2 banks and
-  separates the sector journal from the reclaimed sector. Interrupted erase, restart and reuse passed
-  locally. CI submitted.
+  keeps the sector journal outside the target bank. Its candidate merge tree (`9e38e93b`) passed 180
+  host tests locally, including interrupted erase, restart and reuse. Flash record, replay and create
+  also passed with ASan/UBSan. Remote CI is pending.
 - **M8.6 applications and release.** [#62](https://github.com/maxmixalex/hpclang/pull/62) reduced the
   HP48gII Port 0 transfer to 122,333 bytes. [#67](https://github.com/maxmixalex/hpclang/pull/67) made
   the SDK archives reproducible across Windows and Linux.
-  [#64](https://github.com/maxmixalex/hpclang/pull/64) compares all six launchers.
+  [#64](https://github.com/maxmixalex/hpclang/pull/64) compares all six launchers. Its candidate merge tree
+  (`820adfcc`) passed 180 host tests and reproduced 613 installed-SDK release outputs locally. All six
+  Notebook builds and both HP49g+/HP50g Port 1 installation offsets passed. Runtime CI is pending.
   [#68](https://github.com/maxmixalex/hpclang/pull/68) corrects live heap measurement.
   [#69](https://github.com/maxmixalex/hpclang/pull/69) reduces the HP49g+/HP50g Notebook KOS peak to
   40,980 bytes. [#72](https://github.com/maxmixalex/hpclang/pull/72) exercises moving Stock GC after
@@ -24,10 +27,9 @@ Accepted main is `b0949411` after [#63](https://github.com/maxmixalex/hpclang/pu
   Aplet residency and documents the seven independent packages.
   [#74](https://github.com/maxmixalex/hpclang/pull/74) measures remaining Stock workspace while editing.
   These launch and measurement branches passed their focused local checks and await remote acceptance.
-  [The bitmap
-  change](https://github.com/maxmixalex/hpclang/commit/3f361aa4e2ac6a50ba28aaaa79b6df9915169f83) reduces
-  the independent HP39/40 Notebook bitmap by 4 KiB. Save, Reset and copy/reopen passed locally on all
-  three Stock ROMs, including a 191-byte copy on HP40gs. CI submitted.
+  [#76](https://github.com/maxmixalex/hpclang/pull/76) reduces the independent HP39/40 Notebook bitmap by 4 KiB.
+  All three ROMs passed initial, Reset and copy Save/reopen locally. The HP40gs CI runner also fills
+  a 191-byte copy and checks both the reopened text and the original. Local pass; remote CI submitted.
   [Launcher measurements](architecture.md#notebook-first-install-transfer-size) · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
 - **M8.1–M8.5** are accepted. Their regression requirements remain in the stage table below.
 
