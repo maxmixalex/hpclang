@@ -142,8 +142,15 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
         const struct hpclang_rpl_reader input = {read_packed, &source};
         struct hpclang_rpl_port_cursor cursor = {.end = span};
         if (hpclang_rpl_port_next(&input, &cursor, &replacement) != 1 ||
-            replacement.prologue != 0x02b62u || replacement.span != span)
+            replacement.prologue != (library_id ? 0x02b40u : 0x02b62u) || replacement.span != span)
             return HPCLANG_RPL_MUTATION_MALFORMED;
+        if (library_id) {
+            if (replacement.library_number != *library_id)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            int movable = port1_library_header_only(&input, &replacement);
+            if (movable != 1)
+                return movable ? movable : HPCLANG_RPL_MUTATION_UNSUPPORTED;
+        }
         name = replacement.name;
         name_length = replacement.name_length;
     }
@@ -226,6 +233,15 @@ int hpclang_rpl_port1_remove_backup(const struct hpclang_rpl_mutation_io *io, ui
                                     const struct hpclang_rpl_port1_guard *guard)
 {
     return port1_edit(io, limit, name, name_length, NULL, NULL, 0, guard);
+}
+
+int hpclang_rpl_port1_replace_library(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
+                                      uint32_t number, const uint8_t *packed, uint32_t span,
+                                      const struct hpclang_rpl_port1_guard *guard)
+{
+    if (!packed || number > 0xfffu)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    return port1_edit(io, limit, NULL, 0, &number, packed, span, guard);
 }
 
 int hpclang_rpl_port1_remove_library(const struct hpclang_rpl_mutation_io *io, uint32_t limit,

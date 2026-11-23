@@ -2416,8 +2416,58 @@ static void mapped_graph_traversal(void)
     assert(visited == 99);
 }
 
+static void test_list_overlap(void)
+{
+    struct image image = {.size = 35, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    const uint32_t words[] = {0x2a74, 0x2a74, 0x2baa, 0x41008, 0x41018, 0x312b, 0x312b};
+    for (unsigned i = 0; i < sizeof words / sizeof words[0]; ++i)
+        put(&image, i * 5, words[i], 5);
+    assert(hpclang_rpl_reference_composite_overlap(&reader, 0, words[0], 0x41008, 0x41009) == 1);
+    assert(hpclang_rpl_reference_composite_overlap(&reader, 0, words[0], 0x41018, 0x41019) == 1);
+    assert(!hpclang_rpl_reference_composite_overlap(&reader, 0, words[0], 0x41009, 0x41018));
+    image.fail = 21;
+    assert(hpclang_rpl_reference_composite_overlap(&reader, 0, words[0], 0x41008, 0x41019) < 0);
+    image.fail = UINT32_MAX;
+    put(&image, 10, 0x2911, 5);
+    put(&image, 20, 0x312b, 5);
+    assert(!hpclang_rpl_reference_composite_overlap(&reader, 0, words[0], 0x41008, 0x41009));
+    /* A ROM command index needs a separate resolver. */
+    put(&image, 10, 0x2e92, 5);
+    put(&image, 15, 1, 3);
+    put(&image, 18, 2, 3);
+    put(&image, 21, 0x312b, 5);
+    put(&image, 26, 0x312b, 5);
+    assert(hpclang_rpl_reference_composite_overlap(&reader, 0, words[0], 0x41008, 0x41009) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+}
+
+static void test_tagged_overlap(void)
+{
+    struct image image = {.size = 34, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    /* X: { ACPTR } */
+    put(&image, 0, 0x2afc, 5);
+    put(&image, 5, 1, 2);
+    put(&image, 7, 'X', 2);
+    const uint32_t fields[] = {0x2a74, 0x2baa, 0x41008, 0x41018, 0x312b};
+    for (unsigned i = 0; i < sizeof fields / sizeof fields[0]; ++i)
+        put(&image, 9 + 5 * i, fields[i], 5);
+    assert(hpclang_rpl_reference_composite_overlap(&reader, 0, 0x2afc, 0x41008, 0x41009) == 1);
+    assert(hpclang_rpl_reference_composite_overlap(&reader, 0, 0x2afc, 0x41018, 0x41019) == 1);
+    assert(!hpclang_rpl_reference_composite_overlap(&reader, 0, 0x2afc, 0x41009, 0x41018));
+    /* A tagged integer with the same bits holds no address. */
+    put(&image, 9, 0x2911, 5);
+    put(&image, 14, 0x41008, 5);
+    assert(!hpclang_rpl_reference_composite_overlap(&reader, 0, 0x2afc, 0x41008, 0x41009));
+    put(&image, 5, 255, 2);
+    assert(hpclang_rpl_reference_composite_overlap(&reader, 0, 0x2afc, 0x41008, 0x41009) < 0);
+}
+
 int main(void)
 {
+    test_list_overlap();
+    test_tagged_overlap();
     test_execution_plans();
     mapped_graph_traversal();
     flashptr_guard_composition(0);
