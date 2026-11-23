@@ -186,6 +186,9 @@ jobs:
             build/independent-hp39-run/copy/*.json
             build/independent-hp39-run/copy/screen-*.pgm
             build/independent-hp39-run/copy/emulator.log
+            build/independent-hp39-run/full-copy/*.json
+            build/independent-hp39-run/full-copy/screen-*.pgm
+            build/independent-hp39-run/full-copy/emulator.log
 
   independent-hp48-entry:
     name: HP48gII independent Stock entry and return

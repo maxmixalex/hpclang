@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -55,10 +56,10 @@ def run_stock(dist, state, out, boot, env, timeout, samples):
         raise ValueError("Stock Save sequence did not finish")
 
 
-def verify_save(data, state, out, samples, after_reset=False, original_note=None):
+def verify_save(data, state, out, samples, after_reset=False, original_note=None, extra_text=""):
     saved = "20" if after_reset else "Seed4220"
     if original_note is not None:
-        saved = original_note + "20"
+        saved = original_note + "20" + extra_text
     report = subprocess.check_output(
         [
             sys.executable,
@@ -105,13 +106,20 @@ def verify_save(data, state, out, samples, after_reset=False, original_note=None
     (out / "verified.json").write_text(json.dumps(verified, indent=2) + "\n")
 
 
-def replay_save(dist, state, out, env, samples, sequence):
+def replay_save(dist, state, out, env, samples, sequence, extra_text=""):
     out.mkdir()
     suffix = E2E / "sequences/hp39-independent-notebook-save.seq"
+    delay = 0
     for line in suffix.read_text().splitlines():
         if line and not line.startswith("#"):
             when, action = line.split(maxsplit=1)
-            sequence.append(f"{8000 + int(when)} {action}")
+            at = 8000 + int(when)
+            sequence.append(f"{at + delay} {action}")
+            if action == "tap zero":
+                for digit in extra_text:
+                    delay += 300
+                    key = {"2": "two", "0": "zero"}[digit]
+                    sequence.append(f"{at + delay} tap {key}")
     seq = out / "sequence.seq"
     seq.write_text("\n".join(sequence) + "\n")
     env.update(
@@ -119,7 +127,7 @@ def replay_save(dist, state, out, env, samples, sequence):
         HPCLANG_STOCK_PREFIX=str(out / "screen"),
         HPCLANG_STOCK_JSON=str(out / "result.json"),
     )
-    run_stock(dist, state, out, [], env, 120, samples)
+    run_stock(dist, state, out, [], env, 120 + (delay + 999) // 1000, samples)
 
 
 def main(samples):
@@ -239,10 +247,20 @@ def main(samples):
     replay_save(dist, state, reset, env, samples, ["1000 tap f2", "3000 tap f6", "7000 tap aplet"])
     verify_save(data, state, reset, samples, after_reset=True)
     if args.edit_copy:
+        create_copy = ["1000 tap f1", "3500 tap two", "4500 tap enter"]
+        if args.model == "hp40gs":
+            # Both copies start from the same settled reset original.
+            long_state = samples / "full-copy-state"
+            shutil.copytree(state, long_state)
+            full_copy = out / "full-copy"
+            extra_text = "02" * 93 + "0"  # 187 more digits after "2020".
+            replay_save(dist, long_state, full_copy, env, samples, create_copy.copy(), extra_text)
+            verify_save(
+                data, long_state, full_copy, samples, original_note="20", extra_text=extra_text
+            )
+            print("hp40gs: full 191-byte copy reopened and the original retained 20")
         copy = out / "copy"
-        replay_save(
-            dist, state, copy, env, samples, ["1000 tap f1", "3500 tap two", "4500 tap enter"]
-        )
+        replay_save(dist, state, copy, env, samples, create_copy)
         verify_save(data, state, copy, samples, original_note="20")
         print(f"{args.model}: copy 2 reopened 2020 and the original retained 20")
     print(f"{args.model}: saved and reopened Seed4220, reset the Aplet, then saved and reopened 20")
