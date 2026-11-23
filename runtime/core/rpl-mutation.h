@@ -101,6 +101,12 @@ extern "C"
         HPCLANG_RPL_ROOT_LIBRARY_SWITCH
     };
 
+    /* Return BUSY for a direct root in the half-open Saturn address range.
+     * Complete the scan so malformed or unreadable later roots still fail.
+     * Banked payloads and references inside objects need separate checks. */
+    int hpclang_rpl_mutation_check_root_range(const struct hpclang_rpl_mutation_io *io,
+                                              uint32_t start, uint32_t end);
+
     /* The same cells as visit_roots, with their source preserved. Source is
      * provenance, not a type assertion: system/support tables may mix metadata
      * and references, native roots may include saved execution positions, and

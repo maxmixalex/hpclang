@@ -1120,8 +1120,15 @@ bank window blocks the edit. This includes launcher-private levels. In the
 Stock fixture, the test pushes a Boolean, then substitutes a Port 1 pointer
 for that slot in the guard's reader only. The replacement must return busy
 and preserve the record bytes. Restoring the reader allows the ordinary
-replacement, growth, contraction and deletion cases to run. Indirect object
-references and suspended execution still require separate handling.
+replacement, growth, contraction and deletion cases to run. The fixture also
+checks the full set of direct roots configured by the Stock mutation backend
+against the affected bank-window interval, using the same scanner as the
+main-RAM removal checks. An RPL return cursor inside the interval blocks an
+edit even when it points past the object header. Host tests check that the
+exclusive upper endpoint is outside the interval and that a malformed later
+catalog still reports an error after a cursor match. Both Stock 2.15 ROMs
+passed the ordinary edits and both relaunches locally. Indirect object
+references and execution state outside the configured roots remain open.
 
 Execution has a separate gate. Before relocation, invoking the attached
 library's `PrRUN` launched an SDK program that created the HOME string

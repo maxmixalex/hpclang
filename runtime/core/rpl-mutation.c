@@ -1241,9 +1241,11 @@ static int object_reference_state_with_boundary(const struct hpclang_rpl_mutatio
     return result == HPCLANG_RPL_MUTATION_OK && busy ? HPCLANG_RPL_MUTATION_BUSY : result;
 }
 
-static int object_reference_state(const struct hpclang_rpl_mutation_io *io, uint32_t start,
-                                  uint32_t end)
+int hpclang_rpl_mutation_check_root_range(const struct hpclang_rpl_mutation_io *io, uint32_t start,
+                                          uint32_t end)
 {
+    if (!io_ready(io))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
     return object_reference_state_with_boundary(io, start, end, 0);
 }
 
@@ -2208,7 +2210,7 @@ int hpclang_rpl_mutation_store_replace(const struct hpclang_rpl_mutation_io *io,
     if (!checked_add(entry.object_address, span, &old_end))
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
-    int reference_state = object_reference_state(io, entry.object_address, old_end);
+    int reference_state = hpclang_rpl_mutation_check_root_range(io, entry.object_address, old_end);
     if (reference_state != HPCLANG_RPL_MUTATION_OK && reference_state != HPCLANG_RPL_MUTATION_BUSY)
         return reference_state;
 
@@ -2318,11 +2320,12 @@ static int store_remove(const struct hpclang_rpl_mutation_io *io, uint32_t direc
      * any Stock pointer into them. References to the object itself are
      * preserved through TEMPOB exactly like destructive replacement.
      */
-    result = object_reference_state(io, link, entry.object_address);
+    result = hpclang_rpl_mutation_check_root_range(io, link, entry.object_address);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    int reference_state = object_reference_state(io, entry.object_address, object_end);
+    int reference_state =
+        hpclang_rpl_mutation_check_root_range(io, entry.object_address, object_end);
     if (reference_state != HPCLANG_RPL_MUTATION_OK && reference_state != HPCLANG_RPL_MUTATION_BUSY)
         return reference_state;
 
