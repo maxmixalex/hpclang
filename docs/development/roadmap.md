@@ -1,29 +1,23 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-29. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+Current checkpoint: 2026-11-28. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `1405c01d` after the [roadmap checkpoint #83](https://github.com/maxmixalex/hpclang/pull/83).
+Accepted main is `8f225f5b` after [#78](https://github.com/maxmixalex/hpclang/pull/78).
 
 - **M8.0 native ports.** Main includes Port 2 cross-bank append planning and sector journal staging
   ([#66](https://github.com/maxmixalex/hpclang/pull/66)), and Port 1 reference checks
   ([#70](https://github.com/maxmixalex/hpclang/pull/70), [#75](https://github.com/maxmixalex/hpclang/pull/75)).
   Guarded internal library removal and replacement are in CI ([#79](https://github.com/maxmixalex/hpclang/pull/79),
-  [#81](https://github.com/maxmixalex/hpclang/pull/81)). All five workflows passed for #79 at
-  `0b7918f9`. The reconciled commit `f69e1e25` passed all 180 host tests and strict docs locally
-  and was submitted for CI. #81 now includes the reconciled #79 base; remote acceptance is pending.
-  The local merge candidate on `1405c01d` passed 180 host tests and three Stock launches on each of
-  HP49g+ and HP50g. Its payload and both launchers matched the #81 CI artifacts byte for byte.
-  [#84](https://github.com/maxmixalex/hpclang/pull/84) plans a deleted-suffix sector using the installed journal binding.
-  [#86](https://github.com/maxmixalex/hpclang/pull/86) replayed that journal with an offline ARMED record
-  on both original ROMs. Each freed 40 bytes and matched the full 2 MiB Flash image. The host NOR test
-  reused that address for a new backup. Local replay passed and CI was submitted. Public library management, execution
+  [#81](https://github.com/maxmixalex/hpclang/pull/81)). Both passed remote Quality after the edit validation fix.
+  Local checks cover 180 host tests and HP49g+/HP50g original-ROM edits. [#84](https://github.com/maxmixalex/hpclang/pull/84)
+  plans a deleted-suffix sector at the installed recovery library's bound journal slot. Both original-ROM
+  models verified the complete 4 KiB image and unchanged Flash. On simulated NOR, the installed transaction
+  reclaimed the suffix and a new backup occupied the same address. Full-image comparison passed.
+  CI is pending. Public library management, execution
   roots, Port 2 recovery installation, authority, automatic startup and reclamation remain open.
-- **M8.1 through M8.5** remain accepted. Local integration `a3a5f0e7` passed all 180 host tests,
-  reproduced 613 SDK outputs and built Notebook for six models. The six-model original-ROM
-  regressions previously passed at `5d0b90b6`.
-- **M8.6 applications and release.** Notebook now checks same-name Port 0 and Port 2 backups
-  with distinct text across three Stock launches on HP49g+ and HP50g. HP48gII retains the Port 0 gate.
-  The HP39/40 editor frees 4 KiB
+- **M8.1 through M8.5** remain accepted. The local integration at `5d0b90b6` passed all 180 host tests,
+  six original-ROM Notebook regressions and the relocated SDK checks.
+- **M8.6 applications and release.** The HP39/40 editor frees 4 KiB
   ([#76](https://github.com/maxmixalex/hpclang/pull/76)). On HP48gII, reopening the editor with the
   caller stack preserved left 92,753 bytes of Stock workspace from HOME and 90,682 bytes from Port 0.
   Both pull requests passed all five workflows. HP49g+/HP50g measured 40,980 bytes of peak KOS memory
@@ -34,10 +28,8 @@ Accepted main is `1405c01d` after the [roadmap checkpoint #83](https://github.co
   receiver's 15-second retry interval. The sender now caps backoff at 8 seconds. The delayed-ACK
   regression and local HP39gs object test passed with the original CI artifacts.
   [#82](https://github.com/maxmixalex/hpclang/pull/82) connects all six Notebook CI runs to one verified SDK ZIP.
-  At `6e499793` the producer, Quality and Documentation passed. The downloaded SDK ZIP verified
-  all 4,134 manifest entries and built six model-specific Notebook launchers locally. All three HP39/40
-  payloads, Aplet bundles and entry probes matched the remote ROM-job inputs byte for byte.
-  Earlier local save/reopen checks passed on all six original ROMs. Remote ROM jobs are pending. Resuming a running editor across GC and
+  Its candidate on main `8f225f5b` reproduced 613 outputs and passed local Notebook save/reopen on
+  all six original-ROM models. CI is pending. Resuming a running editor across GC and
   [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
 
 ## Scope and retained requirements
