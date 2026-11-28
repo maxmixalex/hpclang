@@ -516,18 +516,24 @@ def main():
     # Branch from the saved-note state so the existing reload and Port 0 checks
     # retain their own installation and source chain.
     after_gc = dest / "entry-after-gc"
-    transfer(
-        spec,
-        after_gc,
-        dest / "save/state",
-        dest,
-        "NBAFT",
-        package_name="AFTERGC.HP",
-        remote_commands=["HOME 'NBAFT' RCL CKCOPY"],
-        actions="3500 capture editor\n8500 tap on\n15000 capture returned\n",
-        execution_ms=18000,
-    )
+    with tempfile.TemporaryDirectory(dir=dest) as tmp:
+        transfer(
+            spec,
+            after_gc,
+            dest / "save/state",
+            dest,
+            "NBAFT",
+            package_name="AFTERGC.HP",
+            remote_commands=["HOME 'NBAFT' RCL CKCOPY"],
+            actions="3500 capture editor\n8500 tap on\n15000 capture returned\n",
+            execution_ms=18000,
+            resource_prefix=Path(tmp) / "mem",
+        )
+        ram = (Path(tmp) / "mem-editor.sram").read_bytes()
+        _, read = entry_verifier["mapping"](ram, flash, args.model)
+        moved = entry_verifier["moving_gc_result"](read, read(0x806F8) + 5)
     hashes["entry-after-gc"] = {
+        "moved_before_editor": moved,
         "editor": "20",
         "settled_sha256": check_phase(
             after_gc, "20", flash, staged[0x20000:0x40000], font, NORMAL_RESULT
