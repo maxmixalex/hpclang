@@ -3423,6 +3423,50 @@ static void test_port0_registration_commit(void)
     free(before);
 }
 
+static int read_registration_eram(void *context, uint32_t address, uint8_t *value)
+{
+    if (address >= 48u)
+        return 0;
+    *value = ((const uint8_t *)context)[address];
+    return 1;
+}
+
+static void test_port1_registration_commit(void)
+{
+    const char library[] = "04b2062000108510b7000000000000000000000d5c2";
+    struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+    put_word(0x80716, 5, 0x93000);
+    uint8_t bank[48] = {0};
+    const struct hpclang_rpl_reader eram = {read_registration_eram, bank};
+    for (unsigned i = 0; i < sizeof library - 1; ++i)
+        bank[i] = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+    const struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+    struct hpclang_rpl_library_registration plan;
+    assert(hpclang_rpl_library_registration_plan(&eram, 0, 48, &reader, io.library_table,
+                                                 0x100000 - io.library_table, 123, &plan) == 1);
+    uint8_t source[48];
+    memcpy(source, bank, sizeof source);
+    assert(hpclang_rpl_port1_register_library_repaired(&io, &eram, 48, 0, 123, &plan, NULL) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    assert(hpclang_rpl_port1_register_library_repaired(&io, &eram, 47, 0x23c21, 123, &plan, NULL) !=
+           HPCLANG_RPL_MUTATION_OK);
+    ++plan.header;
+    assert(hpclang_rpl_port1_register_library_repaired(&io, &eram, 48, 0x23c21, 123, &plan, NULL) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    --plan.header;
+    assert(!writes);
+    assert(!hpclang_rpl_port1_register_library_repaired(&io, &eram, 48, 0x23c21, 123, &plan, NULL));
+    struct hpclang_rpl_library_binding binding;
+    assert(hpclang_rpl_library_lookup(&reader, io.library_table, 0x100000 - io.library_table, 123,
+                                      &binding) == 1);
+    assert(binding.address == 0x40010u && binding.bank_switch == 0x23c21 && !binding.flags);
+    assert(!memcmp(source, bank, sizeof source));
+    unsigned published = writes;
+    assert(hpclang_rpl_port1_register_library_repaired(&io, &eram, 48, 0x23c21, 123, &plan, NULL) ==
+           HPCLANG_RPL_MUTATION_EXISTS);
+    assert(writes == published);
+}
+
 static void test_catalog_alias_repairs(void)
 {
     uint8_t *before = malloc(sizeof memory);
@@ -4733,6 +4777,7 @@ int main(void)
     test_catalog_observed_guards();
     test_catalog_alias_repairs();
     test_port0_registration_commit();
+    test_port1_registration_commit();
     test_catalog_insert_commit();
     test_catalog_remove_commit();
     test_catalog_attached_rejection();

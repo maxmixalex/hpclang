@@ -529,10 +529,11 @@ int hpclang_rpl_catalog_insert_repaired(const struct hpclang_rpl_mutation_io *io
     return HPCLANG_RPL_MUTATION_OK;
 }
 
-int hpclang_rpl_port0_register_library_repaired(
-    const struct hpclang_rpl_mutation_io *io, uint32_t number,
-    const struct hpclang_rpl_library_registration *expected,
-    const struct hpclang_rpl_catalog_repairs *repairs)
+static int register_ram_library(const struct hpclang_rpl_mutation_io *io,
+                                const struct hpclang_rpl_reader *eram, uint32_t eram_limit,
+                                uint32_t eram_switch, uint32_t number,
+                                const struct hpclang_rpl_library_registration *expected,
+                                const struct hpclang_rpl_catalog_repairs *repairs)
 {
     if (!io || !io->read_nibble || !io->write_nibble || !expected)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -555,9 +556,9 @@ int hpclang_rpl_port0_register_library_repaired(
         return HPCLANG_RPL_MUTATION_MALFORMED;
     const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
     struct hpclang_rpl_library_registration plan;
-    int result =
-        hpclang_rpl_library_registration_plan(&reader, port, 0x100000u, &reader, io->library_table,
-                                              0x100000u - io->library_table, number, &plan);
+    int result = hpclang_rpl_library_registration_plan(
+        eram ? eram : &reader, eram ? 0u : port, eram ? eram_limit : 0x100000u, &reader,
+        io->library_table, 0x100000u - io->library_table, number, &plan);
     if (result != 1)
         return result == 0   ? HPCLANG_RPL_MUTATION_NOT_FOUND
                : result == 2 ? HPCLANG_RPL_MUTATION_EXISTS
@@ -571,10 +572,31 @@ int hpclang_rpl_port0_register_library_repaired(
         plan.insertion.end != expected->insertion.end ||
         plan.insertion.count != expected->insertion.count)
         return HPCLANG_RPL_MUTATION_MALFORMED;
-    /* Port 0 records stay put while the lower catalog/TEMP arena grows. The
-     * binding is derived from the validated source, never a caller address. */
-    const struct hpclang_rpl_library_binding binding = {plan.header, 0, 0};
+    /* Catalog growth moves neither Port 0 above the arena nor the ERAM bank. */
+    const struct hpclang_rpl_library_binding binding = {plan.header + (eram ? 0x40000u : 0u),
+                                                        eram_switch, 0};
     return hpclang_rpl_catalog_insert_repaired(io, number, &binding, &plan.insertion, repairs);
+}
+
+int hpclang_rpl_port0_register_library_repaired(
+    const struct hpclang_rpl_mutation_io *io, uint32_t number,
+    const struct hpclang_rpl_library_registration *expected,
+    const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    return register_ram_library(io, NULL, 0, 0, number, expected, repairs);
+}
+
+int hpclang_rpl_port1_register_library_repaired(
+    const struct hpclang_rpl_mutation_io *io, const struct hpclang_rpl_reader *eram,
+    uint32_t eram_limit, uint32_t eram_switch, uint32_t number,
+    const struct hpclang_rpl_library_registration *expected,
+    const struct hpclang_rpl_catalog_repairs *repairs)
+{
+    if (!eram || !eram->read_nibble)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (!eram_limit || eram_limit > 0x40000u || !eram_switch || eram_switch > 0xfffffu)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    return register_ram_library(io, eram, eram_limit, eram_switch, number, expected, repairs);
 }
 
 struct port0_commit_observer
