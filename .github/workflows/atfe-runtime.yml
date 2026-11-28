@@ -180,6 +180,7 @@ jobs:
             build/independent-hp39-run/screen-*.pgm
             build/independent-hp39-run/emulator.log
             build/independent-hp39-run/gate.log
+            build/independent-hp39-run/server.log
             build/independent-hp39-run/reset/*.json
             build/independent-hp39-run/reset/screen-*.pgm
             build/independent-hp39-run/reset/emulator.log

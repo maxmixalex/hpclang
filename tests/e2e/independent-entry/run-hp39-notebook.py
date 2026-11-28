@@ -224,13 +224,14 @@ def main(samples):
             "USB serial pair",
         )
         log = out / "kermit.log"
-        stack.enter_context(
+        server = stack.enter_context(
             process(
                 ["bash", ROOT / "tools/run-hp39-kermit-server.sh", out / "host", bundle, log],
                 env,
                 out / "server.log",
             )
         )
+        wait_for(log.is_file, [pair, server], timeout, "Kermit server startup (see server.log)")
         fetch = stack.enter_context(
             process(
                 [*gate, "wait", log, out / "gate", "--last-file", "HPCRESET.000"],
