@@ -124,6 +124,15 @@ with two full-size Aplets resident. The independent editor now requests a
 pages. The native bootstrap uses a separate 1 KiB stack. The Aplet keeps
 256 bytes of padding for the saved note string and its signature.
 
+After returning to Stock, the verifier matched both named Aplet entries in SRAM,
+including the stored names and directory bodies. With `20` in the original and
+`2020` in copy `2`, the two entries occupied 112,651 bytes on HP39g+, 112,619
+on HP39gs and 112,635 on HP40gs. During native execution, the bitmap's recorded
+prologue and length gave 86,026 bytes including its header. Its 20 aligned frames
+accounted for 81,920 bytes within that object on each model. The directory
+measurements describe saved storage after exit. The bitmap measurement describes
+the workspace acquired during the editor run.
+
 On each original ROM, Stock copied the reset-and-edited Notebook into a
 second Aplet named `2`. The original retained `20` while the copy saved and
 reopened `2020`. Both named directories, the editor display, ARM return,

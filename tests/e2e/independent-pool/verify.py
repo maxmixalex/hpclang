@@ -100,6 +100,8 @@ def check_bitmap_workspace(words, ram, rows=896):
     require(0x80000 <= lower <= upper < 0x100000, "invalid saved Stock stack bounds")
     return {
         "bitmap_nibble_address": obj,
+        "bitmap_object_nibbles": 5 + span,
+        "aligned_frame_bytes": len(pages) * 4096,
         "pages": pages,
         "stock_stack_gap_bytes": (upper - lower) // 2,
     }
