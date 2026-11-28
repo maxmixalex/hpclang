@@ -1,33 +1,43 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-28. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+Current checkpoint: 2026-11-29. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `3ca51e7c` after [#73](https://github.com/maxmixalex/hpclang/pull/73).
+Accepted main is `1405c01d` after the [roadmap checkpoint #83](https://github.com/maxmixalex/hpclang/pull/83).
 
-- **M8.0 native ports.** [#66](https://github.com/maxmixalex/hpclang/pull/66) is on main. Port 2 now plans
-  append space across six banks and stages a sector journal outside the target bank. Local tests cover
-  interrupted erase, restart and reuse. [#70](https://github.com/maxmixalex/hpclang/pull/70) and
-  [#75](https://github.com/maxmixalex/hpclang/pull/75) are on main. Port 1 now checks references in programs,
-  symbolic objects, units, matrices, arrays, directories and backups before internal library replacement.
-  The Port 1 removal branch passed 180 host tests and HP49g+/HP50g Stock tests locally. Under exclusive
-  ownership it can remove a final library with a body after checking references to the entire record.
-  Remaining gates include public library management, other execution roots, and Port 2 recovery installation,
-  authority, startup and reclamation.
-- **M8.6 applications and release.** [#64](https://github.com/maxmixalex/hpclang/pull/64),
-  [#69](https://github.com/maxmixalex/hpclang/pull/69), [#71](https://github.com/maxmixalex/hpclang/pull/71),
-  [#72](https://github.com/maxmixalex/hpclang/pull/72) and
-  [#74](https://github.com/maxmixalex/hpclang/pull/74) are on main. Startup was compared across six models.
-  The HP49g+/HP50g Notebook used 40,980 bytes of KOS memory at peak and passed moving GC after editor exit.
-  [#68](https://github.com/maxmixalex/hpclang/pull/68) closed after reconciliation produced the identical main
-  tree. HP39/40 Stock workspace measurements are on main. [#76](https://github.com/maxmixalex/hpclang/pull/76)
-  frees 4 KiB in the editor and passed ten local Save/reopen cases. On its refreshed head (`17a23088`), the HP39g+ window dialogs and HP49g+ Port 2
-  retirement suites both passed locally. Full remote CI is pending.
-  The HP39 Stock harness now reports the transfer watchdog's failure reason in the job log. HP48gII HOME and Port 0 workspace measurements passed locally across first launch and reopen in both
-  diagnostic and caller-stack-preserving modes. With the caller stack preserved, the reopened editors left
-  92,753 and 90,682 whole bytes respectively. Active-execution GC and final release acceptance remain open.
-  [Launcher measurements](architecture.md#notebook-first-install-transfer-size) · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
-- **M8.1–M8.5** are accepted. The combined M8.0/M8.6 tree (`ac646bbf`) passed all 180 host tests locally.
-  Its relocated SDK reproduced 613 release outputs and all six model-specific Notebook builds.
+- **M8.0 native ports.** Main includes Port 2 cross-bank append planning and sector journal staging
+  ([#66](https://github.com/maxmixalex/hpclang/pull/66)), and Port 1 reference checks
+  ([#70](https://github.com/maxmixalex/hpclang/pull/70), [#75](https://github.com/maxmixalex/hpclang/pull/75)).
+  Guarded internal library removal and replacement are in CI ([#79](https://github.com/maxmixalex/hpclang/pull/79),
+  [#81](https://github.com/maxmixalex/hpclang/pull/81)). All five workflows passed for #79 at
+  `0b7918f9`. Its roadmap conflict with main is resolved locally. #81 awaits Runtime E2E.
+  The local merge candidate on `1405c01d` passed 180 host tests and three Stock launches on each of
+  HP49g+ and HP50g. Its payload and both launchers matched the #81 CI artifacts byte for byte.
+  [#84](https://github.com/maxmixalex/hpclang/pull/84) plans a deleted-suffix sector using the installed journal binding.
+  [#86](https://github.com/maxmixalex/hpclang/pull/86) replayed that journal with an offline ARMED record
+  on both original ROMs. Each freed 40 bytes and matched the full 2 MiB Flash image. The host NOR test
+  reused that address for a new backup. Local replay passed and CI was submitted. Public library management, execution
+  roots, Port 2 recovery installation, authority, automatic startup and reclamation remain open.
+- **M8.1 through M8.5** remain accepted. Local integration `a3a5f0e7` passed all 180 host tests,
+  reproduced 613 SDK outputs and built Notebook for six models. The six-model original-ROM
+  regressions previously passed at `5d0b90b6`.
+- **M8.6 applications and release.** Notebook now checks same-name Port 0 and Port 2 backups
+  with distinct text across three Stock launches on HP49g+ and HP50g. HP48gII retains the Port 0 gate.
+  The HP39/40 editor frees 4 KiB
+  ([#76](https://github.com/maxmixalex/hpclang/pull/76)). On HP48gII, reopening the editor with the
+  caller stack preserved left 92,753 bytes of Stock workspace from HOME and 90,682 bytes from Port 0.
+  Both pull requests passed all five workflows. HP49g+/HP50g measured 40,980 bytes of peak KOS memory
+  and passed moving GC after editor exit. [Launcher measurements](architecture.md#notebook-first-install-transfer-size).
+  HP39 transfer failures now appear in CI logs ([#78](https://github.com/maxmixalex/hpclang/pull/78)).
+  Notebook entry after moving GC with mappings held ([#80](https://github.com/maxmixalex/hpclang/pull/80))
+  awaits CI acceptance. An HP39gs USB transfer stalled after sender backoff outlasted the
+  receiver's 15-second retry interval. The sender now caps backoff at 8 seconds. The delayed-ACK
+  regression and local HP39gs object test passed with the original CI artifacts.
+  [#82](https://github.com/maxmixalex/hpclang/pull/82) connects all six Notebook CI runs to one verified SDK ZIP.
+  At `6e499793` the producer, Quality and Documentation passed. The downloaded SDK ZIP verified
+  all 4,134 manifest entries and built six model-specific Notebook launchers locally. All three HP39/40
+  payloads, Aplet bundles and entry probes matched the remote ROM-job inputs byte for byte.
+  Earlier local save/reopen checks passed on all six original ROMs. Remote ROM jobs are pending. Resuming a running editor across GC and
+  [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
 
 ## Scope and retained requirements
 

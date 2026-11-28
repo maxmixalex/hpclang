@@ -6,6 +6,7 @@ import runpy
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
@@ -54,7 +55,36 @@ def check_home_note(state, expected):
         raise ValueError("unexpected HOME note after Notebook exit")
 
 
-def main():
+def stock_workspace(samples, out, port0):
+    verifier = runpy.run_path(str(HERE / "verify.py"))
+    resources = runpy.run_path(str(E2E / "harness/verify-resource-snapshots.py"))
+    flash = (out / "clean/state/flash").read_bytes()
+    gaps = {}
+    for launch in ("run", "resume"):
+        phases = ["deposited", "editor", "typed"]
+        if port0 and launch == "resume":
+            phases.extend(("first-save", "second-save"))
+        phases.append("returned")
+        gaps[launch] = {}
+        for phase in phases:
+            prefix = samples / f"{launch}-{phase}"
+            ram = prefix.with_suffix(".sram").read_bytes()
+            meta = json.loads(prefix.with_suffix(".json").read_text())
+            resources["metadata"](meta, resources["MODELS"]["hp48gii"], phase, len(ram))
+            _, word = verifier["mapping"](ram, flash, "hp48gii")
+            rstk, dstk = word(0x806F3), word(0x806F8)
+            if not 0x80000 <= rstk <= dstk < 0x100000:
+                raise ValueError(f"{launch}/{phase}: invalid Stock stack bounds")
+            gap = dstk - rstk
+            if word(0x80E9B) != gap // 5:
+                raise ValueError(f"{launch}/{phase}: AVMEM differs from the Stock stack gap")
+            gaps[launch][phase] = gap
+    (out / "stock-workspace.json").write_text(
+        json.dumps({"stack_gap_nibbles": gaps}, indent=2) + "\n"
+    )
+
+
+def main(samples):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("nor", "dist", "toolchain", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
@@ -131,6 +161,7 @@ def main():
         "ENTRY48",
         package_name="program.HP",
         actions=actions,
+        resource_prefix=samples / "run" if args.notebook else None,
         remote_commands=commands if args.port0 or args.preserve_stack else None,
     )
     if args.notebook:
@@ -160,6 +191,7 @@ def main():
             remote_commands=["-95 CF HOME :0:NOTES RCL"] if args.port0 else None,
             extra_files=[] if args.port0 else [("NOTE.HP", "HPCNOTE")],
             actions=resume_actions,
+            resource_prefix=samples / "resume",
             execution_ms=23000 if args.port0 else 17000,
         )
         check_editor(out / "resume", "20" if args.port0 else "314", repeat_save=args.port0)
@@ -197,6 +229,9 @@ def main():
             check=True,
         )
 
+    if args.notebook:
+        stock_workspace(samples, out, args.port0)
+
     if args.port0:
         for phase in ("report.json", "resume.json"):
             snapshot = json.loads((out / phase).read_text())
@@ -205,4 +240,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with tempfile.TemporaryDirectory(prefix="hpclang-hp48-workspace-") as directory:
+        main(Path(directory))

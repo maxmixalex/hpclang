@@ -242,7 +242,9 @@ fresh Stock, transfers the Aplet over USB and checks the first two launches agai
 the named SRAM directory. It then selects Reset in the Stock Aplet library,
 saves `20` into the cleared Aplet, and reopens it. With `--edit-copy` the runner
 uses Stock Save to create Aplet `2`, edits it to `2020`, reopens it and checks
-both named directories. The original must retain `20`. Each phase writes
+both named directories. On HP40gs the runner also fills a copy to the 191-byte
+note limit from the same reset state, saves it and verifies its full text after
+reopening. The original must retain `20` in both runs. Each phase writes
 `verified.json` alongside its captures after both returns to Stock.
 
 To exercise Stock collection while the Aplet's ENTER handler is active, add
