@@ -135,6 +135,16 @@ def reserve_bank_tail(source: Path, destination: Path, bank: int) -> None:
     (destination / "flash").write_bytes(flash)
 
 
+def armed_authority(slot, target, record):
+    authority_slot = slot + len(record)
+    authority = bytearray.fromhex("7e3e0040") + b"HPCAUTH1"
+    authority += struct.pack(
+        "<4I", authority_slot, slot, target, int.from_bytes(record[-4:], "little")
+    )
+    authority += struct.pack("<I", zlib.crc32(authority[1:]))
+    return authority
+
+
 def prepare(
     source: Path, destination: Path, slot: int, target: int, *, bound=False, bank_status=None
 ) -> None:
@@ -146,7 +156,7 @@ def prepare(
     if bank_status is not None and (
         type(bank_status) is not int or not 0xF0 <= bank_status <= 0xFF or target % 0x20000
     ):
-        raise ValueError("Partial bank status requires a bank-header sector and an F0–FF byte")
+        raise ValueError("Partial bank status requires a bank-header sector and an F0鈥揊F byte")
     bank = slot & ~0x1FFFF
     if not 0x140000 <= bank < 0x200000 or slot != free_tail(flash, bank):
         raise ValueError("Journal must start at an intact bank's free allocation boundary")
@@ -168,11 +178,7 @@ def prepare(
     flash[slot : slot + len(record)] = record
     if bound:
         authority_slot = slot + len(record)
-        authority = bytearray.fromhex("7e3e0040") + b"HPCAUTH1"
-        authority += struct.pack(
-            "<4I", authority_slot, slot, target, int.from_bytes(record[-4:], "little")
-        )
-        authority += struct.pack("<I", zlib.crc32(authority[1:]))
+        authority = armed_authority(slot, target, record)
         flash[authority_slot : authority_slot + len(authority)] = authority
     flash[target : target + 4096] = b"\xff" * 4096
     if bank_status is not None:

@@ -7,10 +7,11 @@ import shutil
 import struct
 from types import SimpleNamespace
 
-from prepare import prepare
+from prepare import armed_authority, free_tail, prepare
 from reservation import packager, reader
 from verify import (
     installed_recovery,
+    verify_flash,
     nibbles,
     require,
     require_stock_pc,
@@ -381,6 +382,23 @@ def verify_reclaim_plan(args, before, root, slot, transfer):
     )
     require(capsule[24:-4] == sector, "Reclaim journal changed retained sector bytes")
 
+    # Start explicit recovery from the state left by the planner. Supply the
+    # durable READY/ARMED pair offline, leaving the deleted sector untouched.
+    armed = root / "reclaim-armed"
+    shutil.copytree(dest / "state", armed)
+    authority = armed_authority(JOURNAL_SLOT, target, capsule)
+    require(free_tail(flash, JOURNAL_SLOT & ~0x1FFFF) == JOURNAL_SLOT, "Journal slot occupied")
+    flash[JOURNAL_SLOT:AUTHORITY_SLOT] = capsule
+    flash[AUTHORITY_SLOT : AUTHORITY_SLOT + len(authority)] = authority
+    (armed / "flash").write_bytes(flash)
+
+    recovered = root / "reclaim-replayed"
+    transfer(args, recovered, armed, args.build, "RCREPLAY")
+    after = (recovered / "state/flash").read_bytes()
+    verify_flash(flash, after, JOURNAL_SLOT, target, retire=True, authority_slot=AUTHORITY_SLOT)
+    require(free_tail(after, target) == target + 0x105, "Deleted slot did not become free")
+    require_stock_pc(recovered / "state")
+
 
 def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
     from startup import run_port1_inventory, verify_startup
@@ -404,6 +422,9 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         args, clean, root, transfer=transfer, emulator=emulator, completed=completed
     )
     verify_reclaim_plan(args, before, root, slot, transfer)
+    reclaim_operations = verify_busy_reads(args, root / "reclaim-replayed")
+    if args.flash_busy_reads:
+        require(reclaim_operations > 0, "Reclaim replay performed no Flash operations")
     matched = root / "matched"
     transfer(args, matched, before, build, "INSTEST", package_name="installation.hp")
     base = verify_probe(before, matched / "state", build, args.nm, 0, slot)
@@ -512,6 +533,8 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 slot=slot,
                 bytes=size,
                 transactions=transactions,
+                reclaim_replay=True,
+                reclaim_flash_operations=reclaim_operations,
                 startup_inventory={
                     "missing": startup_missing,
                     "matched": startup_matched,
