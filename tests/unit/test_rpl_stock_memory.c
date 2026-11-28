@@ -54,6 +54,29 @@ static void execution_word(struct route_fixture *fixture, unsigned at, uint32_t 
         fixture->bytes[at + i] = (uint8_t)(value >> (8 * i));
 }
 
+static void test_cpu_address_overlap(void)
+{
+    struct route_fixture fixture = {0};
+    const struct hpclang_rpl_reader state = {route_read, &fixture};
+    const unsigned fields[] = {0x954, 0x958, 0x978, 0x97c, 0x980,
+                               0x984, 0x988, 0x98c, 0x990, 0x994};
+    for (unsigned i = 0; i < sizeof fields / sizeof *fields; ++i) {
+        unsigned high = i < 2 ? 0 : 0xabc00000u;
+        execution_word(&fixture, fields[i], high | 0x41234u);
+        assert(hpclang_rpl_stock_cpu_address_overlap(&state, 0x41234, 0x41235) == 1);
+        assert(!hpclang_rpl_stock_cpu_address_overlap(&state, 0x41233, 0x41234));
+        execution_word(&fixture, fields[i], 0);
+    }
+    execution_word(&fixture, 0x958, 0x100000u);
+    assert(hpclang_rpl_stock_cpu_address_overlap(&state, 0x40000, 0x80000) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    fixture.stop = fixture.reads + 1;
+    fixture.mode = 1;
+    assert(hpclang_rpl_stock_cpu_address_overlap(&state, 0x40000, 0x80000) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_stock_cpu_address_overlap(&state, 5, 5) == HPCLANG_RPL_SPAN_BOUNDS);
+}
+
 static void test_execution_edits(void)
 {
     struct route_fixture fixture = {0};
@@ -784,6 +807,7 @@ int main(void)
 {
     p_field_prediction();
     test_execution_capture();
+    test_cpu_address_overlap();
     test_execution_edits();
     test_bank_route();
     test_bank_route_capture();
