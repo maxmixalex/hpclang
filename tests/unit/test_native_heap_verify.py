@@ -65,6 +65,18 @@ class HeapTraceVerification(unittest.TestCase):
         self.assertEqual(result["failed_allocations"], 1)
         self.assertEqual(result["minima"], [dict(phase="armtoolbox", usable=40)])
 
+    def test_single_heap_trace(self):
+        self.trace["version"] = 2
+        for phase in self.trace["phases"]:
+            for field in ("initial", "minimum", "latest"):
+                phase[field].pop()
+        self.assertEqual(VERIFY(self.trace, self.profile, self.status)["accepted"], 3)
+
+    def test_legacy_second_list_must_be_empty(self):
+        self.trace["phases"][0]["latest"][1] = self.trace["phases"][0]["latest"][0].copy()
+        with self.assertRaisesRegex(ValueError, "allocated list"):
+            VERIFY(self.trace, self.profile, self.status)
+
     def test_zero_capacity_with_metadata_is_a_real_sample(self):
         phase = self.trace["phases"][0]
         phase["minimum"][0].update(usable=0, largest=0)

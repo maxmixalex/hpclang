@@ -470,15 +470,17 @@ int hpclang_rpl_flash_discard_plan(const struct hpclang_rpl_reader *reader, uint
     return HPCLANG_RPL_SPAN_MALFORMED;
 }
 
-int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
-                           struct hpclang_rpl_flash_space *space)
+static int scan_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
+                     struct hpclang_rpl_flash_space *space, int deleted_suffix)
 {
     if (!reader || !reader->read_nibble || !space || ((first | end) & 1u))
         return HPCLANG_RPL_SPAN_MALFORMED;
     struct hpclang_rpl_port_cursor cursor = {first, end, 0};
     struct hpclang_rpl_port_entry entry;
+    uint32_t last_live_end = first;
     int result;
     while ((result = hpclang_rpl_flash_next(reader, &cursor, &entry)) > 0) {
+        last_live_end = cursor.address;
     }
     if (result)
         return result;
@@ -491,8 +493,56 @@ int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t fir
         if (nibble != 15u)
             return HPCLANG_RPL_SPAN_MALFORMED;
     }
+    if (deleted_suffix) {
+        *space = (struct hpclang_rpl_flash_space){last_live_end, cursor.address - last_live_end};
+        return HPCLANG_RPL_SPAN_OK;
+    }
     *space = (struct hpclang_rpl_flash_space){cursor.address, (end - cursor.address - 2u) & ~3u};
     return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
+                           struct hpclang_rpl_flash_space *space)
+{
+    return scan_tail(reader, first, end, space, 0);
+}
+
+int hpclang_rpl_flash_deleted_suffix(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                     uint32_t end, struct hpclang_rpl_flash_space *space)
+{
+    return scan_tail(reader, first, end, space, 1);
+}
+
+int hpclang_rpl_flash_reclaim_sector_image(const struct hpclang_rpl_reader *reader,
+                                           uint32_t sector_offset, uint8_t *image, uint32_t bytes)
+{
+    if (!image || bytes != HPCLANG_RPL_FLASH_SECTOR_BYTES || sector_offset >= 0x20000u ||
+        sector_offset % HPCLANG_RPL_FLASH_SECTOR_BYTES)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_flash_space suffix;
+    int result = hpclang_rpl_flash_deleted_suffix(reader, 0x20au, 0x40000u, &suffix);
+    if (result)
+        return result;
+    if (!suffix.nibbles || suffix.address >= 2u * (sector_offset + bytes) ||
+        suffix.address + suffix.nibbles <= 2u * sector_offset)
+        return 0;
+    if (suffix.address & 1u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    /* Everything after the suffix has already been verified erased. */
+    uint32_t first = suffix.address / 2u;
+    uint32_t keep = first > sector_offset ? first - sector_offset : 0;
+    for (uint32_t i = 0; i < keep; ++i) {
+        uint32_t at = 2u * (sector_offset + i);
+        uint8_t low, high;
+        if (!reader->read_nibble(reader->context, at, &low) ||
+            !reader->read_nibble(reader->context, at + 1u, &high))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (low > 15u || high > 15u)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        image[i] = (uint8_t)(low | high << 4u);
+    }
+    memset(image + keep, 255, bytes - keep);
+    return 1;
 }
 
 int hpclang_rpl_flash_allocation_find(const struct hpclang_rpl_reader *reader, uint32_t first,

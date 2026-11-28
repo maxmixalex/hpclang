@@ -23,7 +23,10 @@ class ResourceVerifierTests(unittest.TestCase):
         return data
 
     def test_valid_free_capacity(self):
-        heaps = VERIFY["free_capacity"](self.memory(), BASE)
+        ram = self.memory()
+        struct.pack_into("<I", ram, 16, BASE + 128)
+        struct.pack_into("<II", ram, 128, 32, 0x1102)
+        heaps = VERIFY["free_capacity"](ram, BASE)
         self.assertEqual(
             heaps[0],
             dict(
@@ -34,7 +37,7 @@ class ResourceVerifierTests(unittest.TestCase):
                 metadata_bytes=20,
             ),
         )
-        self.assertEqual(heaps[1]["blocks"], 0)
+        self.assertEqual(len(heaps), 1)
 
     def test_invalid_blocks(self):
         for offset, value in (

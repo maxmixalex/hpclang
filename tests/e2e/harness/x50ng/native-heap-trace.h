@@ -44,14 +44,12 @@ static uint32_t native_heap_setting(const char *name)
     return (uint32_t)value;
 }
 
-static int native_heap_write_capacity(const struct native_heap_capacity value[2])
+static int native_heap_write_capacity(const struct native_heap_capacity value)
 {
     return fprintf(native_heap_file,
-                   "[{\"usable\":%u,\"largest\":%u,\"metadata\":%u,\"blocks\":%u},"
-                   "{\"usable\":%u,\"largest\":%u,\"metadata\":%u,\"blocks\":%u}]",
-                   value[0].usable_bytes, value[0].largest_usable_bytes, value[0].metadata_bytes,
-                   value[0].blocks, value[1].usable_bytes, value[1].largest_usable_bytes,
-                   value[1].metadata_bytes, value[1].blocks) < 0;
+                   "[{\"usable\":%u,\"largest\":%u,\"metadata\":%u,\"blocks\":%u}]",
+                   value.usable_bytes, value.largest_usable_bytes, value.metadata_bytes,
+                   value.blocks) < 0;
 }
 
 static void native_heap_trace_finish(void)
@@ -59,7 +57,7 @@ static void native_heap_trace_finish(void)
     if (!native_heap_file)
         return;
     int failed = fprintf(native_heap_file,
-                         "{\"version\":1,\"model\":%u,\"return_pc\":%u,\"roots\":%u,"
+                         "{\"version\":2,\"model\":%u,\"return_pc\":%u,\"roots\":%u,"
                          "\"end\":%u,\"ignored_before_first_phase\":%" PRIu64 ",\"phases\":[",
                          native_heap_model, native_heap_pc, native_heap_roots, native_heap_end,
                          native_heap_ignored) < 0;

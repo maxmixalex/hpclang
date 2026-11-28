@@ -1,37 +1,31 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-23. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+Current checkpoint: 2026-11-28. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `b0949411` after [#63](https://github.com/maxmixalex/hpclang/pull/63).
+Accepted main is `c2dd5b43` after [#74](https://github.com/maxmixalex/hpclang/pull/74).
 
-- **M8.0 native ports.** [#63](https://github.com/maxmixalex/hpclang/pull/63) merged at `b0949411` after
-  all five workflows passed. Internal Port 1 replacement now checks configured Stock roots, ACPTRs and
-  nested list/tagged references. The merge tree passed 180 host tests and two relaunches each on HP49g+
-  and HP50g locally. [#70](https://github.com/maxmixalex/hpclang/pull/70) extends the guard to programs,
-  symbolic objects, units and matrices. [#75](https://github.com/maxmixalex/hpclang/pull/75) adds
-  arrays, directories and backups. Both passed local host, sanitizer and Stock regressions and await CI.
-  [#66](https://github.com/maxmixalex/hpclang/pull/66) plans append space across six Port 2 banks and
-  keeps the sector journal outside the target bank. Its candidate merge tree (`9e38e93b`) passed 180
-  host tests locally, including interrupted erase, restart and reuse. Flash record, replay and create
-  also passed with ASan/UBSan. Remote CI is pending.
-- **M8.6 applications and release.** [#62](https://github.com/maxmixalex/hpclang/pull/62) reduced the
-  HP48gII Port 0 transfer to 122,333 bytes. [#67](https://github.com/maxmixalex/hpclang/pull/67) made
-  the SDK archives reproducible across Windows and Linux.
-  [#64](https://github.com/maxmixalex/hpclang/pull/64) compares all six launchers. Its candidate merge tree
-  (`820adfcc`) passed 180 host tests and reproduced 613 installed-SDK release outputs locally. All six
-  Notebook builds and both HP49g+/HP50g Port 1 installation offsets passed. Runtime CI is pending.
-  [#68](https://github.com/maxmixalex/hpclang/pull/68) corrects live heap measurement.
-  [#69](https://github.com/maxmixalex/hpclang/pull/69) reduces the HP49g+/HP50g Notebook KOS peak to
-  40,980 bytes. [#72](https://github.com/maxmixalex/hpclang/pull/72) exercises moving Stock GC after
-  editor exit with mappings held. [#71](https://github.com/maxmixalex/hpclang/pull/71) measures HP39/40
-  Aplet residency and documents the seven independent packages.
-  [#74](https://github.com/maxmixalex/hpclang/pull/74) measures remaining Stock workspace while editing.
-  These launch and measurement branches passed their focused local checks and await remote acceptance.
-  [#76](https://github.com/maxmixalex/hpclang/pull/76) reduces the independent HP39/40 Notebook bitmap by 4 KiB.
-  All three ROMs passed initial, Reset and copy Save/reopen locally. The HP40gs CI runner also fills
-  a 191-byte copy and checks both the reopened text and the original. Local pass; remote CI submitted.
+- **M8.0 native ports.** [#66](https://github.com/maxmixalex/hpclang/pull/66) is on main. Port 2 now plans
+  append space across six banks and stages a sector journal outside the target bank. Local tests cover
+  interrupted erase, restart and reuse. [#70](https://github.com/maxmixalex/hpclang/pull/70) and
+  [#75](https://github.com/maxmixalex/hpclang/pull/75) are on main. Port 1 now checks references in programs,
+  symbolic objects, units, matrices, arrays, directories and backups before internal library replacement.
+  Remaining gates include public library management, other execution roots, and Port 2 recovery installation,
+  authority, startup and reclamation.
+- **M8.6 applications and release.** [#64](https://github.com/maxmixalex/hpclang/pull/64),
+  [#69](https://github.com/maxmixalex/hpclang/pull/69), [#71](https://github.com/maxmixalex/hpclang/pull/71),
+  [#72](https://github.com/maxmixalex/hpclang/pull/72) and
+  [#74](https://github.com/maxmixalex/hpclang/pull/74) are on main. Startup was compared across six models.
+  The HP49g+/HP50g Notebook used 40,980 bytes of KOS memory at peak and passed moving GC after editor exit.
+  [#68](https://github.com/maxmixalex/hpclang/pull/68) closed after reconciliation produced the identical main
+  tree. HP39/40 Stock workspace measurements are on main. [#76](https://github.com/maxmixalex/hpclang/pull/76)
+  frees 4 KiB in the editor and passed ten local Save/reopen cases. Two remote jobs failed; retrying only
+  failed jobs could not download the old build artifacts. A full CI build was submitted on the refreshed
+  branch. HP48gII HOME and Port 0 workspace measurements passed locally across first launch and reopen in both
+  diagnostic and caller-stack-preserving modes. With the caller stack preserved, the reopened editors left
+  92,737 and 90,682 whole bytes respectively. Active-execution GC and final release acceptance remain open.
   [Launcher measurements](architecture.md#notebook-first-install-transfer-size) · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
-- **M8.1–M8.5** are accepted. Their regression requirements remain in the stage table below.
+- **M8.1–M8.5** are accepted. The combined M8.0/M8.6 tree (`ac646bbf`) passed all 180 host tests locally.
+  Its relocated SDK reproduced 613 release outputs and all six model-specific Notebook builds.
 
 ## Scope and retained requirements
 
