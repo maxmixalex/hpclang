@@ -92,6 +92,15 @@ static u32 notebook_code(void)
     return 0;
 }
 
+static u32 pool_digest(const u32 *pg)
+{
+    u32 digest = 2166136261u;
+    for (unsigned i = 0; i < POOL_PAGES; i++)
+        for (unsigned j = 0; j < 1024; j++)
+            digest = (digest ^ ((volatile u32 *)pg[i])[j]) * 16777619u;
+    return digest;
+}
+
 static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame, u32 code)
 {
     u32 pg[POOL_PAGES], cnt = 0;
@@ -110,6 +119,9 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame,
     u32 oldrw = l1[17], oldcode = l1[18];
     if (NOTEBOOK_MAPPED_GC && second) {
         if (oldrw != (pg[RW_PAGES] | 0x11) || oldcode != ((pg[RW_PAGES] + 1024) | 0x11))
+            for (;;) {
+            }
+        if (pool_digest(pg) != rec[30])
             for (;;) {
             }
         oldrw = rec[28];
@@ -139,7 +151,7 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame,
                 }
         }
 
-    if (!second) {
+    if (second == NOTEBOOK_ENTER_AFTER_GC) {
         volatile u32 *boot = (void *)0x01100000;
         boot[0] = NOTEBOOK_MODEL;
         boot[1] = NOTEBOOK_RW_BYTES;
@@ -178,25 +190,18 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame,
         extern int nb_enter(u32, u32);
         rec[40] = nb_enter(0x01220000 + ENTRY_OFFSET, 0x01100000 + NOTEBOOK_RW_BYTES);
         rec[41] = 0x4e424558;
-    } else if (rec[41] != 0x4e424558)
+    } else if (second && rec[41] != 0x4e424558)
         for (;;) {
         }
     if (NOTEBOOK_MAPPED_GC) {
         /* Words 4..27 hold up to twelve KOS pointer/count pairs. */
-        u32 digest = 2166136261u;
-        for (unsigned i = 0; i < POOL_PAGES; i++)
-            for (unsigned j = 0; j < 1024; j++)
-                digest = (digest ^ ((volatile u32 *)pg[i])[j]) * 16777619u;
         if (!second) {
             rec[28] = oldrw;
             rec[29] = oldcode;
-            rec[30] = digest;
+            rec[30] = pool_digest(pg);
             hpclang_irq_restore(irq);
             return hash;
         }
-        if (digest != rec[30])
-            for (;;) {
-            }
     }
     l1[17] = oldrw;
     l1[18] = oldcode;

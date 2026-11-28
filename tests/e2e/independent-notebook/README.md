@@ -48,6 +48,14 @@ moves an RPL object before the second native call. That call checks the two
 first-level descriptors, the mapped image hash and a checksum over every KOS
 page (including the second-level tables) before restoring the original slots
 and releasing the allocations. Save and reload both exercise this path.
+
+The `AFTERGC.HP` run starts from the saved note. Its first native call sets up
+the mappings and returns to Stock. After collection the second call rechecks
+the leased pages, obtains the current Stock stack bounds and execution roots,
+and enters Notebook. An editor SRAM capture records the tagged object's
+addresses before and after the move. The screen must show the saved text
+`20`, and exiting must release the leases and return to Stock.
+
 A second launch asks KOS for 35 aligned pages. On partial allocation the
 loader releases every acquired block before installing any mappings. The test
 reacquires all those block sizes together and releases them again. Stock GC
@@ -67,6 +75,6 @@ verifier reads `HPCNOTE.TXT` and a pre-existing file and checks their bytes.
 
 The Stock verifier checks the versioned HOME string, GC witness, RPL return
 and two settled Stock frames after each application exit. It also checks the
-editor pixels on the two successful launches. The GC witness runs with leases held after application exit and with the
-partial pool already released after admission refusal. See `report.json` for the
-phase results.
+editor pixels on successful launches. The GC witness covers collection before
+entry, after exit, and after partial allocation refusal. See `report.json` for
+the phase results.

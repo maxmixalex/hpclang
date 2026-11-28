@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[3]
 PARAMETERS = b"~* @-#Y3"
 # CI can deschedule the server during its 50 ms pause (one observed pause
 # lasted 4.719 s). Allow scheduling slack for packet arrival, independently
-# of the explicit 30 ms turnaround and 15 s backoff assertions below.
+# of the explicit 30 ms turnaround and delayed-ACK checks below.
 PACKET_WAIT_SECONDS = 10.0
 
 
@@ -234,12 +234,23 @@ def verify(tools: Path) -> None:
                     if peer.receive(1.2):
                         raise AssertionError("server did not return to silent command wait")
                     peer.negotiate()
+                    log_start = debug_log.stat().st_size
                     peer.fetch(
                         b"NEXT.BIN",
                         b"next transaction\x00\xff",
                         lose_data_ack=False,
-                        delay_data_ack=15,
+                        delay_data_ack=18,
                     )
+                    # A backed-off sender must retry before Stock's 15 s NAK.
+                    transfer_log = debug_log.read_bytes()[log_start:].decode("latin-1")
+                    timeouts = [
+                        int(line.split("=")[1])
+                        for line in transfer_log.splitlines()
+                        if line.startswith("rpack rcvtimo=")
+                    ]
+                    longest = max(timeouts, default=0)
+                    if not 1 <= longest <= 8:
+                        raise AssertionError(f"unexpected maximum receive timeout: {longest}")
                     if peer.receive(1.2):
                         raise AssertionError("server did not return to silent command wait")
                     peer.negotiate()
