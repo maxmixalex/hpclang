@@ -331,6 +331,17 @@ preceded the timing window.
 These are elapsed emulator times rounded outwards to 0.1 ms. Both runs
 checked the saved HOME contents and returned display.
 
+On HP48gII Stock, the installed SDK Notebook left the following space between
+RSKTOP and DSKTOP with two caller strings preserved. Values are whole bytes.
+At every sampled phase, AVMEM equalled the number of complete five-nibble cells
+in that gap. The Port 0 relaunch saved twice and retained 90,679 whole bytes
+after the second Save.
+
+| Program location | First editor entry | After first return | Reopened editor | After second return |
+| --- | ---: | ---: | ---: | ---: |
+| HOME | 92,803 | 92,053 | 92,753 | 92,003 |
+| Port 0 | 90,731 | 89,943 | 90,682 | 89,929 |
+
 #### HP39/40 editor startup
 
 Each model ran the same ATfE 22.1.0 Notebook HPC1 image through the production
