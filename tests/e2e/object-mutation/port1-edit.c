@@ -7,15 +7,25 @@
 #include "rpl-port.h"
 #include "rpl-port-mutation.h"
 #include "rpl-stack-view.h"
+#include "rpl-reference.h"
 #include "rpl-stock-memory.h"
 #include "saturn-view.h"
 
 static const uint8_t first_name[] = "HPCE1A", tail_name[] = "HPCE1B";
 
+enum stack_fixture
+{
+    DIRECT_ACPTR,
+    PROGRAM,
+    ARRAY,
+    TAGGED_LIST
+};
+
 struct owned_tail
 {
     uint32_t first, end, calls;
-    uint32_t test_stack_slot, test_stack_target;
+    uint32_t test_stack_slot, test_stack_target, test_acptr;
+    enum stack_fixture fixture;
 };
 
 static int stock_nibble(void *context, uint32_t address, uint8_t *value)
@@ -25,6 +35,38 @@ static int stock_nibble(void *context, uint32_t address, uint8_t *value)
     if (owned && owned->test_stack_slot && address >= owned->test_stack_slot &&
         address - owned->test_stack_slot < 5u) {
         *value = (owned->test_stack_target >> (4u * (address - owned->test_stack_slot))) & 15u;
+        return 1;
+    }
+    if (owned && owned->test_acptr && address >= owned->test_acptr &&
+        address - owned->test_acptr < (owned->fixture == TAGGED_LIST ? 44u
+                                       : owned->fixture == ARRAY     ? 35u
+                                                                     : 15u)) {
+        uint32_t offset = address - owned->test_acptr;
+        if (owned->fixture == ARRAY) {
+            const uint32_t array[] = {0x29e8u, 30u, 0x2baau, 1u, 1u, owned->test_stack_target,
+                                      0x23c21u};
+            *value = (array[offset / 5u] >> (4u * (offset % 5u))) & 15u;
+            return 1;
+        }
+        if (owned->fixture == PROGRAM) {
+            const uint32_t program[] = {0x2d9du, owned->test_stack_target, 0x312bu};
+            *value = (program[offset / 5u] >> (4u * (offset % 5u))) & 15u;
+            return 1;
+        }
+        /* One-character DOTAG prefix around the existing nested list. */
+        if (owned->fixture == TAGGED_LIST) {
+            if (offset < 9u) {
+                uint32_t header = offset < 5u ? 0x2afcu : (('X' << 8) | 1u);
+                *value = (header >> (4u * (offset % 5u))) & 15u;
+                return 1;
+            }
+            offset -= 9u;
+        }
+        const uint32_t fields[] = {0x2a74u,  0x2a74u, 0x02baau, owned->test_stack_target,
+                                   0x23c21u, 0x312bu, 0x312bu};
+        if (owned->fixture != TAGGED_LIST)
+            offset += 10u;
+        *value = (fields[offset / 5u] >> (4u * (offset % 5u))) & 15u;
         return 1;
     }
     return hpclang_saturn_read_nibble(hpclang_saturn_address_make(address), value);
@@ -60,11 +102,18 @@ static int check_owned_tail(void *context, uint32_t first, uint32_t end)
     int cache = hpclang_rpl_port1_home_overlap(&stock, home, 0x100000u - home, first, end);
     if (cache < 0)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
-    /* A direct address in the bank window may designate ERAM. */
-    int stack = hpclang_rpl_stack_direct_overlap(&stock, 0x40000u + first, 0x40000u + end);
+    /* A stack reference into the bank window may designate ERAM. */
+    int stack = hpclang_rpl_stack_reference_overlap(&stock, 0x40000u + first, 0x40000u + end,
+                                                    hpclang_rpl_reference_composite_overlap);
     if (stack < 0)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
-    return overlap || cache || stack ? HPCLANG_RPL_MUTATION_BUSY : HPCLANG_RPL_MUTATION_OK;
+    if (overlap || cache || stack)
+        return HPCLANG_RPL_MUTATION_BUSY;
+    struct hpclang_rpl_stock_memory memory;
+    struct hpclang_rpl_mutation_io roots;
+    if (!hpclang_rpl_stock_mutation_io(&roots, &memory))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    return hpclang_rpl_mutation_check_root_range(&roots, 0x40000u + first, 0x40000u + end);
 }
 
 static int chain_end(const struct hpclang_rpl_reader *reader, uint32_t *end)
@@ -128,12 +177,12 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
     const struct hpclang_rpl_port1_guard guard = {check_owned_tail, &owned};
     unsigned step = 0;
     const struct hpclang_rpl_reader stock = {stock_nibble, NULL};
-    uint32_t level_one;
+    uint32_t level_one, stack_slot = 0;
     /* The original calculator stack may be empty. Own one real slot for the probe. */
     if (hpclang_stack_push_boolean(1))
         return 0x1e0u;
     if (hpclang_rpl_stack_object_address(&stock, 1, &level_one) ||
-        hpclang_rpl_stack_direct_overlap(&stock, level_one, level_one + 1u) != 1)
+        hpclang_rpl_stack_reference_overlap(&stock, level_one, level_one + 1u, NULL) != 1)
         goto done;
     if (!hpclang_rpl_stock_port1_mutation_io(&io, &limit))
         goto done;
@@ -176,14 +225,26 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
                 uint8_t nibble;
                 if (!stock_nibble(NULL, 0x806f8u + i, &nibble))
                     goto done;
-                owned.test_stack_slot |= (uint32_t)nibble << (4u * i);
+                stack_slot |= (uint32_t)nibble << (4u * i);
             }
+            owned.test_stack_slot = stack_slot;
             owned.test_stack_target = 0x40000u + owned.first;
             result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
             owned.test_stack_slot = 0;
             if (result != HPCLANG_RPL_MUTATION_BUSY ||
                 !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
                 goto done;
+            /* Present the level-one object as an ACPTR without changing Stock RAM. */
+            owned.test_acptr = level_one;
+            const enum stack_fixture fixtures[] = {DIRECT_ACPTR, PROGRAM, ARRAY, TAGGED_LIST};
+            for (unsigned j = 0; j < sizeof fixtures / sizeof *fixtures; ++j) {
+                owned.fixture = fixtures[j];
+                result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
+                if (result != HPCLANG_RPL_MUTATION_BUSY ||
+                    !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
+                    goto done;
+            }
+            owned.test_acptr = 0;
         }
         if (hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard) ||
             !matches(first_name, value) || !matches(tail_name, tail))
@@ -198,8 +259,54 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
         hpclang_rpl_port1_remove_backup(&io, limit, tail_name, 6, &guard))
         goto done;
     step = 7;
-    if (owned.calls != 6 || !chain_end(&reader, &end) || end != owned.first ||
+    if (owned.calls != 10 || !chain_end(&reader, &end) || end != owned.first ||
         !fingerprint(&reader, end, &hash) || hash != original_hash)
+        goto done;
+    /* Store the unregistered header-only library 123 ahead of a named backup. */
+    static const uint8_t library[] = {0x40, 0x2b, 0x60, 0x02, 0x00, 0x01, 0x58, 0x01,
+                                      0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0xd0, 0xc5, 0x02};
+    step = 9;
+    if (hpclang_library_query(123) != 0 ||
+        hpclang_rpl_port1_create_library(&io, limit, library, 43) ||
+        !encode(tail_name, tail, &packed, &span) ||
+        hpclang_rpl_port1_create_backup(&io, limit, packed, span) ||
+        !chain_end(&reader, &owned.end))
+        goto done;
+    static const uint8_t renamed[] = {0x40, 0x2b, 0x80, 0x02, 0x00, 0x02, 0x58, 0x59,
+                                      0x02, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0x00, 0x90, 0x59, 0x02};
+    step = 10;
+    uint32_t before;
+    if (!fingerprint(&reader, owned.end + 6u, &before))
+        goto done;
+    owned.test_stack_slot = stack_slot;
+    owned.test_stack_target = 0x40000u + owned.first;
+    int refused = hpclang_rpl_port1_remove_library(&io, limit, 123, &guard);
+    int replace_refused = hpclang_rpl_port1_replace_library(&io, limit, 123, renamed, 45, &guard);
+    owned.test_stack_slot = 0;
+    if (replace_refused != HPCLANG_RPL_MUTATION_BUSY || refused != HPCLANG_RPL_MUTATION_BUSY ||
+        !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
+        goto done;
+    step = 11;
+    if (hpclang_rpl_port1_replace_library(&io, limit, 123, renamed, 45, &guard) ||
+        !matches(tail_name, tail) || !chain_end(&reader, &owned.end))
+        goto done;
+    struct hpclang_object *copy = hpclang_port_library_get(1, 123);
+    int renamed_ok = copy && copy->nibble_count == 45 && !memcmp(copy->data, renamed, 22) &&
+                     (copy->data[22] & 15) == renamed[22];
+    hpclang_object_release(copy);
+    if (!renamed_ok || hpclang_rpl_port1_replace_library(&io, limit, 123, library, 43, &guard) ||
+        !matches(tail_name, tail) || !chain_end(&reader, &owned.end))
+        goto done;
+    step = 12;
+    if (hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) || !matches(tail_name, tail) ||
+        !chain_end(&reader, &owned.end) ||
+        hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) !=
+            HPCLANG_RPL_MUTATION_NOT_FOUND ||
+        hpclang_rpl_port1_remove_backup(&io, limit, tail_name, 6, &guard) ||
+        !chain_end(&reader, &end) || end != owned.first || !fingerprint(&reader, end, &hash) ||
+        hash != original_hash)
         goto done;
     free(packed);
     hpclang_object_release(value);

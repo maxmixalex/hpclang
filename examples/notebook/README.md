@@ -167,6 +167,13 @@ layout until installation and use a Port without an existing `NBLSE`.
 3. Run `HOME 'NBUSER' RCL CKCOPY EVAL` to open the editor. Save a note, exit
    with ON and repeat the command to reopen it with the caller's stack preserved.
 
+On HP49g+ and HP50g Stock 2.15, the independent editor requests nine aligned
+RAM pages for writable data and page tables. The launcher tries one KOS block
+first, then smaller blocks if allocation or alignment requires it. In the
+fresh-ROM emulator tests, Save and reopen each used 40,980 bytes of KOS heap
+and released the entire block on exit. The installed `NBLSE` record occupies
+additional Port 1 space, with padding determined by its installation offset.
+
 ### Application sizing
 
 The application selects picolibc's integer-only formatter because it displays

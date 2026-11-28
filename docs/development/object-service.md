@@ -1027,8 +1027,15 @@ integer backup, read and replace it with a string after relaunch, then read and
 remove the string after another relaunch. No reinstallation, reset or fixture
 injection occurs between launches. Internal library-record creation preserves
 existing record addresses and rejects duplicate library IDs; it does not yet
-provide public library installation or attachment. Port 1 replacement/removal, Port 2 reclamation and full
-library mutation remain M8.0 requirements.
+provide public library installation or attachment.
+
+The HP49g+/HP50g Stock Port 1 edit fixture supplies a guard that checks address fields inside
+sequences, tags, backups, directories and ordinary or linked arrays. For arrays
+it decodes compact elements using their declared prologue. A pointer into the
+edited range blocks the write. A parse failure or exceeded traversal budget
+also prevents the edit. The guard covers these stack objects; complete external
+reference handling and public Port 1 replacement/removal remain M8.0 work.
+Port 2 reclamation and full library mutation also remain open.
 
 Port 1 enumeration and owned reads use the HP49/50 physical ERAM window after
 checking its live identity mapping. They do not switch Saturn banks or claim
@@ -1120,8 +1127,15 @@ bank window blocks the edit. This includes launcher-private levels. In the
 Stock fixture, the test pushes a Boolean, then substitutes a Port 1 pointer
 for that slot in the guard's reader only. The replacement must return busy
 and preserve the record bytes. Restoring the reader allows the ordinary
-replacement, growth, contraction and deletion cases to run. Indirect object
-references and suspended execution still require separate handling.
+replacement, growth, contraction and deletion cases to run. The fixture also
+checks the full set of direct roots configured by the Stock mutation backend
+against the affected bank-window interval, using the same scanner as the
+main-RAM removal checks. An RPL return cursor inside the interval blocks an
+edit even when it points past the object header. Host tests check that the
+exclusive upper endpoint is outside the interval and that a malformed later
+catalog still reports an error after a cursor match. Both Stock 2.15 ROMs
+passed the ordinary edits and both relaunches locally. Indirect object
+references and execution state outside the configured roots remain open.
 
 Execution has a separate gate. Before relocation, invoking the attached
 library's `PrRUN` launched an SDK program that created the HOME string

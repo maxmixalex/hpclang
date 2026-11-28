@@ -124,6 +124,15 @@ with two full-size Aplets resident. The independent editor now requests a
 pages. The native bootstrap uses a separate 1 KiB stack. The Aplet keeps
 256 bytes of padding for the saved note string and its signature.
 
+After returning to Stock, the verifier matched both named Aplet entries in SRAM,
+including the stored names and directory bodies. With `20` in the original and
+`2020` in copy `2`, the two entries occupied 112,651 bytes on HP39g+, 112,619
+on HP39gs and 112,635 on HP40gs. During native execution, the bitmap's recorded
+prologue and length gave 86,026 bytes including its header. Its 20 aligned frames
+accounted for 81,920 bytes within that object on each model. The directory
+measurements describe saved storage after exit. The bitmap measurement describes
+the workspace acquired during the editor run.
+
 On each original ROM, Stock copied the reset-and-edited Notebook into a
 second Aplet named `2`. The original retained `20` while the copy saved and
 reopened `2020`. Both named directories, the editor display, ARM return,
@@ -137,6 +146,21 @@ are read from RSKTOP and DSKTOP after returning to the library.
 | HP39g+ D1.55 | 56,339 | 146,941 | 90,598 |
 | HP39gs 2.22 | 56,323 | 144,320 | 87,994 |
 | HP40gs 2.22 | 56,331 | 144,123 | 87,789 |
+
+The Stock gap while editing is smaller. These original-ROM samples compare the
+reset original with its saved copy. Values are whole bytes between RSKTOP and
+DSKTOP at the named LCD capture. The final library capture agreed with the
+settled SRAM reading in all nine initial, Reset and copy runs.
+
+| Model | Editing reset original | Editing copy | After Save in copy | Reopened copy |
+| --- | ---: | ---: | ---: | ---: |
+| HP39g+ | 63,072 | 6,727 | 6,727 | 6,723 |
+| HP39gs | 60,399 | 4,069 | 4,069 | 4,065 |
+| HP40gs | 60,202 | 3,864 | 3,864 | 3,860 |
+
+After ON returned from the editor, before leaving the Aplet, the copy runs
+had 6,251, 3,593 and 3,388 whole bytes respectively. The verifier reports
+the exact gap in nibbles at each capture.
 
 Stock Reset stores the five-nibble ROM reference `0x05da2` as the first item
 in the independent ENTER list. In the live D1.55 stack this was followed
@@ -381,23 +405,25 @@ writable extent matched the boot descriptor; the heap figures use the ELF
 symbols `heap_next` and `__bss_end`. Peak resident RAM across Stock and the
 launcher remains open.
 
-On HP49g+ and HP50g, the independent Notebook editor held two live KOS
-allocations totaling 45,096 bytes on entry, after Save and on reopening the note. The eight writable
-pages and one page-table frame occupied 36,864 bytes within those blocks.
-Alignment slack and allocator metadata accounted for the other 8,232 bytes.
-The editor mapped another 81,920 bytes of code directly from its Port 1
-record. With the preceding `NBPAD` record used in this regression, the complete
-`NBLSE` backup occupied 85,595 bytes, including those code pages. Its size
-plus the two disjoint KOS allocations was 130,691 bytes at each editor
-checkpoint. The verifier checked both sets of page descriptors and the extent
-of the named backup in SRAM. After each user launch (Save and reopen), it
-checked that the Stock free list for each allocation's heap covered the entire
-original block, including its header and footer.
+The independent user launcher requests its eight writable pages and page table
+as one nine-page KOS allocation. A refused request or insufficient space before
+the first aligned page for lease metadata falls back to smaller allocations.
+On HP49g+ and HP50g Stock 2.15, Save and reopen each acquired one block.
+Heap 0x100 had 104,072 usable bytes before EVAL, reached 63,092 on allocator
+return and recovered all 104,072 on exit. The verifier matched the block to the
+mapped frames and checked its return to the free list, including header and footer.
+
+The 40,980-byte block contains 36,864 bytes of frames. The preceding two-block
+launcher consumed 45,096 bytes for those same frames. With the preceding
+`NBPAD` record, the 85,595-byte `NBLSE` backup and the new KOS block together
+occupied 126,575 bytes at the editor. The backup includes 81,920 bytes of
+directly mapped code. At the empty-Port-1 offset, the new three-file transfer
+is 108,479 bytes, 176 more than the launcher in the first-install table.
 
 On both models, the free interval between Stock's return and data stacks
-measured 402,508 nibbles before EVAL, 402,409 in the empty editor, 402,334
-after Save and 400,746 after return. On reopening, those readings were
-402,339 before EVAL, 402,260 in the editor and 400,672 after return. Each
+measured 401,804 nibbles before EVAL, 401,705 in the empty editor, 401,630
+after Save and 400,042 after return. On reopening, those readings were
+401,635 before EVAL, 401,556 in the editor and 399,968 after return. Each
 reading agreed with Stock's AVMEM count of complete five-nibble cells.
 These samples track Stock workspace separately. Peak usage between captures
 remains open.
@@ -435,7 +461,7 @@ This is an implementation assessment, not additional native execution evidence.
 | --- | --- |
 | HP39g+/39gs/40gs | `runtime/core/hp39-aplet-frame.c` recognizes the Aplet `_Action` instruction sequence, including the library-275 `xPrRUN` ROMPTR, before exposing the custom-data slot. `tools/prepare-hp39-aplet.py` also installs Start/Reset views and restores the caller's program context around Reset. A new entry must provide an explicit equivalent Aplet data/return contract; replacing the ARM jump alone would leave persistence unavailable. Keep save/relaunch, copied-Aplet isolation and Reset in the comparison. |
 | HP48gII | `platform/armtoolbox/stage0.S` consumes the launcher's pool count and L2 table, rejects insufficient space before changing mappings, and releases its optional KOS allocation on both rejection and return. The independent model-4 probe maps 29 pages. The installed SDK Notebook editor now runs with 25 pages. A fresh Stock boot accepted keyboard input and returned on ON. A trailer beyond the mapped pages records the code location relative to the Stock object in nibbles. After Stock stored a HOME note and moved the program, a second process recalled it and Notebook read the note. Each exit now runs Stock GC and checks a relocated tagged temporary. The independent Port 0 variant provides checked RPL bounds, keeps its own port read-only and saves HOME from the application. A second Stock process loads and replaces that note. Active-execution GC remains open. |
-| HP49g+/HP50g | `tests/e2e/independent-hpc1/loader.c` supplies one code page and four RW pages from its fixed arena, but sets both `saturn_state` and `platform_cookie` to zero. It proves the common HPC1 bootstrap boundary, not the native object/port services used by Notebook. Supplying those services requires a captured Stock context and equivalent relocation/allocation boundaries before the application comparison is meaningful. |
+| HP49g+/HP50g | The independent Notebook passes the Stock map and suspended execution roots to the application, with its Port 1 code record protected from edits. The successful diagnostic launch leaves its code and writable mappings installed after the editor returns. Stock moves an RPL object between native calls. The second call checks both L1 descriptors, the mapped code hash and the contents of the entire leased page pool before restoring the Stock entries and releasing the blocks. The ordinary user launcher restores both slots at exit. |
 
 Across families, `platform/armtoolbox/stage1.c` derives main/Port1 allocation
 fences from the actual pool and publishes launcher and suspended-execution roots.
@@ -480,18 +506,9 @@ The follow-up `rpl-probe.c` now borrows and restores 28 main-RPL pages (112 KiB)
 while Stock execution and interrupts remain paused. Each page is checked against
 the saved native Read map, page-end contents are restored, and entry/return plus
 ten corruption negatives pass. Its optional state argument leaves the default
-entry package unchanged. This small-entry baseline does not establish combined
-KOS/RPL availability with the full Notebook resident, or a lease across native
-allocation/GC. Report: `/work/nov14-independent-rpl-pool-live/verified.json`. Then
-connect the captured Stock context and service fences to a service-capable
-HP49/50 Notebook prototype, followed by HP48gII application-sized ownership
-and the HP39 Aplet data boundary. Compare identical application
-sources and configuration; record package transfer cost, supported-flow memory
-use, allocation failure and settled return. This does not require the deferred
-whole-system worst-case memory proof. Until those comparisons exist, the
-installation-step benefit is established but a net memory, size or startup-time
-benefit is not. Production launchers remain in use and this evaluation remains
-open.
+entry package unchanged. The later Notebook uses Port 1 for code and KOS for writable pages and page
+tables. See the [family assessment](#source-level-family-assessment) for its
+Stock service and return checks.
 
 ## Common bootstrap
 

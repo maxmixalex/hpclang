@@ -6,7 +6,12 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
         return;
     hpclang_irq_restore(control[0]);
     unsigned count = 0, total = 0;
-    for (unsigned n = 8; n; n /= 2)
+#ifdef NOTEBOOK_USER_RETURN
+    unsigned n = POOL_PAGES;
+#else
+    unsigned n = 8;
+#endif
+    for (; n; n = n > 8 ? 8 : n / 2) {
         while (count < 12 && total + n <= REQUEST_PAGES) {
             unsigned ptr = stock_call(201, 0x100, n * 4096 + 4095);
             if (!ptr)
@@ -15,9 +20,18 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
             if (!owner(ptr, n * 4096 + 4095) || ptr + n * 4096 + 4095 > 0x08020000)
                 for (;;) {
                 }
+            u32 first = (ptr + 4095) & ~4095u;
+#ifdef NOTEBOOK_USER_RETURN
+            /* The lease record must fit before the first mapped page. */
+            if (n == POOL_PAGES && first - ptr < 168) {
+                if (stock_call(101, ptr, 0))
+                    for (;;) {
+                    }
+                break;
+            }
+#endif
             out[8 + 2 * count] = ptr;
             out[9 + 2 * count] = n;
-            u32 first = (ptr + 4095) & ~4095u;
             for (unsigned i = 0; i < n; i++) {
                 u32 p = first + i * 4096;
                 if ((desc(p) & 0xfff00003u) != 0x08000002u)
@@ -29,6 +43,7 @@ void exercise(u32 *out, volatile u32 *control, const u32 *map, u32 *frame)
             total += n;
             count++;
         }
+    }
     if (total != REQUEST_PAGES || (((out[8] + 4095) & ~4095u) - out[8]) < 168) {
         for (unsigned i = count; i; i--)
             if (stock_call(101, out[8 + 2 * (i - 1)], 0))

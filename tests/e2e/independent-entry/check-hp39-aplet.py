@@ -134,14 +134,17 @@ def check(
         if sum(memory.count(prefix + variant) for variant in variants) != 1:
             raise ValueError(f"saved named Aplet directory did not match {title!r}")
 
+        return len(prefix) + len(body)
+
     expected = saved if initial_note is None else initial
     if saved_note is not None:
         expected = note_object(saved_note)
-    require_entry(
-        title, with_custom_data(expected if original_note is None else note_object(original_note))
-    )
+    original = with_custom_data(expected if original_note is None else note_object(original_note))
+    extents = {title.decode(): require_entry(title, original)}
     if copy_state is not None:
-        require_entry(b"2", with_custom_data(word(0x5DA2) if copy_state == "reset" else expected))
+        copy = with_custom_data(word(0x5DA2) if copy_state == "reset" else expected)
+        extents["2"] = require_entry(b"2", copy)
+    return extents
 
 
 def main():
@@ -292,7 +295,7 @@ def main():
                 report.update(application_result=result, stock_l1=[restored_data, restored_code])
 
     sram = args.sram.read_bytes()
-    check(
+    extents = check(
         args.aplet.read_bytes(),
         sram,
         args.copy_state,
@@ -304,6 +307,7 @@ def main():
         args.original_note,
     )
     if report:
+        report["saved_aplet_entry_nibbles"] = extents
         print(json.dumps(report))
 
 
