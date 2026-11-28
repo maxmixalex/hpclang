@@ -2,7 +2,7 @@
 
 Current checkpoint: 2026-11-28. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `c2dd5b43` after [#74](https://github.com/maxmixalex/hpclang/pull/74).
+Accepted main is `3ca51e7c` after [#73](https://github.com/maxmixalex/hpclang/pull/73).
 
 - **M8.0 native ports.** [#66](https://github.com/maxmixalex/hpclang/pull/66) is on main. Port 2 now plans
   append space across six banks and stages a sector journal outside the target bank. Local tests cover
@@ -18,9 +18,9 @@ Accepted main is `c2dd5b43` after [#74](https://github.com/maxmixalex/hpclang/pu
   The HP49g+/HP50g Notebook used 40,980 bytes of KOS memory at peak and passed moving GC after editor exit.
   [#68](https://github.com/maxmixalex/hpclang/pull/68) closed after reconciliation produced the identical main
   tree. HP39/40 Stock workspace measurements are on main. [#76](https://github.com/maxmixalex/hpclang/pull/76)
-  frees 4 KiB in the editor and passed ten local Save/reopen cases. Two remote jobs failed; retrying only
-  failed jobs could not download the old build artifacts. A full CI build was submitted on the refreshed
-  branch. HP48gII HOME and Port 0 workspace measurements passed locally across first launch and reopen in both
+  frees 4 KiB in the editor and passed ten local Save/reopen cases. On its refreshed head (`17a23088`), the HP39g+ window dialogs and HP49g+ Port 2
+  retirement suites both passed locally. Full remote CI is pending.
+  The HP39 Stock harness now reports the transfer watchdog's failure reason in the job log. HP48gII HOME and Port 0 workspace measurements passed locally across first launch and reopen in both
   diagnostic and caller-stack-preserving modes. With the caller stack preserved, the reopened editors left
   92,753 and 90,682 whole bytes respectively. Active-execution GC and final release acceptance remain open.
   [Launcher measurements](architecture.md#notebook-first-install-transfer-size) · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
