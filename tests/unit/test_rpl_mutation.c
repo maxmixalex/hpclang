@@ -2199,6 +2199,10 @@ static void test_port1_edit_owned_suffix(void)
         assert(entry.name_length == 4 && !memcmp(entry.name, "TAIL", 4));
         assert_char_at(entry.value_address, 'T');
         assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
+        uint32_t last = cursor.address;
+        assert(!hpclang_rpl_port1_create_library(&io, 256, executable, sizeof(header) + body));
+        assert(!hpclang_rpl_port1_remove_library(&io, 256, 124, &guard));
+        assert(fixture.start == last && fixture.end == last + sizeof(header) + body);
     }
     /* Growth, shrinkage, same-size replacement and deletion must distinguish
      * interrupted commits from preflight I/O errors at every write boundary. */

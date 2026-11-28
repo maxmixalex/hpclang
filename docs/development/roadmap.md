@@ -11,7 +11,8 @@ Accepted main is `3ca51e7c` after [#73](https://github.com/maxmixalex/hpclang/pu
   symbolic objects, units, matrices, arrays, directories and backups before internal library replacement.
   [#79](https://github.com/maxmixalex/hpclang/pull/79) passed 180 host tests and HP49g+/HP50g Stock tests locally. Under exclusive
   ownership it can remove a final library with a body after checking references to the entire record.
-  The dependent Port 1 guard checks D0, D1 and eight Saturn hardware return slots before editing.
+  [#81](https://github.com/maxmixalex/hpclang/pull/81) also covers a target followed by movable records.
+  The guard checks D0, D1 and eight Saturn hardware return slots across the affected range.
   All 180 host tests and both HP49g+/HP50g original-ROM edit suites passed locally.
   Remaining gates include public library management, other execution roots, and Port 2 recovery installation,
   authority, startup and reclamation.
@@ -22,16 +23,16 @@ Accepted main is `3ca51e7c` after [#73](https://github.com/maxmixalex/hpclang/pu
   The HP49g+/HP50g Notebook used 40,980 bytes of KOS memory at peak and passed moving GC after editor exit.
   [#68](https://github.com/maxmixalex/hpclang/pull/68) closed after reconciliation produced the identical main
   tree. HP39/40 Stock workspace measurements are on main. [#76](https://github.com/maxmixalex/hpclang/pull/76)
-  frees 4 KiB in the editor and passed ten local Save/reopen cases. On its refreshed head (`17a23088`), the HP39g+ window dialogs and HP49g+ Port 2
-  retirement suites both passed locally. Full remote CI is pending.
-  The HP39 Stock harness now reports the transfer watchdog's failure reason in the job log. HP48gII HOME and Port 0 workspace measurements passed locally across first launch and reopen in both
-  diagnostic and caller-stack-preserving modes. With the caller stack preserved, the reopened editors left
-  92,753 and 90,682 whole bytes respectively. HP49g+/HP50g local tests also opened the saved editor after
-  Stock moved a tagged object with the launcher mappings installed. Resuming an already-running editor
-  across GC and final release acceptance remain open.
+  frees 4 KiB in the editor. Its refreshed HP39g+ window-dialog job passed remotely. Full CI is pending.
+  [#77](https://github.com/maxmixalex/hpclang/pull/77) measured 92,753 and 90,682 bytes of Stock workspace
+  on HP48gII HOME and Port 0 reopen. [#78](https://github.com/maxmixalex/hpclang/pull/78) exposes HP39
+  transfer failures in job logs. [#80](https://github.com/maxmixalex/hpclang/pull/80) reopened a saved
+  note after moving GC with mappings held on HP49g+/HP50g. Resuming a running editor across GC
+  and final release acceptance remain open.
   [Launcher measurements](architecture.md#notebook-first-install-transfer-size) · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
-- **M8.1–M8.5** are accepted. The combined M8.0/M8.6 tree (`ac646bbf`) passed all 180 host tests locally.
-  Its relocated SDK reproduced 613 release outputs and all six model-specific Notebook builds.
+- **M8.1–M8.5** remain accepted. Local integration `5d0b90b6` combines the reviewed heads of #76–#81.
+  It passed 180 host tests and six original-ROM Notebook regressions. The two 4,134-file SDK archives
+  matched, and the relocated install reproduced 613 outputs. Remote acceptance is tracked per PR.
 
 ## Scope and retained requirements
 

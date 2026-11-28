@@ -1071,7 +1071,9 @@ references still require their own checks before public replacement/removal.
 Internal ERAM edit primitives now validate complete backup chains, resize or
 remove records within the launcher ownership fence, and can move a following
 library if its validated encoding contains only its header, four zero table
-offsets and CRC. The guard must cover the whole shifted suffix. A body or
+offsets and CRC. An unregistered, unattached target library can have a body
+when it is removed or replaced by a header-only library of the same ID.
+The guard must cover the whole shifted suffix. A body or
 nonzero table offset prevents the move. Their caller must establish reference safety; they are not
 yet connected to the public write API. Host/sanitizer tests cover growth,
 shrinkage, same-size replacement, removal, CRC damage, I/O failure and bounds.
