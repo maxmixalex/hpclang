@@ -61,10 +61,12 @@ port returns `ENOSPC`. This does not provide automatic power-on recovery or
 compaction. The example preserves the editable note when an operation fails.
 
 Host tests cover operation selection and rejected writes for all three port
-indices using simulated service capabilities. The separate `notebook-backup`
-Stock fixture verifies Port 0 create, restore without changing the primary save,
-replacement, and removal across three launches. Recorded acceptance includes
-HP48gII, HP49g+ and HP50g ROM-emulator runs. The UI fixture separately checks primary persistence and pixels,
+indices using simulated service capabilities. The `notebook-backup` Stock fixture creates a backup, restores it after
+relaunch, replaces it and removes it on a third launch. It checks that HOME
+retains the primary note and that the removed backup can no longer be read.
+HP48gII exercises Port 0. HP49g+ and HP50g use distinct texts under the same
+backup name in Port 0 and Port 2, checking that each restore reads its own port.
+The UI fixture separately checks primary persistence and pixels,
 including all three HP39g+ launches with the model-specific build;
 this example does not establish completion of M8.6.
 
