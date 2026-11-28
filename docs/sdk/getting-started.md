@@ -56,9 +56,10 @@ do not depend on source timestamps, installation path or zlib version. The
 bundled font archive remains compressed. Symbolic links in an installation are
 rejected; package a normal `cmake --install` output.
 
-The SDK acceptance check compares two archives after changing the installed
-prefix and timestamps, validates the manifest, removes the original installation
-and builds the external examples from the unpacked distribution.
+The SDK acceptance check configures two clean CMake build directories and installs
+each into its own prefix. It changes the second installation's file timestamps,
+compares the archives byte for byte, validates the manifest and builds the external
+examples from the unpacked distribution after removing both installations.
 
 ## Build the C and C++ examples
 
