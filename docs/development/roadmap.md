@@ -22,7 +22,7 @@ Accepted main is `c2dd5b43` after [#74](https://github.com/maxmixalex/hpclang/pu
   failed jobs could not download the old build artifacts. A full CI build was submitted on the refreshed
   branch. HP48gII HOME and Port 0 workspace measurements passed locally across first launch and reopen in both
   diagnostic and caller-stack-preserving modes. With the caller stack preserved, the reopened editors left
-  92,737 and 90,682 whole bytes respectively. Active-execution GC and final release acceptance remain open.
+  92,753 and 90,682 whole bytes respectively. Active-execution GC and final release acceptance remain open.
   [Launcher measurements](architecture.md#notebook-first-install-transfer-size) · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
 - **M8.1–M8.5** are accepted. The combined M8.0/M8.6 tree (`ac646bbf`) passed all 180 host tests locally.
   Its relocated SDK reproduced 613 release outputs and all six model-specific Notebook builds.
