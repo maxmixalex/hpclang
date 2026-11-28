@@ -6,7 +6,8 @@ Accepted main is `c9672704` after the [verified SDK release checks #82](https://
 
 - **M8.0 native ports.** Port 1 reference checks and Port 2 append planning are on main. Guarded
   [Port 1 removal](https://github.com/maxmixalex/hpclang/pull/79) and [replacement](https://github.com/maxmixalex/hpclang/pull/81)
-  passed local integration tests and await CI on their updated branches. The [Port 2 planner](https://github.com/maxmixalex/hpclang/pull/84)
+  and the two Port 2 branches were reconciled with the accepted SDK. Integration `6081c2d9` passed all 180 host tests.
+  CI is pending on the four updated heads. The [Port 2 planner](https://github.com/maxmixalex/hpclang/pull/84)
   passed the HP49g+ and HP50g installation suites in [Core CI](https://github.com/maxmixalex/hpclang/actions/runs/46156279111).
   [Explicit replay](https://github.com/maxmixalex/hpclang/pull/86) freed a deleted allocation locally on HP49g+ and HP50g
   with an offline authorization record. Public library management, execution roots, trusted recovery installation,
@@ -16,7 +17,8 @@ Accepted main is `c9672704` after the [verified SDK release checks #82](https://
 - **M8.6 applications and release.** All six original-ROM Notebook jobs passed for the [verified SDK](https://github.com/maxmixalex/hpclang/actions/runs/46158651085).
   HP40gs reopened a 191-byte copy and retained the original note. Core, Quality and Documentation passed. [#80 Core CI](https://github.com/maxmixalex/hpclang/actions/runs/46155383833)
   verified that both HP49/50 models retain their mappings across a moving GC, enter Notebook with the saved
-  text and return to Stock. Runtime and Objects E2E remain pending. [Same-name backups across ports](https://github.com/maxmixalex/hpclang/pull/85)
+  text and return to Stock. The reconciled #80 head `6e907e75` repeated both ROM runs locally using
+  the released SDK ZIP and passed the Kermit retry test. CI is pending. [Same-name backups across ports](https://github.com/maxmixalex/hpclang/pull/85)
   passed locally and await CI.
   Windows shell checkout and Kermit startup fixes are tracked in [#87](https://github.com/maxmixalex/hpclang/pull/87)
   and [#88](https://github.com/maxmixalex/hpclang/pull/88). Resuming an active editor across GC and
