@@ -89,13 +89,14 @@ def check_cpp_headers(package, work, env):
     print(f"Installed SDK: {len(headers)} standalone C++ headers/profile PASS")
 
 
-def check_sdk_archive(root, prefix, sdk, work, env):
+def check_sdk_archive(root, prefixes, sdk, work, env):
     archives = [work / "sdk-first.zip", work / "sdk-second.zip"]
-    moved = work / "repacked prefix"
-    for index, location in enumerate((prefix, moved)):
+    for index, location in enumerate(prefixes):
+        installer = work / f"installer-{index}"
+        run("cmake", "-S", str(root), "-B", str(installer), env=env)
+        run("cmake", "--install", str(installer), "--prefix", str(location), env=env)
         if index:
-            prefix.rename(moved)
-            for path in moved.rglob("*"):
+            for path in location.rglob("*"):
                 if path.is_file():
                     os.utime(path, (1700000000, 1700000000))
         run(
@@ -107,6 +108,8 @@ def check_sdk_archive(root, prefix, sdk, work, env):
             str(archives[index]),
             env=env,
         )
+        shutil.rmtree(location)
+        shutil.rmtree(installer)
     if archives[0].read_bytes() != archives[1].read_bytes():
         raise AssertionError("Nonreproducible SDK distribution archive")
     with zipfile.ZipFile(archives[0]) as archive:
@@ -118,14 +121,11 @@ def check_sdk_archive(root, prefix, sdk, work, env):
             if len(data) != entry["size"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
                 raise AssertionError("SDK archive content mismatch: " + name)
         archive.extractall(sdk)
-    # Subsequent compilation must use the distributed package, with neither
-    # original installed prefix available as a hidden build dependency.
-    shutil.rmtree(moved)
-    for path in archives:
-        path.unlink()
+    archives[1].unlink()
     print(
         f"SDK distribution: {len(manifest['files'])} files, identical archives, extracted build input"
     )
+    return archives[0]
 
 
 def check_public_docs(package):
@@ -334,6 +334,9 @@ def check_interworking(package, work, env):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-archive", type=Path, help="save the verified SDK ZIP after all checks pass"
+    )
     parser.add_argument("--aplet-tool", type=Path)
     parser.add_argument("--aplet-assets", type=Path)
     parser.add_argument(
@@ -356,18 +359,9 @@ def main():
             export_dir.parent.mkdir(parents=True, exist_ok=True)
             staging = cleanup.enter_context(tempfile.TemporaryDirectory(dir=export_dir.parent))
             notebooks = Path(staging) / "inputs"
-        prefix = work / "original prefix"
         sdk = work / "relocated sdk"
-        run("cmake", "-S", str(root), "-B", str(work / "installer"), env=env)
-        run(
-            "cmake",
-            "--install",
-            str(work / "installer"),
-            "--prefix",
-            str(prefix),
-            env=env,
-        )
-        check_sdk_archive(root, prefix, sdk, work, env)
+        prefixes = [work / "first install", work / "second install"]
+        verified_archive = check_sdk_archive(root, prefixes, sdk, work, env)
         package = sdk / "share/hpclang"
         check_cpp_headers(package, work, env)
         check_public_docs(package)
@@ -494,7 +488,7 @@ endforeach()
         commands = json.loads((build / "compile_commands.json").read_text())
         for command in commands:
             serialized = json.dumps(command)
-            for forbidden in (str(root), str(prefix)):
+            for forbidden in map(str, (root, *prefixes)):
                 if forbidden in serialized:
                     raise AssertionError(f"Nonrelocatable build dependency: {forbidden}")
         reproducible_outputs = []
@@ -924,6 +918,13 @@ endforeach()
                 raise AssertionError(f"Model configuration did not reject {model}: {result}")
         if args.independent_notebooks:
             notebooks.rename(export_dir)
+        if args.output_archive:
+            destination = args.output_archive
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(dir=destination.parent) as staging_dir:
+                staged = Path(staging_dir) / "sdk.zip"
+                shutil.copyfile(verified_archive, staged)
+                staged.replace(destination)
         print("Installed SDK: C/C++, fonts, HPC1, six-model launchers and relocation PASS")
         if args.aplet_tool:
             print("Installed SDK: HP39g+/HP39gs/HP40gs C/C++ Aplet packaging PASS")

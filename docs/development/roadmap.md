@@ -2,19 +2,19 @@
 
 Current checkpoint: 2026-11-29. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `1405c01d` after the [roadmap checkpoint #83](https://github.com/maxmixalex/hpclang/pull/83).
+Accepted main is `c9672704` after the [verified SDK release checks #82](https://github.com/maxmixalex/hpclang/pull/82) merged.
 
 - **M8.0 native ports.** Port 1 reference checks and Port 2 append planning are on main. Guarded
   [Port 1 removal](https://github.com/maxmixalex/hpclang/pull/79) and [replacement](https://github.com/maxmixalex/hpclang/pull/81)
   passed local integration tests and await CI on their updated branches. The [Port 2 planner](https://github.com/maxmixalex/hpclang/pull/84)
-  passed the [HP49g+ installation suite](https://github.com/maxmixalex/hpclang/actions/runs/46156279111/job/141026001484).
+  passed the HP49g+ and HP50g installation suites in [Core CI](https://github.com/maxmixalex/hpclang/actions/runs/46156279111).
   [Explicit replay](https://github.com/maxmixalex/hpclang/pull/86) freed a deleted allocation locally on HP49g+ and HP50g
   with an offline authorization record. Public library management, execution roots, trusted recovery installation,
   authority lifecycle, automatic startup and reclamation remain open.
 - **M8.1–M8.5** are complete. The local integration at `31f44992` passed 180 host tests and SDK relocation,
   reproduced 613 release outputs and rebuilt Notebook for all six models with byte-identical model outputs.
 - **M8.6 applications and release.** All six original-ROM Notebook jobs passed for the [verified SDK](https://github.com/maxmixalex/hpclang/actions/runs/46158651085).
-  HP40gs reopened a 191-byte copy and retained the original note. The overall Core workflow is still running. [#80 Core CI](https://github.com/maxmixalex/hpclang/actions/runs/46155383833)
+  HP40gs reopened a 191-byte copy and retained the original note. Core, Quality and Documentation passed. [#80 Core CI](https://github.com/maxmixalex/hpclang/actions/runs/46155383833)
   verified that both HP49/50 models retain their mappings across a moving GC, enter Notebook with the saved
   text and return to Stock. Runtime and Objects E2E remain pending. [Same-name backups across ports](https://github.com/maxmixalex/hpclang/pull/85)
   passed locally and await CI.
