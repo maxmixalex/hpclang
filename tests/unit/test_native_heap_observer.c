@@ -17,19 +17,20 @@ static int read32(void *context, uint32_t address, uint32_t *value)
     return 0;
 }
 
-static void block(unsigned offset, unsigned size, unsigned heap)
+static void block(unsigned offset, unsigned size, unsigned flags)
 {
-    ram[heap * 4u] = BASE + offset;
     ram[offset / 4u] = size;
-    ram[offset / 4u + 1u] = (heap + 1u) * 0x100u;
+    ram[offset / 4u + 1u] = flags;
     ram[(offset + 16u + size) / 4u] = size;
 }
 
 static void sample(unsigned first, unsigned second)
 {
     memset(ram, 0, sizeof ram);
-    block(64, first, 0);
-    block(512, second, 1);
+    ram[0] = BASE + 64;
+    block(64, first, 0x100);
+    ram[4] = BASE + 512; /* Allocated list immediately follows the free descriptor. */
+    block(512, second, 0x1102);
 }
 
 int main(void)
@@ -44,39 +45,39 @@ int main(void)
     sample(200, 200);
     assert(native_heap_observe(&observation, read32, ram, BASE, BASE + sizeof ram, BASE) == 0);
     assert(observation.accepted == 4 && observation.rejected == 0);
-    assert(observation.minimum_total_usable == 120 && observation.minimum_sample == 2);
-    assert(observation.at_minimum[0].usable_bytes == 20);
-    assert(observation.at_minimum[1].usable_bytes == 100);
-    assert(observation.initial[0].usable_bytes == observation.latest[0].usable_bytes);
-    assert(observation.latest[0].blocks == 1 && observation.latest[0].metadata_bytes == 20);
-    assert(observation.latest[0].largest_usable_bytes == 200);
+    assert(observation.minimum_total_usable == 20 && observation.minimum_sample == 2);
+    assert(observation.at_minimum.usable_bytes == 20);
+    assert(observation.initial.usable_bytes == observation.latest.usable_bytes);
+    assert(observation.latest.blocks == 1 && observation.latest.metadata_bytes == 20);
+    assert(observation.latest.largest_usable_bytes == 200);
 
     struct native_heap_observation saved = observation;
-    const unsigned bad_offsets[] = {0, 64, 68, 72, 76, 280, 16};
-    const uint32_t bad_values[] = {BASE + 65, UINT32_MAX - 3, 0x2100, BASE + 64, BASE + 512,
-                                   0,         BASE + 64};
+    const unsigned bad_offsets[] = {0, 64, 68, 72, 76, 280};
+    const uint32_t bad_values[] = {BASE + 65, UINT32_MAX - 3, 0x2100, BASE + 64, BASE + 512, 0};
     for (unsigned i = 0; i < sizeof bad_offsets / sizeof *bad_offsets; ++i) {
         sample(200, 200);
         ram[bad_offsets[i] / 4u] = bad_values[i];
         observation = saved;
         assert(native_heap_observe(&observation, read32, ram, BASE, BASE + sizeof ram, BASE) == -1);
         assert(observation.accepted == saved.accepted && observation.rejected == 1);
-        assert(!memcmp(observation.latest, saved.latest, sizeof saved.latest));
+        assert(!memcmp(&observation.latest, &saved.latest, sizeof saved.latest));
         assert(observation.minimum_total_usable == saved.minimum_total_usable);
     }
     sample(200, 200);
-    block(128, 20, 1); /* A plausible second-heap header inside the first span. */
+    block(128, 20, 0x100); /* A linked free block overlapping the first. */
+    ram[72 / 4] = BASE + 128;
+    ram[140 / 4] = BASE + 64;
     assert(native_heap_observe(&observation, read32, ram, BASE, BASE + sizeof ram, BASE) == -1);
     sample(200, 200);
     fail_address = BASE + 68;
     assert(native_heap_observe(&observation, read32, ram, BASE, BASE + sizeof ram, BASE) == -1);
     fail_address = 0;
-    struct native_heap_capacity output[2], unchanged[2];
-    memset(output, 0x55, sizeof output);
-    memcpy(unchanged, output, sizeof output);
-    assert(native_heap_capacity_read(read32, ram, BASE, BASE + sizeof ram, BASE + 1020, output) ==
+    struct native_heap_capacity output, unchanged;
+    memset(&output, 0x55, sizeof output);
+    unchanged = output;
+    assert(native_heap_capacity_read(read32, ram, BASE, BASE + sizeof ram, BASE + 1020, &output) ==
            -1);
-    assert(!memcmp(output, unchanged, sizeof output));
+    assert(!memcmp(&output, &unchanged, sizeof output));
     memset(ram, 0, sizeof ram);
     assert(native_heap_observe(&observation, read32, ram, BASE, BASE + sizeof ram, BASE) == 0);
     assert(observation.minimum_total_usable == 0);
