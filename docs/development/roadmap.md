@@ -10,10 +10,10 @@ Accepted main is `8f225f5b` after [#78](https://github.com/maxmixalex/hpclang/pu
   Guarded internal library removal and replacement are in CI ([#79](https://github.com/maxmixalex/hpclang/pull/79),
   [#81](https://github.com/maxmixalex/hpclang/pull/81)). Both passed remote Quality after the edit validation fix.
   Local checks cover 180 host tests and HP49g+/HP50g original-ROM edits. [#84](https://github.com/maxmixalex/hpclang/pull/84)
-  plans a deleted-suffix sector at the installed recovery library's bound journal slot. Both original-ROM
-  models verified the complete 4 KiB image and unchanged Flash. On simulated NOR, the installed transaction
-  reclaimed the suffix and a new backup occupied the same address. Full-image comparison passed.
-  CI is pending. Public library management, execution
+  plans a deleted-suffix sector using the installed journal binding. HP49g+ and HP50g original-ROM
+  tests replayed the planner's journal with an offline ARMED record, freed the 40-byte allocation
+  and matched the entire 2 MiB Flash image. A host NOR test reused that address for a new backup.
+  The original-ROM replay passed locally. CI acceptance is pending. Public library management, execution
   roots, Port 2 recovery installation, authority, automatic startup and reclamation remain open.
 - **M8.1 through M8.5** remain accepted. The local integration at `5d0b90b6` passed all 180 host tests,
   six original-ROM Notebook regressions and the relocated SDK checks.

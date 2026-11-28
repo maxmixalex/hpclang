@@ -998,6 +998,10 @@ chain before returning the image. Both slots must be outside the target bank.
 A host NOR regression stages and activates that binding, replays one sector,
 retires the journal and closes the authority. It appends a CRC-valid backup at
 the previously occupied address and compares the entire six-bank image.
+On HP49g+ and HP50g original ROMs, a fixture copies the planner's READY journal
+from RAM into Flash and supplies its ARMED record offline. Explicit recovery
+restores the free tail, retires both records and returns to Stock. The complete
+2 MiB Flash image matches the expected sector and record updates.
 The caller still needs exclusive ownership and startup recovery before erasing Flash.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
