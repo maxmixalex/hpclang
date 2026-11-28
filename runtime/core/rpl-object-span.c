@@ -576,6 +576,12 @@ struct array_body_reader
     uint32_t prologue;
 };
 
+int hpclang_rpl_sequence_prologue(uint32_t type)
+{
+    return type == RPL_DOLIST || type == RPL_DOCOL || type == RPL_DOSYMB || type == RPL_DOEXT ||
+           type == RPL_DOMATRIX;
+}
+
 int hpclang_rpl_sequence_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
                                uint32_t limit, hpclang_rpl_sequence_visit_fn visit, void *context)
 {
@@ -587,8 +593,7 @@ int hpclang_rpl_sequence_visit(const struct hpclang_rpl_reader *reader, uint32_t
     int result = read_nibbles(reader, address, 5, limit, &type);
     if (result)
         return result;
-    if (type != RPL_DOLIST && type != RPL_DOCOL && type != RPL_DOSYMB && type != RPL_DOEXT &&
-        type != RPL_DOMATRIX)
+    if (!hpclang_rpl_sequence_prologue(type))
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     uint32_t span;
     result = parse_object(reader, address, limit, 0, &span);

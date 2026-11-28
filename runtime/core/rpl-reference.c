@@ -1090,7 +1090,7 @@ int hpclang_rpl_reference_composite_overlap(const struct hpclang_rpl_reader *rea
                                             uint32_t address, uint32_t prologue, uint32_t first,
                                             uint32_t end)
 {
-    if (prologue != 0x2a74u && prologue != 0x2afcu)
+    if (!hpclang_rpl_sequence_prologue(prologue) && prologue != 0x2afcu)
         return 0;
     if (address >= 0x100000u || first >= end || end > 0x100000u)
         return HPCLANG_RPL_SPAN_MALFORMED;
