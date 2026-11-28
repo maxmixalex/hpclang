@@ -61,6 +61,16 @@ each into its own prefix. It changes the second installation's file timestamps,
 compares the archives byte for byte, validates the manifest and builds the external
 examples from the unpacked distribution after removing both installations.
 
+To keep the exact ZIP used for those builds, run the check from the checkout
+with `ATFE` set to the toolchain directory. With the prepared HP39 resources,
+this also checks C and C++ Aplet packaging. The output ZIP is replaced only
+after verification succeeds.
+
+```sh
+python3 tests/sdk/check.py --output-archive build/hpclang-sdk.zip \
+  --aplet-tool /path/to/hp2aplet --aplet-assets /path/to/prepared-hpgcc39/data
+```
+
 ## Build the C and C++ examples
 
 Copy `share/hpclang/examples/hello` from the installation to a separate

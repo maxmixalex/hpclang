@@ -121,11 +121,11 @@ def check_sdk_archive(root, prefixes, sdk, work, env):
             if len(data) != entry["size"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
                 raise AssertionError("SDK archive content mismatch: " + name)
         archive.extractall(sdk)
-    for path in archives:
-        path.unlink()
+    archives[1].unlink()
     print(
         f"SDK distribution: {len(manifest['files'])} files, identical archives, extracted build input"
     )
+    return archives[0]
 
 
 def check_public_docs(package):
@@ -334,6 +334,9 @@ def check_interworking(package, work, env):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-archive", type=Path, help="save the verified SDK ZIP after all checks pass"
+    )
     parser.add_argument("--aplet-tool", type=Path)
     parser.add_argument("--aplet-assets", type=Path)
     parser.add_argument(
@@ -358,7 +361,7 @@ def main():
             notebooks = Path(staging) / "inputs"
         sdk = work / "relocated sdk"
         prefixes = [work / "first install", work / "second install"]
-        check_sdk_archive(root, prefixes, sdk, work, env)
+        verified_archive = check_sdk_archive(root, prefixes, sdk, work, env)
         package = sdk / "share/hpclang"
         check_cpp_headers(package, work, env)
         check_public_docs(package)
@@ -915,6 +918,13 @@ endforeach()
                 raise AssertionError(f"Model configuration did not reject {model}: {result}")
         if args.independent_notebooks:
             notebooks.rename(export_dir)
+        if args.output_archive:
+            destination = args.output_archive
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(dir=destination.parent) as staging_dir:
+                staged = Path(staging_dir) / "sdk.zip"
+                shutil.copyfile(verified_archive, staged)
+                staged.replace(destination)
         print("Installed SDK: C/C++, fonts, HPC1, six-model launchers and relocation PASS")
         if args.aplet_tool:
             print("Installed SDK: HP39g+/HP39gs/HP40gs C/C++ Aplet packaging PASS")
