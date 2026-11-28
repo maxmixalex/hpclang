@@ -39,6 +39,13 @@ def allocator_profile(rom, model):
     roots = struct.unpack_from("<I", rom, literal)[0]
     end = 0x08040000 if model == 4 else 0x08080000
     require(roots % 4 == 0 and 0x08000000 <= roots <= end - 32, "invalid allocator roots")
+    # At +0x128 the allocator loads the base at which +0x130 links a newly
+    # allocated block. This global immediately follows the free-list descriptor.
+    load = struct.unpack_from("<I", rom, start + 0x128)[0]
+    require(load & 0xFFFFF000 == 0xE59F3000, "unexpected allocated-list load")
+    literal = start + 0x130 + (load & 0xFFF)
+    require(literal <= len(rom) - 4, "allocated-list literal outside ROM")
+    require(struct.unpack_from("<I", rom, literal)[0] == roots + 16, "unreviewed heap layout")
     # The fingerprinted implementation has one common return, reached both
     # after linking a successful allocation and on an allocation failure.
     # Observe BEFORE this pop executes, when metadata is stable and r0 contains
@@ -73,38 +80,34 @@ def free_capacity(ram, roots):
         )
         return struct.unpack_from("<I", ram, address - begin)[0]
 
-    heaps, spans = [], []
-    for index in range(2):
-        head, previous, seen, sizes = word(roots + index * 16), 0, set(), []
-        while head:
-            require(
-                head not in seen and begin <= head <= end - 20, "cyclic/out-of-range free block"
-            )
-            seen.add(head)
-            size, flags, following, back = (word(head + offset) for offset in (0, 4, 8, 12))
-            require(size % 4 == 0 and size <= end - head - 20, "invalid free extent")
-            require(
-                flags & 0xF000 == 0 and flags & 0x300 == (index + 1) * 0x100,
-                "invalid free block flags",
-            )
-            require(
-                back == previous and word(head + 16 + size) == size, "inconsistent free list/footer"
-            )
-            spans.append((head, head + size + 20))
-            sizes.append(size)
-            previous, head = head, following
-        heaps.append(
-            dict(
-                heap=(index + 1) * 0x100,
-                blocks=len(sizes),
-                usable_bytes=sum(sizes),
-                largest_usable_bytes=max(sizes, default=0),
-                metadata_bytes=20 * len(sizes),
-            )
+    spans = []
+    head, previous, seen, sizes = word(roots), 0, set(), []
+    while head:
+        require(head not in seen and begin <= head <= end - 20, "cyclic/out-of-range free block")
+        seen.add(head)
+        size, flags, following, back = (word(head + offset) for offset in (0, 4, 8, 12))
+        require(size % 4 == 0 and size <= end - head - 20, "invalid free extent")
+        require(
+            flags & 0xF000 == 0 and flags & 0x300 == 0x100,
+            "invalid free block flags",
         )
+        require(
+            back == previous and word(head + 16 + size) == size, "inconsistent free list/footer"
+        )
+        spans.append((head, head + size + 20))
+        sizes.append(size)
+        previous, head = head, following
     spans.sort()
     require(all(a[1] <= b[0] for a, b in zip(spans, spans[1:])), "overlapping free blocks")
-    return heaps
+    return [
+        dict(
+            heap=0x100,
+            blocks=len(sizes),
+            usable_bytes=sum(sizes),
+            largest_usable_bytes=max(sizes, default=0),
+            metadata_bytes=20 * len(sizes),
+        )
+    ]
 
 
 def metadata(data, model, phase, size):
@@ -196,10 +199,10 @@ def verify(directory, model, rom_path=None, ui_return=False):
         "invalid lifecycle order",
     )
     report = dict(
-        version=1,
+        version=2,
         model=model,
         passed=True,
-        scope="Sampled native free lists, not total memory or peak admission",
+        scope="Sampled free capacity of Stock heap 0x100",
         rom_sha256=hashlib.sha256(rom).hexdigest(),
         status_sha256=hashlib.sha256(status_path.read_bytes()).hexdigest(),
         allocator_code_sha256=fingerprint,

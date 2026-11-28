@@ -11,7 +11,7 @@ static const uint8_t record[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03,
                                  0x4c, 0x41, 0x53, 0x48, 0x4f, 0x4e, 0x45, 0x08, 0x14, 0x26, 0x90,
                                  0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
 static uint8_t flash[6u * 0x20000u];
-static unsigned writes;
+static unsigned writes, reads;
 static uint32_t fail_address;
 static unsigned write_failures;
 static unsigned fail_write_at;
@@ -25,6 +25,7 @@ static int read16(void *context, uint32_t address, uint16_t *value)
 {
     (void)context;
     assert(!(address & 1u) && address >= base && address - base < sizeof flash);
+    ++reads;
     if (address == fail_address)
         return 0;
     if (fail_read_after_write && writes) {
@@ -67,7 +68,7 @@ static void init(void)
         flash[i * 0x20000u + 0x100u] = 0xf0;
         flash[i * 0x20000u + 0x101u] = (uint8_t)(i + 8u);
     }
-    writes = 0;
+    reads = writes = 0;
     write_failures = 0;
     fail_write_at = UINT32_MAX;
     fail_address = UINT32_MAX;
@@ -177,6 +178,68 @@ static void fill_bank(uint32_t index)
     flash[at + 1u] = (uint8_t)extent;
     flash[at + 2u] = (uint8_t)(extent >> 8u);
     flash[at + 3u] = (uint8_t)(0xf0u | (extent >> 16u));
+}
+
+static void plan_append_space(const struct hpclang_rpl_flash_io *io)
+{
+    struct hpclang_rpl_flash_append_space plan;
+    init();
+    /* Even on empty Flash the last bank must be checked. Each tail halfword
+     * needs only one bus read, apart from the header and end-marker probes. */
+    flash[0x104] = 0;
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan));
+    assert(plan.slot == base + 0x105u && !plan.sector_count);
+    assert(reads <= 6u * ((0x20000u - 0x104u) / 2u + 4u));
+    fail_address = base + sizeof flash - 2u;
+    assert(hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan) ==
+           HPCLANG_RPL_FLASH_FAILED);
+    fail_address = UINT32_MAX;
+    flash[sizeof flash - 1u] = 0xfe;
+    assert(hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(!writes);
+    init();
+    fill_bank(0);
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan));
+    assert(plan.slot == base + 0x20105u && !plan.sector_count);
+
+    for (unsigned bank = 1; bank < 6; ++bank)
+        fill_bank(bank);
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan));
+    assert(plan.slot == base + 0x105u && plan.sector_count == 32u);
+
+    /* Put a live backup between two deleted records in bank 10. Only its
+     * trailing backup may be reclaimed, which needs just the final sector. */
+    uint32_t bank = 2u * 0x20000u;
+    uint32_t at = bank + 0x105u;
+    uint32_t extent = ((0x40000u - 0x20au - 2u) & ~3u) - 2u - 4u * sizeof record;
+    flash[at + 1] = (uint8_t)extent;
+    flash[at + 2] = (uint8_t)(extent >> 8);
+    flash[at + 3] = (uint8_t)(0xf0u | (extent >> 16));
+    at += 1u + extent / 2u;
+    memcpy(flash + at, record, sizeof record);
+    at += sizeof record;
+    memcpy(flash + at, record, sizeof record);
+    flash[at] = 0;
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan));
+    assert(plan.slot == base + at && plan.sector_count == 1u);
+    assert(!hpclang_rpl_flash_plan_append_space(io, sizeof record + 2u, &plan));
+    assert(plan.slot == base + 0x105u && plan.sector_count == 32u);
+
+    uint8_t journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    uint32_t slot = 17;
+    assert(hpclang_rpl_flash_prepare_reclaim_sector(io, base + bank + 0x1f000u, journal,
+                                                    sizeof journal,
+                                                    &slot) == HPCLANG_RPL_FLASH_NOSPACE);
+    assert(slot == 17 && !writes);
+
+    plan = (struct hpclang_rpl_flash_append_space){12, 34};
+    assert(hpclang_rpl_flash_plan_append_space(io, 0x20000, &plan) == HPCLANG_RPL_FLASH_NOSPACE);
+    assert(hpclang_rpl_flash_plan_append_space(io, 3, &plan) == HPCLANG_RPL_FLASH_INVALID);
+    flash[5u * 0x20000u + 0x100u] = 0;
+    assert(hpclang_rpl_flash_plan_append_space(io, sizeof record, &plan) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(plan.slot == 12 && plan.sector_count == 34 && !writes);
 }
 
 static int string_nibble(void *context, uint32_t address, uint8_t *value)
@@ -1041,6 +1104,7 @@ static void create_libraries(const struct hpclang_rpl_flash_io *io)
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {0, read16, program16, base, base + sizeof flash};
+    plan_append_space(&io);
     init();
     uint32_t attempted = UINT32_MAX;
     flash[5u * 0x20000u + 0x110u] = 0;

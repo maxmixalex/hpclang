@@ -17,8 +17,11 @@ def counter(value):
     return type(value) is int and 0 <= value <= 0xFFFFFFFFFFFFFFFF
 
 
-def capacity(heaps, available):
-    require(isinstance(heaps, list) and len(heaps) == 2, "expected two native heaps")
+def capacity(heaps, available, version):
+    require(
+        isinstance(heaps, list) and len(heaps) == (2 if version == 1 else 1),
+        "unexpected native heap count",
+    )
     total = 0
     for heap in heaps:
         require(isinstance(heap, dict), "invalid heap capacity")
@@ -28,6 +31,8 @@ def capacity(heaps, available):
         require(heap["metadata"] == heap["blocks"] * 20, "invalid native block overhead")
         require(heap["blocks"] != 0 or heap["usable"] == 0, "inconsistent empty heap")
         total += heap["usable"] + heap["metadata"]
+    if version == 1:
+        require(not any(heaps[1].values()), "legacy trace counted the allocated list as free")
     require(total <= available, "capacity exceeds SRAM")
     return sum(heap["usable"] for heap in heaps)
 
@@ -38,8 +43,18 @@ def verify(trace, profile, status):
         all(status.get(key) is True for key in ("saw_pass", "returned", "return_settled")),
         "Stock execution/settled return missing",
     )
+    report = verify_observations(trace, profile)
+    names = [phase["phase"] for phase in trace["phases"]]
     require(
-        type(trace.get("version")) is int and trace["version"] == 1, "unsupported trace version"
+        "application-pass" in names and names[-1] == "settled-return", "incomplete lifecycle phases"
+    )
+    return report
+
+
+def verify_observations(trace, profile):
+    require(
+        type(trace.get("version")) is int and trace["version"] in (1, 2),
+        "unsupported trace version",
     )
     for key, source in (
         ("model", "model"),
@@ -65,9 +80,6 @@ def verify(trace, profile, status):
         ),
         "invalid phase name",
     )
-    require(
-        "application-pass" in names and names[-1] == "settled-return", "incomplete lifecycle phases"
-    )
     available = profile["end"] - profile["begin"]
     accepted = failed = 0
     minima = []
@@ -90,7 +102,8 @@ def verify(trace, profile, status):
             "allocation failure count exceeds samples",
         )
         values = {
-            key: capacity(phase.get(key), available) for key in ("initial", "minimum", "latest")
+            key: capacity(phase.get(key), available, trace["version"])
+            for key in ("initial", "minimum", "latest")
         }
         if phase["accepted"]:
             require(
@@ -99,7 +112,7 @@ def verify(trace, profile, status):
             require(
                 type(phase.get("minimum_total_usable")) is int
                 and phase["minimum_total_usable"] == values["minimum"],
-                "minimum is not a paired-heap sum",
+                "minimum disagrees with sampled free capacity",
             )
             require(
                 values["minimum"] <= min(values["initial"], values["latest"]),

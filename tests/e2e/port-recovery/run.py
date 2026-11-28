@@ -68,6 +68,8 @@ def emulator(
     *,
     flash_busy=False,
     reset_checkpoint=False,
+    resource_prefix=None,
+    native_heap_profile=None,
 ):
     phase.mkdir(parents=True, exist_ok=True)
     seq = phase / "sequence.seq"
@@ -86,6 +88,15 @@ def emulator(
         HPCLANG_STOCK_PREFIX=str(phase / "stock"),
         HPCLANG_STOCK_JSON=str(phase / "stock.json"),
     )
+    if resource_prefix is not None:
+        env["HPCLANG_X50NG_RESOURCE_SNAPSHOT"] = str(resource_prefix)
+    if native_heap_profile is not None:
+        env.update(
+            HPCLANG_X50NG_NATIVE_HEAP=str(phase / "native-heap.json"),
+            HPCLANG_X50NG_NATIVE_HEAP_MODEL=str(native_heap_profile["model"]),
+            HPCLANG_X50NG_NATIVE_HEAP_PC=str(native_heap_profile["return_pc"]),
+            HPCLANG_X50NG_NATIVE_HEAP_ROOTS=str(native_heap_profile["free_list_roots"]),
+        )
     if usb is not None:
         env["HPCLANG_X50NG_USB0"] = str(usb)
         env["HPCLANG_E2E_HOST_GATE_FILE"] = str(phase / "complete")
@@ -129,6 +140,8 @@ def transfer(
     actions="",
     extra_files=(),
     sd_image=None,
+    resource_prefix=None,
+    native_heap_profile=None,
 ):
     if execution_ms < 2000:
         raise ValueError("Execution budget must allow the final checkpoint")
@@ -175,7 +188,16 @@ def transfer(
     ) as bridge:
         wait_for(lambda: xtty.exists() and ktty.exists(), [bridge], 10, "PTY creation")
         extra = [f"--sd-dir={sd_image}"] if sd_image is not None else []
-        with emulator(args, recovery, sequence, extra, usb=xtty, power_cut=power_cut) as child:
+        with emulator(
+            args,
+            recovery,
+            sequence,
+            extra,
+            usb=xtty,
+            power_cut=power_cut,
+            resource_prefix=resource_prefix,
+            native_heap_profile=native_heap_profile,
+        ) as child:
             wait_for(
                 lambda: (recovery / "stock-server-usb.pgm").exists(),
                 [bridge, child],

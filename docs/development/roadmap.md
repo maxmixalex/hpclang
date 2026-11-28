@@ -12,21 +12,24 @@ merged the direct Port 1 stack guard.
   blocks edits that would invalidate a direct data-stack reference. [#61](https://github.com/maxmixalex/hpclang/pull/61)
   and [#63](https://github.com/maxmixalex/hpclang/pull/63) extend internal Port 1
   edits to remove and replace an owned, unregistered header-only library.
-  #63 at `496dbe23` checks configured Stock roots and both fields of top-level
-  data-stack ACPTRs. Host tests, focused sanitizers and both Stock ROM regressions
+  #63 checks configured Stock roots, top-level data-stack ACPTRs and address fields inside nested lists. Host tests, focused sanitizers and both Stock ROM regressions
   passed locally. #61 targets main; #61 and #63 await remote acceptance.
   [#66](https://github.com/maxmixalex/hpclang/pull/66) at `c8478724` scans trailing
   deleted Port 2 records and stages sector images. Local simulated Flash passed
   interrupted erase, replay and reuse across a two-sector suffix. CI is pending.
-  Nested references, remaining execution roots, public library management
+  The follow-up to #70 checks stack arrays, directories and backups. All 180 host
+  tests passed locally. An array reference blocked replacement on both HP49g+ and
+  HP50g Stock emulators, including two relaunches per model. CI submitted.
+  Other references, remaining execution roots, public library management
   and Port 2 installation, recovery and space reclamation remain open.
 - **M8.6 applications and release.** [#60](https://github.com/maxmixalex/hpclang/pull/60)
   is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) now targets
   main for the 122,333-byte HP48gII Port 0 transfer (16 KiB smaller), and [#64](https://github.com/maxmixalex/hpclang/pull/64)
   compares all six launchers. Local measurements support retaining the
-  production SDK defaults. #64 at `a10d9aa9` covers Port 1 install-offset changes and
-  live KOS allocation measurements. Both models used 45,096 bytes in the editor
-  locally. Remote acceptance, peak resident memory, GC with
+  production SDK defaults. #64 checks Port 1 install-offset changes. In local
+  HP49g+ and HP50g runs the editor's two KOS blocks and Port 1 backup totaled
+  130,691 bytes. After both Save and reopen the Stock allocator reclaimed all
+  45,096 KOS bytes. On HP48gII the installed Port 0 backup used 244,683 nibbles after save and reopen, including the 102,400-byte mapped pool. Remote acceptance, peak resident memory, GC with
   live native mappings, and final release acceptance remain open.
   [Launcher measurements](https://github.com/maxmixalex/hpclang/blob/aaca2595692db5608ac6d11bd43513b77895faba/docs/development/architecture.md#notebook-first-install-transfer-size)
   · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).

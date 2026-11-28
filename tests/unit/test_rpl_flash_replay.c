@@ -21,6 +21,10 @@ static const uint8_t backup[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03,
                                  0x4c, 0x41, 0x53, 0x48, 0x4f, 0x4e, 0x45, 0x08, 0x14, 0x26, 0x90,
                                  0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
 
+static const uint8_t library[] = {0x53, 0x36, 0x00, 0x10, 0x40, 0x2b, 0x60, 0x02, 0x00, 0x01,
+                                  0x58, 0x01, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                  0x00, 0x00, 0x00, 0xd0, 0xc5, 0xf2, 0xff, 0xff};
+
 static int read16(void *context, uint32_t address, uint16_t *value)
 {
     assert(context == flash && !(address & 1u) && address >= FIRST && address + 1 < END);
@@ -674,8 +678,137 @@ static void non_header_sector_test(void)
     sector_address = FIRST;
 }
 
+static int bank_nibble(void *context, uint32_t at, uint8_t *value)
+{
+    assert(at < 0x40000u);
+    *value = (((const uint8_t *)context)[at / 2] >> (4u * (at & 1u))) & 15u;
+    return 1;
+}
+
+static void reclaim_published_sector_test(void)
+{
+    uint32_t journal = 17;
+    const uint32_t live_end = 0x105u + sizeof library;
+    prepare_preflight();
+    memcpy(flash + 0x105, library, sizeof library);
+    memcpy(flash + live_end, backup, sizeof backup);
+    flash[live_end] = 0;
+    assert(hpclang_rpl_flash_prepare_reclaim_sector(&io.flash, FIRST + SECTOR, scratch,
+                                                    sizeof scratch,
+                                                    &journal) == HPCLANG_RPL_FLASH_NOT_FOUND);
+    assert(journal == 17 && !programs && !erases);
+    /* The other bank already holds a library: its header and body stay intact. */
+    memcpy(flash + SLOT - FIRST, library, sizeof library);
+    assert(!hpclang_rpl_flash_prepare_reclaim_sector(&io.flash, FIRST, scratch, sizeof scratch,
+                                                     &journal));
+    assert(journal == SLOT + sizeof library && !programs && !erases);
+    assert(!memcmp(flash + SLOT - FIRST, library, sizeof library));
+    memset(flash + SLOT - FIRST, 255, sizeof library);
+    assert(!hpclang_rpl_flash_prepare_reclaim_sector(&io.flash, FIRST, scratch, sizeof scratch,
+                                                     &journal));
+    assert(journal == SLOT && !programs && !erases);
+    memcpy(desired, flash, live_end);
+    memset(desired + live_end, 255, SECTOR - live_end);
+    memcpy(original, flash, sizeof flash);
+    memcpy(original + journal - FIRST, scratch, sizeof scratch);
+    publishing = 1;
+    assert(publish() == HPCLANG_RPL_FLASH_WRITTEN);
+    publishing = 0;
+
+    erase_error = 1;
+    erase_prefix = 512;
+    assert(replay() == HPCLANG_RPL_FLASH_DIRTY);
+    /* The verifier starts again using only Flash and the six bank boundaries. */
+    reset_counters();
+    uint32_t slot = 0, target = 0;
+    uint8_t workspace[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == 1);
+    assert(slot == SLOT && target == FIRST && !programs && !erases);
+    assert(hpclang_rpl_flash_sector_replay_expected(&io, slot, workspace, sizeof scratch, scratch,
+                                                    sizeof scratch) == HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!memcmp(flash, original, live_end));
+    publishing = 1;
+    assert(hpclang_rpl_flash_retire_sector(&io.flash, slot, workspace, sizeof scratch) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    publishing = 0;
+    assert(!hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                               &target));
+    assert(hpclang_rpl_flash_create_backup(&io.flash, backup, sizeof backup, &slot) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    assert(slot == FIRST + live_end && !memcmp(flash + live_end, backup, sizeof backup));
+    reset_counters();
+    assert(!hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                               &target));
+    assert(!programs && !erases);
+    assert(!memcmp(flash, original, live_end));
+}
+
+static void reclaim_suffix_test(void)
+{
+    const struct hpclang_rpl_reader bank = {bank_nibble, flash};
+    uint32_t live_end = 0x105u + sizeof backup;
+    memset(flash, 255, sizeof flash);
+    for (unsigned i = 0; i < 0x100; ++i)
+        flash[i] = (uint8_t)i;
+    /* Stock user bank 8 identity. */
+    memcpy(flash + 0x100, "\xf0\x08\x00\x00\x00", 5);
+    memcpy(flash + 0x105, backup, sizeof backup);
+    assert(!hpclang_rpl_flash_reclaim_sector_image(&bank, 0, desired, sizeof desired));
+    /* Deleted records cross the sector boundary. Plan both against intact Flash. */
+    for (unsigned i = 0; i < 128; ++i) {
+        unsigned at = live_end + i * sizeof backup;
+        memcpy(flash + at, backup, sizeof backup);
+        flash[at] = 0;
+    }
+    uint8_t continuation[SECTOR];
+    assert(!hpclang_rpl_flash_reclaim_sector_image(&bank, 2 * SECTOR, continuation, SECTOR));
+    assert(hpclang_rpl_flash_reclaim_sector_image(&bank, 1, continuation, SECTOR) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    flash[0x1ffff] = 0;
+    assert(hpclang_rpl_flash_reclaim_sector_image(&bank, 0, desired, SECTOR) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    flash[0x1ffff] = 255;
+    assert(hpclang_rpl_flash_reclaim_sector_image(&bank, SECTOR, continuation, SECTOR) == 1);
+    for (unsigned i = 0; i < SECTOR; ++i)
+        assert(continuation[i] == 255);
+    assert(hpclang_rpl_flash_reclaim_sector_image(&bank, 0, desired, SECTOR) == 1);
+    assert(!memcmp(desired, flash, live_end));
+    for (unsigned i = live_end; i < SECTOR; ++i)
+        assert(desired[i] == 255);
+    /* A caller-owned journal in another bank replays the staged sector after a cut. */
+    assert(!hpclang_rpl_flash_sector_encode(FIRST, END, SLOT, FIRST, desired, flash + SLOT - FIRST,
+                                            HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES));
+    const uint32_t second_slot = SLOT + 2 * SECTOR;
+    assert(!hpclang_rpl_flash_sector_encode(FIRST, END, second_slot, FIRST + SECTOR, continuation,
+                                            flash + second_slot - FIRST,
+                                            HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES));
+    memcpy(original, flash, sizeof flash);
+    reset_counters();
+    erase_error = 1;
+    erase_prefix = 512;
+    assert(replay() == HPCLANG_RPL_FLASH_DIRTY);
+    retry();
+    sector_address = FIRST + SECTOR;
+    reset_counters();
+    assert(hpclang_rpl_flash_sector_replay(&io, second_slot, scratch, sizeof scratch) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    struct hpclang_rpl_flash_space tail;
+    assert(!hpclang_rpl_flash_tail(&bank, 0x20au, 0x40000u, &tail));
+    assert(tail.address == 2 * live_end && !memcmp(flash, original, live_end));
+    sector_address = FIRST;
+    /* Reuse the released address for a distinct CRC-valid native library. */
+    assert(hpclang_rpl_flash_append(&io.flash, FIRST + live_end, library, sizeof library) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!memcmp(flash + live_end, library, sizeof library));
+    assert(!hpclang_rpl_flash_tail(&bank, 0x20au, 0x40000u, &tail));
+    assert(tail.address == 2 * (live_end + sizeof library));
+}
+
 int main(void)
 {
+    reclaim_published_sector_test();
+    reclaim_suffix_test();
     for (unsigned i = 0; i < sizeof original; ++i)
         original[i] = (uint8_t)(i * 31u + 11u);
     for (unsigned i = 0; i < SECTOR; ++i)

@@ -229,6 +229,24 @@ int hpclang_rpl_flash_allocation_find(const struct hpclang_rpl_reader *reader, u
 int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
                            struct hpclang_rpl_flash_space *space);
 
+/* Locate consecutive deleted allocations immediately before the erased tail.
+ * Success reports the exact native allocation range in nibbles (zero length
+ * when absent). The entire chain and erased tail must validate. This range
+ * can still contain referenced payloads and retired recovery infrastructure.
+ * Reuse requires separate ownership, reference and erase-sector checks. */
+int hpclang_rpl_flash_deleted_suffix(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                     uint32_t end, struct hpclang_rpl_flash_space *space);
+
+/* Build the desired image for one 4 KiB sector intersecting the deleted suffix.
+ * The stable reader maps one complete validated Stock bank at nibble address 0;
+ * sector_offset is bank-relative in bytes. Return 1 for an image, 0 if the
+ * sector is unaffected, or a negative span result. The output is disposable
+ * staging RAM on error. For a multi-sector suffix, plan all images against
+ * the original bank before editing it. Publication requires separate durable
+ * transaction ownership, reference exclusion and recovery ordering. */
+int hpclang_rpl_flash_reclaim_sector_image(const struct hpclang_rpl_reader *reader,
+                                           uint32_t sector_offset, uint8_t *image, uint32_t bytes);
+
 struct hpclang_rpl_flash_discard
 {
     uint32_t address;

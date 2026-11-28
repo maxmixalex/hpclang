@@ -78,8 +78,8 @@ int hpclang_rpl_stack_depth(const struct hpclang_rpl_reader *reader, uint32_t *d
     return stack_bounds(reader, NULL, depth);
 }
 
-int hpclang_rpl_stack_direct_overlap(const struct hpclang_rpl_reader *reader, uint32_t first,
-                                     uint32_t end)
+int hpclang_rpl_stack_reference_overlap(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                        uint32_t end, hpclang_rpl_stack_inspect_fn inspect)
 {
     if (first >= end || end > RPL_SATURN_MAX + 1u)
         return HPCLANG_RPL_STACK_MALFORMED;
@@ -94,6 +94,26 @@ int hpclang_rpl_stack_direct_overlap(const struct hpclang_rpl_reader *reader, ui
             return result;
         if (target >= first && target < end)
             return 1;
+        uint32_t prologue;
+        result = read_word5(reader, target, &prologue);
+        if (result)
+            return result;
+        if (inspect) {
+            result = inspect(reader, target, prologue, first, end);
+            if (result)
+                return result;
+        }
+        if (prologue == 0x02baau) {
+            /* Both the data address and the executable bank switch are references. */
+            for (uint32_t offset = 5; offset <= 10; offset += 5) {
+                uint32_t field;
+                result = read_word5(reader, target + offset, &field);
+                if (result)
+                    return result;
+                if (field >= first && field < end)
+                    return 1;
+            }
+        }
     }
     return 0;
 }

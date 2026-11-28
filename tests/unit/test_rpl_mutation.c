@@ -2117,13 +2117,30 @@ static void test_port1_edit_owned_suffix(void)
            HPCLANG_RPL_MUTATION_NOT_FOUND);
     assert(hpclang_rpl_port1_remove_library(&io, 256, 4096, &guard) ==
            HPCLANG_RPL_MUTATION_MALFORMED);
+    const uint8_t renamed[] = {0x40, 0x2b, 0x80, 0x02, 0x00, 0x02, 0x58, 0x59,
+                               0x02, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                               0x00, 0x00, 0x00, 0x00, 0x90, 0x59, 0x02};
+    assert(hpclang_rpl_port1_replace_library(&io, 256, 124, renamed, 45, &guard) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    uint8_t invalid[sizeof(renamed)];
+    memcpy(invalid, renamed, sizeof(invalid));
+    invalid[20] ^= 0x10; /* CRC */
+    assert(hpclang_rpl_port1_replace_library(&io, 256, 123, invalid, 45, &guard) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
     fixture.result = HPCLANG_RPL_MUTATION_BUSY;
     assert(hpclang_rpl_port1_remove_library(&io, 256, 123, &guard) == HPCLANG_RPL_MUTATION_BUSY);
     assert(writes == before);
     fixture.result = HPCLANG_RPL_MUTATION_OK;
     assert(!hpclang_rpl_port1_create_backup(&io, 256, small, small_span));
-    assert(!hpclang_rpl_port1_remove_library(&io, 256, 123, &guard));
+    assert(!hpclang_rpl_port1_replace_library(&io, 256, 123, renamed, 45, &guard));
     assert(fixture.start == 0 && fixture.end == sizeof(header) + small_span);
+    cursor = (struct hpclang_rpl_port_cursor){0, 256, 0};
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.library_number == 123);
+    assert(entry.name_length == 2 && !memcmp(entry.name, "XY", 2));
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == 45);
+    assert(entry.name_length == 4 && !memcmp(entry.name, "DATA", 4));
+    assert(!hpclang_rpl_port1_remove_library(&io, 256, 123, &guard));
+    assert(fixture.start == 0 && fixture.end == 45 + small_span);
     cursor = (struct hpclang_rpl_port_cursor){0, 256, 0};
     assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == 0);
     assert(entry.name_length == 4 && !memcmp(entry.name, "DATA", 4));
@@ -2153,6 +2170,11 @@ static void test_port1_edit_owned_suffix(void)
                HPCLANG_RPL_MUTATION_UNSUPPORTED);
         assert(hpclang_rpl_port1_remove_library(&io, 256, 124, &guard) ==
                HPCLANG_RPL_MUTATION_UNSUPPORTED);
+        uint8_t executable[22] = {0};
+        for (unsigned i = 0; i < sizeof(header) + body; ++i)
+            executable[i / 2] |= memory[fixed_at + i] << (4 * (i % 2));
+        assert(hpclang_rpl_port1_replace_library(&io, 256, 124, executable, sizeof(header) + body,
+                                                 &guard) == HPCLANG_RPL_MUTATION_UNSUPPORTED);
         assert(writes == before);
         assert(!hpclang_rpl_port1_replace_backup(&io, 256, same, same_span, &guard));
         assert(fixture.start == 0 && fixture.end == small_span);
@@ -2676,6 +2698,17 @@ static void test_root_sources(void)
     put_word(0x86128, 5, 0);
     put_word(0x86133, 5, 0x41234);
     put_word(0x86138, 5, 0x22f5a);
+    /* A return cursor may point inside the bank window without identifying
+     * an object header. The upper endpoint itself is outside the edit. */
+    put_word(0x84ffbu, 5u, 0x4789au);
+    assert(hpclang_rpl_mutation_check_root_range(&io, 0x47899u, 0x4789bu) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+    assert(hpclang_rpl_mutation_check_root_range(&io, 0x47899u, 0x4789au) == 0);
+    io.library_table = 0xfffffu;
+    assert(hpclang_rpl_mutation_check_root_range(&io, 0x47899u, 0x4789bu) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    io.library_table = 0x8611du;
+    put_word(0x84ffbu, 5u, pair.object_b);
     struct source_visit_state state = {0};
     uint8_t *before = malloc(sizeof memory);
     assert(before);

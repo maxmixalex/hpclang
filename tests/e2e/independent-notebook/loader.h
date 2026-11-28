@@ -108,27 +108,36 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame,
     unsigned irq = hpclang_irq_save_disable();
     volatile u32 *l1 = (void *)0x07f00000, *l2 = (void *)pg[RW_PAGES];
     u32 oldrw = l1[17], oldcode = l1[18];
-    for (unsigned i = 0; i < 512; i++)
-        l2[i] = 0;
-    /* The entire staged image is page aligned in the leased Port 1 record. */
-    for (unsigned i = 0; i < (IMAGE_BYTES + 4095) / 4096; i++)
-        l2[256 + 32 + i] = (code + i * 4096) | 0xaa2;
-    for (unsigned i = 0; i < RW_PAGES; i++)
-        l2[i] = pg[i] | 0xff2;
-    l2[256 + 31] = pg[RW_PAGES] | 0xaa2;
-    l1[17] = pg[RW_PAGES] | 0x11;
-    l1[18] = (pg[RW_PAGES] + 1024) | 0x11;
-    hpclang_mmu_sync(l2, l1);
+    if (NOTEBOOK_MAPPED_GC && second) {
+        if (oldrw != (pg[RW_PAGES] | 0x11) || oldcode != ((pg[RW_PAGES] + 1024) | 0x11))
+            for (;;) {
+            }
+        oldrw = rec[28];
+        oldcode = rec[29];
+    } else {
+        for (unsigned i = 0; i < 512; i++)
+            l2[i] = 0;
+        /* The entire staged image is page aligned in the leased Port 1 record. */
+        for (unsigned i = 0; i < (IMAGE_BYTES + 4095) / 4096; i++)
+            l2[256 + 32 + i] = (code + i * 4096) | 0xaa2;
+        for (unsigned i = 0; i < RW_PAGES; i++)
+            l2[i] = pg[i] | 0xff2;
+        l2[256 + 31] = pg[RW_PAGES] | 0xaa2;
+        l1[17] = pg[RW_PAGES] | 0x11;
+        l1[18] = (pg[RW_PAGES] + 1024) | 0x11;
+        hpclang_mmu_sync(l2, l1);
+    }
     unsigned hash = 2166136261u;
     for (unsigned j = 0; j < IMAGE_BYTES; j++)
         hash = (hash ^ ((volatile unsigned char *)0x01220000u)[j]) * 16777619u;
-    for (unsigned i = 0; i < RW_PAGES; i++) {
-        volatile u32 *dst = (void *)(0x01100000 + i * 4096), *phys = (void *)pg[i];
-        dst[0] = 0xc5170000u + i + second;
-        if (phys[0] != dst[0])
-            for (;;) {
-            }
-    }
+    if (!(NOTEBOOK_MAPPED_GC && second))
+        for (unsigned i = 0; i < RW_PAGES; i++) {
+            volatile u32 *dst = (void *)(0x01100000 + i * 4096), *phys = (void *)pg[i];
+            dst[0] = 0xc5170000u + i + second;
+            if (phys[0] != dst[0])
+                for (;;) {
+                }
+        }
 
     if (!second) {
         volatile u32 *boot = (void *)0x01100000;
@@ -172,6 +181,23 @@ static u32 split(volatile u32 *rec, unsigned second, const u32 *map, u32 *frame,
     } else if (rec[41] != 0x4e424558)
         for (;;) {
         }
+    if (NOTEBOOK_MAPPED_GC) {
+        /* Words 4..27 hold up to twelve KOS pointer/count pairs. */
+        u32 digest = 2166136261u;
+        for (unsigned i = 0; i < POOL_PAGES; i++)
+            for (unsigned j = 0; j < 1024; j++)
+                digest = (digest ^ ((volatile u32 *)pg[i])[j]) * 16777619u;
+        if (!second) {
+            rec[28] = oldrw;
+            rec[29] = oldcode;
+            rec[30] = digest;
+            hpclang_irq_restore(irq);
+            return hash;
+        }
+        if (digest != rec[30])
+            for (;;) {
+            }
+    }
     l1[17] = oldrw;
     l1[18] = oldcode;
     hpclang_mmu_sync(l2, l1);

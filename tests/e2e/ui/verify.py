@@ -408,8 +408,8 @@ def verify_native_release(prefix: Path, model: int, state: Path, proof: Path | N
         return struct.unpack_from("<I", ram, address - begin)[0]
 
     heap = report["flags"] & 0x300
-    assert heap in (0x100, 0x200)
-    head = read32(roots + ((heap >> 8) - 1) * 16)
+    assert heap == 0x100
+    head = read32(roots)
     released = report["usable_bytes"] + 20
     assert free_list_covers(
         read32, head, begin, end, heap, pointer - 16, pointer + released - 16
