@@ -65,7 +65,10 @@ def check(
     # to the Stock directory entry. Transfer buffers contain a different name.
     memory = nibbles(sram)
 
+    original_area = None
+
     def require_entry(title, body):
+        nonlocal original_area
         name = b"'" + title
         size = word(len(name), 2)
         prefix = size + nibbles(name) + size
@@ -121,12 +124,15 @@ def check(
                 "check_payload"
             ]
             check_payload(actual, meta, base, check_workspace)
-            previous = ["0" * reserve]
+            # Stock clones the original directory, including the bytes at both
+            # edges of its aligned execution slot. Save can move the copy again
+            # between its first and second launch.
+            seed = original_area if original_area is not None else "0" * reserve
+            previous = [seed]
             if saved_note is not None:
-                # Publishing a longer note can move the Aplet before its second
-                # launch. The previous aligned copy can leave up to seven edge
-                # nibbles, all from immutable instructions at the ends of the blob.
-                previous = ["0" * i + source + "0" * (7 - i) for i in range(8)]
+                previous.extend(seed[:i] + source + seed[i + len(source) :] for i in range(8))
+            if original_area is None:
+                original_area = area
             variants = {
                 body[:pos] + old[:pad] + packed + old[pad + len(source) :] + body[pos + reserve :]
                 for old in previous
