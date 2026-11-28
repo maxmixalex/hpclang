@@ -339,7 +339,7 @@ after the second Save.
 
 | Program location | First editor entry | After first return | Reopened editor | After second return |
 | --- | ---: | ---: | ---: | ---: |
-| HOME | 92,787 | 92,037 | 92,737 | 91,987 |
+| HOME | 92,803 | 92,053 | 92,753 | 92,003 |
 | Port 0 | 90,731 | 89,943 | 90,682 | 89,929 |
 
 #### HP39/40 editor startup
