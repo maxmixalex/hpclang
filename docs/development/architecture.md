@@ -119,8 +119,8 @@ neither a worst-case requirement nor the cost of a different launcher.
 
 The earlier 112 KiB startup bitmap exceeded the 67–70 KiB stack gap left
 with two full-size Aplets resident. The independent editor now requests a
-1024 by 672 monochrome bitmap (84 KiB). One page covers alignment. The tested
-20 aligned frames supply 12 code pages, one MMU page and seven application RW
+1024 by 640 monochrome bitmap (80 KiB). One page covers alignment. The tested
+19 aligned frames supply 12 code pages, one MMU page and six application RW
 pages. The native bootstrap uses a separate 1 KiB stack. The Aplet keeps
 256 bytes of padding for the saved note string and its signature.
 
@@ -128,8 +128,8 @@ After returning to Stock, the verifier matched both named Aplet entries in SRAM,
 including the stored names and directory bodies. With `20` in the original and
 `2020` in copy `2`, the two entries occupied 112,651 bytes on HP39g+, 112,619
 on HP39gs and 112,635 on HP40gs. During native execution, the bitmap's recorded
-prologue and length gave 86,026 bytes including its header. Its 20 aligned frames
-accounted for 81,920 bytes within that object on each model. The directory
+prologue and length gave 81,930 bytes including its header. Its 19 aligned frames
+accounted for 77,824 bytes within that object on each model. The directory
 measurements describe saved storage after exit. The bitmap measurement describes
 the workspace acquired during the editor run.
 
@@ -154,13 +154,13 @@ settled SRAM reading in all nine initial, Reset and copy runs.
 
 | Model | Editing reset original | Editing copy | After Save in copy | Reopened copy |
 | --- | ---: | ---: | ---: | ---: |
-| HP39g+ | 63,072 | 6,727 | 6,727 | 6,723 |
-| HP39gs | 60,399 | 4,069 | 4,069 | 4,065 |
-| HP40gs | 60,202 | 3,864 | 3,864 | 3,860 |
+| HP39g+ | 67,168 | 10,823 | 10,823 | 10,819 |
+| HP39gs | 64,495 | 8,165 | 8,165 | 8,161 |
+| HP40gs | 64,298 | 7,960 | 7,960 | 7,956 |
 
-After ON returned from the editor, before leaving the Aplet, the copy runs
-had 6,251, 3,593 and 3,388 whole bytes respectively. The verifier reports
-the exact gap in nibbles at each capture.
+The smaller bitmap freed 4,096 bytes of Stock workspace while editing a copy on
+each model. After ON returned from the editor, before leaving the Aplet, the copy
+runs had 10,347, 7,689 and 7,484 whole bytes respectively.
 
 Stock Reset stores the five-nibble ROM reference `0x05da2` as the first item
 in the independent ENTER list. In the live D1.55 stack this was followed
@@ -330,6 +330,17 @@ preceded the timing window.
 
 These are elapsed emulator times rounded outwards to 0.1 ms. Both runs
 checked the saved HOME contents and returned display.
+
+On HP48gII Stock, the installed SDK Notebook left the following space between
+RSKTOP and DSKTOP with two caller strings preserved. Values are whole bytes.
+At every sampled phase, AVMEM equalled the number of complete five-nibble cells
+in that gap. The Port 0 relaunch saved twice and retained 90,679 whole bytes
+after the second Save.
+
+| Program location | First editor entry | After first return | Reopened editor | After second return |
+| --- | ---: | ---: | ---: | ---: |
+| HOME | 92,803 | 92,053 | 92,753 | 92,003 |
+| Port 0 | 90,731 | 89,943 | 90,682 | 89,929 |
 
 #### HP39/40 editor startup
 
