@@ -11,7 +11,9 @@ Accepted main is `8f225f5b` after [#78](https://github.com/maxmixalex/hpclang/pu
   [#81](https://github.com/maxmixalex/hpclang/pull/81)). Both passed remote Quality after the edit validation fix.
   Local checks cover 180 host tests and HP49g+/HP50g original-ROM edits. [#84](https://github.com/maxmixalex/hpclang/pull/84)
   plans a deleted-suffix sector at the installed recovery library's bound journal slot. Both original-ROM
-  models verified the complete 4 KiB image and unchanged Flash. CI is pending. Public library management, execution
+  models verified the complete 4 KiB image and unchanged Flash. On simulated NOR, the installed transaction
+  reclaimed the suffix and a new backup occupied the same address. Full-image comparison passed.
+  CI is pending. Public library management, execution
   roots, Port 2 recovery installation, authority, automatic startup and reclamation remain open.
 - **M8.1 through M8.5** remain accepted. The local integration at `5d0b90b6` passed all 180 host tests,
   six original-ROM Notebook regressions and the relocated SDK checks.
@@ -22,10 +24,13 @@ Accepted main is `8f225f5b` after [#78](https://github.com/maxmixalex/hpclang/pu
   and passed moving GC after editor exit. [Launcher measurements](architecture.md#notebook-first-install-transfer-size).
   HP39 transfer failures now appear in CI logs ([#78](https://github.com/maxmixalex/hpclang/pull/78)).
   Notebook entry after moving GC with mappings held ([#80](https://github.com/maxmixalex/hpclang/pull/80))
-  awaits CI acceptance after an HP39gs Kermit transfer failure. The SDK export
-  ([#82](https://github.com/maxmixalex/hpclang/pull/82)) is in CI. Its candidate on main `8f225f5b`
-  reproduced 613 outputs and passed local Notebook save/reopen on all six original-ROM models. Resuming a running editor
-  across GC and [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
+  awaits CI acceptance. An HP39gs USB transfer stalled after sender backoff outlasted the
+  receiver's 15-second retry interval. The sender now caps backoff at 8 seconds. The delayed-ACK
+  regression and local HP39gs object test passed with the original CI artifacts.
+  [#82](https://github.com/maxmixalex/hpclang/pull/82) connects all six Notebook CI runs to one verified SDK ZIP.
+  Its candidate on main `8f225f5b` reproduced 613 outputs and passed local Notebook save/reopen on
+  all six original-ROM models. CI is pending. Resuming a running editor across GC and
+  [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
 
 ## Scope and retained requirements
 
