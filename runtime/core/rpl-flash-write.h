@@ -106,6 +106,32 @@ int hpclang_rpl_flash_prepare_write(const struct hpclang_rpl_flash_io *io);
 int hpclang_rpl_flash_finish_commit(const struct hpclang_rpl_flash_io *io, uint32_t address,
                                     const uint8_t *record, uint32_t bytes);
 
+struct hpclang_rpl_flash_append_space
+{
+    uint32_t slot;         /* Absolute byte address after any planned reclamation. */
+    uint32_t sector_count; /* Consecutive sectors starting at the one containing slot. */
+};
+
+/* Read-only placement for an even-sized allocation across all six Stock banks.
+ * Prefer the first erased tail that fits. Otherwise select a whole deleted suffix
+ * covering the fewest sectors, with bank order breaking ties. Preserve the end
+ * marker. Returns WRITTEN (success), NOSPACE or a scan error; changes the output
+ * only on success. The caller keeps Flash stable. An extent plan does not reserve
+ * space, validate a new object's identity or grant ownership of hidden records,
+ * references or journal storage. Establish these before erasing any sector. */
+int hpclang_rpl_flash_plan_append_space(const struct hpclang_rpl_flash_io *io, uint32_t bytes,
+                                        struct hpclang_rpl_flash_append_space *space);
+
+/* Under a stable exclusive mapping, prepare a RAM journal for one sector intersecting
+ * the trailing deleted allocations. Validate all six banks and choose an erased tail
+ * in another bank so journal discovery can survive loss of the target bank header.
+ * NOT_FOUND means the sector does not intersect the suffix. NOSPACE means no other
+ * bank can hold the journal. Only success sets slot; record is scratch on error.
+ * This reads Flash only. Publication, ownership of the deleted allocations, and
+ * staging every required image before a multi-sector erase are caller responsibilities. */
+int hpclang_rpl_flash_prepare_reclaim_sector(const struct hpclang_rpl_flash_io *io, uint32_t target,
+                                             uint8_t *record, uint32_t capacity, uint32_t *slot);
+
 /* Create one native backup across the six user Flash banks. IO spans exactly
  * six 128-KiB banks; its first address corresponds to native bank 8. Validate
  * all bank identities, records and erased tails before mutation, even after
