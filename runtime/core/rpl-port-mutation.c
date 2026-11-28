@@ -134,7 +134,8 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
 {
     if (!io || !io->read_nibble || !io->write_nibble || !guard || !guard->check)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
-    if (limit > 0x40000u || span > 0xfffffu || (!name && name_length) || name_length > 255)
+    if (limit > 0x40000u || span > 0xfffffu || (!packed && span) || (!name && name_length) ||
+        name_length > 255)
         return HPCLANG_RPL_MUTATION_MALFORMED;
     struct hpclang_rpl_port_entry replacement;
     if (packed) {
@@ -180,7 +181,11 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
         return parse_error(result);
     if (!target.span)
         return HPCLANG_RPL_MUTATION_NOT_FOUND;
-    if (fixed_library)
+    /* Deleting the final library copies only the terminator. No surviving
+     * library changes address, and the guard still covers the entire target. */
+    int removing_last_library =
+        library_id && !packed && target.address + target.span == cursor.address;
+    if (fixed_library && !removing_last_library)
         return HPCLANG_RPL_MUTATION_UNSUPPORTED;
     uint32_t old_end = cursor.address;
     uint32_t new_end = old_end - target.span + span;

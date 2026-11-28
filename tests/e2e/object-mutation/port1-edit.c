@@ -308,6 +308,22 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
         !chain_end(&reader, &end) || end != owned.first || !fingerprint(&reader, end, &hash) ||
         hash != original_hash)
         goto done;
+    /* A final, never-executed library with an inline binary integer. */
+    static const uint8_t with_body[] = {0x40, 0x2b, 0x0,  0x3, 0x0, 0x1, 0x58, 0x1,  0x7b,
+                                        0x0,  0x0,  0x0,  0x0, 0x0, 0x0, 0x0,  0x0,  0x0,
+                                        0x0,  0x10, 0xa1, 0x2, 0x1, 0x0, 0xa0, 0x29, 0x5};
+    step = 13;
+    if (hpclang_rpl_port1_create_library(&io, limit, with_body, 53u) ||
+        !chain_end(&reader, &owned.end) || owned.end != owned.first + 53u)
+        goto done;
+    owned.test_stack_slot = stack_slot;
+    owned.test_stack_target = 0x40000u + owned.first + 39u;
+    refused = hpclang_rpl_port1_remove_library(&io, limit, 123, &guard);
+    owned.test_stack_slot = 0;
+    if (refused != HPCLANG_RPL_MUTATION_BUSY ||
+        hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) || !chain_end(&reader, &end) ||
+        end != owned.first || !fingerprint(&reader, end, &hash) || hash != original_hash)
+        goto done;
     free(packed);
     hpclang_object_release(value);
     hpclang_object_release(tail);
