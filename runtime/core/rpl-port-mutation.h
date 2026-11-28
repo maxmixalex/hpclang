@@ -105,6 +105,15 @@ int hpclang_rpl_port0_register_library_repaired(
     const struct hpclang_rpl_mutation_io *io, uint32_t number,
     const struct hpclang_rpl_library_registration *expected,
     const struct hpclang_rpl_catalog_repairs *repairs);
+/* Same repair, ownership and failure contract as Port 0. The caller supplies
+ * a stationary, independently qualified ERAM reader in zero-based nibble
+ * coordinates, its exclusive bound, and the ROM-proven ERAM switch entry.
+ * The catalog uses the library header in the native 0x40000 bank window. */
+int hpclang_rpl_port1_register_library_repaired(
+    const struct hpclang_rpl_mutation_io *io, const struct hpclang_rpl_reader *eram,
+    uint32_t eram_limit, uint32_t eram_switch, uint32_t number,
+    const struct hpclang_rpl_library_registration *expected,
+    const struct hpclang_rpl_catalog_repairs *repairs);
 /* Internal catalog commit, not public registration authorization. Revalidate
  * the strictly ordered catalog and the expected insertion plan before writes.
  * binding uses FINAL post-move coordinates, independently proven by the caller;
