@@ -55,6 +55,9 @@ cd "$STAGED"
 # alone cannot guarantee that Stock observes every receive notification.
 # Recover promptly from a lost notification, backing off consecutive timeouts
 # in the bundled server rather than exhausting the retry limit in ten seconds.
+# Stock retries a missing data packet every 15 seconds. Cap the host backoff
+# below that interval so lost USB notifications get an independent retry
+# between NAKs, even after the previous packet needed retransmission.
 # HP39's serial-disk client removes CR from each decoded CRLF, including inside
 # HP39BinB objects. Send in transparent eight-bit text mode with LF as the local
 # line ending: Kermit inserts one CR before every LF and Stock removes that CR.
@@ -65,7 +68,7 @@ cd "$STAGED"
     -l "$TTY" \
     -b 9600 \
     -8 -P \
-    -C "set carrier-watch off,set modem type none,set flow none,set parity none,set control prefix all,set send packet-length 80,set send pause 50,set send timeout 1 dynamic 1 30,set transfer mode manual,set file type text,set file eol lf,set file bytesize 8,set transfer character-set transparent,set handshake none,log debug $LOG,server" &
+    -C "set carrier-watch off,set modem type none,set flow none,set parity none,set control prefix all,set send packet-length 80,set send pause 50,set send timeout 1 dynamic 1 8,set transfer mode manual,set file type text,set file eol lf,set file bytesize 8,set transfer character-set transparent,set handshake none,log debug $LOG,server" &
 SERVER_PID=$!
 wait "$SERVER_PID"
 SERVER_PID=""
