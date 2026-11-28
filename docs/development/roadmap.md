@@ -22,8 +22,9 @@ Accepted main is `8f225f5b` after [#78](https://github.com/maxmixalex/hpclang/pu
   and passed moving GC after editor exit. [Launcher measurements](architecture.md#notebook-first-install-transfer-size).
   HP39 transfer failures now appear in CI logs ([#78](https://github.com/maxmixalex/hpclang/pull/78)).
   Notebook entry after moving GC with mappings held ([#80](https://github.com/maxmixalex/hpclang/pull/80))
-  and export of the tested SDK ZIP ([#82](https://github.com/maxmixalex/hpclang/pull/82)) are in CI. At `60dac96f`,
-  three independent local packages matched and the SDK reproduced 613 outputs. Resuming a running editor
+  awaits CI acceptance after an HP39gs Kermit transfer failure. The SDK export
+  ([#82](https://github.com/maxmixalex/hpclang/pull/82)) is in CI. Its candidate on main `8f225f5b`
+  reproduced 613 outputs and passed local Notebook save/reopen on all six original-ROM models. Resuming a running editor
   across GC and [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
 
 ## Scope and retained requirements
