@@ -1090,8 +1090,17 @@ int hpclang_rpl_reference_composite_overlap(const struct hpclang_rpl_reader *rea
                                             uint32_t address, uint32_t prologue, uint32_t first,
                                             uint32_t end)
 {
-    if (!hpclang_rpl_sequence_prologue(prologue) && prologue != 0x2afcu)
-        return 0;
+    switch (prologue) {
+    case 0x29e8: /* array */
+    case 0x2a0a: /* linked array */
+    case 0x2a96: /* directory */
+    case 0x2afc: /* tagged object */
+    case 0x2b62: /* backup */
+        break;
+    default:
+        if (!hpclang_rpl_sequence_prologue(prologue))
+            return 0;
+    }
     if (address >= 0x100000u || first >= end || end > 0x100000u)
         return HPCLANG_RPL_SPAN_MALFORMED;
     struct hpclang_rpl_reference_node work[32];

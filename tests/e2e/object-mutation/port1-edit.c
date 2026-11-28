@@ -13,11 +13,19 @@
 
 static const uint8_t first_name[] = "HPCE1A", tail_name[] = "HPCE1B";
 
+enum stack_fixture
+{
+    DIRECT_ACPTR,
+    PROGRAM,
+    ARRAY,
+    TAGGED_LIST
+};
+
 struct owned_tail
 {
     uint32_t first, end, calls;
     uint32_t test_stack_slot, test_stack_target, test_acptr;
-    int test_tagged_list, test_program;
+    enum stack_fixture fixture;
 };
 
 static int stock_nibble(void *context, uint32_t address, uint8_t *value)
@@ -30,15 +38,23 @@ static int stock_nibble(void *context, uint32_t address, uint8_t *value)
         return 1;
     }
     if (owned && owned->test_acptr && address >= owned->test_acptr &&
-        address - owned->test_acptr < (owned->test_tagged_list ? 44u : 15u)) {
+        address - owned->test_acptr < (owned->fixture == TAGGED_LIST ? 44u
+                                       : owned->fixture == ARRAY     ? 35u
+                                                                     : 15u)) {
         uint32_t offset = address - owned->test_acptr;
-        if (owned->test_program) {
+        if (owned->fixture == ARRAY) {
+            const uint32_t array[] = {0x29e8u, 30u, 0x2baau, 1u, 1u, owned->test_stack_target,
+                                      0x23c21u};
+            *value = (array[offset / 5u] >> (4u * (offset % 5u))) & 15u;
+            return 1;
+        }
+        if (owned->fixture == PROGRAM) {
             const uint32_t program[] = {0x2d9du, owned->test_stack_target, 0x312bu};
             *value = (program[offset / 5u] >> (4u * (offset % 5u))) & 15u;
             return 1;
         }
         /* One-character DOTAG prefix around the existing nested list. */
-        if (owned->test_tagged_list) {
+        if (owned->fixture == TAGGED_LIST) {
             if (offset < 9u) {
                 uint32_t header = offset < 5u ? 0x2afcu : (('X' << 8) | 1u);
                 *value = (header >> (4u * (offset % 5u))) & 15u;
@@ -48,7 +64,7 @@ static int stock_nibble(void *context, uint32_t address, uint8_t *value)
         }
         const uint32_t fields[] = {0x2a74u,  0x2a74u, 0x02baau, owned->test_stack_target,
                                    0x23c21u, 0x312bu, 0x312bu};
-        if (!owned->test_tagged_list)
+        if (owned->fixture != TAGGED_LIST)
             offset += 10u;
         *value = (fields[offset / 5u] >> (4u * (offset % 5u))) & 15u;
         return 1;
@@ -220,22 +236,15 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
                 goto done;
             /* Present the level-one object as an ACPTR without changing Stock RAM. */
             owned.test_acptr = level_one;
-            result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
-            if (result != HPCLANG_RPL_MUTATION_BUSY ||
-                !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
-                goto done;
-            owned.test_program = 1;
-            result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
-            owned.test_program = 0;
-            if (result != HPCLANG_RPL_MUTATION_BUSY ||
-                !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
-                goto done;
-            owned.test_tagged_list = 1;
-            result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
+            const enum stack_fixture fixtures[] = {DIRECT_ACPTR, PROGRAM, ARRAY, TAGGED_LIST};
+            for (unsigned j = 0; j < sizeof fixtures / sizeof *fixtures; ++j) {
+                owned.fixture = fixtures[j];
+                result = hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard);
+                if (result != HPCLANG_RPL_MUTATION_BUSY ||
+                    !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
+                    goto done;
+            }
             owned.test_acptr = 0;
-            if (result != HPCLANG_RPL_MUTATION_BUSY ||
-                !fingerprint(&reader, owned.end + 6u, &hash) || hash != before)
-                goto done;
         }
         if (hpclang_rpl_port1_replace_backup(&io, limit, packed, span, &guard) ||
             !matches(first_name, value) || !matches(tail_name, tail))
@@ -250,7 +259,7 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
         hpclang_rpl_port1_remove_backup(&io, limit, tail_name, 6, &guard))
         goto done;
     step = 7;
-    if (owned.calls != 9 || !chain_end(&reader, &end) || end != owned.first ||
+    if (owned.calls != 10 || !chain_end(&reader, &end) || end != owned.first ||
         !fingerprint(&reader, end, &hash) || hash != original_hash)
         goto done;
     /* Store the unregistered header-only library 123 ahead of a named backup. */

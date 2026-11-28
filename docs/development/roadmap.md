@@ -17,7 +17,10 @@ merged the direct Port 1 stack guard.
   [#66](https://github.com/maxmixalex/hpclang/pull/66) at `c8478724` scans trailing
   deleted Port 2 records and stages sector images. Local simulated Flash passed
   interrupted erase, replay and reuse across a two-sector suffix. CI is pending.
-  Nested references, remaining execution roots, public library management
+  The follow-up to #70 checks stack arrays, directories and backups. All 180 host
+  tests passed locally. An array reference blocked replacement on both HP49g+ and
+  HP50g Stock emulators, including two relaunches per model. CI submitted.
+  Other references, remaining execution roots, public library management
   and Port 2 installation, recovery and space reclamation remain open.
 - **M8.6 applications and release.** [#60](https://github.com/maxmixalex/hpclang/pull/60)
   is accepted on main. [#62](https://github.com/maxmixalex/hpclang/pull/62) now targets
