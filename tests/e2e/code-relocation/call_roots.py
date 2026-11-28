@@ -11,6 +11,7 @@ from fixtures import word
 CASES = {
     "native": b"",
     "native-new-message": b"",
+    "native-port1-message": b"",
     "native-missing-message": b"\0",
     "native-remove": b"\0",
     "native-detach": b"\1",
@@ -50,33 +51,48 @@ def attachment_records(read):
     ]
 
 
-def verify_bindings(before, read, *, removed=False):
-    """Check complete records and independently locate the fixture in Port 0."""
+def library_bindings(read_port, start, end, at, selector):
+    matches = []
+    while start <= at <= end - 5:
+        prologue = read_port(at)
+        if not prologue:
+            break
+        span = 5 + read_port(at + 5)
+        if prologue not in (0x2B40, 0x2B62) or span < 24 or at + span > end:
+            raise ValueError("Invalid native RAM port object")
+        if prologue == 0x2B40:
+            length = read_port(at + 10, 2)
+            binding = at + 14 + 2 * length
+            if span < 41 + 2 * length or read_port(binding - 2, 2) != length:
+                raise ValueError("Invalid native library title")
+            if read_port(binding, 3) == 123:
+                matches.append((123, binding, selector, 0))
+        at += span
+    else:
+        raise ValueError("Missing native RAM port terminator")
+    return matches
+
+
+def verify_bindings(before, read, *, removed=False, bank=None, selector=0):
     records = catalog_records(read)
     if [record for record in records if record[0] != 123] != before:
         raise ValueError("Native call changed an existing catalog binding")
-    at = read(0x80716)
-    matches = []
-    while 0x80000 <= at <= 0xFFFFB:
-        prologue = read(at)
-        if not prologue:
-            break
-        span = 5 + read(at + 5)
-        if prologue not in (0x2B40, 0x2B62) or span < 24 or at + span > 0x100000:
-            raise ValueError("Invalid native Port 0 object")
-        if prologue == 0x2B40:
-            length = read(at + 10, 2)
-            binding = at + 14 + 2 * length
-            if span < 41 + 2 * length or read(binding - 2, 2) != length:
-                raise ValueError("Invalid native library title")
-            if read(binding, 3) == 123:
-                matches.append((123, binding, 0, 0))
-        at += span
-    else:
-        raise ValueError("Missing native Port 0 terminator")
+    matches = library_bindings(read, 0x80000, 0x100000, read(0x80716), 0)
+    if bank is not None:
+        if matches:
+            raise ValueError("Port 1 lookup fixture also present in Port 0")
+
+        def read_bank(address, width=5):
+            offset = address - 0x40000
+            return sum(
+                ((bank[i // 2] >> (4 * (i % 2))) & 15) << (4 * n)
+                for n, i in enumerate(range(offset, offset + width))
+            )
+
+        matches = library_bindings(read_bank, 0x40000, 0x80000, 0x40000, selector)
     expected = [] if removed else matches
     if len(matches) != 1 or [record for record in records if record[0] == 123] != expected:
-        raise ValueError("Catalog binding does not identify the Port 0 fixture")
+        raise ValueError("Catalog binding does not identify the RAM port fixture")
 
 
 def package(launcher, name):
@@ -159,6 +175,10 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         raise ValueError("Call-root fixture requires an unregistered library 123")
     results = []
     for name, encoding in CASES.items():
+        program = "CALLBANK" if name == "native-port1-message" else "CALLROOT"
+        registered_message = name in ("native-new-message", "native-port1-message")
+        if name == "native-port1-message" and before(0x26C39) != 0x23C21:
+            raise ValueError("Unexpected Stock ERAM selector")
         case = output / name
         package_dir = case / "package"
         package_dir.mkdir(parents=True)
@@ -169,25 +189,25 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
             case / "run",
             source,
             package_dir,
-            "CALLROOT",
+            program,
             remote_commands=[
                 "-95 CF HOME CLEAR",
                 "\"0\" 1 7 START DUP + NEXT 'ENTRYOBS' STO",
                 "\"0\" 1 7 START DUP + NEXT 1 124 SUB 'EXECOBS' STO",
-                "'CALLROOT' RCL",
+                f"'{program}' RCL",
             ],
         )
         state = case / "run/state"
         # Check the producing run before restarting it for message/cache probes.
         # A saved ARM exception otherwise appears as a later USB/key failure.
         require_stock_pc(state)
-        if name in ("native-new-message", "native-missing-message"):
+        if registered_message or name == "native-missing-message":
             transfer(
                 args,
                 case / "message-run",
                 state,
                 package_dir,
-                "CALLROOT",
+                program,
                 installed=True,
                 execute=False,
                 remote_commands=["IFERR #7B01h DOERR THEN ERRM 'NEWMSG' STO END"],
@@ -200,7 +220,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                 case / "lookup-run",
                 state,
                 package_dir,
-                "CALLROOT",
+                program,
                 installed=True,
                 execute=False,
                 remote_commands=[
@@ -301,6 +321,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         if name in (
             "native",
             "native-new-message",
+            "native-port1-message",
             "native-missing-message",
             "native-remove",
             "native-detach",
@@ -341,7 +362,11 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
         expected_ids = original_ids if removed else sorted(original_ids + [123])
         if ids != expected_ids or len(ids) != len(set(ids)):
             raise ValueError("Native call did not produce the expected catalog")
-        verify_bindings(original_records, read, removed=removed)
+        if name == "native-port1-message":
+            bank = (state / "sram").read_bytes()[0x20000:0x40000]
+            verify_bindings(original_records, read, bank=bank, selector=before(0x26C39))
+        else:
+            verify_bindings(original_records, read, removed=removed)
         expected_attachments = [
             record
             for record in original_attachments
@@ -399,9 +424,9 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                 verify_cache_message(read)
         if attachment_records(read) != expected_attachments:
             raise ValueError("Native call did not preserve the expected HOME attachments")
-        if name in ("native-new-message", "native-missing-message"):
+        if registered_message or name == "native-missing-message":
             message = home_string(read, b"NEWMSG")
-            if name == "native-new-message" and message != b"hpclang library message":
+            if registered_message and message != b"hpclang library message":
                 raise ValueError("Newly registered library message was not resolved")
             if name == "native-missing-message" and message == b"hpclang library message":
                 raise ValueError("Unregistered library message unexpectedly resolved")
@@ -414,6 +439,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                 not in (
                     "native",
                     "native-new-message",
+                    "native-port1-message",
                     "native-missing-message",
                     "native-remove",
                     "native-detach",
@@ -423,7 +449,7 @@ def verify_calls(args, build, source, output, *, transfer, native_words):
                     "native-cache-message",
                 ),
                 catalog_removed=removed,
-                new_library_message=name == "native-new-message",
+                new_library_message=registered_message,
                 missing_library_message=name == "native-missing-message",
                 home_detached=name == "native-detach",
                 cache_roundtrip=name == "native-cache",

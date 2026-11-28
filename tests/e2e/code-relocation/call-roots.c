@@ -458,7 +458,7 @@ done:
     return result;
 }
 
-static int probe_register(void)
+static int probe_register(int port1)
 {
     struct hpclang_rpl_stock_memory memory;
     struct hpclang_rpl_mutation_io io;
@@ -480,12 +480,22 @@ static int probe_register(void)
         probe_read_word(&io, 0x80716, 5, &port))
         return 3;
     struct hpclang_rpl_library_registration registration;
-    if (hpclang_rpl_library_registration_plan(&reader, port, 0x100000, &reader, io.library_table,
+    struct hpclang_rpl_reader source = reader;
+    uint32_t limit = 0x100000u, selector = 0;
+    if (port1) {
+        struct hpclang_rpl_mutation_io eram;
+        if (!hpclang_rpl_stock_port1_mutation_io(&eram, &limit))
+            return 4;
+        source = (struct hpclang_rpl_reader){eram.read_nibble, eram.context};
+        /* Stock 2.15 ERAM selector, verified against the original ROM by the driver. */
+        selector = 0x23c21u;
+        port = 0;
+    }
+    if (hpclang_rpl_library_registration_plan(&source, port, limit, &reader, io.library_table,
                                               0x100000 - io.library_table, 123, &registration) != 1)
         return 2;
     const struct hpclang_rpl_catalog_insertion insertion = registration.insertion;
-    uint32_t binding = registration.header;
-    if (!binding || binding < end)
+    if (!port1 && registration.header < end)
         return 4;
     struct live_probe *p = calloc(1, sizeof *p);
     if (!p)
@@ -521,7 +531,9 @@ static int probe_register(void)
     const struct hpclang_rpl_catalog_repairs repairs = {
         1, p->edits, p->builder.count, p->guards, p->guard_builder.count, NULL, 0, NULL, NULL, 0};
     /* After this boundary an error must halt the test, never return Stock. */
-    if (hpclang_rpl_port0_register_library_repaired(&io, 123, &registration, &repairs)) {
+    if (port1 ? hpclang_rpl_port1_register_library_repaired(&io, &source, limit, selector, 123,
+                                                            &registration, &repairs)
+              : hpclang_rpl_port0_register_library_repaired(&io, 123, &registration, &repairs)) {
         hpclang_e2e_result = 0x46410ffe;
         for (;;)
             __asm__ volatile("nop");
@@ -2394,7 +2406,10 @@ int hpclang_call_roots_probe(void)
     uint32_t home;
     if (probe_read_word(&io, 0x80711, 5, &home))
         return 60;
-    int found = hpclang_rpl_directory_find(&reader, home, (const uint8_t *)"CALLROOT", 8, &entry);
+    int found = hpclang_rpl_directory_find(&reader, home, (const uint8_t *)"CALLBANK", 8, &entry);
+    int port1 = found == 0;
+    if (found == HPCLANG_RPL_STORE_NOT_FOUND)
+        found = hpclang_rpl_directory_find(&reader, home, (const uint8_t *)"CALLROOT", 8, &entry);
     if (found == HPCLANG_RPL_STORE_NOT_FOUND)
         return -1;
     if (found || entry.prologue != 0x2d9d)
@@ -2405,11 +2420,11 @@ int hpclang_call_roots_probe(void)
     struct hpclang_object *source = NULL, *existing = NULL;
     if (hpclang_object_snapshot_copy(&encoded, 0, sizeof library_encoding - 1, &source))
         return 62;
-    existing = hpclang_port_library_get(0, 123);
+    existing = hpclang_port_library_get(port1, 123);
     int valid = existing ? existing->nibble_count == source->nibble_count &&
                                !memcmp(existing->data, source->data, (source->nibble_count + 1) / 2)
-                         : errno == ENOENT && !hpclang_port_library_create(0, source);
+                         : errno == ENOENT && !hpclang_port_library_create(port1, source);
     hpclang_object_release(existing);
     hpclang_object_release(source);
-    return valid ? probe_register() : 63;
+    return valid ? probe_register(port1) : 63;
 }

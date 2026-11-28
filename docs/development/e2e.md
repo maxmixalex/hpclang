@@ -771,6 +771,13 @@ Stock session executes `IFERR #7B01h DOERR THEN ERRM 'NEWMSG' STO END`; only the
 registered case may return the fixture message. Host checks retain exact catalog
 bindings, original Stock return, Flash and HOME attachment checks.
 
+The `native-port1-message` case installs the same fixture exclusively in Port 1.
+Its launcher registers the ERAM header using the Stock 2.15 bank selector and
+returns to the original RPL caller. A fresh Stock session resolves message
+`#7B01h`. The verifier independently walks the saved ERAM records, compares
+the catalog binding with the library header, and checks that Port 0 contains
+no library 123. The existing catalog bindings and HOME attachments are also checked.
+
 When insertion is retained, reviewed original HOME cache pointers must advance
 by 16 nibbles; zero and direct-ROM pointers stay fixed. The verifier rejects
 main-RAM attachment fields outside the original complete-wrapper cache bounds.
