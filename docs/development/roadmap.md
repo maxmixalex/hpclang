@@ -13,6 +13,8 @@ Accepted main is `3ca51e7c` after [#73](https://github.com/maxmixalex/hpclang/pu
   ownership it can remove a final library with a body after checking references to the entire record.
   [#81](https://github.com/maxmixalex/hpclang/pull/81) also covers a target followed by movable records.
   The guard checks D0, D1 and eight Saturn hardware return slots across the affected range.
+  Both branches now reject a nonzero replacement length without data before accessing the port.
+  Host and ARM static analysis of the edit code passed locally after the #79 Quality failure.
   All 180 host tests and both HP49g+/HP50g original-ROM edit suites passed locally.
   Remaining gates include public library management, other execution roots, and Port 2 recovery installation,
   authority, startup and reclamation.
@@ -30,9 +32,11 @@ Accepted main is `3ca51e7c` after [#73](https://github.com/maxmixalex/hpclang/pu
   note after moving GC with mappings held on HP49g+/HP50g. Resuming a running editor across GC
   and final release acceptance remain open.
   [Launcher measurements](architecture.md#notebook-first-install-transfer-size) · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
-- **M8.1–M8.5** remain accepted. Local integration `5d0b90b6` combines the reviewed heads of #76–#81.
+- **M8.1–M8.5** remain accepted. Local integration `5d0b90b6` includes #76 through #80 and the earlier #81 head `61490d0e`.
   It passed 180 host tests and six original-ROM Notebook regressions. The two 4,134-file SDK archives
-  matched, and the relocated install reproduced 613 outputs. Remote acceptance is tracked per PR.
+  matched, and the relocated install reproduced 613 outputs. The release check now also compares
+  separate clean CMake installations. On local integration `da525ec9` their archives matched, and
+  the unpacked SDK passed all six Notebook builds and HP39/40 C/C++ Aplet packaging. Remote acceptance is tracked per PR.
 
 ## Scope and retained requirements
 
