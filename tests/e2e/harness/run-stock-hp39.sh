@@ -51,6 +51,9 @@ cleanup() {
     wait "${GATE_PID:-}" 2>/dev/null || true
     wait "${KERMIT_PID:-}" 2>/dev/null || true
     wait "$SOCAT_PID" 2>/dev/null || true
+    if [[ -s "$HOST_GATE.failed" ]]; then
+        cat "$HOST_GATE.failed" >&2
+    fi
     rm -f "$HOST_GATE" "$HOST_GATE.directory" "$HOST_GATE.failed"
 }
 trap cleanup EXIT
