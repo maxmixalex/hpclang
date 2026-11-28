@@ -47,6 +47,14 @@ int hpclang_rpl_stock_execution_edit(const struct hpclang_rpl_stock_execution_so
                                      struct hpclang_rpl_native_edit *edits, unsigned *count,
                                      hpclang_rpl_reference_dependency_fn dependency, void *context);
 
+/* Conservative refusal check for HP49g+/50g under stable, exclusive ownership.
+ * Return 1 if D0, D1 or the low 20 bits of any hardware RSTK slot lies in
+ * [first,end), 0 for no match, or a negative span error. Raw numeric matches
+ * can refuse an edit. This scan neither classifies nor repairs a register.
+ * The caller separately checks the suspended PC, other registers and RPL roots. */
+int hpclang_rpl_stock_cpu_address_overlap(const struct hpclang_rpl_reader *state, uint32_t first,
+                                          uint32_t end);
+
 /* Capture the reviewed HP49g+/50g CPU register layout through the existing
  * state-relative nibble reader (e.g. stock_view_native). Observe all 272 read
  * nibbles as dependencies, including full scalar/stack words. pc is the

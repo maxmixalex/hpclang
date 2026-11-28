@@ -9,6 +9,7 @@
 #include "rpl-stack-view.h"
 #include "rpl-reference.h"
 #include "rpl-stock-memory.h"
+#include "rpl-stock-view.h"
 #include "saturn-view.h"
 
 static const uint8_t first_name[] = "HPCE1A", tail_name[] = "HPCE1B";
@@ -26,6 +27,7 @@ struct owned_tail
     uint32_t first, end, calls;
     uint32_t test_stack_slot, test_stack_target, test_acptr;
     enum stack_fixture fixture;
+    uint32_t test_last_rstk;
 };
 
 static int stock_nibble(void *context, uint32_t address, uint8_t *value)
@@ -72,6 +74,24 @@ static int stock_nibble(void *context, uint32_t address, uint8_t *value)
     return hpclang_saturn_read_nibble(hpclang_saturn_address_make(address), value);
 }
 
+struct cpu_source
+{
+    struct hpclang_rpl_stock_view view;
+    uint32_t test_last_rstk;
+};
+
+static int cpu_nibble(void *context, uint32_t address, uint8_t *value)
+{
+    struct cpu_source *cpu = context;
+    /* Overlay the last hardware RSTK slot only for the refusal test. */
+    unsigned field = 2u * 0x994u;
+    if (cpu->test_last_rstk && address >= field && address < field + 5u) {
+        *value = (cpu->test_last_rstk >> (4u * (address - field))) & 15u;
+        return 1;
+    }
+    return hpclang_rpl_stock_view_native(&cpu->view, address, value);
+}
+
 /* Test-only ownership proof: these records are appended during this invocation,
  * never exported as native references and never exposed to resumed Stock.
  * This is not the production live-reference collector needed by public edits. */
@@ -108,6 +128,15 @@ static int check_owned_tail(void *context, uint32_t first, uint32_t end)
     if (stack < 0)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
     if (overlap || cache || stack)
+        return HPCLANG_RPL_MUTATION_BUSY;
+    struct cpu_source cpu = {.test_last_rstk = owned->test_last_rstk};
+    if (hpclang_rpl_stock_view_reader(&cpu.view))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    const struct hpclang_rpl_reader state = {cpu_nibble, &cpu};
+    int address = hpclang_rpl_stock_cpu_address_overlap(&state, 0x40000u + first, 0x40000u + end);
+    if (address < 0)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (address)
         return HPCLANG_RPL_MUTATION_BUSY;
     struct hpclang_rpl_stock_memory memory;
     struct hpclang_rpl_mutation_io roots;
@@ -308,21 +337,44 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
         !chain_end(&reader, &end) || end != owned.first || !fingerprint(&reader, end, &hash) ||
         hash != original_hash)
         goto done;
-    /* A final, never-executed library with an inline binary integer. */
+    /* A never-executed library with an inline binary integer, before a live backup. */
     static const uint8_t with_body[] = {0x40, 0x2b, 0x0,  0x3, 0x0, 0x1, 0x58, 0x1,  0x7b,
                                         0x0,  0x0,  0x0,  0x0, 0x0, 0x0, 0x0,  0x0,  0x0,
                                         0x0,  0x10, 0xa1, 0x2, 0x1, 0x0, 0xa0, 0x29, 0x5};
     step = 13;
     if (hpclang_rpl_port1_create_library(&io, limit, with_body, 53u) ||
-        !chain_end(&reader, &owned.end) || owned.end != owned.first + 53u)
+        hpclang_rpl_port1_create_backup(&io, limit, packed, span) ||
+        !chain_end(&reader, &owned.end) || owned.end != owned.first + 53u + span)
         goto done;
     owned.test_stack_slot = stack_slot;
     owned.test_stack_target = 0x40000u + owned.first + 39u;
     refused = hpclang_rpl_port1_remove_library(&io, limit, 123, &guard);
     owned.test_stack_slot = 0;
-    if (refused != HPCLANG_RPL_MUTATION_BUSY ||
-        hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) || !chain_end(&reader, &end) ||
-        end != owned.first || !fingerprint(&reader, end, &hash) || hash != original_hash)
+    if (refused != HPCLANG_RPL_MUTATION_BUSY || !fingerprint(&reader, owned.end + 6u, &before))
+        goto done;
+    owned.test_last_rstk = 0x40000u + owned.first + 53u;
+    refused = hpclang_rpl_port1_remove_library(&io, limit, 123, &guard);
+    owned.test_last_rstk = 0;
+    if (refused != HPCLANG_RPL_MUTATION_BUSY || !fingerprint(&reader, owned.end + 6u, &hash) ||
+        hash != before || hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) ||
+        !matches(tail_name, tail) || !chain_end(&reader, &owned.end) ||
+        owned.end != owned.first + span ||
+        hpclang_rpl_port1_remove_backup(&io, limit, tail_name, 6, &guard) ||
+        !chain_end(&reader, &end) || end != owned.first || !fingerprint(&reader, end, &hash) ||
+        hash != original_hash)
+        goto done;
+    step = 14;
+    if (hpclang_rpl_port1_create_library(&io, limit, with_body, 53u) ||
+        hpclang_rpl_port1_create_backup(&io, limit, packed, span) ||
+        !chain_end(&reader, &owned.end) ||
+        hpclang_rpl_port1_replace_library(&io, limit, 123, renamed, 45, &guard) ||
+        !matches(tail_name, tail) || !chain_end(&reader, &owned.end) ||
+        owned.end != owned.first + 45u + span ||
+        hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) ||
+        !chain_end(&reader, &owned.end) ||
+        hpclang_rpl_port1_remove_backup(&io, limit, tail_name, 6, &guard) ||
+        !chain_end(&reader, &end) || end != owned.first || !fingerprint(&reader, end, &hash) ||
+        hash != original_hash)
         goto done;
     free(packed);
     hpclang_object_release(value);

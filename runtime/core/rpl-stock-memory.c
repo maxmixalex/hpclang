@@ -41,12 +41,35 @@ static int state_word(const struct hpclang_rpl_reader *state, uint32_t at, unsig
             return HPCLANG_RPL_SPAN_UNAVAILABLE;
         if (value > 15)
             return HPCLANG_RPL_SPAN_MALFORMED;
-        int result = dependency(context, at + j, value);
+        int result = dependency ? dependency(context, at + j, value) : 0;
         if (result)
             return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
         next |= (uint32_t)value << (4u * j);
     }
     *word = next;
+    return 0;
+}
+
+int hpclang_rpl_stock_cpu_address_overlap(const struct hpclang_rpl_reader *state, uint32_t first,
+                                          uint32_t end)
+{
+    if (!state || !state->read_nibble)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (first >= end || end > 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    const unsigned fields[] = {0x954, 0x958, 0x978, 0x97c, 0x980,
+                               0x984, 0x988, 0x98c, 0x990, 0x994};
+    for (unsigned i = 0; i < sizeof fields / sizeof *fields; ++i) {
+        uint32_t value;
+        /* D0/D1 are canonical addresses. A return-stack word can hold raw data. */
+        int result = state_word(state, 2u * fields[i], i < 2 ? 8 : 5, &value, NULL, NULL);
+        if (result)
+            return result;
+        if (value > 0xfffffu)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        if (value >= first && value < end)
+            return 1;
+    }
     return 0;
 }
 

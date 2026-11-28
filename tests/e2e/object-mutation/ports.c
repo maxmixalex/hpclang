@@ -6,6 +6,7 @@
 #include <hpclang/target.h>
 
 #ifdef HPCLANG_E2E_PORT1_EDITS
+#include "irq.h"
 uint32_t hpclang_e2e_port1_owned_edits(void);
 #endif
 
@@ -57,7 +58,9 @@ uint32_t hpclang_e2e_port_lifecycle(uint32_t *phase)
             if (result)
                 return 0xb8;
 #ifdef HPCLANG_E2E_PORT1_EDITS
+            uint32_t irq = hpclang_irq_save_disable();
             uint32_t edit_result = hpclang_e2e_port1_owned_edits();
+            hpclang_irq_restore(irq);
             if (edit_result)
                 return edit_result;
 #endif
