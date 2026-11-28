@@ -1,31 +1,26 @@
 # hpclang roadmap
 
-Current checkpoint: 2026-11-28. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
+Current checkpoint: 2026-11-29. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `8f225f5b` after [#78](https://github.com/maxmixalex/hpclang/pull/78).
+Accepted main is `1405c01d` after the [roadmap checkpoint #83](https://github.com/maxmixalex/hpclang/pull/83).
 
-- **M8.0 native ports.** Main includes Port 2 cross-bank append planning and sector journal staging
-  ([#66](https://github.com/maxmixalex/hpclang/pull/66)), and Port 1 reference checks
-  ([#70](https://github.com/maxmixalex/hpclang/pull/70), [#75](https://github.com/maxmixalex/hpclang/pull/75)).
-  Guarded internal library removal and replacement are in CI ([#79](https://github.com/maxmixalex/hpclang/pull/79),
-  [#81](https://github.com/maxmixalex/hpclang/pull/81)). Both passed remote Quality after the edit validation fix.
-  Local checks cover 180 host tests and HP49g+/HP50g original-ROM edits. [#84](https://github.com/maxmixalex/hpclang/pull/84)
-  plans a deleted-suffix sector at the installed recovery library's bound journal slot. Both original-ROM
-  models verified the complete 4 KiB image and unchanged Flash. CI is pending. Public library management, execution
-  roots, Port 2 recovery installation, authority, automatic startup and reclamation remain open.
-- **M8.1 through M8.5** remain accepted. The local integration at `5d0b90b6` passed all 180 host tests,
-  six original-ROM Notebook regressions and the relocated SDK checks.
-- **M8.6 applications and release.** The HP39/40 editor frees 4 KiB
-  ([#76](https://github.com/maxmixalex/hpclang/pull/76)). On HP48gII, reopening the editor with the
-  caller stack preserved left 92,753 bytes of Stock workspace from HOME and 90,682 bytes from Port 0.
-  Both pull requests passed all five workflows. HP49g+/HP50g measured 40,980 bytes of peak KOS memory
-  and passed moving GC after editor exit. [Launcher measurements](architecture.md#notebook-first-install-transfer-size).
-  HP39 transfer failures now appear in CI logs ([#78](https://github.com/maxmixalex/hpclang/pull/78)).
-  Notebook entry after moving GC with mappings held ([#80](https://github.com/maxmixalex/hpclang/pull/80))
-  awaits CI acceptance after an HP39gs Kermit transfer failure. The SDK export
-  ([#82](https://github.com/maxmixalex/hpclang/pull/82)) is in CI. Its candidate on main `8f225f5b`
-  reproduced 613 outputs and passed local Notebook save/reopen on all six original-ROM models. Resuming a running editor
-  across GC and [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
+- **M8.0 native ports.** Port 1 reference checks and Port 2 append planning are on main. Guarded
+  [Port 1 removal](https://github.com/maxmixalex/hpclang/pull/79) and [replacement](https://github.com/maxmixalex/hpclang/pull/81)
+  passed local integration tests and await CI on their updated branches. The [Port 2 planner](https://github.com/maxmixalex/hpclang/pull/84)
+  passed the [HP49g+ installation suite](https://github.com/maxmixalex/hpclang/actions/runs/46156279111/job/141026001484).
+  [Explicit replay](https://github.com/maxmixalex/hpclang/pull/86) freed a deleted allocation locally on HP49g+ and HP50g
+  with an offline authorization record. Public library management, execution roots, trusted recovery installation,
+  authority lifecycle, automatic startup and reclamation remain open.
+- **M8.1–M8.5** are complete. The local integration at `31f44992` passed 180 host tests and SDK relocation,
+  reproduced 613 release outputs and rebuilt Notebook for all six models with byte-identical model outputs.
+- **M8.6 applications and release.** All six original-ROM Notebook jobs passed for the [verified SDK](https://github.com/maxmixalex/hpclang/actions/runs/46158651085).
+  HP40gs reopened a 191-byte copy and retained the original note. The overall Core workflow is still running. [#80 Core CI](https://github.com/maxmixalex/hpclang/actions/runs/46155383833)
+  verified that both HP49/50 models retain their mappings across a moving GC, enter Notebook with the saved
+  text and return to Stock. Runtime and Objects E2E remain pending. [Same-name backups across ports](https://github.com/maxmixalex/hpclang/pull/85)
+  passed locally and await CI.
+  Windows shell checkout and Kermit startup fixes are tracked in [#87](https://github.com/maxmixalex/hpclang/pull/87)
+  and [#88](https://github.com/maxmixalex/hpclang/pull/88). Resuming an active editor across GC and
+  [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
 
 ## Scope and retained requirements
 
