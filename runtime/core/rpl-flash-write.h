@@ -122,6 +122,11 @@ struct hpclang_rpl_flash_append_space
 int hpclang_rpl_flash_plan_append_space(const struct hpclang_rpl_flash_io *io, uint32_t bytes,
                                         struct hpclang_rpl_flash_append_space *space);
 
+/* Build the desired image from the target bank's native deleted suffix.
+ * This reads only that bank. It does not reserve journal space or validate other banks. */
+int hpclang_rpl_flash_read_reclaim_image(const struct hpclang_rpl_flash_io *io, uint32_t target,
+                                         uint8_t *image, uint32_t capacity);
+
 /* Under a stable exclusive mapping, prepare a RAM journal for one sector intersecting
  * the trailing deleted allocations. Validate all six banks and choose an erased tail
  * in another bank so journal discovery can survive loss of the target bank header.

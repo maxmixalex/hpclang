@@ -291,8 +291,14 @@ int hpclang_recovery_predicate(const uint32_t *map)
     const struct hpclang_rpl_flash_recovery_layout layout = {
         expected_library, expected_bytes, EXPECTED_RECOVERY_BINDING, EXPECTED_ADMISSION_BINDING};
     struct hpclang_rpl_flash_installed_recovery installed;
+#ifdef HPCLANG_INSTALLATION_RECLAIM
+    int result = hpclang_rpl_flash_plan_installed_reclaim(&io, &layout, &catalog, 0x1c0000u,
+                                                          transaction_scratch,
+                                                          sizeof transaction_scratch, &installed);
+#else
     int result = hpclang_rpl_flash_preflight_installed(&io, &layout, &catalog, transaction_scratch,
                                                        sizeof transaction_scratch, &installed);
+#endif
     if (result >= 0) {
         slot = installed.library_slot;
         transaction_pair[0] = installed.journal_slot;
