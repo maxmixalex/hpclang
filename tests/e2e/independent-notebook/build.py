@@ -51,11 +51,13 @@ def build_phase(
     expected_status,
     phase,
     user_return=False,
+    enter_after_gc=False,
 ):
     source = out / (phase + ".c")
     source.write_text(
         ("#define NOTEBOOK_USER_RETURN\n" if user_return else "")
         + f"#define NOTEBOOK_MAPPED_GC {int(not user_return and expected_status == 0)}\n"
+        + f"#define NOTEBOOK_ENTER_AFTER_GC {int(enter_after_gc)}\n"
         + f"#define NOTEBOOK_MODEL {MODELS[model]}u\n"
         f"#define NOTEBOOK_RW_BYTES {rw_bytes}u\n"
         f"#define NOTEBOOK_EXPECTED_STATUS {expected_status or 0}u\n"

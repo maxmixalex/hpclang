@@ -84,6 +84,7 @@ def build(dest, toolchain, profile, sdk, at):
         shutil.copyfile(dest / "app/notebook-independent" / name, dest / name)
     for package, rw_bytes, expected_status in (
         ("RUN.HP", 32768, 0),
+        ("AFTERGC.HP", 32768, 0),
         ("LOWMEM.HP", 20480, 1),
         ("REFUSE.HP", 32768, None),
     ):
@@ -99,6 +100,7 @@ def build(dest, toolchain, profile, sdk, at):
             offset,
             rw_bytes,
             expected_status,
+            enter_after_gc=package == "AFTERGC.HP",
         )
     return image
 
@@ -113,6 +115,7 @@ def build_runner(
     offset,
     rw_bytes,
     expected_status,
+    enter_after_gc,
 ):
     parts = [
         builder["build_phase"](
@@ -125,6 +128,7 @@ def build_runner(
             rw_bytes,
             expected_status,
             phase,
+            enter_after_gc=enter_after_gc,
         )
         for phase in ("acquire", "check")
     ]
@@ -509,6 +513,26 @@ def main():
             ),
         }
         source = name
+    # Branch from the saved-note state so the existing reload and Port 0 checks
+    # retain their own installation and source chain.
+    after_gc = dest / "entry-after-gc"
+    transfer(
+        spec,
+        after_gc,
+        dest / "save/state",
+        dest,
+        "NBAFT",
+        package_name="AFTERGC.HP",
+        remote_commands=["HOME 'NBAFT' RCL CKCOPY"],
+        actions="3500 capture editor\n8500 tap on\n15000 capture returned\n",
+        execution_ms=18000,
+    )
+    hashes["entry-after-gc"] = {
+        "editor": "20",
+        "settled_sha256": check_phase(
+            after_gc, "20", flash, staged[0x20000:0x40000], font, NORMAL_RESULT
+        ),
+    }
     media["verify"](files, card)
     hashes["reload"]["export"] = files["expected_files"]
     hashes["refused"].update(requested_pages=35, rpl_result=REFUSED_RESULT)
