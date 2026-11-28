@@ -892,6 +892,42 @@ static void installed_preflight_tests(void)
         layout.admission_binding = 88;
         packed_word(catalog_data, 126, 0x40222, 5);
     }
+    /* The first erased bank has room, but the installed root binds the journal
+     * to bank 9. Reclaim only the deleted allocation in bank 12. */
+    const uint32_t target = FIRST + 4u * 0x20000u;
+    prepare_native_port(0x7e, 0x7e, ROOT, JOURNAL);
+    memset(flash + JOURNAL - FIRST, 255, sizeof journal);
+    memset(flash + ROOT - FIRST, 255, sizeof authority);
+    memcpy(flash + LIBRARY - FIRST, library, sizeof library);
+    output = sentinel;
+    assert(hpclang_rpl_flash_plan_installed_reclaim(&io, &layout, &catalog, target, journal,
+                                                    sizeof journal,
+                                                    &output) == HPCLANG_RPL_FLASH_NOT_FOUND);
+    memcpy(image, flash + target - FIRST, sizeof image);
+    tombstone(target + 0x105u, 40);
+    flash[target - FIRST + 0x10au] = 0x52;
+    memcpy(initial, flash, sizeof flash);
+    assert(hpclang_rpl_flash_plan_installed_reclaim(&io, &layout, &catalog, JOURNAL & ~0x1ffffu,
+                                                    journal, sizeof journal,
+                                                    &output) == HPCLANG_RPL_FLASH_UNSUPPORTED);
+    assert(!memcmp(&sentinel, &output, sizeof output));
+    assert(!hpclang_rpl_flash_plan_installed_reclaim(&io, &layout, &catalog, target, journal,
+                                                     sizeof journal, &output));
+    assert(output.target == target && output.library_slot == LIBRARY &&
+           output.authority_slot == ROOT && output.journal_slot == JOURNAL);
+    uint32_t decoded;
+    const uint8_t *desired;
+    assert(!hpclang_rpl_flash_sector_decode(FIRST, END, JOURNAL, journal, sizeof journal, &decoded,
+                                            &desired));
+    assert(decoded == target && !memcmp(desired, image, sizeof image));
+    assert(!memcmp(initial, flash, sizeof flash) && !programs && !erases);
+    packed_word(catalog_data, 126, 0x40223, 5);
+    output = sentinel;
+    assert(hpclang_rpl_flash_plan_installed_reclaim(&io, &layout, &catalog, target, journal,
+                                                    sizeof journal, &output) < 0);
+    assert(!memcmp(&sentinel, &output, sizeof output));
+    assert(!memcmp(initial, flash, sizeof flash) && !programs && !erases);
+    packed_word(catalog_data, 126, 0x40222, 5);
     for (unsigned geometry = 0; geometry < 6; ++geometry) {
         cancel_journal = JOURNAL;
         cancel_authority = geometry ? JOURNAL + sizeof journal : ROOT;

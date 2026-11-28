@@ -429,6 +429,30 @@ int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
     return 0;
 }
 
+int hpclang_rpl_flash_plan_installed_reclaim(const struct hpclang_rpl_flash_io *io,
+                                             const struct hpclang_rpl_flash_recovery_layout *layout,
+                                             const struct hpclang_rpl_flash_catalog *catalog,
+                                             uint32_t target, uint8_t *journal, uint32_t capacity,
+                                             struct hpclang_rpl_flash_installed_recovery *installed)
+{
+    if (!installed || !journal || capacity < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t slot, authority;
+    int result = layout_binding(layout, &slot, &authority);
+    if (result)
+        return result;
+    if ((slot >> 17) == (target >> 17) || (authority >> 17) == (target >> 17))
+        return HPCLANG_RPL_FLASH_UNSUPPORTED;
+    result = hpclang_rpl_flash_read_reclaim_image(io, target, journal, capacity);
+    if (result)
+        return result;
+    if (hpclang_rpl_flash_sector_encode(io->first, io->end, slot, target, journal, journal,
+                                        capacity))
+        return HPCLANG_RPL_FLASH_INVALID;
+    return hpclang_rpl_flash_plan_installed(io, layout, catalog, journal,
+                                            HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES, installed);
+}
+
 int hpclang_rpl_flash_preflight_staged_installed(
     const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
     const struct hpclang_rpl_flash_catalog *catalog, uint8_t *scratch, uint32_t capacity,

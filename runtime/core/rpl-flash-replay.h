@@ -90,6 +90,15 @@ int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
                                      const uint8_t *journal, uint32_t journal_bytes,
                                      struct hpclang_rpl_flash_installed_recovery *installed);
 
+/* Prepare a deleted-suffix journal at the installed root's bound slot and validate
+ * the resulting native chain and catalog before publication. Journal and authority
+ * must lie outside the target bank. Journal is scratch on error. Success supplies
+ * the READY image and plan for one sector; ownership and startup rules above apply. */
+int hpclang_rpl_flash_plan_installed_reclaim(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *journal,
+    uint32_t capacity, struct hpclang_rpl_flash_installed_recovery *installed);
+
 /* Read-only validation of a complete staged (7F) authority and READY journal
  * addressed by the trusted executing layout. Validate both actual allocation
  * boundaries, the intact current port and the proposed target image, with the

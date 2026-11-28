@@ -1044,6 +1044,26 @@ int hpclang_rpl_flash_plan_append_space(const struct hpclang_rpl_flash_io *io, u
     return HPCLANG_RPL_FLASH_WRITTEN;
 }
 
+int hpclang_rpl_flash_read_reclaim_image(const struct hpclang_rpl_flash_io *io, uint32_t target,
+                                         uint8_t *image, uint32_t capacity)
+{
+    if (!io || !io->read16 || !image || capacity < HPCLANG_RPL_FLASH_SECTOR_BYTES ||
+        (io->first & 0x1ffffu) || io->end < io->first || io->end - io->first != 6u * 0x20000u ||
+        target < io->first || target >= io->end || target % HPCLANG_RPL_FLASH_SECTOR_BYTES)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t bank = target & ~0x1ffffu;
+    struct recovery_reader mapped = {io, bank};
+    const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
+    int result = hpclang_rpl_flash_reclaim_sector_image(&reader, target - bank, image,
+                                                        HPCLANG_RPL_FLASH_SECTOR_BYTES);
+    if (!result)
+        return HPCLANG_RPL_FLASH_NOT_FOUND;
+    if (result < 0)
+        return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                      : HPCLANG_RPL_FLASH_DIRTY;
+    return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
 int hpclang_rpl_flash_prepare_reclaim_sector(const struct hpclang_rpl_flash_io *io, uint32_t target,
                                              uint8_t *record, uint32_t capacity, uint32_t *slot)
 {
@@ -1057,16 +1077,10 @@ int hpclang_rpl_flash_prepare_reclaim_sector(const struct hpclang_rpl_flash_io *
                               tails, NULL);
     if (result)
         return result;
+    result = hpclang_rpl_flash_read_reclaim_image(io, target, record, capacity);
+    if (result)
+        return result;
     uint32_t bank = target & ~0x1ffffu;
-    struct recovery_reader mapped = {io, bank};
-    const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
-    result = hpclang_rpl_flash_reclaim_sector_image(&reader, target - bank, record,
-                                                    HPCLANG_RPL_FLASH_SECTOR_BYTES);
-    if (!result)
-        return HPCLANG_RPL_FLASH_NOT_FOUND;
-    if (result < 0)
-        return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
-                                                      : HPCLANG_RPL_FLASH_DIRTY;
     for (unsigned i = 0; i < 6; ++i) {
         if (i == (bank - io->first) / 0x20000u ||
             tails[i].bytes < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES)

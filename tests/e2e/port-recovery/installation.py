@@ -349,6 +349,39 @@ def installed_baseline(args, clean, root, *, transfer, emulator, completed):
     return before, slot, size
 
 
+def verify_reclaim_plan(args, before, root, slot, transfer):
+    # Model a logically removed 40-byte allocation in the first sector of bank 12.
+    target = 0x1C0000
+    source = root / "deleted-suffix"
+    shutil.copytree(before, source)
+    flash = bytearray((source / "flash").read_bytes())
+    sector = bytes(flash[target : target + 4096])
+    require(sector[0x100:0x102] == b"\xf0\x0c", "Unexpected target bank identity")
+    require(sector[0x105:] == b"\xff" * (4096 - 0x105), "Target sector already occupied")
+    flash[target + 0x105 : target + 0x105 + 40] = bytes.fromhex("004e0000") + b"R" * 36
+    (source / "flash").write_bytes(flash)
+    dest = root / "reclaim"
+    transfer(args, dest, source, args.build, "RCPLAN", package_name="installation-reclaim.hp")
+    base = verify_probe(
+        source, dest / "state", args.build, args.nm, 0, slot, image="installation-reclaim"
+    )
+    symbols = symbol_offsets(args.build / "installation-reclaim.elf", args.nm)
+    ram = (dest / "state/sram").read_bytes()
+    require(
+        struct.unpack_from("<3I", ram, base + symbols["transaction_pair"])
+        == (JOURNAL_SLOT, AUTHORITY_SLOT, target),
+        "Unexpected reclaim plan coordinates",
+    )
+    start = base + symbols["transaction_scratch"]
+    capsule = ram[start : start + 4124]
+    require(
+        capsule[4:12] == b"HPCSECT1"
+        and struct.unpack_from("<3I", capsule, 12) == (JOURNAL_SLOT, target, 4096),
+        "Unexpected reclaim journal header",
+    )
+    require(capsule[24:-4] == sector, "Reclaim journal changed retained sector bytes")
+
+
 def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
     from startup import run_port1_inventory, verify_startup
     from staging import run_staging
@@ -370,6 +403,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     before, slot, size = installed_baseline(
         args, clean, root, transfer=transfer, emulator=emulator, completed=completed
     )
+    verify_reclaim_plan(args, before, root, slot, transfer)
     matched = root / "matched"
     transfer(args, matched, before, build, "INSTEST", package_name="installation.hp")
     base = verify_probe(before, matched / "state", build, args.nm, 0, slot)

@@ -991,7 +991,11 @@ discard-on-error policy. Host tests interrupt every actual replacement write,
 recover without transaction RAM, and retain the refusal to resolve legacy
 duplicate backups lacking an intent. Returned zero/full programming failures
 and readback failures are tested at each write; repeated outcome queries do not
-write again. Startup integration and sector reclamation remain open.
+write again. The internal reclaim planner builds a sector image from the native deleted suffix and
+encodes it for the journal slot named by the installed recovery library. It checks
+the catalog, the journal and authority slots, and the projected native allocation
+chain before returning the image. Both slots must be outside the target bank.
+The caller still needs exclusive ownership and startup recovery before erasing Flash.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and

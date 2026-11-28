@@ -132,7 +132,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${HPCLANG_ROOT}/tools/package-recovery.py")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/installation.py"
     "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_ERROR_IS_FATAL ANY)
-set(installation_witnesses installation installation-transaction installation-publication
+set(installation_witnesses installation installation-transaction installation-reclaim installation-publication
         installation-cancellation installation-identity installation-reservation-failure
         installation-store installation-cleanup installation-staging installation-abort
         installation-activation-reject installation-creation installation-creation-admission
@@ -228,7 +228,10 @@ foreach(witness IN LISTS installation_witnesses)
         target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-identity.c"
             "${CORE}/rpl-recovery-installation.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_IDENTITY)
-    elseif(witness STREQUAL "installation-transaction")
+    elseif(witness STREQUAL "installation-transaction" OR witness STREQUAL "installation-reclaim")
+        if(witness STREQUAL "installation-reclaim")
+            target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_RECLAIM)
+        endif()
         target_sources(${witness} PRIVATE "${CORE}/rpl-flash-replay.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TRANSACTION)
     elseif(witness STREQUAL "installation-publication" OR
