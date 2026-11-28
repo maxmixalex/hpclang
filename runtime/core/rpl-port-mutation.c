@@ -180,7 +180,11 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
         return parse_error(result);
     if (!target.span)
         return HPCLANG_RPL_MUTATION_NOT_FOUND;
-    if (fixed_library)
+    /* Deleting the final library copies only the terminator. No surviving
+     * library changes address, and the guard still covers the entire target. */
+    int removing_last_library =
+        library_id && !packed && target.address + target.span == cursor.address;
+    if (fixed_library && !removing_last_library)
         return HPCLANG_RPL_MUTATION_UNSUPPORTED;
     uint32_t old_end = cursor.address;
     uint32_t new_end = old_end - target.span + span;
