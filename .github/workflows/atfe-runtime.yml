@@ -191,6 +191,7 @@ jobs:
             build/independent-hp39-run/full-copy/emulator.log
 
   independent-hp48-entry:
+    needs: runtime
     name: HP48gII independent Stock entry and return
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -211,6 +212,10 @@ jobs:
             --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-entry
           python3 tests/e2e/independent-entry/run-hp48gii.py --nor "$RUNNER_TEMP/48gii.bin" \
             --fixture independent-hpc1 --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-hp48-hpc1
+      - uses: actions/download-artifact@v7
+        with:
+          name: verified-sdk
+          path: build/release
       - name: Build and exercise the installed HP48gII Notebook
         run: |
           sdk="$RUNNER_TEMP/hp48-sdk"
@@ -218,8 +223,7 @@ jobs:
           dist="$GITHUB_WORKSPACE/build/x50ng/dist"
           export PATH="$ATFE/bin:$dist/tools:$PATH"
           export LD_LIBRARY_PATH="$dist/runtime-lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          cmake -S . -B "$RUNNER_TEMP/hp48-install" -DCMAKE_INSTALL_PREFIX="$sdk"
-          cmake --install "$RUNNER_TEMP/hp48-install"
+          unzip -q build/release/hpclang-sdk.zip -d "$sdk"
           cmake -S "$sdk/share/hpclang/examples/notebook" -B "$app" -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DCMAKE_PREFIX_PATH="$sdk" -DCMAKE_TOOLCHAIN_FILE="$sdk/share/hpclang/cmake/toolchains/hpclang-armv4t.cmake" \
             -DHPCLANG_BUILD_MODEL=hp48gii
@@ -258,6 +262,7 @@ jobs:
           if-no-files-found: warn
 
   independent-notebook:
+    needs: runtime
     name: ${{ matrix.model }} independent Notebook save and relaunch
     strategy:
       fail-fast: false
@@ -273,13 +278,19 @@ jobs:
       - uses: ./.github/actions/setup-x50ng
       - name: Install FAT image tools
         run: bash tools/install-ci-packages.sh dosfstools mtools
+      - uses: actions/download-artifact@v7
+        with:
+          name: verified-sdk
+          path: build/release
       - name: Run original-ROM regression from fresh firmware
         run: |
           dist="$GITHUB_WORKSPACE/build/x50ng/dist"
           export PATH="$dist/tools:$PATH"
           export LD_LIBRARY_PATH="$dist/runtime-lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          unzip -q build/release/hpclang-sdk.zip -d "$RUNNER_TEMP/notebook-sdk"
           python3 tests/e2e/independent-notebook/regression.py \
-            --model "${{ matrix.model }}" --toolchain "$ATFE/bin" --dist "$dist" --output build/independent-notebook
+            --sdk "$RUNNER_TEMP/notebook-sdk" --model "${{ matrix.model }}" --toolchain "$ATFE/bin" \
+            --dist "$dist" --output build/independent-notebook
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -371,7 +382,18 @@ jobs:
           clang -O2 .cache/hp39-aplet/sdk/src/hp2aplet.c -o "$host_tool/hp2aplet"
           python3 tests/sdk/check.py --aplet-tool "$host_tool/hp2aplet" \
             --aplet-assets .cache/hp39-aplet/sdk/data \
+            --output-archive build/release/hpclang-sdk.zip \
             --independent-notebooks build/independent-hp39-inputs
+          sha256sum build/release/hpclang-sdk.zip
+
+      - name: Upload the SDK verified with external applications
+        uses: actions/upload-artifact@v7
+        with:
+          name: verified-sdk
+          path: build/release/hpclang-sdk.zip
+          compression-level: 1
+          retention-days: 1
+          if-no-files-found: error
 
       - uses: actions/upload-artifact@v7
         with:

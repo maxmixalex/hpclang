@@ -26,10 +26,11 @@ Accepted main is `8f225f5b` after [#78](https://github.com/maxmixalex/hpclang/pu
   Notebook entry after moving GC with mappings held ([#80](https://github.com/maxmixalex/hpclang/pull/80))
   awaits CI acceptance. An HP39gs USB transfer stalled after sender backoff outlasted the
   receiver's 15-second retry interval. The sender now caps backoff at 8 seconds. The delayed-ACK
-  regression and local HP39gs object test passed with the original CI artifacts. The SDK export
-  ([#82](https://github.com/maxmixalex/hpclang/pull/82)) is in CI. Its candidate on main `8f225f5b`
-  reproduced 613 outputs and passed local Notebook save/reopen on all six original-ROM models. Resuming a running editor
-  across GC and [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
+  regression and local HP39gs object test passed with the original CI artifacts.
+  [#82](https://github.com/maxmixalex/hpclang/pull/82) connects all six Notebook CI runs to one verified SDK ZIP.
+  Its candidate on main `8f225f5b` reproduced 613 outputs and passed local Notebook save/reopen on
+  all six original-ROM models. CI is pending. Resuming a running editor across GC and
+  [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
 
 ## Scope and retained requirements
 
