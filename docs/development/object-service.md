@@ -1076,6 +1076,12 @@ nonzero table offset prevents the move. Their caller must establish reference sa
 yet connected to the public write API. Host/sanitizer tests cover growth,
 shrinkage, same-size replacement, removal, CRC damage, I/O failure and bounds.
 
+For the owned Port 1 fixture on Stock 2.15, a match in Saturn D0, D1 or any
+of the eight hardware return-stack slots refuses the edit. The check compares
+20-bit addresses with the half-open range of affected records while interrupts
+are masked. An ordinary numeric value in a return slot can also cause a refusal.
+The caller still checks catalog, HOME, RPL stack and launcher roots separately.
+
 On HP49g+ and HP50g Stock 2.15, a native Port 1 test stored integer 456
 as `:1:BEFORE`, then installed library 123 (title X) immediately after it.
 The backup occupied 50 nibbles. Across warmstart the library header stayed

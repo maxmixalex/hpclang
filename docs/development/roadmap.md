@@ -9,8 +9,10 @@ Accepted main is `3ca51e7c` after [#73](https://github.com/maxmixalex/hpclang/pu
   interrupted erase, restart and reuse. [#70](https://github.com/maxmixalex/hpclang/pull/70) and
   [#75](https://github.com/maxmixalex/hpclang/pull/75) are on main. Port 1 now checks references in programs,
   symbolic objects, units, matrices, arrays, directories and backups before internal library replacement.
-  The Port 1 removal branch passed 180 host tests and HP49g+/HP50g Stock tests locally. Under exclusive
+  [#79](https://github.com/maxmixalex/hpclang/pull/79) passed 180 host tests and HP49g+/HP50g Stock tests locally. Under exclusive
   ownership it can remove a final library with a body after checking references to the entire record.
+  The dependent Port 1 guard checks D0, D1 and eight Saturn hardware return slots before editing.
+  All 180 host tests and both HP49g+/HP50g original-ROM edit suites passed locally.
   Remaining gates include public library management, other execution roots, and Port 2 recovery installation,
   authority, startup and reclamation.
 - **M8.6 applications and release.** [#64](https://github.com/maxmixalex/hpclang/pull/64),
@@ -24,7 +26,9 @@ Accepted main is `3ca51e7c` after [#73](https://github.com/maxmixalex/hpclang/pu
   retirement suites both passed locally. Full remote CI is pending.
   The HP39 Stock harness now reports the transfer watchdog's failure reason in the job log. HP48gII HOME and Port 0 workspace measurements passed locally across first launch and reopen in both
   diagnostic and caller-stack-preserving modes. With the caller stack preserved, the reopened editors left
-  92,753 and 90,682 whole bytes respectively. Active-execution GC and final release acceptance remain open.
+  92,753 and 90,682 whole bytes respectively. HP49g+/HP50g local tests also opened the saved editor after
+  Stock moved a tagged object with the launcher mappings installed. Resuming an already-running editor
+  across GC and final release acceptance remain open.
   [Launcher measurements](architecture.md#notebook-first-install-transfer-size) · [Release checklist](roadmap-history.md#m86-application-and-release-acceptance).
 - **M8.1–M8.5** are accepted. The combined M8.0/M8.6 tree (`ac646bbf`) passed all 180 host tests locally.
   Its relocated SDK reproduced 613 release outputs and all six model-specific Notebook builds.
