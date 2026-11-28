@@ -27,7 +27,8 @@ def check_line(
             for column in range(131):
                 if row in (0, 5) or column in (0, 130):
                     expected[row * 131 + column] = 0
-    origin = 0
+    # A focused input scrolls horizontally to keep its trailing caret on screen.
+    origin = min(0, 130 - sum(glyphs[ord(ch)][4] for ch in text)) if focused else 0
     for character in text:
         x, y, width, height, advance, stride, data = glyphs[ord(character)]
         for row in range(height):

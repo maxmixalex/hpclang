@@ -16,9 +16,9 @@ HP39_MODELS = ("hp39gplus", "hp39gs", "hp40gs")
 
 def bitmap_rows(aplet_writeback):
     # 1024 monochrome pixels per row, 32 rows per 4 KiB page.
-    # The editor uses 12 code pages, one MMU page and seven RW pages.
+    # The editor uses 12 code pages, one MMU page and six RW pages.
     # One additional page covers alignment within the Stock bitmap.
-    return (12 + 1 + 7 + 1) * 32 if aplet_writeback else 896
+    return (12 + 1 + 6 + 1) * 32 if aplet_writeback else 896
 
 
 def bitmap_image_info(path):
