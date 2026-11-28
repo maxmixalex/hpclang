@@ -134,7 +134,8 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
 {
     if (!io || !io->read_nibble || !io->write_nibble || !guard || !guard->check)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
-    if (limit > 0x40000u || span > 0xfffffu || (!name && name_length) || name_length > 255)
+    if (limit > 0x40000u || span > 0xfffffu || (!packed && span) || (!name && name_length) ||
+        name_length > 255)
         return HPCLANG_RPL_MUTATION_MALFORMED;
     struct hpclang_rpl_port_entry replacement;
     if (packed) {
