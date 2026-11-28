@@ -995,6 +995,9 @@ write again. The internal reclaim planner builds a sector image from the native 
 encodes it for the journal slot named by the installed recovery library. It checks
 the catalog, the journal and authority slots, and the projected native allocation
 chain before returning the image. Both slots must be outside the target bank.
+A host NOR regression stages and activates that binding, replays one sector,
+retires the journal and closes the authority. It appends a CRC-valid backup at
+the previously occupied address and compares the entire six-bank image.
 The caller still needs exclusive ownership and startup recovery before erasing Flash.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before

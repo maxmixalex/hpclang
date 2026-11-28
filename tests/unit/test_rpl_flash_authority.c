@@ -800,6 +800,68 @@ static void cancellation_tests(const struct hpclang_rpl_flash_recovery_layout *l
     }
 }
 
+/* Exclusive host NOR for the complete installed-reclaim transaction. */
+static int reclaim_program(void *context, uint32_t address, uint16_t value)
+{
+    assert(context == flash && !(address & 1u) && address >= FIRST && address < END);
+    flash[address - FIRST] &= (uint8_t)value;
+    flash[address - FIRST + 1] &= (uint8_t)(value >> 8);
+    return 1;
+}
+
+static int reclaim_erase(void *context, uint32_t address)
+{
+    assert(context == flash && address == FIRST + 4u * 0x20000u);
+    ++erases;
+    memset(flash + address - FIRST, 255, sizeof image);
+    return 1;
+}
+
+static void reuse_deleted_suffix(const struct hpclang_rpl_flash_recovery_layout *layout,
+                                 const struct hpclang_rpl_flash_catalog *catalog, uint32_t target)
+{
+    /* Stock FLASHONE backup, with a valid native record CRC. */
+    static const uint8_t backup[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03,
+                                     0x00, 0x08, 0x46, 0x4c, 0x41, 0x53, 0x48, 0x4f,
+                                     0x4e, 0x45, 0x08, 0x14, 0x26, 0x90, 0x00, 0x00,
+                                     0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
+    const struct hpclang_rpl_flash_replay_io chip = {{flash, read16, reclaim_program, FIRST, END},
+                                                     reclaim_erase};
+    const struct hpclang_rpl_flash_io *nor = &chip.flash;
+    const uint32_t slot = target + 0x105u;
+    struct hpclang_rpl_flash_installed_recovery installed;
+    uint8_t scratch[2 * sizeof journal];
+    assert(hpclang_rpl_flash_append(nor, slot, backup, sizeof backup) ==
+           HPCLANG_RPL_FLASH_OCCUPIED);
+    assert(!hpclang_rpl_flash_plan_installed_reclaim(nor, layout, catalog, target, journal,
+                                                     sizeof journal, &installed));
+    uint32_t j = installed.journal_slot, a = installed.authority_slot;
+    assert(!hpclang_rpl_flash_publish_sector(nor, j, journal, sizeof journal));
+    assert(!hpclang_rpl_flash_stage_authority(nor, a, j, journal, sizeof journal));
+    assert(!hpclang_rpl_flash_preflight_staged_installed(nor, layout, catalog, scratch,
+                                                         sizeof scratch, &installed));
+    assert(!hpclang_rpl_flash_activate_staged_authority(nor, a, j, journal, sizeof journal));
+    assert(hpclang_rpl_flash_preflight_installed(nor, layout, catalog, scratch, sizeof scratch,
+                                                 &installed) == 1);
+    assert(!hpclang_rpl_flash_sector_replay_bound(&chip, a, j, journal, sizeof journal, scratch,
+                                                  sizeof scratch));
+    assert(erases == 1 && !memcmp(flash + target - FIRST, image, sizeof image));
+    assert(!hpclang_rpl_flash_retire_sector(nor, j, journal, sizeof journal));
+    assert(!hpclang_rpl_flash_close_authority(nor, a, j, journal, sizeof journal));
+    assert(!hpclang_rpl_flash_append(nor, slot, backup, sizeof backup));
+    assert(!hpclang_rpl_flash_preflight_installed(nor, layout, catalog, scratch, sizeof scratch,
+                                                  &installed));
+    /* Only the two closed records and the reused sector may have changed. */
+    assert(!hpclang_rpl_flash_authority_encode(FIRST, END, a, j, journal, sizeof journal, authority,
+                                               sizeof authority));
+    memcpy(initial + a - FIRST, authority, sizeof authority);
+    memcpy(initial + j - FIRST, journal, sizeof journal);
+    initial[a - FIRST] = initial[j - FIRST] = 0;
+    memcpy(initial + target - FIRST, image, sizeof image);
+    memcpy(initial + slot - FIRST, backup, sizeof backup);
+    assert(!memcmp(flash, initial, sizeof flash));
+}
+
 static void installed_preflight_tests(void)
 {
     enum
@@ -928,6 +990,7 @@ static void installed_preflight_tests(void)
     assert(!memcmp(&sentinel, &output, sizeof output));
     assert(!memcmp(initial, flash, sizeof flash) && !programs && !erases);
     packed_word(catalog_data, 126, 0x40222, 5);
+    reuse_deleted_suffix(&layout, &catalog, target);
     for (unsigned geometry = 0; geometry < 6; ++geometry) {
         cancel_journal = JOURNAL;
         cancel_authority = geometry ? JOURNAL + sizeof journal : ROOT;
