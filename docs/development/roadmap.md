@@ -2,14 +2,16 @@
 
 Current checkpoint: 2026-11-28. **M8.1 through M8.5 are accepted complete. M8.0 and M8.6 remain open.**
 
-Accepted main is `ca804356` after [#77](https://github.com/maxmixalex/hpclang/pull/77).
+Accepted main is `8f225f5b` after [#78](https://github.com/maxmixalex/hpclang/pull/78).
 
 - **M8.0 native ports.** Main includes Port 2 cross-bank append planning and sector journal staging
   ([#66](https://github.com/maxmixalex/hpclang/pull/66)), and Port 1 reference checks
   ([#70](https://github.com/maxmixalex/hpclang/pull/70), [#75](https://github.com/maxmixalex/hpclang/pull/75)).
   Guarded internal library removal and replacement are in CI ([#79](https://github.com/maxmixalex/hpclang/pull/79),
   [#81](https://github.com/maxmixalex/hpclang/pull/81)). Both passed remote Quality after the edit validation fix.
-  Local checks cover 180 host tests and HP49g+/HP50g original-ROM edits. Public library management, execution
+  Local checks cover 180 host tests and HP49g+/HP50g original-ROM edits. [#84](https://github.com/maxmixalex/hpclang/pull/84)
+  plans a deleted-suffix sector at the installed recovery library's bound journal slot. Both original-ROM
+  models verified the complete 4 KiB image and unchanged Flash. CI is pending. Public library management, execution
   roots, Port 2 recovery installation, authority, automatic startup and reclamation remain open.
 - **M8.1 through M8.5** remain accepted. The local integration at `5d0b90b6` passed all 180 host tests,
   six original-ROM Notebook regressions and the relocated SDK checks.
@@ -18,9 +20,9 @@ Accepted main is `ca804356` after [#77](https://github.com/maxmixalex/hpclang/pu
   caller stack preserved left 92,753 bytes of Stock workspace from HOME and 90,682 bytes from Port 0.
   Both pull requests passed all five workflows. HP49g+/HP50g measured 40,980 bytes of peak KOS memory
   and passed moving GC after editor exit. [Launcher measurements](architecture.md#notebook-first-install-transfer-size).
-  HP39 transfer diagnostics ([#78](https://github.com/maxmixalex/hpclang/pull/78)), Notebook entry after
-  moving GC with mappings held ([#80](https://github.com/maxmixalex/hpclang/pull/80)), and export of the
-  tested SDK ZIP ([#82](https://github.com/maxmixalex/hpclang/pull/82)) are in CI. At `60dac96f`,
+  HP39 transfer failures now appear in CI logs ([#78](https://github.com/maxmixalex/hpclang/pull/78)).
+  Notebook entry after moving GC with mappings held ([#80](https://github.com/maxmixalex/hpclang/pull/80))
+  and export of the tested SDK ZIP ([#82](https://github.com/maxmixalex/hpclang/pull/82)) are in CI. At `60dac96f`,
   three independent local packages matched and the SDK reproduced 613 outputs. Resuming a running editor
   across GC and [final release acceptance](roadmap-history.md#m86-application-and-release-acceptance) remain open.
 
