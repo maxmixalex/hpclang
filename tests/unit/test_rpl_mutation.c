@@ -2184,6 +2184,12 @@ static void test_port1_edit_owned_suffix(void)
         cursor = (struct hpclang_rpl_port_cursor){0, 256, 0};
         assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
         assert_char_at(entry.value_address, 'B');
+        assert(!hpclang_rpl_port1_create_backup(&io, 256, tail, tail_span));
+        before = writes;
+        assert(hpclang_rpl_port1_remove_library(&io, 256, 124, &guard) ==
+               HPCLANG_RPL_MUTATION_UNSUPPORTED);
+        assert(writes == before);
+        assert(!hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"TAIL", 4, &guard));
         assert(!hpclang_rpl_port1_remove_library(&io, 256, 124, &guard));
         assert(fixture.start == fixed_at && fixture.end == fixed_at + sizeof(header) + body);
         assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.library_number == 123);
