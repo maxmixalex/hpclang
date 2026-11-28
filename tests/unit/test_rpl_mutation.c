@@ -2186,14 +2186,19 @@ static void test_port1_edit_owned_suffix(void)
         assert_char_at(entry.value_address, 'B');
         assert(!hpclang_rpl_port1_create_backup(&io, 256, tail, tail_span));
         before = writes;
+        fixture.result = HPCLANG_RPL_MUTATION_BUSY;
         assert(hpclang_rpl_port1_remove_library(&io, 256, 124, &guard) ==
-               HPCLANG_RPL_MUTATION_UNSUPPORTED);
+               HPCLANG_RPL_MUTATION_BUSY);
+        assert(fixture.start == fixed_at &&
+               fixture.end == fixed_at + sizeof(header) + body + tail_span);
         assert(writes == before);
-        assert(!hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"TAIL", 4, &guard));
+        fixture.result = HPCLANG_RPL_MUTATION_OK;
         assert(!hpclang_rpl_port1_remove_library(&io, 256, 124, &guard));
-        assert(fixture.start == fixed_at && fixture.end == fixed_at + sizeof(header) + body);
         assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.library_number == 123);
-        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0 && cursor.address == fixed_at);
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == fixed_at);
+        assert(entry.name_length == 4 && !memcmp(entry.name, "TAIL", 4));
+        assert_char_at(entry.value_address, 'T');
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
     }
     /* Growth, shrinkage, same-size replacement and deletion must distinguish
      * interrupted commits from preflight I/O errors at every write boundary. */

@@ -164,7 +164,9 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
         int match = library ? library_id && entry.library_number == *library_id
                             : !library_id && entry.name_length == name_length &&
                                   (!name_length || !memcmp(entry.name, name, name_length));
-        if (library && (match || (target.span && span != target.span)) && !fixed_library) {
+        /* Only surviving records after a size-changing edit are relocated.
+         * The target is discarded and the replacement was validated above. */
+        if (library && target.span && span != target.span && !fixed_library) {
             int movable = port1_library_header_only(&reader, &entry);
             if (movable < 0)
                 return movable;
@@ -180,11 +182,7 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
         return parse_error(result);
     if (!target.span)
         return HPCLANG_RPL_MUTATION_NOT_FOUND;
-    /* Deleting the final library copies only the terminator. No surviving
-     * library changes address, and the guard still covers the entire target. */
-    int removing_last_library =
-        library_id && !packed && target.address + target.span == cursor.address;
-    if (fixed_library && !removing_last_library)
+    if (fixed_library)
         return HPCLANG_RPL_MUTATION_UNSUPPORTED;
     uint32_t old_end = cursor.address;
     uint32_t new_end = old_end - target.span + span;

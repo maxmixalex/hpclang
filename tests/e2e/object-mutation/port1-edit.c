@@ -337,13 +337,14 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
         !chain_end(&reader, &end) || end != owned.first || !fingerprint(&reader, end, &hash) ||
         hash != original_hash)
         goto done;
-    /* A final, never-executed library with an inline binary integer. */
+    /* A never-executed library with an inline binary integer, before a live backup. */
     static const uint8_t with_body[] = {0x40, 0x2b, 0x0,  0x3, 0x0, 0x1, 0x58, 0x1,  0x7b,
                                         0x0,  0x0,  0x0,  0x0, 0x0, 0x0, 0x0,  0x0,  0x0,
                                         0x0,  0x10, 0xa1, 0x2, 0x1, 0x0, 0xa0, 0x29, 0x5};
     step = 13;
     if (hpclang_rpl_port1_create_library(&io, limit, with_body, 53u) ||
-        !chain_end(&reader, &owned.end) || owned.end != owned.first + 53u)
+        hpclang_rpl_port1_create_backup(&io, limit, packed, span) ||
+        !chain_end(&reader, &owned.end) || owned.end != owned.first + 53u + span)
         goto done;
     owned.test_stack_slot = stack_slot;
     owned.test_stack_target = 0x40000u + owned.first + 39u;
@@ -351,11 +352,27 @@ uint32_t hpclang_e2e_port1_owned_edits(void)
     owned.test_stack_slot = 0;
     if (refused != HPCLANG_RPL_MUTATION_BUSY || !fingerprint(&reader, owned.end + 6u, &before))
         goto done;
-    owned.test_last_rstk = 0x40000u + owned.first + 39u;
+    owned.test_last_rstk = 0x40000u + owned.first + 53u;
     refused = hpclang_rpl_port1_remove_library(&io, limit, 123, &guard);
     owned.test_last_rstk = 0;
     if (refused != HPCLANG_RPL_MUTATION_BUSY || !fingerprint(&reader, owned.end + 6u, &hash) ||
         hash != before || hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) ||
+        !matches(tail_name, tail) || !chain_end(&reader, &owned.end) ||
+        owned.end != owned.first + span ||
+        hpclang_rpl_port1_remove_backup(&io, limit, tail_name, 6, &guard) ||
+        !chain_end(&reader, &end) || end != owned.first || !fingerprint(&reader, end, &hash) ||
+        hash != original_hash)
+        goto done;
+    step = 14;
+    if (hpclang_rpl_port1_create_library(&io, limit, with_body, 53u) ||
+        hpclang_rpl_port1_create_backup(&io, limit, packed, span) ||
+        !chain_end(&reader, &owned.end) ||
+        hpclang_rpl_port1_replace_library(&io, limit, 123, renamed, 45, &guard) ||
+        !matches(tail_name, tail) || !chain_end(&reader, &owned.end) ||
+        owned.end != owned.first + 45u + span ||
+        hpclang_rpl_port1_remove_library(&io, limit, 123, &guard) ||
+        !chain_end(&reader, &owned.end) ||
+        hpclang_rpl_port1_remove_backup(&io, limit, tail_name, 6, &guard) ||
         !chain_end(&reader, &end) || end != owned.first || !fingerprint(&reader, end, &hash) ||
         hash != original_hash)
         goto done;
