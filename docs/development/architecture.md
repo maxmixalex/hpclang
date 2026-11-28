@@ -260,8 +260,145 @@ up to twelve writable pages. The same Notebook image now transfers in a
 difference from the production first install.
 
 All six independent first installs transferred more bytes. HP39/40 and
-HP48gII each needed one fewer file. The remaining cost comparisons are peak
-resident RAM and time from launch to a usable editor.
+HP48gII each needed one fewer file.
+
+#### HP48gII editor memory and startup
+
+Two local Stock paths ran the same uninstrumented SDK Notebook image
+(`88885b9a6501`, ATfE 22.1.0) from the same starting NOR. One installed
+ARMToolbox48 and launched through PrRUN. The other recalled the independent
+Port 0 program and launched through EVAL. Each opened an empty editor, typed
+`20`, saved to HOME and returned to a settled Stock display.
+
+| Measured application resource | PrRUN | Independent Port 0 |
+| --- | ---: | ---: |
+| Mapped writable region | 49,152 bytes | 32,768 bytes |
+| Heap reserved at first editor display | 9,924 bytes | 9,924 bytes |
+| Heap reserved after Save | 9,972 bytes | 9,972 bytes |
+| Deepest observed user-mode application stack | 4,984 bytes | 4,984 bytes |
+
+The page tables in each captured SRAM image resolved all 16 code pages to
+the original Notebook payload. The ELF symbols `heap_next` and `__bss_end`
+gave the reserved heap at each checkpoint. The emulator traced application
+stack-pointer writes through exit. Both paths reached the same lowest stack
+offset in `hpclang_rpl_stock_memory_read`. These measurements cover the
+application's writable mapping, heap checkpoints and user stack. Peak
+resident RAM across the launcher and Stock still needs separate accounting.
+
+On HP48gII, Stock stores the installed user's 122,333-byte transfer as a
+244,683-nibble `NOTES` backup in Port 0 (122,341½ bytes). The diagnostic
+variant occupies 245,872 nibbles. The snapshot verifier walks past the preceding
+record, checks the backup CRC and places the complete 102,400-byte page pool
+inside each backup. That pool contains one table page, sixteen code pages and
+eight writable pages. Counting it again would overstate resident usage.
+These figures measure the saved record after Stock regains control.
+
+For startup, the emulator captured the Stock screen immediately before the
+PrRUN or EVAL key event, then captured the LCD at scheduled 5 ms intervals.
+The actual capture timestamps bracket the first screen with both the Notebook
+title and the focused empty editor. Installation, recall and menu navigation
+preceded the timing window.
+
+| Emulator run | PrRUN editor visible | Independent Port 0 editor visible |
+| --- | ---: | ---: |
+| First pair | 56.8–63.0 ms | 24.9–31.0 ms |
+| Second pair | 55.7–62.0 ms | 23.9–29.9 ms |
+
+These are elapsed emulator times rounded outwards to 0.1 ms. Both runs
+checked the saved HOME contents and returned display.
+
+#### HP39/40 editor startup
+
+Each model ran the same ATfE 22.1.0 Notebook HPC1 image through the production
+ARMToolbox Aplet and the independent bitmap Aplet. Both started from the Stock
+library with Notebook selected and `20` saved. The first Enter opened the
+Aplet. Timing started at the capture immediately before the second Enter.
+The emulator sampled the LCD every 5 ms until both the Notebook title and
+the focused editor containing `20` appeared. Both paths then typed another
+`20`, saved, reopened `2020`, and returned to the same library display.
+
+| Model and ROM | Production, first pair | Independent, first pair | Production, repeat | Independent, repeat |
+| --- | ---: | ---: | ---: | ---: |
+| HP39g+ D1.55 | 64.9–71.0 ms | 46.9–53.0 ms | 77.0–83.0 ms | 52.8–58.9 ms |
+| HP39gs 2.22 | 34.8–40.9 ms | 34.9–41.0 ms | 52.7–58.8 ms | 48.0–54.1 ms |
+| HP40gs 2.22 | 29.8–35.8 ms | 22.9–29.0 ms | 41.8–47.9 ms | 22.8–28.8 ms |
+
+Intervals use the actual emulator timestamps on either side of the first
+matching capture, rounded outwards to 0.1 ms. The independent path showed
+the editor earlier in both pairs on HP39g+ and HP40gs. The HP39gs intervals
+overlap in both pairs. These runs measure editor relaunch after installation.
+
+To repeat a pair, save `20` in each installed Aplet, return to the Stock
+library with Notebook selected, and close the emulator to persist each state.
+Use the same model-specific Notebook image for both packages. The runner
+copies the two state directories and removes its temporary captures on exit.
+
+```sh
+python3 tests/e2e/independent-entry/measure-hp39-notebook.py \
+  --model hp39gs --dist "$dist" \
+  --production "$production_state" --independent "$independent_state"
+```
+
+#### HP49g+ and HP50g editor startup and application memory
+
+On each Stock 2.15 ROM the installed SDK built the production and independent
+packages from the same Notebook HPC1 image (HP49g+ `699685de3c37`, HP50g
+`48078d5f0892`, SHA-256 prefixes). Production used the installed ARMToolbox
+PrRUN softkey. The independent entry used EVAL with code in a named Port 1
+backup behind an existing record. Timing began at the LCD capture immediately
+before the launch key, after USB transfer, recall and menu selection. Captures
+scheduled every 5 ms bracketed the first matching Notebook title and focused
+editor using actual emulator timestamps.
+
+| Model and launch | Empty editor | Reopen `20` | Repeat from the same saved state |
+| --- | ---: | ---: | ---: |
+| HP49g+ PrRUN | 40.9–47.1 ms | 53.7–59.8 ms | 65.9–71.9 ms |
+| HP49g+ Port 1 | 22.6–28.0 ms | 23.8–29.9 ms | 23.8–29.9 ms |
+| HP50g PrRUN | 46.9–53.1 ms | 47.8–53.9 ms | 76.9–82.9 ms |
+| HP50g Port 1 | 29.0–35.5 ms | 23.8–29.9 ms | 28.8–34.9 ms |
+
+Each empty-editor run typed and saved `20`. Both subsequent launches reopened
+that HOME note. All twelve launches preserved the caller's two RPN strings
+in order, retained the Flash contents and returned to a settled Stock display.
+
+Both models gave the same memory readings. PrRUN mapped 155,648 writable
+bytes and the independent entry mapped 32,768. Heap reserved at the empty
+editor and after Save was 13,780 and 13,828 bytes through PrRUN, and 12,348
+and 12,396 bytes through independent entry. At both checkpoints the captured
+page tables reproduced the complete 20-page application payload. The mapped
+writable extent matched the boot descriptor; the heap figures use the ELF
+symbols `heap_next` and `__bss_end`. Peak resident RAM across Stock and the
+launcher remains open.
+
+On HP49g+ and HP50g, the independent Notebook editor held two live KOS
+allocations totaling 45,096 bytes on entry, after Save and on reopening the note. The eight writable
+pages and one page-table frame occupied 36,864 bytes within those blocks.
+Alignment slack and allocator metadata accounted for the other 8,232 bytes.
+The editor mapped another 81,920 bytes of code directly from its Port 1
+record. With the preceding `NBPAD` record used in this regression, the complete
+`NBLSE` backup occupied 85,595 bytes, including those code pages. Its size
+plus the two disjoint KOS allocations was 130,691 bytes at each editor
+checkpoint. The verifier checked both sets of page descriptors and the extent
+of the named backup in SRAM. After each user launch (Save and reopen), it
+checked that the Stock free list for each allocation's heap covered the entire
+original block, including its header and footer.
+
+On both models, the free interval between Stock's return and data stacks
+measured 402,508 nibbles before EVAL, 402,409 in the empty editor, 402,334
+after Save and 400,746 after return. On reopening, those readings were
+402,339 before EVAL, 402,260 in the editor and 400,672 after return. Each
+reading agreed with Stock's AVMEM count of complete five-nibble cells.
+These samples track Stock workspace separately. Peak usage between captures
+remains open.
+
+**SDK default after the six-model startup comparison (2026-11-23).**
+Keep the existing production launchers as the SDK defaults. Independent entry
+showed the Notebook editor earlier on five models in the measured pairs.
+On HP39gs the timing intervals overlapped. The independent first install took
+more transfer bytes on all six models, including the revised HP48gII package.
+The remaining migration decision depends on measured peak resident memory and
+safe ownership of live native mappings during Stock collection. The independent
+targets remain available for evaluation through the SDK.
 
 **Promotion evidence.** For each candidate run, record the owner, physical
 extent and lifetime of every frame; exclude aliases and Stock reservations.

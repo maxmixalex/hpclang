@@ -7,8 +7,10 @@ import os
 from pathlib import Path
 import runpy
 import shutil
+import struct
 import subprocess
 import sys
+import tempfile
 from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
@@ -21,6 +23,8 @@ from run import emulator, completed, transfer  # noqa: E402
 from verify import home_string, require_stock_pc  # noqa: E402
 
 entry_verifier = runpy.run_path(str(E2E / "independent-entry/verify.py"))
+free_list_covers = runpy.run_path(str(E2E / "ui/verify.py"))["free_list_covers"]
+allocator = runpy.run_path(str(E2E / "harness/verify-resource-snapshots.py"))
 no_toolbox = entry_verifier["no_toolbox"]
 ui = runpy.run_path(str(E2E / "notebook/verify.py"))
 
@@ -138,6 +142,114 @@ def build_runner(
     )
 
 
+def port1_field(ram, at, n):
+    assert 0 <= at <= 0x40000 - n
+    return sum(
+        ((ram[0x20000 + (at + i) // 2] >> (4 * ((at + i) % 2))) & 15) << (4 * i) for i in range(n)
+    )
+
+
+def editor_pool_usage(ram, image, code_offset, record_start):
+    """Account for each live launcher allocation once, including allocator overhead."""
+    base = 0x08000000
+    assert len(ram) == 0x80000
+
+    def word_at(offset):
+        return struct.unpack_from("<I", ram, offset)[0]
+
+    # The launcher places its lease record in the leading slack of its first block.
+    records = [
+        at
+        for at in range(16, 0x20000 - 168, 4)
+        if word_at(at) == 0x4B4C4541 and word_at(at + 16) == base + at
+    ]
+    assert len(records) == 1
+    record = records[0]
+    count, pages = struct.unpack_from("<II", ram, record + 4)
+    assert 1 <= count <= 12 and pages == 9
+    extents = []
+    frames = []
+    for i in range(count):
+        ptr, n = struct.unpack_from("<II", ram, record + 16 + 8 * i)
+        at = ptr - base
+        assert 16 <= at < 0x20000 and 1 <= n <= 8
+        size, flags = struct.unpack_from("<II", ram, at - 16)
+        assert flags & 0xF000 in (0x1000, 0x2000)
+        assert n * 4096 + 4095 <= size and at + size + 4 <= 0x20000
+        assert word_at(at + size) == size
+        extents.append((ptr - 16, ptr + size + 4, flags & 0x300))
+        first = (ptr + 4095) & ~4095
+        frames.extend(first + 4096 * j for j in range(n))
+    extents.sort()
+    assert all(prev[1] <= cur[0] for prev, cur in zip(extents, extents[1:]))
+    assert len(set(frames)) == len(frames) == pages
+    # The last frame holds both L2 tables. Code stays in its separate Port 1 record.
+    l2 = frames[-1] - base
+    assert [word_at(l2 + 4 * i) for i in range(8)] == [p | 0xFF2 for p in frames[:8]]
+    code = 0x20000 + code_offset
+    assert ram[code : code + len(image)] == image
+    code_pages = (len(image) + 4095) // 4096
+    for i in range(code_pages):
+        assert word_at(l2 + 4 * (256 + 32 + i)) == (base + code + i * 4096) | 0xAA2
+    # NBLSE is a named Stock backup containing a string. Measure its complete
+    # record and verify that every mapped code frame belongs to the string.
+    assert port1_field(ram, record_start, 5) == 0x2B62
+    record_end = record_start + 5 + port1_field(ram, record_start + 5, 5)
+    name_len = port1_field(ram, record_start + 10, 2)
+    assert name_len == 5
+    name = bytes(port1_field(ram, record_start + 12 + 2 * i, 2) for i in range(name_len))
+    assert name == b"NBLSE"
+    string = record_start + 14 + 2 * name_len
+    assert port1_field(ram, string - 2, 2) == name_len and port1_field(ram, string, 5) == 0x2A2C
+    string_end = string + 5 + port1_field(ram, string + 5, 5)
+    assert string + 10 <= 2 * code_offset < 2 * (code_offset + code_pages * 4096) <= string_end
+    assert string_end + 10 == record_end and port1_field(ram, record_end, 5) == 0
+    return {
+        "kos_blocks": count,
+        "kos_resident_bytes": sum(end - start for start, end, _ in extents),
+        "pool_frame_bytes": pages * 4096,
+        "port1_code_frame_bytes": code_pages * 4096,
+        "port1_record_nibbles": record_end - record_start,
+    }, extents
+
+
+def user_memory(prefix, phases, model, flash, image, page, record_start):
+    roots, _ = allocator["allocator_root"](flash, allocator["MODELS"][model])
+    pools, gaps = {}, {}
+    owned = []
+    for phase in ("deposited", *phases, "returned"):
+        ram = (prefix / f"mem-{phase}.sram").read_bytes()
+        _, read = entry_verifier["mapping"](ram, flash, model)
+        # Stock counts complete five-nibble cells between RSKTOP and DSKTOP in AVMEM.
+        rstk, dstk = read(0x806F3), read(0x806F8)
+        assert 0x80000 <= rstk <= dstk < 0x100000
+        gaps[phase] = dstk - rstk
+        assert read(0x80E9B) == gaps[phase] // 5
+        if phase in phases:
+            pools[phase], extents = editor_pool_usage(ram, image, page, record_start)
+            assert not owned or owned == extents, "Notebook lease moved while live"
+            owned = extents
+        elif phase == "returned":
+            base = 0x08000000
+
+            def read32(address):
+                assert base <= address <= base + len(ram) - 4 and address % 4 == 0
+                return struct.unpack_from("<I", ram, address - base)[0]
+
+            assert owned
+            for start, end, heap in owned:
+                assert heap in (0x100, 0x200)
+                head = read32(roots + ((heap >> 8) - 1) * 16)
+                assert free_list_covers(read32, head, base, base + len(ram), heap, start, end), (
+                    "Notebook allocation missing from Stock free list after return"
+                )
+            pools[phase] = {
+                "kos_released_bytes": sum(end - start for start, end, _ in owned),
+                "kos_released_blocks": len(owned),
+            }
+    return pools, gaps
+
+
 def check_phase(phase, editor_text, flash, original, font, expected_result):
     ram = (phase / "state/sram").read_bytes()
     assert (phase / "state/flash").read_bytes() == flash
@@ -245,16 +357,10 @@ def main():
     ram = (baseline / "sram").read_bytes()
 
     # Stock appends NBLSE after the existing ERAM chain.
-    def field(at, n):
-        return sum(
-            ((ram[0x20000 + (at + i) // 2] >> (4 * ((at + i) % 2))) & 15) << (4 * i)
-            for i in range(n)
-        )
-
     at = 0
-    while field(at, 5):
-        assert field(at, 5) in (0x2B62, 0x2B40)
-        size = field(at + 5, 5) + 5
+    while port1_field(ram, at, 5):
+        assert port1_field(ram, at, 5) in (0x2B62, 0x2B40)
+        size = port1_field(ram, at + 5, 5) + 5
         assert 20 < size <= 0x40000 - at
         at += size
     offset = at + 34
@@ -287,24 +393,31 @@ def main():
     save_keys = "4300 tap two\n4900 tap zero\n5500 tap down\n6200 tap enter\n7600 capture saved\n"
     for name, previous, editor in (("user-save", "setup", ""), ("user-reopen", "user-save", "20")):
         installed = previous == "user-save"
-        transfer(
-            spec,
-            dest / name,
-            dest / previous / "state",
-            dest,
-            "NBUSER",
-            package_name="USER.HP",
-            installed=installed,
-            extra_files=[] if installed else [("COPY.HP", "CKCOPY")],
-            remote_commands=[
-                ("HOME " if installed else 'HOME CLEAR "first" "second" ') + "'NBUSER' RCL CKCOPY"
-            ],
-            actions="3500 capture editor\n"
-            + ("" if installed else save_keys)
-            + "8500 tap on\n15000 capture returned\n",
-            execution_ms=18000,
-        )
+        with tempfile.TemporaryDirectory(dir=dest) as tmp:
+            transfer(
+                spec,
+                dest / name,
+                dest / previous / "state",
+                dest,
+                "NBUSER",
+                package_name="USER.HP",
+                installed=installed,
+                extra_files=[] if installed else [("COPY.HP", "CKCOPY")],
+                remote_commands=[
+                    ("HOME " if installed else 'HOME CLEAR "first" "second" ')
+                    + "'NBUSER' RCL CKCOPY"
+                ],
+                actions="3500 capture editor\n"
+                + ("" if installed else save_keys)
+                + "8500 tap on\n15000 capture returned\n",
+                execution_ms=18000,
+                resource_prefix=Path(tmp) / "mem",
+            )
+            phases = ("editor",) if installed else ("editor", "saved")
+            usage, gaps = user_memory(Path(tmp), phases, args.model, flash, image, page, at)
         hashes[name] = {
+            "memory": usage,
+            "stock_free_gap_nibbles": gaps,
             "user_stack_top_first": ["second", "first"],
             "settled_sha256": check_phase(
                 dest / name, editor, flash, staged[0x20000:0x40000], font, None
