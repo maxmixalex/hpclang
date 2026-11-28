@@ -26,10 +26,12 @@ static int cleanup(void)
     return result;
 }
 
-static int backup_cycle(struct notebook *note, unsigned phase)
+static int backup_cycle(struct notebook *note, unsigned phase, unsigned index)
 {
+    const char *first = index == 2 ? "First flash backup" : "First saved note";
+    const char *second = index == 2 ? "Second flash backup" : "Second saved note";
     struct hpclang_port_info port = {.size = sizeof(port), .version = HPCLANG_PORT_INFO_VERSION};
-    if (hpclang_port_query(0, &port))
+    if (hpclang_port_query(index, &port))
         return -1;
     if (port.medium == HPCLANG_PORT_ABSENT)
         return -1;
@@ -39,23 +41,26 @@ static int backup_cycle(struct notebook *note, unsigned phase)
         return -1;
     char value[NOTEBOOK_CAPACITY];
     if (phase == 2) {
-        if (notebook_backup_load(0, value) || strcmp(value, "Second saved note"))
+        if (notebook_backup_load(index, value) || strcmp(value, second) ||
+            hpclang_port_backup_remove(index, (const uint8_t *)"HPCNOTE", 7))
             return -1;
-        return hpclang_port_backup_remove(0, (const uint8_t *)"HPCNOTE", 7);
+        return notebook_backup_load(index, value) == -1 && errno == ENOENT ? 0 : -1;
     }
     if (phase == 1) {
-        struct hpclang_ui_event restore = {.kind = HPCLANG_UI_ACTIVATE, .action = {RESTORE, 0}};
-        if (notebook_update(note, &restore) || strcmp(note->text, "First saved note") ||
-            notebook_load(value) || strcmp(value, "Second saved note"))
+        struct hpclang_ui_event restore = {.kind = HPCLANG_UI_ACTIVATE, .action = {RESTORE, index}};
+        if (notebook_update(note, &restore) || strcmp(note->text, first) || notebook_load(value) ||
+            strcmp(value, "Second saved note"))
             return -1;
         /* Restore changes the edit buffer, while the primary save survives. */
         struct hpclang_ui_event reload = {.kind = HPCLANG_UI_ACTIVATE, .action = {LOAD, 0}};
         if (notebook_update(note, &reload) || strcmp(note->text, "Second saved note"))
             return -1;
     }
-    struct hpclang_ui_event backup = {.kind = HPCLANG_UI_ACTIVATE, .action = {BACKUP, 0}};
+    if (index == 2)
+        strcpy(note->text, phase ? second : first);
+    struct hpclang_ui_event backup = {.kind = HPCLANG_UI_ACTIVATE, .action = {BACKUP, index}};
     if (notebook_update(note, &backup) || strcmp(note->status, "Backup saved") ||
-        notebook_backup_load(0, value) || strcmp(value, note->text))
+        notebook_backup_load(index, value) || strcmp(value, note->text))
         return -1;
     return 0;
 }
@@ -85,9 +90,13 @@ int main(void)
             goto done;
     }
     failure = 3;
-    if (backup_cycle(&note, phase))
+    if (backup_cycle(&note, phase, 0) ||
+        (hpclang_device_info()->family == HPCLANG_FAMILY_HP4950 && backup_cycle(&note, phase, 2)))
         goto done;
     failure = 4;
+    if (notebook_load(previous) ||
+        strcmp(previous, phase ? "Second saved note" : "First saved note"))
+        goto done;
     if (phase == 2 && cleanup())
         goto done;
     hpclang_e2e_result = UINT32_C(0x4f53b000) | phase;
